@@ -3,6 +3,7 @@
 #include "voip_input_capture.h"
 #include "audio_stream_voip.h"
 #include "audio_stream_playback_voip.h"
+#include "handyopusnode.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
@@ -20,6 +21,7 @@ void initialize_one_voip_module(ModuleInitializationLevel p_level) {
     ClassDB::register_class<VOIPInputCapture>();
     ClassDB::register_class<AudioStreamVOIP>();
     ClassDB::register_class<AudioStreamPlaybackVOIP>();
+    ClassDB::register_class<HandyOpusNode>();
 }
 
 void uninitialize_one_voip_module(ModuleInitializationLevel p_level) {
