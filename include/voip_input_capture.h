@@ -24,9 +24,9 @@ private:
     SpeexResamplerState* _resampler;
     PackedVector2Array _sample_buf; // Resample audio here before sending through opus
 
+public:
     PackedByteArray _sample_buf_to_packet(PackedVector2Array samples);
 
-public:
     // Constants
 
     const int GODOT_SAMPLE_RATE = 44100;

@@ -59,6 +59,7 @@ public:
     ~AudioStreamVOIP();
 
     void push_packet(const PackedByteArray&);
+    PackedVector2Array spush_packet(const PackedByteArray&);
 
 };
 

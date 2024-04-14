@@ -27,6 +27,7 @@ void VOIPInputCapture::_bind_methods(){
     // Methods
 
     ClassDB::bind_method(D_METHOD("send_test_packets"), &VOIPInputCapture::send_test_packets);
+    ClassDB::bind_method(D_METHOD("_sample_buf_to_packet"), &VOIPInputCapture::_sample_buf_to_packet);
 
 
     // Property Get / Set
