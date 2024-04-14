@@ -1,0 +1,8 @@
+[configuration]
+
+entry_symbol = "one_voip_library_init"
+compatibility_minimum = 4.2
+
+[libraries]
+
+linux.x86_64="res://addons/twovoip/libtwovoip.linux.template_debug.x86_64.so"
