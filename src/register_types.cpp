@@ -1,8 +1,5 @@
 #include "register_types.h"
 
-#include "voip_input_capture.h"
-#include "audio_stream_voip.h"
-#include "audio_stream_playback_voip.h"
 #include "handyopusnode.h"
 
 #include <gdextension_interface.h>

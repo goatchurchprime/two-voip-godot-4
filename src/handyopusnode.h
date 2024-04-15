@@ -2,13 +2,10 @@
 #define HANDYOPUSNODE_H
 
 #include <godot_cpp/classes/node.hpp>
-#include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
-#include <godot_cpp/classes/audio_effect_capture.hpp>
 
 #include "opus.h"
-#include "spsc_jitter_buffer.h"
-#include "speex/speex_resampler.h"
+#include "speex_resampler/speex_resampler.h"
 
 namespace godot {
 
