@@ -17,7 +17,17 @@ private:
 
     int _last_opus_error = 0;
     int _last_resampler_error = 0;
+
     OpusDecoder* _opus_decoder;
+    OpusEncoder* _opus_encoder;
+    
+
+    int _last_opus_errorE = 0;
+    int _last_resampler_errorE = 0;
+    SpeexResamplerState* _resamplerE;
+    PackedVector2Array _sample_bufE;
+
+
     SpeexResamplerState* _resampler;
     PackedVector2Array _sample_buf;
 
@@ -26,6 +36,8 @@ private:
     const int OPUS_SAMPLE_RATE = 48000;
     const int CHANNELS = 2;
     const int RESAMPLING_QUALITY = 10; // 0 to 10
+    const int DEFAULT_BITRATE = 24000; // bits / second from 500 to 512000
+    const int EXPECTED_PACKET_LOSS = 5; // percentage from 0 to 100
 
     SPSCJitterBuffer jitter_buffer;
 
@@ -38,6 +50,8 @@ public:
 	~HandyOpusNode();
 
     PackedVector2Array decode_opus_packet(const PackedByteArray&);
+    PackedByteArray encode_opus_packet(PackedVector2Array samples);
+   
 };
 
 }
