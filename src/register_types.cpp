@@ -23,7 +23,6 @@ void initialize_one_voip_module(ModuleInitializationLevel p_level) {
     ClassDB::register_class<AudioStreamPlaybackVOIP>();
 
     ClassDB::register_class<HandyOpusNode>();
-    ClassDB::register_class<VOIPInputCaptureE>();
 }
 
 void uninitialize_one_voip_module(ModuleInitializationLevel p_level) {
