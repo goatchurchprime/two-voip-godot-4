@@ -1,6 +1,7 @@
-[gd_scene load_steps=4 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=5 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://main.gd" id="1_anot2"]
+[ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
 
 [sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_itmlg"]
 
@@ -81,7 +82,60 @@ offset_bottom = 216.32
 text = "0
 "
 
+[node name="ConnectMQTT" type="Button" parent="."]
+layout_mode = 0
+offset_left = 665.0
+offset_top = 215.0
+offset_right = 768.0
+offset_bottom = 256.0
+text = "Connect MQTT"
+
+[node name="LabelMQTT" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.035
+anchor_bottom = 0.035
+offset_left = 455.0
+offset_top = 273.0
+offset_right = 527.68
+offset_bottom = 273.32
+text = "MQTTBroker
+"
+
+[node name="MQTTBroker" type="LineEdit" parent="."]
+layout_mode = 0
+offset_left = 589.0
+offset_top = 269.0
+offset_right = 850.0
+offset_bottom = 300.0
+text = "mosquitto.doesliverpool.xyz"
+
+[node name="Labeltopic" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.035
+anchor_bottom = 0.035
+offset_left = 458.0
+offset_top = 309.0
+offset_right = 530.68
+offset_bottom = 309.32
+text = "MQTTTopic
+"
+
+[node name="MQTTTopic" type="LineEdit" parent="."]
+layout_mode = 0
+offset_left = 589.0
+offset_top = 309.0
+offset_right = 850.0
+offset_bottom = 340.0
+text = "godot/voip1"
+
+[node name="MQTT" parent="." instance=ExtResource("2_4wm5t")]
+verbose_level = 1
+binarymessages = true
+
 [connection signal="button_down" from="PTT" to="." method="_on_ptt_button_down"]
 [connection signal="button_up" from="PTT" to="." method="_on_ptt_button_up"]
 [connection signal="toggled" from="OpusPackets" to="." method="_on_opus_packets_toggled"]
 [connection signal="toggled" from="Play" to="." method="_on_play_toggled"]
+[connection signal="pressed" from="ConnectMQTT" to="." method="_on_connect_mqtt_pressed"]
