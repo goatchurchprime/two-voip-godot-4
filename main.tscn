@@ -58,6 +58,29 @@ toggle_mode = true
 text = "Play
 "
 
+[node name="Label" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.035
+anchor_bottom = 0.035
+offset_left = 195.0
+offset_top = 214.0
+offset_right = 194.68
+offset_bottom = 214.32
+text = "Recorded opus frames: "
+
+[node name="FrameCount" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.035
+anchor_bottom = 0.035
+offset_left = 400.0
+offset_top = 216.0
+offset_right = 542.68
+offset_bottom = 216.32
+text = "0
+"
+
 [connection signal="button_down" from="PTT" to="." method="_on_ptt_button_down"]
 [connection signal="button_up" from="PTT" to="." method="_on_ptt_button_up"]
 [connection signal="toggled" from="OpusPackets" to="." method="_on_opus_packets_toggled"]

@@ -1,6 +1,6 @@
 [configuration]
 
-entry_symbol = "one_voip_library_init"
+entry_symbol = "two_voip_library_init"
 compatibility_minimum = 4.2
 
 [libraries]

@@ -7,7 +7,6 @@ var audiospectrumeffect : AudioEffectSpectrumAnalyzer
 var audiospectrumeffectinstance : AudioEffectSpectrumAnalyzerInstance
 var audiostreamgeneratorplayback : AudioStreamGeneratorPlayback
 
-
 func _ready():
 	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
 	audiocaptureeffect = AudioServer.get_bus_effect(microphoneidx, 0)
@@ -50,6 +49,8 @@ func _on_ptt_button_down():
 
 func _on_ptt_button_up():
 	print("recordedpacketsMemSize ", recordedpacketsMemSize)
+	var k = "frames: %d  mem: %d  time: %.01f" % [len(recordedpackets), recordedpacketsMemSize, len(recordedpackets)*0.01]
+	$FrameCount.text = k
 	
 # use this to change the encoding of the packet list
 func _on_opus_packets_toggled(toggled_on):
