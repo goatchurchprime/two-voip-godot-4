@@ -34,29 +34,11 @@
         "type": "github"
       }
     },
-    "one-voip-godot-4": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1711667942,
-        "narHash": "sha256-XxEJxszD4Z9QnBkPwA3VtgYX9G0kN1BpQ+BC/3EHDPE=",
-        "ref": "refs/heads/main",
-        "rev": "e9eb26ed16f3e25953724b85007914b299c673e3",
-        "revCount": 85,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/RevoluPowered/one-voip-godot-4"
-      },
-      "original": {
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/RevoluPowered/one-voip-godot-4"
-      }
-    },
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
-        "one-voip-godot-4": "one-voip-godot-4"
+        "two-voip-godot-4": "two-voip-godot-4"
       }
     },
     "systems": {
@@ -72,6 +54,24 @@
         "owner": "nix-systems",
         "repo": "default",
         "type": "github"
+      }
+    },
+    "two-voip-godot-4": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1713202595,
+        "narHash": "sha256-/NcM1+ZJt5ukP1/SRNzepV1SkHTCDofer3Aih/fH8a8=",
+        "ref": "refs/heads/main",
+        "rev": "03c1986b8a5ae8f277e699bef742ae4fc3358c26",
+        "revCount": 17,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/goatchurchprime/two-voip-godot-4"
+      },
+      "original": {
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/goatchurchprime/two-voip-godot-4"
       }
     }
   },

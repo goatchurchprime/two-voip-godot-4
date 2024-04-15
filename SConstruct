@@ -39,8 +39,6 @@ sources += ["src/speex_resampler/resample.c"]
 
 # etc
 
-env.Append(CPPPATH=["thirdparty"])
-
 
 # OneVOIP Extension
 
@@ -48,7 +46,6 @@ if env["platform"] == "windows":
     env['CCPDBFLAGS'] = '/Zi /Fd${TARGET}.pdb'
 
 # env.Append(CPPDEFINES={"NDEBUG": None}) # For release builds
-env.Append(CPPPATH=["include/"])
 sources += Glob("src/*.cpp")
 
 if env["platform"] == "macos":
