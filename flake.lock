@@ -20,11 +20,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1712883908,
-        "narHash": "sha256-icE1IJE9fHcbDfJ0+qWoDdcBXUoZCcIJxME4lMHwvSM=",
+        "lastModified": 1713128889,
+        "narHash": "sha256-aB90ZqzosyRDpBh+rILIcyP5lao8SKz8Sr2PSWvZrzk=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "a0c9e3aee1000ac2bfb0e5b98c94c946a5d180a9",
+        "rev": "2748d22b45a99fb2deafa5f11c7531c212b2cefa",
         "type": "github"
       },
       "original": {
@@ -59,11 +59,11 @@
     "two-voip-godot-4": {
       "flake": false,
       "locked": {
-        "lastModified": 1713202595,
-        "narHash": "sha256-/NcM1+ZJt5ukP1/SRNzepV1SkHTCDofer3Aih/fH8a8=",
+        "lastModified": 1713203872,
+        "narHash": "sha256-Hs3hJhi7FKLpA2mxlZ/1SbwKG5HeGHZPOeHWBxEL4qM=",
         "ref": "refs/heads/main",
-        "rev": "03c1986b8a5ae8f277e699bef742ae4fc3358c26",
-        "revCount": 17,
+        "rev": "2b4d55dcc7f420e2ca92919b2ca0c99fb4dbd964",
+        "revCount": 18,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/goatchurchprime/two-voip-godot-4"

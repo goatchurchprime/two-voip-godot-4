@@ -28,8 +28,7 @@ func _process(_delta):
 		if $PTT.button_pressed:
 			if $OpusPackets.button_pressed:
 				recordedpackets.append($HandyOpusNode.encode_opus_packet(samples))
-				if $MQTT.brokerconnectmode == $MQTT.BCM_CONNECTED:
-					$MQTT.publish($MQTTTopic.text, recordedpackets[-1])
+				$MQTTnetwork.transportaudiopacket(recordedpackets[-1])
 			else:
 				recordedpackets.append(samples)
 			recordedpacketsMemSize += len(recordedpackets[-1])
@@ -81,6 +80,3 @@ func _on_play_toggled(toggled_on):
 		$OpusPackets.disabled = false
 		$PTT.disabled = false
 
-# Use mosquitto_sub -h mosquitto.doesliverpool.xyz -v -t godot/voip1 -F %X
-func _on_connect_mqtt_pressed():
-	$MQTT.connect_to_broker($MQTTBroker.text)

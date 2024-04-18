@@ -164,7 +164,10 @@ func _process(delta):
 		
 	elif brokerconnectmode == BCM_WAITING_CONNACK or brokerconnectmode == BCM_CONNECTED:
 		receiveintobuffer()
-		wait_msg()
+		var Ew = 0
+		while Ew == 0:
+			Ew = wait_msg()
+		
 		if brokerconnectmode == BCM_CONNECTED and pingticksnext0 < Time.get_ticks_msec():
 			pingreq()
 			pingticksnext0 = Time.get_ticks_msec() + pinginterval*1000
@@ -381,18 +384,18 @@ func unsubscribe(stopic):
 func wait_msg():
 	var n = receivedbuffer.size()
 	if n < 2:
-		return OK
+		return -1
 	var op = receivedbuffer[0]
 	var i = 1
 	var sz = receivedbuffer[i] & 0x7f
 	while (receivedbuffer[i] & 0x80):
 		i += 1
 		if i == n:
-			return 0
+			return -1
 		sz += (receivedbuffer[i] & 0x7f) << ((i-1)*7)
 	i += 1
 	if n < i + sz:
-		return OK
+		return -1
 		
 	var E = OK
 	if op == CP_PINGRESP:

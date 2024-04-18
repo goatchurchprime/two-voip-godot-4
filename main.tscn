@@ -1,7 +1,8 @@
-[gd_scene load_steps=5 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=6 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://main.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
+[ext_resource type="Script" path="res://MQTTnetwork.gd" id="2_y485j"]
 
 [sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_itmlg"]
 
@@ -47,6 +48,7 @@ offset_left = 326.0
 offset_top = 141.0
 offset_right = 370.0
 offset_bottom = 165.0
+button_pressed = true
 text = "Opus Packets"
 
 [node name="Play" type="Button" parent="."]
@@ -82,60 +84,79 @@ offset_bottom = 216.32
 text = "0
 "
 
-[node name="ConnectMQTT" type="Button" parent="."]
+[node name="MQTTnetwork" type="Control" parent="."]
+anchors_preset = 0
+offset_left = 521.0
+offset_top = 337.0
+offset_right = 929.0
+offset_bottom = 512.0
+script = ExtResource("2_y485j")
+
+[node name="MQTT" parent="MQTTnetwork" instance=ExtResource("2_4wm5t")]
+verbose_level = 1
+binarymessages = true
+
+[node name="Members" type="VBoxContainer" parent="MQTTnetwork"]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.049
+anchor_bottom = 0.333
+offset_left = 30.0
+offset_top = 79.0
+offset_right = 167.008
+offset_bottom = 58.725
+
+[node name="ConnectMQTT" type="Button" parent="MQTTnetwork"]
 layout_mode = 0
-offset_left = 665.0
-offset_top = 215.0
-offset_right = 768.0
-offset_bottom = 256.0
+offset_left = 16.0
+offset_top = -8.0
+offset_right = 138.0
+offset_bottom = 33.0
+toggle_mode = true
 text = "Connect MQTT"
 
-[node name="LabelMQTT" type="Label" parent="."]
+[node name="LabelMQTT" type="Label" parent="MQTTnetwork"]
 layout_mode = 1
 anchors_preset = -1
 anchor_right = 0.035
 anchor_bottom = 0.035
-offset_left = 455.0
-offset_top = 273.0
-offset_right = 527.68
-offset_bottom = 273.32
+offset_left = 156.0
+offset_top = -1.0
+offset_right = 240.72
+offset_bottom = 15.875
 text = "MQTTBroker
 "
 
-[node name="MQTTBroker" type="LineEdit" parent="."]
+[node name="MQTTBroker" type="LineEdit" parent="MQTTnetwork"]
 layout_mode = 0
-offset_left = 589.0
-offset_top = 269.0
-offset_right = 850.0
-offset_bottom = 300.0
+offset_left = 283.0
+offset_top = -2.0
+offset_right = 544.0
+offset_bottom = 29.0
 text = "mosquitto.doesliverpool.xyz"
 
-[node name="Labeltopic" type="Label" parent="."]
+[node name="Labelroom" type="Label" parent="MQTTnetwork"]
 layout_mode = 1
 anchors_preset = -1
 anchor_right = 0.035
 anchor_bottom = 0.035
-offset_left = 458.0
-offset_top = 309.0
-offset_right = 530.68
-offset_bottom = 309.32
-text = "MQTTTopic
+offset_left = 120.0
+offset_top = 30.0
+offset_right = 192.72
+offset_bottom = 46.875
+text = "roomname
 "
 
-[node name="MQTTTopic" type="LineEdit" parent="."]
+[node name="roomname" type="LineEdit" parent="MQTTnetwork"]
 layout_mode = 0
-offset_left = 589.0
-offset_top = 309.0
-offset_right = 850.0
-offset_bottom = 340.0
-text = "godot/voip1"
-
-[node name="MQTT" parent="." instance=ExtResource("2_4wm5t")]
-verbose_level = 1
-binarymessages = true
+offset_left = 230.0
+offset_top = 36.0
+offset_right = 491.0
+offset_bottom = 67.0
+text = "myplace"
 
 [connection signal="button_down" from="PTT" to="." method="_on_ptt_button_down"]
 [connection signal="button_up" from="PTT" to="." method="_on_ptt_button_up"]
 [connection signal="toggled" from="OpusPackets" to="." method="_on_opus_packets_toggled"]
 [connection signal="toggled" from="Play" to="." method="_on_play_toggled"]
-[connection signal="pressed" from="ConnectMQTT" to="." method="_on_connect_mqtt_pressed"]
+[connection signal="toggled" from="MQTTnetwork/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
