@@ -7,7 +7,6 @@
 using namespace godot;
 
 
-
 HandyOpusNode::HandyOpusNode() {
     opus_decoder = opus_decoder_create(OPUS_SAMPLE_RATE, CHANNELS, &last_opus_error);
     assert (opus_decoder != NULL);

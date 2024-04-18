@@ -6,45 +6,71 @@
   
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    two-voip-godot-4 = {
-      url = "git+https://github.com/goatchurchprime/two-voip-godot-4?submodules=1";
+    godot-cpp = {
+      url = "github:godotengine/godot-cpp/48afa82f29354668c12cffaf6a2474dabfd395ed";
       flake = false;
     };
-    flake-utils.url = "github:numtide/flake-utils";
+    opus = {
+      url = "github:xiph/opus/ddbe48383984d56acd9e1ab6a090c54ca6b735a6";
+      flake = false;
+    };
+    flake-parts.url = "github:hercules-ci/flake-parts";
   };
   
-  outputs = { nixpkgs, flake-utils, two-voip-godot-4, self, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = import nixpkgs { inherit system; };
-      in
-      {
+  outputs = inputs@{ flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [ "x86_64-linux" ];
+      perSystem = { pkgs, system, self', ... }: {
         packages.default = pkgs.stdenv.mkDerivation {
           name = "two-voip";
-          src = two-voip-godot-4;
+          src = inputs.self;
+          prePatch = ''
+            cp -r --no-preserve=mode ${inputs.godot-cpp} ./godot-cpp
+          '';
           nativeBuildInputs = [
             pkgs.scons
           ];
           buildInputs = [
-            self.packages.${system}.third-party-opus
+            self'.packages.third-party-opus
           ];
           preBuild = ''
             substituteInPlace SConstruct \
                 --replace-fail 'env.Append(CPPPATH=["opus/include"], LIBS=["opus"], LIBPATH="opus/build")' \
-                               'env.Append(CPPPATH=["opus/include"], LIBS=["opus"], LIBPATH="${self.packages.${system}.third-party-opus}/lib")'
+                               'env.Append(CPPPATH=["${inputs.opus}/include"], LIBS=["opus"], LIBPATH="${self'.packages.third-party-opus}/lib")'
           '';
-          installPhase = ''
+          installPhase = let 
+            configFile = builtins.toFile "configFile.toml" ''
+              [configuration]
+
+              entry_symbol = "two_voip_library_init"
+              compatibility_minimum = 4.2
+
+              [libraries]
+
+              linux.x86_64="res://addons/twovoip/libtwovoip.linux.template_debug.x86_64.so"
+            '';
+          in ''
             mkdir $out/addons
             mkdir $out/addons/twovoip
             cp addons/twovoip/* $out/addons/twovoip
+
+            cp ${configFile} $out/addons/twovoip/twovoip.gdextension
+
+            echo "" > $out/.gdignore
+            ls -lah $out
+
+
           '';
         };
         packages.third-party-opus = pkgs.stdenv.mkDerivation {
-          src = two-voip-godot-4;
           name = "third-party-opus";
+          src = inputs.self;
+          prePatch = ''
+            cp -r --no-preserve=mode ${inputs.opus} ./opus
+          '';
           postPatch = ''
-            cd opus
             ls -lah
+            cd opus
           '';
           cmakeFlags = [
             "-DCMAKE_POSITION_INDEPENDENT_CODE=ON"
@@ -53,20 +79,7 @@
             cmake
           ];
         };
-
-
-
-        # To hack the code, do:
-        #  nix develop
-        #  cd opus; cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-        #  cd build; make
-        #  cd ../..; scons 
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            scons
-            cmake
-         ];
-        };
-      });
+      };
+   };
 }
 

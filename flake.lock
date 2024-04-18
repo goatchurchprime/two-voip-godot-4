@@ -1,20 +1,37 @@
 {
   "nodes": {
-    "flake-utils": {
+    "flake-parts": {
       "inputs": {
-        "systems": "systems"
+        "nixpkgs-lib": "nixpkgs-lib"
       },
       "locked": {
-        "lastModified": 1710146030,
-        "narHash": "sha256-SZ5L6eA7HJ/nmkzGG7/ISclqe6oZdOZTNoesiInkXPQ=",
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "rev": "b1d9ab70662946ef0850d488da1c9019f3a9752a",
+        "lastModified": 1712014858,
+        "narHash": "sha256-sB4SWl2lX95bExY2gMFG5HIzvva5AVMJd4Igm+GpZNw=",
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "rev": "9126214d0a59633752a136528f5f3b9aa8565b7d",
         "type": "github"
       },
       "original": {
-        "owner": "numtide",
-        "repo": "flake-utils",
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "type": "github"
+      }
+    },
+    "godot-cpp": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1701935911,
+        "narHash": "sha256-fbFjb/A1Am2BVxC16+a9X7ZebwtrEj81JCBlEttevTM=",
+        "owner": "godotengine",
+        "repo": "godot-cpp",
+        "rev": "48afa82f29354668c12cffaf6a2474dabfd395ed",
+        "type": "github"
+      },
+      "original": {
+        "owner": "godotengine",
+        "repo": "godot-cpp",
+        "rev": "48afa82f29354668c12cffaf6a2474dabfd395ed",
         "type": "github"
       }
     },
@@ -34,44 +51,47 @@
         "type": "github"
       }
     },
-    "root": {
-      "inputs": {
-        "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs",
-        "two-voip-godot-4": "two-voip-godot-4"
-      }
-    },
-    "systems": {
+    "nixpkgs-lib": {
       "locked": {
-        "lastModified": 1681028828,
-        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
-        "owner": "nix-systems",
-        "repo": "default",
-        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "dir": "lib",
+        "lastModified": 1711703276,
+        "narHash": "sha256-iMUFArF0WCatKK6RzfUJknjem0H9m4KgorO/p3Dopkk=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "d8fe5e6c92d0d190646fb9f1056741a229980089",
         "type": "github"
       },
       "original": {
-        "owner": "nix-systems",
-        "repo": "default",
+        "dir": "lib",
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
         "type": "github"
       }
     },
-    "two-voip-godot-4": {
+    "opus": {
       "flake": false,
       "locked": {
-        "lastModified": 1713203872,
-        "narHash": "sha256-Hs3hJhi7FKLpA2mxlZ/1SbwKG5HeGHZPOeHWBxEL4qM=",
-        "ref": "refs/heads/main",
-        "rev": "2b4d55dcc7f420e2ca92919b2ca0c99fb4dbd964",
-        "revCount": 18,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/goatchurchprime/two-voip-godot-4"
+        "lastModified": 1712781530,
+        "narHash": "sha256-M1G7ypcfs7nJmXgkyoG96jT/CkgN5BOzy+DGO4LVCvA=",
+        "owner": "xiph",
+        "repo": "opus",
+        "rev": "ddbe48383984d56acd9e1ab6a090c54ca6b735a6",
+        "type": "github"
       },
       "original": {
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/goatchurchprime/two-voip-godot-4"
+        "owner": "xiph",
+        "repo": "opus",
+        "rev": "ddbe48383984d56acd9e1ab6a090c54ca6b735a6",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "flake-parts": "flake-parts",
+        "godot-cpp": "godot-cpp",
+        "nixpkgs": "nixpkgs",
+        "opus": "opus"
       }
     }
   },
