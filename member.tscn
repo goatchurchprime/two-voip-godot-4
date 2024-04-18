@@ -1,0 +1,32 @@
+[gd_scene load_steps=3 format=3 uid="uid://c1ibcb1toyerh"]
+
+[ext_resource type="Script" path="res://member.gd" id="1_o3hks"]
+
+[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_ngiei"]
+
+[node name="Member" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("1_o3hks")
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
+stream = SubResource("AudioStreamGenerator_ngiei")
+
+[node name="HandyOpusNode" type="HandyOpusNode" parent="."]
+
+[node name="Label" type="Label" parent="."]
+layout_mode = 0
+offset_left = 65.0
+offset_right = 115.0
+offset_bottom = 23.0
+text = "empty"
+
+[node name="ColorRect" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 6.0
+offset_right = 57.0
+offset_bottom = 20.0
+color = Color(1, 1, 0.113725, 1)
