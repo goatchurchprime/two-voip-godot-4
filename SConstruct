@@ -25,7 +25,15 @@ else:
 
 if env["platform"] == "linux":
     env.Append(CXXFLAGS = ['-fpermissive'])
-
+    env.Append(
+        LINKFLAGS=[
+            "-Wl,--no-undefined",
+            "-static-libgcc",
+            "-static-libstdc++",
+        ]
+    )
+    # And add some linux dependencies.
+    env.Append(LIBS=["pthread", "dl"])
 
 # Speex (resampler / jitter buffer)
 

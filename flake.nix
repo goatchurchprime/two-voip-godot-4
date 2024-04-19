@@ -6,6 +6,7 @@
   
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs-old.url = "github:NixOS/nixpkgs/nixos-20.03";
     godot-cpp = {
       url = "github:godotengine/godot-cpp/48afa82f29354668c12cffaf6a2474dabfd395ed";
       flake = false;
@@ -20,8 +21,18 @@
   outputs = inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "x86_64-linux" ];
-      perSystem = { pkgs, system, self', ... }: {
-        packages.default = pkgs.stdenv.mkDerivation {
+      perSystem = { pkgs, system, self', ... }: let
+        cc = pkgs.wrapCCWith {
+          cc = pkgs.gcc-unwrapped;
+
+          libc = inputs.nixpkgs-old.legacyPackages.${system}.glibc;
+          bintools = pkgs.binutils.override {
+            libc = inputs.nixpkgs-old.legacyPackages.${system}.glibc;
+          };
+        };
+        x = (pkgs.overrideCC pkgs.stdenv cc).cc.cc;
+      in {
+        packages.default = x.stdenv.mkDerivation {
           name = "two-voip";
           src = inputs.self;
           prePatch = ''
@@ -62,7 +73,9 @@
 
           '';
         };
-        packages.third-party-opus = pkgs.stdenv.mkDerivation {
+        packages.third-party-opus = x.stdenv.mkDerivation {
+          NIX_CFLAGS_COMPILE = [ "-static-libgcc" "-static-libstdc++" ];
+          NIX_CFLAGS_LINK = [ "-static-libgcc" "-static-libstdc++" ];
           name = "third-party-opus";
           src = inputs.self;
           prePatch = ''
