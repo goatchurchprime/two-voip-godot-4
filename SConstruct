@@ -30,6 +30,7 @@ if env["platform"] == "linux":
             "-Wl,--no-undefined",
             "-static-libgcc",
             "-static-libstdc++",
+            "-fPIC",
         ]
     )
     # And add some linux dependencies.

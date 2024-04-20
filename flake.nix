@@ -6,7 +6,10 @@
   
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    nixpkgs-old.url = "github:NixOS/nixpkgs/nixos-20.03";
+    nixpkgs-old = {
+      url = "github:NixOS/nixpkgs/nixos-19.09";
+      flake = false;
+    };
     godot-cpp = {
       url = "github:godotengine/godot-cpp/48afa82f29354668c12cffaf6a2474dabfd395ed";
       flake = false;
@@ -22,17 +25,20 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "x86_64-linux" ];
       perSystem = { pkgs, system, self', ... }: let
-        cc = pkgs.wrapCCWith {
-          cc = pkgs.gcc-unwrapped;
-
-          libc = inputs.nixpkgs-old.legacyPackages.${system}.glibc;
+        nixpkgs-old = import inputs.nixpkgs-old { inherit system; };
+        glibc-old = nixpkgs-old.glibc // { pname = "glibc"; };
+        cc-old = pkgs.wrapCCWith {
+          cc = nixpkgs-old.buildPackages.gcc-unwrapped;
+          libc = glibc-old;
           bintools = pkgs.binutils.override {
-            libc = inputs.nixpkgs-old.legacyPackages.${system}.glibc;
+            libc = glibc-old;
           };
         };
-        x = (pkgs.overrideCC pkgs.stdenv cc).cc.cc;
+        stdenv-old = (pkgs.overrideCC pkgs.stdenv cc-old);
       in {
-        packages.default = x.stdenv.mkDerivation {
+        packages.default = stdenv-old.mkDerivation {
+          NIX_CFLAGS_COMPILE = [ "-static-libgcc" "-static-libstdc++" ];
+          NIX_CFLAGS_LINK = [ "-static-libgcc" "-static-libstdc++" ];
           name = "two-voip";
           src = inputs.self;
           prePatch = ''
@@ -73,7 +79,7 @@
 
           '';
         };
-        packages.third-party-opus = x.stdenv.mkDerivation {
+        packages.third-party-opus = pkgs.stdenv.mkDerivation {
           NIX_CFLAGS_COMPILE = [ "-static-libgcc" "-static-libstdc++" ];
           NIX_CFLAGS_LINK = [ "-static-libgcc" "-static-libstdc++" ];
           name = "third-party-opus";
