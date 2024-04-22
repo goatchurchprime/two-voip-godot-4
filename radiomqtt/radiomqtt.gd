@@ -20,8 +20,12 @@ var recordedpacketsMemSize = 0
 var recordedpacketsI = 0
 
 func _process(_delta):
-	var s = audiospectrumeffectinstance.get_magnitude_for_frequency_range(20, 500)
-	$LowFreq.size.y = s.x*10000 + 2
+	var s0 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(20, 500)
+	$LowFreq.size.x = s0.x*1000 + 2
+	var s1 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(500, 2000)
+	$MidFreq.size.x = s1.x*1000 + 2
+	var s2 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(2000, 20000)
+	$HighFreq.size.x = s2.x*10000 + 2
 
 	while audiocaptureeffect.get_frames_available() >= 441:
 		var samples = audiocaptureeffect.get_buffer(441)

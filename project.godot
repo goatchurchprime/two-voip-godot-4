@@ -11,13 +11,17 @@ config_version=5
 [application]
 
 config/name="Two-voip-godot-4"
-run/main_scene="res://main.tscn"
+run/main_scene="res://radiomqtt/radiomqtt.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [audio]
 
 driver/enable_input=true
+
+[display]
+
+window/stretch/mode="viewport"
 
 [rendering]
 

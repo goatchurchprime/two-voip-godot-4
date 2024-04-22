@@ -1,14 +1,16 @@
 [gd_scene load_steps=3 format=3 uid="uid://c1ibcb1toyerh"]
 
-[ext_resource type="Script" path="res://member.gd" id="1_o3hks"]
+[ext_resource type="Script" path="res://radiomqtt/member.gd" id="1_o3hks"]
 
 [sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_ngiei"]
 
 [node name="Member" type="Control"]
+custom_minimum_size = Vector2(0, 28)
 layout_mode = 3
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
+anchor_right = 0.028
+anchor_bottom = 0.035
+offset_right = 111.744
+offset_bottom = 5.32
 script = ExtResource("1_o3hks")
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]

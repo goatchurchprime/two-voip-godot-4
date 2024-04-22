@@ -164,10 +164,8 @@ func _process(delta):
 		
 	elif brokerconnectmode == BCM_WAITING_CONNACK or brokerconnectmode == BCM_CONNECTED:
 		receiveintobuffer()
-		var Ew = 0
-		while Ew == 0:
-			Ew = wait_msg()
-		
+		while wait_msg():
+			pass
 		if brokerconnectmode == BCM_CONNECTED and pingticksnext0 < Time.get_ticks_msec():
 			pingreq()
 			pingticksnext0 = Time.get_ticks_msec() + pinginterval*1000
@@ -384,20 +382,19 @@ func unsubscribe(stopic):
 func wait_msg():
 	var n = receivedbuffer.size()
 	if n < 2:
-		return -1
+		return false
 	var op = receivedbuffer[0]
 	var i = 1
 	var sz = receivedbuffer[i] & 0x7f
 	while (receivedbuffer[i] & 0x80):
 		i += 1
 		if i == n:
-			return -1
+			return false
 		sz += (receivedbuffer[i] & 0x7f) << ((i-1)*7)
 	i += 1
 	if n < i + sz:
-		return -1
+		return false
 		
-	var E = OK
 	if op == CP_PINGRESP:
 		assert (sz == 0)
 		if verbose_level >= 2:
@@ -436,22 +433,21 @@ func wait_msg():
 			if verbose_level:
 				print("Bad connection retcode=", retcode) # see https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html
 			emit_signal("broker_connection_failed")
-			E = FAILED
 
 	elif op == CP_PUBREC:
 		assert (sz == 2)
 		var apid = (receivedbuffer[i]<<8) + receivedbuffer[i+1]
 		if verbose_level >= 2:
 			print("PUBACK[%d]" % apid)
-		emit_signal("publish_acknowledge", apid)
+		emit_signal("publish_acknowledgewait_msg", apid)
 
 	elif op == CP_SUBACK:
 		assert (sz == 3)
 		var apid = (receivedbuffer[i]<<8) + receivedbuffer[i+1]
 		if verbose_level:
 			print("SUBACK[%d] ret=%02x" % [apid, receivedbuffer[i+2]])
-		if receivedbuffer[i+2] == 0x80:
-			E = FAILED
+		#if receivedbuffer[i+2] == 0x80:
+		#	E = FAILED
 
 	elif op == CP_UNSUBACK:
 		assert (sz == 2)
@@ -464,7 +460,7 @@ func wait_msg():
 			print("Unknown MQTT opcode op=%x" % op)
 
 	trimreceivedbuffer(i + sz)
-	return E
+	return true
 
 func trimreceivedbuffer(n):
 	if n == receivedbuffer.size():
