@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=6 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
@@ -6,8 +6,6 @@
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 
 [sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_itmlg"]
-
-[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_g1koy"]
 
 [node name="radiomqtt" type="Control"]
 layout_mode = 3
@@ -33,8 +31,7 @@ stream = SubResource("AudioStreamMicrophone_itmlg")
 autoplay = true
 bus = &"MicrophoneBus"
 
-[node name="AudioStreamGenerator" type="AudioStreamPlayer" parent="."]
-stream = SubResource("AudioStreamGenerator_g1koy")
+[node name="HandyOpusEncoder" type="HandyOpusNode" parent="AudioStreamMicrophone"]
 
 [node name="LowFreq" type="ColorRect" parent="."]
 layout_mode = 0

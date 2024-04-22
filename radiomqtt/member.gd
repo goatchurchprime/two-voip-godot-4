@@ -1,7 +1,5 @@
 extends Control
 
-
-
 var audiostreamgeneratorplayback : AudioStreamGeneratorPlayback
 var audiopacketsbuffer = [ ]
 var isOpus = true

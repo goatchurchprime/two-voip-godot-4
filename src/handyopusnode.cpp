@@ -99,6 +99,10 @@ PackedByteArray HandyOpusNode::encodeopuspacket(PackedVector2Array audiosamples)
 void HandyOpusNode::_bind_methods() {
     ClassDB::bind_method(D_METHOD("decode_opus_packet", "packet"), &HandyOpusNode::decode_opus_packet);
     ClassDB::bind_method(D_METHOD("encode_opus_packet", "samples"), &HandyOpusNode::encode_opus_packet);
+
+    ClassDB::bind_method(D_METHOD("createencoder", "opussamplerate", "opusframesize", "audiosamplerate", "audiosamplesize"), &HandyOpusNode::createencoder); 
+    ClassDB::bind_method(D_METHOD("encodeopuspacket", "audiosamples"), &HandyOpusNode::encodeopuspacket);
+
 }
 
 PackedVector2Array HandyOpusNode::decode_opus_packet(const PackedByteArray& packet) {

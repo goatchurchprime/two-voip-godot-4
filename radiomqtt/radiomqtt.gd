@@ -5,15 +5,13 @@ extends Control
 var audiocaptureeffect : AudioEffectCapture
 var audiospectrumeffect : AudioEffectSpectrumAnalyzer
 var audiospectrumeffectinstance : AudioEffectSpectrumAnalyzerInstance
-var audiostreamgeneratorplayback : AudioStreamGeneratorPlayback
 
 func _ready():
 	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
 	audiocaptureeffect = AudioServer.get_bus_effect(microphoneidx, 0)
 	audiospectrumeffect = AudioServer.get_bus_effect(microphoneidx, 1)
 	audiospectrumeffectinstance = AudioServer.get_bus_effect_instance(microphoneidx, 1)
-	$AudioStreamGenerator.play()
-	audiostreamgeneratorplayback = $AudioStreamGenerator.get_stream_playback()
+	$AudioStreamMicrophone/HandyOpusEncoder.createencoder(48000, 480, 44100, 441); 
 
 var recordedpackets = [ ]
 var recordedpacketsMemSize = 0
@@ -30,8 +28,9 @@ func _process(_delta):
 		var samples = audiocaptureeffect.get_buffer(441)
 		if $PTT.button_pressed:
 			if $OpusPackets.button_pressed:
-				recordedpackets.append($HandyOpusNode.encode_opus_packet(samples))
-				$MQTTnetwork.transportaudiopacket(recordedpackets[-1])
+				var opuspacket = $AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(samples)
+				recordedpackets.append(opuspacket)
+				$MQTTnetwork.transportaudiopacket(opuspacket)
 			else:
 				recordedpackets.append(samples)
 			recordedpacketsMemSize += len(recordedpackets[-1])
@@ -52,12 +51,12 @@ func _on_opus_packets_toggled(toggled_on):
 	recordedpacketsMemSize = 0
 	if toggled_on:
 		for samples in recordedpackets:
-			rs.append($HandyOpusNode.encode_opus_packet(samples))
+			rs.append($AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(samples))
 			recordedpacketsMemSize += len(rs[-1])
 		print("Encoded to opus to size ", recordedpacketsMemSize)
 	else:
 		for packet in recordedpackets:
-			rs.append($HandyOpusNode.decode_opus_packet(packet))
+			rs.append($MQTTnetwork/Members/Self/HandyOpusNode.decode_opus_packet(packet))
 			recordedpacketsMemSize += len(rs[-1])
 		print("Decoded from opus to size ", recordedpacketsMemSize)
 	recordedpackets = rs
