@@ -13,12 +13,6 @@ HandyOpusNode::HandyOpusNode() {
     resampler = speex_resampler_init(CHANNELS, OPUS_SAMPLE_RATE, GODOT_SAMPLE_RATE, RESAMPLING_QUALITY, &last_resampler_error);
     sample_buf.resize(OPUS_FRAME_SIZE);
     
-    opus_encoder = opus_encoder_create(OPUS_SAMPLE_RATE, CHANNELS, OPUS_APPLICATION_VOIP, &last_opus_errorE);
-    opus_encoder_ctl(opus_encoder, OPUS_SET_BITRATE(DEFAULT_BITRATE));
-    resamplerE = speex_resampler_init(CHANNELS, GODOT_SAMPLE_RATE, OPUS_SAMPLE_RATE, RESAMPLING_QUALITY, &last_resampler_errorE);
-    assert (resamplerE != NULL);
-    sample_bufE.resize(OPUS_FRAME_SIZE);
-
     
     opusencoder = NULL;
     opusdecoder = NULL;
@@ -43,9 +37,7 @@ void HandyOpusNode::destroyallsamplers() {
 
 HandyOpusNode::~HandyOpusNode() {
     opus_decoder_destroy(opus_decoder);
-    opus_encoder_destroy(opus_encoder);
     speex_resampler_destroy(resampler);
-    speex_resampler_destroy(resamplerE);
     
     destroyallsamplers();
 }
@@ -74,7 +66,7 @@ int HandyOpusNode::createencoder(int opussamplerate, int opusframesize, int audi
     // opussamplesize is 480 for 10ms at 48000
     int opusapplication = OPUS_APPLICATION_VOIP; // or OPUS_APPLICATION_AUDIO
     int opuserror = 0;
-    opus_encoder = opus_encoder_create(opussamplerate, channels, opusapplication, &opuserror);
+    opusencoder = opus_encoder_create(opussamplerate, channels, opusapplication, &opuserror);
 
     opusframebuffer.resize(opusframesize);
     bytepacketbuffer.resize(sizeof(float)*channels*opusframesize);
@@ -90,15 +82,14 @@ PackedByteArray HandyOpusNode::encodeopuspacket(PackedVector2Array audiosamples)
     int sxerr = speex_resampler_process_interleaved_float(speexresampler, 
             (float*)audiosamples.ptr(), &Nsamples, 
             (float*)opusframebuffer.ptrw(), &Nopusframebuffer);
-    int bytepacketsize = opus_encode_float(opus_encoder, (float*)opusframebuffer.ptr(), opusframebuffer.size(), 
-                                                         (unsigned char*)bytepacketbuffer.ptrw(), bytepacketbuffer.size());
+    int bytepacketsize = opus_encode_float(opusencoder, (float*)opusframebuffer.ptr(), opusframebuffer.size(), 
+                                                        (unsigned char*)bytepacketbuffer.ptrw(), bytepacketbuffer.size());
     return bytepacketbuffer.slice(0, bytepacketsize);
 }
 
 
 void HandyOpusNode::_bind_methods() {
     ClassDB::bind_method(D_METHOD("decode_opus_packet", "packet"), &HandyOpusNode::decode_opus_packet);
-    ClassDB::bind_method(D_METHOD("encode_opus_packet", "samples"), &HandyOpusNode::encode_opus_packet);
 
     ClassDB::bind_method(D_METHOD("createencoder", "opussamplerate", "opusframesize", "audiosamplerate", "audiosamplesize"), &HandyOpusNode::createencoder); 
     ClassDB::bind_method(D_METHOD("encodeopuspacket", "audiosamples"), &HandyOpusNode::encodeopuspacket);
@@ -119,24 +110,6 @@ PackedVector2Array HandyOpusNode::decode_opus_packet(const PackedByteArray& pack
     assert (resampling_result == 0);
 
     return samples;
-}
-
-PackedByteArray HandyOpusNode::encode_opus_packet(PackedVector2Array samples) {
-    assert(sample_bufE.size() == OPUS_FRAME_SIZE);
-
-    PackedByteArray packet;
-    packet.resize(sizeof(float) * CHANNELS * OPUS_FRAME_SIZE);
-
-    unsigned int num_samples = samples.size();
-    unsigned int num_buffer_samples = OPUS_FRAME_SIZE;
-    int resampling_result = speex_resampler_process_interleaved_float(resamplerE, (float*)samples.ptr(), &num_samples, (float*)sample_bufE.ptrw(), &num_buffer_samples);
-    assert (resampling_result == 0);
-
-    int packet_size = opus_encode_float(opus_encoder, (float*)sample_bufE.ptr(), OPUS_FRAME_SIZE, (unsigned char*)packet.ptrw(), packet.size());
-    assert (packet_size > 0);
-    packet.resize(packet_size);
-
-    return packet;
 }
 
 

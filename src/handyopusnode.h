@@ -33,13 +33,6 @@ private:
     SpeexResamplerState* resampler;
     PackedVector2Array sample_buf;
 
-    int last_opus_errorE = 0;
-    int last_resampler_errorE = 0;
-    OpusEncoder* opus_encoder;
-    SpeexResamplerState* resamplerE;
-    PackedVector2Array sample_bufE;
-    
-    
     OpusEncoder* opusencoder;
     OpusDecoder* opusdecoder;
     SpeexResamplerState* speexresampler;
@@ -56,7 +49,6 @@ private:
 
 public:
     PackedVector2Array decode_opus_packet(const PackedByteArray&);
-    PackedByteArray encode_opus_packet(PackedVector2Array samples);
 
     int createencoder(int opussamplerate, int opusframesize, int audiosamplerate, int audiosamplesize);
     PackedByteArray encodeopuspacket(PackedVector2Array audiosamples); 

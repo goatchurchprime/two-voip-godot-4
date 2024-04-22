@@ -54,8 +54,6 @@ offset_top = 183.0
 offset_right = 90.0
 offset_bottom = 203.0
 
-[node name="HandyOpusNode" type="HandyOpusNode" parent="."]
-
 [node name="OpusPackets" type="CheckButton" parent="."]
 layout_mode = 0
 offset_left = 171.0
