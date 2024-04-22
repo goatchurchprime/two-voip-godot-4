@@ -26,13 +26,6 @@ protected:
     static void _bind_methods();
 
 private:
-    double time_passed;
-    int last_opus_error = 0;
-    int last_resampler_error = 0;
-    OpusDecoder* opus_decoder;
-    SpeexResamplerState* resampler;
-    PackedVector2Array sample_buf;
-
     OpusEncoder* opusencoder;
     OpusDecoder* opusdecoder;
     SpeexResamplerState* speexresampler;
@@ -48,10 +41,11 @@ private:
 
 
 public:
-    PackedVector2Array decode_opus_packet(const PackedByteArray&);
-
-    int createencoder(int opussamplerate, int opusframesize, int audiosamplerate, int audiosamplesize);
+    int createencoder(int audiosamplerate, int audiosamplesize, int opussamplerate, int opusframesize);
     PackedByteArray encodeopuspacket(PackedVector2Array audiosamples); 
+
+    int createdecoder(int opussamplerate, int opusframesize, int audiosamplerate, int audiosamplesize); 
+    PackedVector2Array decodeopuspacket(const PackedByteArray& bytepacket, int decode_fec);
 
     HandyOpusNode();
     ~HandyOpusNode();

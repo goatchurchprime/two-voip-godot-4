@@ -16,7 +16,7 @@ script = ExtResource("1_o3hks")
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
 stream = SubResource("AudioStreamGenerator_ngiei")
 
-[node name="HandyOpusNode" type="HandyOpusNode" parent="."]
+[node name="HandyOpusDecoder" type="HandyOpusNode" parent="."]
 
 [node name="Label" type="Label" parent="."]
 layout_mode = 0

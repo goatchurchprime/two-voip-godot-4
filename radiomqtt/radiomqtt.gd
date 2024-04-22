@@ -6,15 +6,21 @@ var audiocaptureeffect : AudioEffectCapture
 var audiospectrumeffect : AudioEffectSpectrumAnalyzer
 var audiospectrumeffectinstance : AudioEffectSpectrumAnalyzerInstance
 
+var recordedsamples = [ ]
+var recordedopuspackets = [ ]
+var recordedopuspacketsMemSize = 0
+
 func _ready():
 	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
 	audiocaptureeffect = AudioServer.get_bus_effect(microphoneidx, 0)
 	audiospectrumeffect = AudioServer.get_bus_effect(microphoneidx, 1)
 	audiospectrumeffectinstance = AudioServer.get_bus_effect_instance(microphoneidx, 1)
-	$AudioStreamMicrophone/HandyOpusEncoder.createencoder(48000, 480, 44100, 441); 
+	$AudioStreamMicrophone/HandyOpusEncoder.createencoder(44100, 441, 48000, 480); 
 
-var recordedpackets = [ ]
-var recordedpacketsMemSize = 0
+func _on_ptt_button_down():
+	recordedsamples = [ ]
+	recordedopuspackets = [ ]
+	recordedopuspacketsMemSize = 0
 
 func _process(_delta):
 	var s0 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(20, 500)
@@ -27,44 +33,41 @@ func _process(_delta):
 	while audiocaptureeffect.get_frames_available() >= 441:
 		var samples = audiocaptureeffect.get_buffer(441)
 		if $PTT.button_pressed:
+			recordedsamples.append(samples)
 			if $OpusPackets.button_pressed:
 				var opuspacket = $AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(samples)
-				recordedpackets.append(opuspacket)
+				recordedopuspackets.append(opuspacket)
 				$MQTTnetwork.transportaudiopacket(opuspacket)
-			else:
-				recordedpackets.append(samples)
-			recordedpacketsMemSize += len(recordedpackets[-1])
+				recordedopuspacketsMemSize += len(opuspacket)
 
-
-func _on_ptt_button_down():
-	recordedpackets = [ ]
-	recordedpacketsMemSize = 0
 
 func _on_ptt_button_up():
-	print("recordedpacketsMemSize ", recordedpacketsMemSize)
-	var k = "frames: %d  mem: %d  time: %.01f" % [len(recordedpackets), recordedpacketsMemSize, len(recordedpackets)*0.01]
+	print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
+	var k = "frames: %d  mem: %d  time: %.01f" % [len(recordedsamples), recordedopuspacketsMemSize, len(recordedsamples)*0.01]
 	$FrameCount.text = k
 	
 # use this to change the encoding of the packet list
 func _on_opus_packets_toggled(toggled_on):
-	var rs = [ ]
-	recordedpacketsMemSize = 0
 	if toggled_on:
-		for samples in recordedpackets:
-			rs.append($AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(samples))
-			recordedpacketsMemSize += len(rs[-1])
-		print("Encoded to opus to size ", recordedpacketsMemSize)
+		recordedopuspackets = [ ]
+		recordedopuspacketsMemSize = 0
+		for samples in recordedsamples:
+			var opuspacket = $AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(samples)
+			recordedopuspackets.append(opuspacket)
+			recordedopuspacketsMemSize += len(opuspacket)
+		print("Encoded to opus to size ", recordedopuspacketsMemSize)
 	else:
-		for packet in recordedpackets:
-			rs.append($MQTTnetwork/Members/Self/HandyOpusNode.decode_opus_packet(packet))
-			recordedpacketsMemSize += len(rs[-1])
-		print("Decoded from opus to size ", recordedpacketsMemSize)
-	recordedpackets = rs
+		recordedsamples = [ ]
+		for opuspacket in recordedopuspackets:
+			recordedsamples.append($MQTTnetwork/Members/Self/HandyOpusDecoder.decodeopuspacket(opuspacket, 0))
 	
 
 func _on_play_pressed():
-	$MQTTnetwork/Members/Self.audiopacketsbuffer = recordedpackets.duplicate()
-	$MQTTnetwork/Members/Self.isOpus = $OpusPackets.button_pressed 
-
+	if recordedopuspackets:
+		$MQTTnetwork/Members/Self.audiopacketsbuffer = recordedopuspackets.duplicate()
+		$MQTTnetwork/Members/Self.isOpus = true 
+	else:
+		$MQTTnetwork/Members/Self.audiopacketsbuffer = recordedsamples.duplicate()
+		$MQTTnetwork/Members/Self.isOpus = false 
 
 
