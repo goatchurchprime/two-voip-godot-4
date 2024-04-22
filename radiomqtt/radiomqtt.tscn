@@ -18,16 +18,44 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_anot2")
 
-[node name="OptionButton" type="OptionButton" parent="."]
+[node name="HBoxContainer" type="HBoxContainer" parent="."]
 layout_mode = 0
-offset_left = 781.0
-offset_top = 5.0
-offset_right = 853.0
-offset_bottom = 36.0
-item_count = 1
-selected = 0
-popup/item_0/text = "thing"
+offset_left = 393.0
+offset_top = 87.0
+offset_right = 596.0
+offset_bottom = 120.0
+
+[node name="LabFrameDuration" type="Label" parent="HBoxContainer"]
+layout_mode = 2
+text = "Frame duration"
+
+[node name="FrameDuration" type="OptionButton" parent="HBoxContainer"]
+layout_mode = 2
+item_count = 6
+selected = 3
+popup/item_0/text = "2.5ms"
 popup/item_0/id = 0
+popup/item_1/text = "5ms"
+popup/item_1/id = 1
+popup/item_2/text = "10ms"
+popup/item_2/id = 2
+popup/item_3/text = "20ms"
+popup/item_3/id = 3
+popup/item_4/text = "40ms"
+popup/item_4/id = 4
+popup/item_5/text = "60ms"
+popup/item_5/id = 5
+
+[node name="ResampleState" type="OptionButton" parent="HBoxContainer"]
+layout_mode = 2
+item_count = 3
+selected = 1
+popup/item_0/text = "Uncompressed"
+popup/item_0/id = 2
+popup/item_1/text = "Speex Resample"
+popup/item_1/id = 0
+popup/item_2/text = "44.1k as 48k"
+popup/item_2/id = 1
 
 [node name="PTT" type="Button" parent="."]
 layout_mode = 0
@@ -120,10 +148,10 @@ binarymessages = true
 
 [node name="Members" type="VBoxContainer" parent="MQTTnetwork"]
 layout_mode = 0
-offset_left = 33.0
-offset_top = 77.0
-offset_right = 231.008
-offset_bottom = 181.725
+offset_left = -404.0
+offset_top = -1.0
+offset_right = -205.992
+offset_bottom = 103.725
 
 [node name="Self" parent="MQTTnetwork/Members" instance=ExtResource("4_w5dv2")]
 layout_mode = 2
