@@ -14,7 +14,7 @@ func received_mqtt(topic, msg):
 		var membername = stopic[2]
 		if stopic[3] == "status" and membername != myname:
 			if msg == "alive".to_ascii_buffer():
-				var member = load("res://member.tscn").instantiate()
+				var member = load("res://radiomqtt/member.tscn").instantiate()
 				member.setname(membername)
 				$Members.add_child(member)
 				$MQTT.subscribe("twovoip/%s/%s/audio" % [$roomname.text, membername])
