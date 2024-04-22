@@ -37,12 +37,29 @@ private:
     int last_resampler_errorE = 0;
     OpusEncoder* opus_encoder;
     SpeexResamplerState* resamplerE;
-    PackedVector2Array sample_bufE; // Resample audio here before sending through opus
+    PackedVector2Array sample_bufE;
+    
+    
+    OpusEncoder* opusencoder;
+    OpusDecoder* opusdecoder;
+    SpeexResamplerState* speexresampler;
+    int opussamplerate;
+    int opusframesize;
+    int audiosamplerate;
+    int audiosamplesize;
+    float Dtimeframeopus;
+    float Dtimeframeaudio;
+    PackedVector2Array opusframebuffer;
+    PackedByteArray bytepacketbuffer;
+    void destroyallsamplers(); 
+
 
 public:
     PackedVector2Array decode_opus_packet(const PackedByteArray&);
     PackedByteArray encode_opus_packet(PackedVector2Array samples);
 
+    int createencoder(int opussamplerate, int opusframesize, int audiosamplerate, int audiosamplesize);
+    PackedByteArray encodeopuspacket(PackedVector2Array audiosamples); 
 
     HandyOpusNode();
     ~HandyOpusNode();

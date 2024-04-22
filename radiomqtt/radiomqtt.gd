@@ -17,7 +17,6 @@ func _ready():
 
 var recordedpackets = [ ]
 var recordedpacketsMemSize = 0
-var recordedpacketsI = 0
 
 func _process(_delta):
 	var s0 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(20, 500)
@@ -37,17 +36,6 @@ func _process(_delta):
 				recordedpackets.append(samples)
 			recordedpacketsMemSize += len(recordedpackets[-1])
 
-	if $Play.button_pressed:
-		while recordedpacketsI < len(recordedpackets) and audiostreamgeneratorplayback.get_frames_available() > 441:
-			var packet = recordedpackets[recordedpacketsI]
-			recordedpacketsI += 1
-			if $OpusPackets.button_pressed:
-				audiostreamgeneratorplayback.push_buffer($HandyOpusNode.decode_opus_packet(packet))
-			else:
-				audiostreamgeneratorplayback.push_buffer(packet)
-		if recordedpacketsI == len(recordedpackets):
-			$Play.button_pressed = false
-			
 
 func _on_ptt_button_down():
 	recordedpackets = [ ]
@@ -75,12 +63,9 @@ func _on_opus_packets_toggled(toggled_on):
 	recordedpackets = rs
 	
 
-func _on_play_toggled(toggled_on):
-	if toggled_on:
-		$OpusPackets.disabled = true
-		$PTT.disabled = true
-		recordedpacketsI = 0
-	else:
-		$OpusPackets.disabled = false
-		$PTT.disabled = false
+func _on_play_pressed():
+	$MQTTnetwork/Members/Self.audiopacketsbuffer = recordedpackets.duplicate()
+	$MQTTnetwork/Members/Self.isOpus = $OpusPackets.button_pressed 
+
+
 
