@@ -111,15 +111,6 @@ offset_top = 183.0
 offset_right = 90.0
 offset_bottom = 203.0
 
-[node name="OpusPackets" type="CheckButton" parent="."]
-layout_mode = 0
-offset_left = 171.0
-offset_top = 40.0
-offset_right = 324.0
-offset_bottom = 71.0
-button_pressed = true
-text = "Opus Packets"
-
 [node name="Play" type="Button" parent="."]
 layout_mode = 0
 offset_left = 342.0
@@ -232,7 +223,7 @@ text = "myplace"
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
 [connection signal="button_down" from="PTT" to="." method="_on_ptt_button_down"]
 [connection signal="button_up" from="PTT" to="." method="_on_ptt_button_up"]
-[connection signal="toggled" from="OpusPackets" to="." method="_on_opus_packets_toggled"]
+[connection signal="pressed" from="Play" to="." method="_on_play_pressed"]
 [connection signal="toggled" from="MQTTnetwork/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
 
 [editable path="MQTTnetwork/Members/Self"]

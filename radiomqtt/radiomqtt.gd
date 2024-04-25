@@ -85,14 +85,13 @@ func _process(_delta):
 		var audiosamples = audiocaptureeffect.get_buffer(audiosamplesize)
 		if $PTT.button_pressed:
 			recordedsamples.append(audiosamples)
-			if $OpusPackets.button_pressed:
-				if opusframesize != 0:
-					var opuspacket = $AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(audiosamples)
-					recordedopuspackets.append(opuspacket)
-					$MQTTnetwork.transportaudiopacket(opuspacket)
-					recordedopuspacketsMemSize += len(opuspacket)
-				else:
-					$MQTTnetwork.transportaudiopacket(audiosamples)
+			if opusframesize != 0:
+				var opuspacket = $AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(audiosamples)
+				recordedopuspackets.append(opuspacket)
+				$MQTTnetwork.transportaudiopacket(opuspacket)
+				recordedopuspacketsMemSize += len(opuspacket)
+			else:
+				$MQTTnetwork.transportaudiopacket(audiosamples)
 					
 
 func _on_ptt_button_up():
