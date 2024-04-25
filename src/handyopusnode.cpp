@@ -12,6 +12,9 @@ void HandyOpusNode::_bind_methods() {
 
     ClassDB::bind_method(D_METHOD("createdecoder", "opussamplerate", "opusframesize", "audiosamplerate", "audiosamplesize"), &HandyOpusNode::createdecoder); 
     ClassDB::bind_method(D_METHOD("decodeopuspacket", "bytepacket", "decode_fec"), &HandyOpusNode::decodeopuspacket); 
+
+    ClassDB::bind_method(D_METHOD("destroyallsamplers"), &HandyOpusNode::decodeopuspacket); 
+    ClassDB::bind_method(D_METHOD("maxabsvalue", "audiosamples"), &HandyOpusNode::maxabsvalue); 
 }
 
 HandyOpusNode::HandyOpusNode() {
@@ -73,7 +76,20 @@ int HandyOpusNode::createencoder(int audiosamplerate, int audiosamplesize, int o
     return opuserror; 
 }
 
-PackedByteArray HandyOpusNode::encodeopuspacket(PackedVector2Array audiosamples) {
+float HandyOpusNode::maxabsvalue(const PackedVector2Array& audiosamples) {
+    float r = 0.0F;
+    float* p = (float*)opusframebuffer.ptr();
+    int N = opusframebuffer.size()*2;
+    for (int i = 0; i < N; i++) {
+        float s = abs(p[i]);
+        if (s > r)
+            r = s;
+    }
+    return r;
+}
+
+
+PackedByteArray HandyOpusNode::encodeopuspacket(const PackedVector2Array& audiosamples) {
     unsigned int Nsamples = audiosamples.size();
     assert (Nsamples == audiosamplesize); 
     unsigned int Nopusframebuffer = opusframebuffer.size();

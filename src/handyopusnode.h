@@ -37,19 +37,20 @@ private:
     float Dtimeframeaudio;
     PackedVector2Array opusframebuffer;
     PackedByteArray bytepacketbuffer;
-    void destroyallsamplers(); 
 
 
 public:
     int createencoder(int audiosamplerate, int audiosamplesize, int opussamplerate, int opusframesize);
-    PackedByteArray encodeopuspacket(PackedVector2Array audiosamples); 
+    PackedByteArray encodeopuspacket(const PackedVector2Array& audiosamples); 
+    float maxabsvalue(const PackedVector2Array& audiosamples); 
 
     int createdecoder(int opussamplerate, int opusframesize, int audiosamplerate, int audiosamplesize); 
     PackedVector2Array decodeopuspacket(const PackedByteArray& bytepacket, int decode_fec);
 
+    void destroyallsamplers(); 
+
     HandyOpusNode();
     ~HandyOpusNode();
-
 };
 
 
