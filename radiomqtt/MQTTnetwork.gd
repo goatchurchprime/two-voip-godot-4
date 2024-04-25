@@ -24,7 +24,7 @@ func received_mqtt(topic, msg):
 					$Members.remove_child(member)
 					$MQTT.unsubscribe("twovoip/%s/%s/audio" % [$roomname.text, membername])
 		if stopic[3] == "audio":
-			$Members.get_node(membername).audiopacketsbuffer.push_back(msg)
+			$Members.get_node(membername).receivemqttmessage(msg)
 			
 func on_broker_connect():
 	$roomname.editable = false

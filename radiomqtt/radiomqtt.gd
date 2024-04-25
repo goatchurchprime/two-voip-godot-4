@@ -71,7 +71,7 @@ func _on_ptt_button_down():
 	recordedsamples = [ ]
 	recordedopuspackets = [ ]
 	recordedopuspacketsMemSize = 0
-	$MQTTnetwork.transportaudiopacket(JSON.stringify(recordedheader))
+	$MQTTnetwork.transportaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
 
 func _process(_delta):
 	var s0 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(20, 500)
@@ -98,9 +98,8 @@ func _on_ptt_button_up():
 	print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
 	var k = "frames: %d  mem: %d  time: %.01f" % [len(recordedsamples), recordedopuspacketsMemSize, len(recordedsamples)*audiosamplesize/audiosamplerate]
 	$FrameCount.text = k
-	$MQTTnetwork.transportaudiopacket(JSON.stringify({"framecount":len(recordedsamples)}))
-	
-	
+	$MQTTnetwork.transportaudiopacket(JSON.stringify({"framecount":len(recordedsamples)}).to_ascii_buffer())
+
 
 func _on_play_pressed():
 	if recordedopuspackets:
