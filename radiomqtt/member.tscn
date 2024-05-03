@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://radiomqtt/member.gd" id="1_o3hks"]
 
 [sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_ngiei"]
+buffer_length = 0.2
 
 [node name="Member" type="Control"]
 custom_minimum_size = Vector2(0, 28)

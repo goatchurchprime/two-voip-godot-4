@@ -15,7 +15,7 @@ var recordedheader = { }
 
 const opussamplerate = 48000
 var opusframesize = 480
-const audiosamplerate = 44100
+var audiosamplerate = 44100
 var audiosamplesize = 441
 
 func resamplerecordedsamples(orgsamples, newsamplesize):
@@ -38,11 +38,15 @@ func updatesamplerates():
 	opusframesize = int(opussamplerate*frametimems/1000)
 	var i = $VBoxFrameLength/HBoxAudioFrame/ResampleState.get_selected_id()
 	if i == 0:  # uncompressed
-		audiosamplesize = opusframesize
+		audiosamplerate = 44100
+		audiosamplesize = int(audiosamplerate*frametimems/1000)
+		recordedopuspackets = [ ]
 		opusframesize = 0
 	elif i == 1: # Speexresample
+		audiosamplerate = 44100
 		audiosamplesize = int(audiosamplerate*frametimems/1000)
 	else:  # 441.1k as 48k fakery
+		audiosamplerate = opussamplerate
 		audiosamplesize = opusframesize
 		
 	$VBoxFrameLength/HBoxOpusFrame/LabFrameLength.text = "%d samples" % opusframesize
@@ -52,7 +56,7 @@ func updatesamplerates():
 		print("createencoder ", audiosamplerate, " ", audiosamplesize, " ", opussamplerate, " ", opusframesize)
 	else:
 		$AudioStreamMicrophone/HandyOpusEncoder.destroyallsamplers()
-	recordedheader = { "opusframesize":opusframesize, "audiosamplesize":audiosamplesize }
+	recordedheader = { "opusframesize":opusframesize, "audiosamplesize":audiosamplesize, "opussamplerate":opussamplerate, "audiosamplerate":audiosamplerate }
 	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audiosamplesize:
 		recordedsamples = resamplerecordedsamples(recordedsamples, audiosamplesize)
 	if opusframesize != 0:
@@ -90,7 +94,6 @@ func _process(_delta):
 			recordedsamples.append(audiosamples)
 			if opusframesize != 0:
 				var opuspacket = $AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(audiosamples)
-				print(len(opuspacket))
 				recordedopuspackets.append(opuspacket)
 				$MQTTnetwork.transportaudiopacket(opuspacket)
 				recordedopuspacketsMemSize += opuspacket.size()
@@ -100,10 +103,10 @@ func _process(_delta):
 
 func _on_ptt_button_up():
 	print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
-	var k = "frames: %d  mem: %d  time: %.01f" % [len(recordedsamples), recordedopuspacketsMemSize, len(recordedsamples)*audiosamplesize/audiosamplerate]
+	var tm = len(recordedsamples)*audiosamplesize*1.0/audiosamplerate
+	var k = "mem: %d  time: %.01f  byt/s:%d" % [recordedopuspacketsMemSize, tm, int(recordedopuspacketsMemSize/tm)]
 	$FrameCount.text = k
 	$MQTTnetwork.transportaudiopacket(JSON.stringify({"framecount":len(recordedsamples)}).to_ascii_buffer())
-
 
 #var D = 0
 #func _input(event):
@@ -113,10 +116,21 @@ func _on_ptt_button_up():
 
 func _on_play_pressed():
 	if recordedopuspackets:
-		$MQTTnetwork/Members/Self.processheaderpacket(recordedheader)
+		$MQTTnetwork/Members/Self.processheaderpacket(recordedheader.duplicate())
 		$MQTTnetwork/Members/Self.opuspacketsbuffer = recordedopuspackets.duplicate()
 	else:
-		$MQTTnetwork/Members/Self.audiopacketsbuffer = recordedsamples.duplicate()
+		var lrecordedsamples = [ ]
+		if false:  # inline resample uncompressed case
+			var Dresampler = HandyOpusNode.new()
+			#Dresampler.createdecoder(48000, 0, 44100, 441); 
+			Dresampler.createdecoder(44100, 0, 20000, 200); 
+			print("Using local Dresampler")
+			for audiosample in recordedsamples:
+				lrecordedsamples.append(Dresampler.resampledecodedopuspacket(audiosample))
+			Dresampler.destroyallsamplers()
+		else:
+			lrecordedsamples = recordedsamples.duplicate()
+		$MQTTnetwork/Members/Self.audiopacketsbuffer = lrecordedsamples
 
 func _on_frame_duration_item_selected(index):
 	updatesamplerates()

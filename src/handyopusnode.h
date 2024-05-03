@@ -35,8 +35,10 @@ private:
     int audiosamplesize;
     float Dtimeframeopus;
     float Dtimeframeaudio;
+
     PackedVector2Array opusframebuffer;
     PackedByteArray bytepacketbuffer;
+    PackedVector2Array audiosamplesOut;
 
 
 public:
@@ -46,6 +48,8 @@ public:
 
     int createdecoder(int opussamplerate, int opusframesize, int audiosamplerate, int audiosamplesize); 
     PackedVector2Array decodeopuspacket(const PackedByteArray& bytepacket, int decode_fec);
+
+    PackedVector2Array resampledecodedopuspacket(const PackedVector2Array& lopusframebuffer);
 
     void destroyallsamplers(); 
 

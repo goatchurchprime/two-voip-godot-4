@@ -9,13 +9,16 @@ using namespace godot;
 void HandyOpusNode::_bind_methods() {
     ClassDB::bind_method(D_METHOD("createencoder", "audiosamplerate", "audiosamplesize", "opussamplerate", "opusframesize"), &HandyOpusNode::createencoder); 
     ClassDB::bind_method(D_METHOD("encodeopuspacket", "audiosamples"), &HandyOpusNode::encodeopuspacket);
+    ClassDB::bind_method(D_METHOD("maxabsvalue", "audiosamples"), &HandyOpusNode::maxabsvalue); 
 
     ClassDB::bind_method(D_METHOD("createdecoder", "opussamplerate", "opusframesize", "audiosamplerate", "audiosamplesize"), &HandyOpusNode::createdecoder); 
     ClassDB::bind_method(D_METHOD("decodeopuspacket", "bytepacket", "decode_fec"), &HandyOpusNode::decodeopuspacket); 
+    ClassDB::bind_method(D_METHOD("resampledecodedopuspacket", "lopusframebuffer"), &HandyOpusNode::resampledecodedopuspacket); 
 
-    ClassDB::bind_method(D_METHOD("destroyallsamplers"), &HandyOpusNode::decodeopuspacket); 
-    ClassDB::bind_method(D_METHOD("maxabsvalue", "audiosamples"), &HandyOpusNode::maxabsvalue); 
+    ClassDB::bind_method(D_METHOD("destroyallsamplers"), &HandyOpusNode::destroyallsamplers); 
 }
+
+
 
 HandyOpusNode::HandyOpusNode() {
     opusencoder = NULL;
@@ -60,6 +63,7 @@ int HandyOpusNode::createencoder(int audiosamplerate, int audiosamplesize, int o
     if (audiosamplerate != opussamplerate) {
         int speexerror = 0; 
         int resamplingquality = 10;
+        // the speex resampler needs sample rates to be consistent with the sample buffer sizes
         speexresampler = speex_resampler_init(channels, audiosamplerate, opussamplerate, resamplingquality, &speexerror);
     }
     printf("Encoder timeframeopus %f timeframeaudio %f ***  %f \n\n", Dtimeframeopus, Dtimeframeaudio, 1.22345); 
@@ -112,29 +116,31 @@ PackedByteArray HandyOpusNode::encodeopuspacket(const PackedVector2Array& audios
 }
 
 
-
 int HandyOpusNode::createdecoder(int opussamplerate, int opusframesize, int audiosamplerate, int audiosamplesize) {
     destroyallsamplers();
     this->opussamplerate = opussamplerate;
     this->opusframesize = opusframesize;
     this->audiosamplerate = audiosamplerate;
     this->audiosamplesize = audiosamplesize;
-    this->Dtimeframeopus = opusframesize/opussamplerate;
+    this->Dtimeframeopus = opusframesize*1.0F/opussamplerate;
     this->Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
     assert (Dtimeframeopus == Dtimeframeaudio);
     printf("Decoder timeframeopus %f timeframeaudio %f ***  %f \n\n", Dtimeframeopus, Dtimeframeaudio, 0.888); 
     
     int channels = 2;
 
+    int opuserror = 0;
+    if (opusframesize != 0) {
+        opusdecoder = opus_decoder_create(opussamplerate, channels, &opuserror);
+        opusframebuffer.resize(opusframesize);
+    }
+    
     if (audiosamplerate != opussamplerate) {
         int speexerror = 0; 
         int resamplingquality = 10;
         speexresampler = speex_resampler_init(channels, opussamplerate, audiosamplerate, resamplingquality, &speexerror);
+        audiosamplesOut.resize(audiosamplesize);
     }
-
-    int opuserror = 0;
-    opusdecoder = opus_decoder_create(opussamplerate, channels, &opuserror);
-    opusframebuffer.resize(opusframesize);
     return opuserror; 
 }
 
@@ -145,14 +151,24 @@ PackedVector2Array HandyOpusNode::decodeopuspacket(const PackedByteArray& bytepa
         assert (audiosamplesize == opusframesize); 
         return opusframebuffer;
     }
-
-    PackedVector2Array audiosamples;
-    audiosamples.resize(audiosamplesize);
     unsigned int Nopusframebuffer = opusframebuffer.size();
     assert (Nopusframebuffer == opusframesize); 
-    unsigned int Nsamples = audiosamples.size();
+    unsigned int Nsamples = audiosamplesOut.size();
     assert (Nsamples == audiosamplesize); 
-    int resampling_result = speex_resampler_process_interleaved_float(speexresampler, (float*)opusframebuffer.ptr(), &Nopusframebuffer, (float*)audiosamples.ptrw(), &Nsamples);
-    return audiosamples;
+    int resampling_result = speex_resampler_process_interleaved_float(speexresampler, (float*)opusframebuffer.ptr(), &Nopusframebuffer, (float*)audiosamplesOut.ptrw(), &Nsamples);
+    return audiosamplesOut;
+}
+
+PackedVector2Array HandyOpusNode::resampledecodedopuspacket(const PackedVector2Array& lopusframebuffer) {
+    if (speexresampler == NULL) {
+        assert (audiosamplesize == opusframesize); 
+        return lopusframebuffer;
+    }
+    unsigned int Nopusframebuffer = lopusframebuffer.size();
+    assert (Nopusframebuffer == opusframesize); 
+    unsigned int Nsamples = audiosamplesOut.size();
+    assert (Nsamples == audiosamplesize); 
+    int resampling_result = speex_resampler_process_interleaved_float(speexresampler, (float*)lopusframebuffer.ptr(), &Nopusframebuffer, (float*)audiosamplesOut.ptrw(), &Nsamples);
+    return audiosamplesOut;
 }
 
