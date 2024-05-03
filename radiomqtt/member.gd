@@ -13,6 +13,7 @@ func _ready():
 	$AudioStreamPlayer.play()
 	audiostreamgeneratorplayback = $AudioStreamPlayer.get_stream_playback()
 	$HandyOpusDecoder.createdecoder(opussamplerate, opusframesize, audiosamplerate, audiosamplesize); 
+	print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
 
 func setname(lname):
 	set_name(lname)
@@ -24,6 +25,7 @@ func processheaderpacket(h):
 		audiosamplesize = h["audiosamplesize"]
 		if opusframesize != 0:
 			$HandyOpusDecoder.createdecoder(opussamplerate, opusframesize, audiosamplerate, audiosamplesize); 
+			print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
 		else:
 			$HandyOpusDecoder.destroyallsamplers()
 

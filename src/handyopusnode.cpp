@@ -50,8 +50,8 @@ int HandyOpusNode::createencoder(int audiosamplerate, int audiosamplesize, int o
     this->opusframesize = opusframesize;
     this->audiosamplerate = audiosamplerate;
     this->audiosamplesize = audiosamplesize;
-    this->Dtimeframeopus = opusframesize/opussamplerate;
-    this->Dtimeframeaudio = opusframesize/opussamplerate;
+    this->Dtimeframeopus = opusframesize*1.0F/opussamplerate;
+    this->Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
     assert (Dtimeframeopus == Dtimeframeaudio);
     
     int channels = 2;
@@ -62,13 +62,15 @@ int HandyOpusNode::createencoder(int audiosamplerate, int audiosamplesize, int o
         int resamplingquality = 10;
         speexresampler = speex_resampler_init(channels, audiosamplerate, opussamplerate, resamplingquality, &speexerror);
     }
+    printf("Encoder timeframeopus %f timeframeaudio %f ***  %f \n\n", Dtimeframeopus, Dtimeframeaudio, 1.22345); 
 
     // opussamplerate is one of 8000,12000,16000,24000,48000
     // opussamplesize is 480 for 10ms at 48000
-    int opusapplication = OPUS_APPLICATION_VOIP; // or OPUS_APPLICATION_AUDIO
-        // OPUS_APPLICATION_VOIP includes in-band forward error correction
+    int opusapplication = OPUS_APPLICATION_VOIP; // this option includes in-band forward error correction
+    int DEFAULT_BITRATE = 24000; // bits / second from 500 to 512000
     int opuserror = 0;
     opusencoder = opus_encoder_create(opussamplerate, channels, opusapplication, &opuserror);
+    opus_encoder_ctl(opusencoder, OPUS_SET_BITRATE(DEFAULT_BITRATE));
 
     opusframebuffer.resize(opusframesize);
     bytepacketbuffer.resize(sizeof(float)*channels*opusframesize);
@@ -78,10 +80,10 @@ int HandyOpusNode::createencoder(int audiosamplerate, int audiosamplesize, int o
 
 float HandyOpusNode::maxabsvalue(const PackedVector2Array& audiosamples) {
     float r = 0.0F;
-    float* p = (float*)opusframebuffer.ptr();
-    int N = opusframebuffer.size()*2;
+    float* p = (float*)audiosamples.ptr();
+    int N = audiosamples.size()*2;
     for (int i = 0; i < N; i++) {
-        float s = abs(p[i]);
+        float s = fabs(p[i]);
         if (s > r)
             r = s;
     }
@@ -94,11 +96,18 @@ PackedByteArray HandyOpusNode::encodeopuspacket(const PackedVector2Array& audios
     assert (Nsamples == audiosamplesize); 
     unsigned int Nopusframebuffer = opusframebuffer.size();
     assert (Nopusframebuffer == opusframesize); 
-    int sxerr = speex_resampler_process_interleaved_float(speexresampler, 
-            (float*)audiosamples.ptr(), &Nsamples, 
-            (float*)opusframebuffer.ptrw(), &Nopusframebuffer);
-    int bytepacketsize = opus_encode_float(opusencoder, (float*)opusframebuffer.ptr(), opusframebuffer.size(), 
+    int bytepacketsize = 0; 
+    if (speexresampler == NULL) {
+        assert (audiosamplesize == opusframesize); 
+        bytepacketsize = opus_encode_float(opusencoder, (float*)audiosamples.ptr(), audiosamples.size(), 
                                                         (unsigned char*)bytepacketbuffer.ptrw(), bytepacketbuffer.size());
+    } else {
+        int sxerr = speex_resampler_process_interleaved_float(speexresampler, 
+                (float*)audiosamples.ptr(), &Nsamples, 
+                (float*)opusframebuffer.ptrw(), &Nopusframebuffer);
+        bytepacketsize = opus_encode_float(opusencoder, (float*)opusframebuffer.ptr(), opusframebuffer.size(), 
+                                                        (unsigned char*)bytepacketbuffer.ptrw(), bytepacketbuffer.size());
+    }
     return bytepacketbuffer.slice(0, bytepacketsize);
 }
 
@@ -111,8 +120,9 @@ int HandyOpusNode::createdecoder(int opussamplerate, int opusframesize, int audi
     this->audiosamplerate = audiosamplerate;
     this->audiosamplesize = audiosamplesize;
     this->Dtimeframeopus = opusframesize/opussamplerate;
-    this->Dtimeframeaudio = opusframesize/opussamplerate;
+    this->Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
     assert (Dtimeframeopus == Dtimeframeaudio);
+    printf("Decoder timeframeopus %f timeframeaudio %f ***  %f \n\n", Dtimeframeopus, Dtimeframeaudio, 0.888); 
     
     int channels = 2;
 
@@ -131,6 +141,10 @@ int HandyOpusNode::createdecoder(int opussamplerate, int opusframesize, int audi
 PackedVector2Array HandyOpusNode::decodeopuspacket(const PackedByteArray& bytepacket, int decode_fec) {
     int decodedsamples = opus_decode_float(opusdecoder, bytepacket.ptr(), bytepacket.size(), (float*)opusframebuffer.ptrw(), opusframesize, decode_fec);
     assert (decodedsamples > 0);
+    if (speexresampler == NULL) {
+        assert (audiosamplesize == opusframesize); 
+        return opusframebuffer;
+    }
 
     PackedVector2Array audiosamples;
     audiosamples.resize(audiosamplesize);

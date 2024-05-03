@@ -49,6 +49,7 @@ func updatesamplerates():
 	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples" % audiosamplesize
 	if opusframesize != 0:
 		$AudioStreamMicrophone/HandyOpusEncoder.createencoder(audiosamplerate, audiosamplesize, opussamplerate, opusframesize); 
+		print("createencoder ", audiosamplerate, " ", audiosamplesize, " ", opussamplerate, " ", opusframesize)
 	else:
 		$AudioStreamMicrophone/HandyOpusEncoder.destroyallsamplers()
 	recordedheader = { "opusframesize":opusframesize, "audiosamplesize":audiosamplesize }
@@ -83,13 +84,16 @@ func _process(_delta):
 
 	while audiocaptureeffect.get_frames_available() >= audiosamplesize:
 		var audiosamples = audiocaptureeffect.get_buffer(audiosamplesize)
+		var a = $AudioStreamMicrophone/HandyOpusEncoder.maxabsvalue(audiosamples)
+		$NoiseGraph.addwindow(a)
 		if $PTT.button_pressed:
 			recordedsamples.append(audiosamples)
 			if opusframesize != 0:
 				var opuspacket = $AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(audiosamples)
+				print(len(opuspacket))
 				recordedopuspackets.append(opuspacket)
 				$MQTTnetwork.transportaudiopacket(opuspacket)
-				recordedopuspacketsMemSize += len(opuspacket)
+				recordedopuspacketsMemSize += opuspacket.size()
 			else:
 				$MQTTnetwork.transportaudiopacket(audiosamples)
 					
@@ -100,6 +104,12 @@ func _on_ptt_button_up():
 	$FrameCount.text = k
 	$MQTTnetwork.transportaudiopacket(JSON.stringify({"framecount":len(recordedsamples)}).to_ascii_buffer())
 
+
+#var D = 0
+#func _input(event):
+#	if event is InputEventKey:
+#		D += 1
+#		print(D, " ", event.pressed, " ", event.keycode)
 
 func _on_play_pressed():
 	if recordedopuspackets:
