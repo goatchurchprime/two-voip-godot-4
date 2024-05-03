@@ -1,9 +1,5 @@
 {
-
-  # nix build -L --builders 'ssh-ng://nix-ssh@100.107.23.115 x86_64-linux,i686-linux - 16 - big-parallel'
-
-  description = "A flake for Godot 4 VoIP extension";
-  
+  description = "A flake for Godot 4 Opus VoIP gdextension";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     nixpkgs-old = {
@@ -14,17 +10,21 @@
       url = "github:godotengine/godot-cpp/48afa82f29354668c12cffaf6a2474dabfd395ed";
       flake = false;
     };
-    opus = {
-      url = "github:xiph/opus/ddbe48383984d56acd9e1ab6a090c54ca6b735a6";
-      flake = false;
-    };
+    android.url = "github:tadfisher/android-nixpkgs";
     flake-parts.url = "github:hercules-ci/flake-parts";
   };
-  
   outputs = inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "x86_64-linux" ];
       perSystem = { pkgs, system, self', ... }: let
+        androidenv = inputs.android.sdk.x86_64-linux (sdkPkgs: with sdkPkgs; [
+          build-tools-34-0-0
+          cmdline-tools-latest
+          platform-tools
+          platforms-android-34
+          ndk-23-2-8568313
+        ]);
+        # older glibc to make gdextension work on older linux distributions
         nixpkgs-old = import inputs.nixpkgs-old { inherit system; };
         glibc-old = nixpkgs-old.glibc // { pname = "glibc"; };
         cc-old = pkgs.wrapCCWith {
@@ -35,11 +35,20 @@
           };
         };
         stdenv-old = (pkgs.overrideCC pkgs.stdenv cc-old);
-      in {
+      in rec {
+        packages.android = packages.default.overrideAttrs {
+          ANDROID_HOME = "${androidenv}/share/android-sdk";
+          sconsFlags = [
+            "platform=android"
+          ];
+          preBuild = ''
+            substituteInPlace SConstruct \
+                --replace-fail 'env.Append(CPPPATH=["opus/include"], LIBS=["opus"], LIBPATH="opus/build")' \
+                               'env.Append(CPPPATH=["${pkgs.libopus.dev}/include/opus"], LIBS=["opus"], LIBPATH="${pkgs.pkgsCross.aarch64-multiplatform.pkgsStatic.libopus}/lib")'
+          '';
+        };
         packages.default = stdenv-old.mkDerivation {
-          NIX_CFLAGS_COMPILE = [ "-static-libgcc" "-static-libstdc++" ];
-          NIX_CFLAGS_LINK = [ "-static-libgcc" "-static-libstdc++" ];
-          name = "two-voip";
+          name = "opus-voip";
           src = inputs.self;
           prePatch = ''
             cp -r --no-preserve=mode ${inputs.godot-cpp} ./godot-cpp
@@ -48,14 +57,14 @@
             pkgs.scons
           ];
           buildInputs = [
-            self'.packages.third-party-opus
+            pkgs.pkgsStatic.libopus
           ];
           preBuild = ''
             substituteInPlace SConstruct \
                 --replace-fail 'env.Append(CPPPATH=["opus/include"], LIBS=["opus"], LIBPATH="opus/build")' \
-                               'env.Append(CPPPATH=["${inputs.opus}/include"], LIBS=["opus"], LIBPATH="${self'.packages.third-party-opus}/lib")'
+                               'env.Append(CPPPATH=["${pkgs.libopus.dev}/include/opus"], LIBS=["opus"], LIBPATH="${pkgs.pkgsStatic.libopus}/lib")'
           '';
-          installPhase = let 
+          installPhase = let
             configFile = builtins.toFile "configFile.toml" ''
               [configuration]
 
@@ -63,7 +72,6 @@
               compatibility_minimum = 4.2
 
               [libraries]
-
               linux.x86_64="res://addons/twovoip/libtwovoip.linux.template_debug.x86_64.so"
             '';
           in ''
@@ -75,30 +83,8 @@
 
             echo "" > $out/.gdignore
             ls -lah $out
-
-
           '';
-        };
-        packages.third-party-opus = pkgs.stdenv.mkDerivation {
-          NIX_CFLAGS_COMPILE = [ "-static-libgcc" "-static-libstdc++" ];
-          NIX_CFLAGS_LINK = [ "-static-libgcc" "-static-libstdc++" ];
-          name = "third-party-opus";
-          src = inputs.self;
-          prePatch = ''
-            cp -r --no-preserve=mode ${inputs.opus} ./opus
-          '';
-          postPatch = ''
-            ls -lah
-            cd opus
-          '';
-          cmakeFlags = [
-            "-DCMAKE_POSITION_INDEPENDENT_CODE=ON"
-          ];
-          nativeBuildInputs = with pkgs; [
-            cmake
-          ];
         };
       };
    };
 }
-

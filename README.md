@@ -6,8 +6,13 @@ Instructions:
 
 The build system is defined by the flake.nix file
 
-> nix build  # makes the result directory that links into the nix store
-> cd addons
-> ln -s ../result/addons/twovoip/ twovoip
+ * makes a result directory that needs to be copied into addons
+> nix build
+> cp result/addons/twovoip/*so addons/twovoip
 
+ * android version:
+> nix build .#android
+> cp result/addons/twovoip/*so addons/twovoip
+
+Make sure addons/twovoip/twovoip.gdextension point to these files:
 
