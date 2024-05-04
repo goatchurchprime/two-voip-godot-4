@@ -7,7 +7,7 @@
 using namespace godot;
 
 void HandyOpusNode::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("createencoder", "audiosamplerate", "audiosamplesize", "opussamplerate", "opusframesize"), &HandyOpusNode::createencoder); 
+    ClassDB::bind_method(D_METHOD("createencoder", "audiosamplerate", "audiosamplesize", "opussamplerate", "opusframesize", "opusbitrate"), &HandyOpusNode::createencoder); 
     ClassDB::bind_method(D_METHOD("encodeopuspacket", "audiosamples"), &HandyOpusNode::encodeopuspacket);
     ClassDB::bind_method(D_METHOD("maxabsvalue", "audiosamples"), &HandyOpusNode::maxabsvalue); 
 
@@ -47,7 +47,7 @@ HandyOpusNode::~HandyOpusNode() {
 }
 
 
-int HandyOpusNode::createencoder(int audiosamplerate, int audiosamplesize, int opussamplerate, int opusframesize) {
+int HandyOpusNode::createencoder(int audiosamplerate, int audiosamplesize, int opussamplerate, int opusframesize, int opusbitrate) {
     destroyallsamplers();
     this->opussamplerate = opussamplerate;
     this->opusframesize = opusframesize;
@@ -71,10 +71,9 @@ int HandyOpusNode::createencoder(int audiosamplerate, int audiosamplesize, int o
     // opussamplerate is one of 8000,12000,16000,24000,48000
     // opussamplesize is 480 for 10ms at 48000
     int opusapplication = OPUS_APPLICATION_VOIP; // this option includes in-band forward error correction
-    int DEFAULT_BITRATE = 24000; // bits / second from 500 to 512000
     int opuserror = 0;
     opusencoder = opus_encoder_create(opussamplerate, channels, opusapplication, &opuserror);
-    opus_encoder_ctl(opusencoder, OPUS_SET_BITRATE(DEFAULT_BITRATE));
+    opus_encoder_ctl(opusencoder, OPUS_SET_BITRATE(opusbitrate));
 
     opusframebuffer.resize(opusframesize);
     bytepacketbuffer.resize(sizeof(float)*channels*opusframesize);

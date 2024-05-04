@@ -49,10 +49,9 @@ text = "Opus Frame duration:"
 
 [node name="FrameDuration" type="OptionButton" parent="VBoxFrameLength/HBoxOpusFrame"]
 layout_mode = 2
-item_count = 6
 selected = 2
+item_count = 6
 popup/item_0/text = "2.5ms"
-popup/item_0/id = 0
 popup/item_1/text = "5ms"
 popup/item_1/id = 1
 popup/item_2/text = "10ms"
@@ -77,10 +76,9 @@ text = "Audio sampler"
 
 [node name="ResampleState" type="OptionButton" parent="VBoxFrameLength/HBoxAudioFrame"]
 layout_mode = 2
-item_count = 3
 selected = 1
+item_count = 3
 popup/item_0/text = "Uncompressed"
-popup/item_0/id = 0
 popup/item_1/text = "Speex Resample"
 popup/item_1/id = 1
 popup/item_2/text = "44.1k as 48k"
@@ -89,6 +87,27 @@ popup/item_2/id = 2
 [node name="LabFrameLength" type="Label" parent="VBoxFrameLength/HBoxAudioFrame"]
 layout_mode = 2
 text = "---"
+
+[node name="HBoxBitRate" type="HBoxContainer" parent="VBoxFrameLength"]
+layout_mode = 2
+
+[node name="LabBitRate" type="Label" parent="VBoxFrameLength/HBoxBitRate"]
+layout_mode = 2
+text = "Opus Bit Rate"
+
+[node name="BitRate" type="OptionButton" parent="VBoxFrameLength/HBoxBitRate"]
+layout_mode = 2
+selected = 0
+item_count = 5
+popup/item_0/text = "24000"
+popup/item_1/text = "12000"
+popup/item_1/id = 1
+popup/item_2/text = "10000"
+popup/item_2/id = 2
+popup/item_3/text = "6000"
+popup/item_3/id = 3
+popup/item_4/text = "3000"
+popup/item_4/id = 4
 
 [node name="PTT" type="Button" parent="."]
 layout_mode = 0
@@ -236,6 +255,7 @@ text = "myplace"
 
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
+[connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
 [connection signal="button_down" from="PTT" to="." method="_on_ptt_button_down"]
 [connection signal="button_up" from="PTT" to="." method="_on_ptt_button_up"]
 [connection signal="pressed" from="Play" to="." method="_on_play_pressed"]

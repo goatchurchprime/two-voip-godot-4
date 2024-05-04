@@ -10,17 +10,7 @@
 namespace godot {
 
 class HandyOpusNode : public Node {
-	GDCLASS(HandyOpusNode, Node)
-
-    // Constants
-    const int GODOT_SAMPLE_RATE = 44100;
-    const int OPUS_FRAME_SIZE = 480;
-    const int OPUS_SAMPLE_RATE = 48000;
-    const int CHANNELS = 2;
-    const int RESAMPLING_QUALITY = 10; // 0 to 10
-    const int DEFAULT_BITRATE = 24000; // bits / second from 500 to 512000
-    const int EXPECTED_PACKET_LOSS = 5; // percentage from 0 to 100
-
+    GDCLASS(HandyOpusNode, Node)
 
 protected:
     static void _bind_methods();
@@ -33,6 +23,7 @@ private:
     int opusframesize;
     int audiosamplerate;
     int audiosamplesize;
+    int opusbitrate;
     float Dtimeframeopus;
     float Dtimeframeaudio;
 
@@ -42,7 +33,7 @@ private:
 
 
 public:
-    int createencoder(int audiosamplerate, int audiosamplesize, int opussamplerate, int opusframesize);
+    int createencoder(int audiosamplerate, int audiosamplesize, int opussamplerate, int opusframesize, int opusbitrate);  // defaults: (48000, 480, 44100, 441, 24000)
     PackedByteArray encodeopuspacket(const PackedVector2Array& audiosamples); 
     float maxabsvalue(const PackedVector2Array& audiosamples); 
 

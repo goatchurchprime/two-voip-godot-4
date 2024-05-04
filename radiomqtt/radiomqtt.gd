@@ -17,6 +17,7 @@ const opussamplerate = 48000
 var opusframesize = 480
 var audiosamplerate = 44100
 var audiosamplesize = 441
+var opusbitrate = 24000; # bits / second from 500 to 512000
 
 func resamplerecordedsamples(orgsamples, newsamplesize):
 	var res = [ ]
@@ -35,6 +36,7 @@ func resamplerecordedsamples(orgsamples, newsamplesize):
 			
 func updatesamplerates():
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
+	opusbitrate = int($VBoxFrameLength/HBoxBitRate/BitRate.text)
 	opusframesize = int(opussamplerate*frametimems/1000)
 	var i = $VBoxFrameLength/HBoxAudioFrame/ResampleState.get_selected_id()
 	if i == 0:  # uncompressed
@@ -52,7 +54,7 @@ func updatesamplerates():
 	$VBoxFrameLength/HBoxOpusFrame/LabFrameLength.text = "%d samples" % opusframesize
 	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples" % audiosamplesize
 	if opusframesize != 0:
-		$AudioStreamMicrophone/HandyOpusEncoder.createencoder(audiosamplerate, audiosamplesize, opussamplerate, opusframesize); 
+		$AudioStreamMicrophone/HandyOpusEncoder.createencoder(audiosamplerate, audiosamplesize, opussamplerate, opusframesize, opusbitrate); 
 		print("createencoder ", audiosamplerate, " ", audiosamplesize, " ", opussamplerate, " ", opusframesize)
 	else:
 		$AudioStreamMicrophone/HandyOpusEncoder.destroyallsamplers()
@@ -104,7 +106,7 @@ func _process(_delta):
 func _on_ptt_button_up():
 	print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
 	var tm = len(recordedsamples)*audiosamplesize*1.0/audiosamplerate
-	var k = "mem: %d  time: %.01f  byt/s:%d" % [recordedopuspacketsMemSize, tm, int(recordedopuspacketsMemSize/tm)]
+	var k = "mem: %d  time: %.01f  byte/s:%d" % [recordedopuspacketsMemSize, tm, int(recordedopuspacketsMemSize/tm)]
 	$FrameCount.text = k
 	$MQTTnetwork.transportaudiopacket(JSON.stringify({"framecount":len(recordedsamples)}).to_ascii_buffer())
 
@@ -136,4 +138,7 @@ func _on_frame_duration_item_selected(index):
 	updatesamplerates()
 
 func _on_resample_state_item_selected(index):
+	updatesamplerates()
+
+func _on_option_button_item_selected(index):
 	updatesamplerates()
