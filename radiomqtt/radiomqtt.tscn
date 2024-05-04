@@ -1,9 +1,10 @@
-[gd_scene load_steps=7 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=8 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
 [ext_resource type="Script" path="res://radiomqtt/NoiseGraph.gd" id="2_bp5o4"]
 [ext_resource type="Script" path="res://radiomqtt/MQTTnetwork.gd" id="2_y485j"]
+[ext_resource type="Script" path="res://radiomqtt/voxdetector.gd" id="3_qvq17"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 
 [sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_itmlg"]
@@ -33,6 +34,53 @@ script = ExtResource("2_bp5o4")
 scale = Vector2(200, 40)
 width = 0.02
 
+[node name="VoxDetector" type="Control" parent="."]
+anchors_preset = 0
+offset_left = 47.0
+offset_top = 260.0
+offset_right = 461.0
+offset_bottom = 327.0
+script = ExtResource("3_qvq17")
+
+[node name="ColorRectOutline" type="ColorRect" parent="VoxDetector"]
+layout_mode = 0
+offset_left = -5.0
+offset_top = -10.0
+offset_right = 145.0
+offset_bottom = 30.0
+color = Color(0.255659, 0.255659, 0.255659, 1)
+
+[node name="ColorRectLoudness" type="ColorRect" parent="VoxDetector"]
+layout_mode = 0
+offset_left = 1.0
+offset_top = -6.0
+offset_right = 124.0
+offset_bottom = 26.0
+color = Color(0.224055, 0.434373, 0.715477, 1)
+
+[node name="ColorRectThreshold" type="ColorRect" parent="VoxDetector"]
+layout_mode = 0
+offset_left = 80.0
+offset_top = -6.0
+offset_right = 84.0
+offset_bottom = 26.0
+color = Color(0.689579, 0.760623, 0.0826142, 1)
+
+[node name="HSliderVox" type="HSlider" parent="VoxDetector"]
+layout_mode = 0
+offset_right = 257.0
+offset_bottom = 16.0
+value = 20.0
+
+[node name="EnableVox" type="CheckBox" parent="VoxDetector"]
+layout_mode = 0
+offset_left = 1.0
+offset_top = 36.0
+offset_right = 25.0
+offset_bottom = 60.0
+text = "Enable Vox
+"
+
 [node name="VBoxFrameLength" type="VBoxContainer" parent="."]
 layout_mode = 0
 offset_left = 537.0
@@ -49,7 +97,7 @@ text = "Opus Frame duration:"
 
 [node name="FrameDuration" type="OptionButton" parent="VBoxFrameLength/HBoxOpusFrame"]
 layout_mode = 2
-selected = 2
+selected = 3
 item_count = 6
 popup/item_0/text = "2.5ms"
 popup/item_1/text = "5ms"
@@ -179,10 +227,10 @@ text = "0
 
 [node name="MQTTnetwork" type="Control" parent="."]
 anchors_preset = 0
-offset_left = 521.0
-offset_top = 337.0
-offset_right = 929.0
-offset_bottom = 512.0
+offset_left = 544.0
+offset_top = 316.0
+offset_right = 925.0
+offset_bottom = 477.0
 script = ExtResource("2_y485j")
 
 [node name="MQTT" parent="MQTTnetwork" instance=ExtResource("2_4wm5t")]
@@ -191,10 +239,10 @@ binarymessages = true
 
 [node name="Members" type="VBoxContainer" parent="MQTTnetwork"]
 layout_mode = 0
-offset_left = -404.0
-offset_top = -1.0
-offset_right = -205.992
-offset_bottom = 103.725
+offset_left = -1.0
+offset_top = 104.0
+offset_right = 197.008
+offset_bottom = 208.725
 
 [node name="Self" parent="MQTTnetwork/Members" instance=ExtResource("4_w5dv2")]
 layout_mode = 2
@@ -206,10 +254,10 @@ text = "self
 
 [node name="ConnectMQTT" type="Button" parent="MQTTnetwork"]
 layout_mode = 0
-offset_left = -464.0
-offset_top = -117.0
-offset_right = -342.0
-offset_bottom = -76.0
+offset_left = -25.0
+offset_top = -34.0
+offset_right = 97.0
+offset_bottom = 7.0
 toggle_mode = true
 text = "Connect MQTT"
 
@@ -218,19 +266,19 @@ layout_mode = 1
 anchors_preset = -1
 anchor_right = 0.035
 anchor_bottom = 0.035
-offset_left = -303.0
-offset_top = -106.0
-offset_right = -218.28
-offset_bottom = -89.125
+offset_left = 192.0
+offset_top = -17.0
+offset_right = 277.665
+offset_bottom = 0.365
 text = "MQTTBroker
 "
 
 [node name="MQTTBroker" type="LineEdit" parent="MQTTnetwork"]
 layout_mode = 0
-offset_left = -176.0
-offset_top = -108.0
-offset_right = 85.0
-offset_bottom = -77.0
+offset_left = 49.0
+offset_top = 15.0
+offset_right = 310.0
+offset_bottom = 46.0
 text = "mosquitto.doesliverpool.xyz"
 
 [node name="Labelroom" type="Label" parent="MQTTnetwork"]
@@ -238,21 +286,22 @@ layout_mode = 1
 anchors_preset = -1
 anchor_right = 0.035
 anchor_bottom = 0.035
-offset_left = -378.0
-offset_top = -64.0
-offset_right = -305.28
-offset_bottom = -47.125
+offset_left = -42.0
+offset_top = 61.0
+offset_right = 30.72
+offset_bottom = 78.365
 text = "roomname
 "
 
 [node name="roomname" type="LineEdit" parent="MQTTnetwork"]
 layout_mode = 0
-offset_left = -284.0
-offset_top = -63.0
-offset_right = -23.0
-offset_bottom = -32.0
+offset_left = 84.0
+offset_top = 53.0
+offset_right = 345.0
+offset_bottom = 84.0
 text = "myplace"
 
+[connection signal="value_changed" from="VoxDetector/HSliderVox" to="VoxDetector" method="_on_h_slider_vox_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]

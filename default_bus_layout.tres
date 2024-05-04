@@ -6,6 +6,7 @@ buffer_length = 0.2
 
 [sub_resource type="AudioEffectSpectrumAnalyzer" id="AudioEffectSpectrumAnalyzer_qv5cd"]
 resource_name = "SpectrumAnalyzer"
+buffer_length = 1.0
 
 [resource]
 bus/1/name = &"MicrophoneBus"

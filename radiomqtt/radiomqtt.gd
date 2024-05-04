@@ -74,11 +74,15 @@ func _ready():
 	audiospectrumeffectinstance = AudioServer.get_bus_effect_instance(microphoneidx, 1)
 	updatesamplerates()
 
-func _on_ptt_button_down():
+var currentlytalking = false
+var talkingstarttime = 0
+func starttalking():
+	currentlytalking = true
 	recordedsamples = [ ]
 	recordedopuspackets = [ ]
 	recordedopuspacketsMemSize = 0
 	$MQTTnetwork.transportaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
+	talkingstarttime = Time.get_ticks_msec()
 
 func _process(_delta):
 	var s0 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(20, 500)
@@ -88,11 +92,18 @@ func _process(_delta):
 	var s2 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(2000, 20000)
 	$HighFreq.size.x = s2.x*10000 + 2
 
+	var talking = $PTT.button_pressed or ($VoxDetector/EnableVox.button_pressed and $VoxDetector/ColorRectThreshold.visible)
+	if talking and not currentlytalking:
+		starttalking()
+	elif not talking and currentlytalking:
+		endtalking()
+
 	while audiocaptureeffect.get_frames_available() >= audiosamplesize:
 		var audiosamples = audiocaptureeffect.get_buffer(audiosamplesize)
 		var a = $AudioStreamMicrophone/HandyOpusEncoder.maxabsvalue(audiosamples)
 		$NoiseGraph.addwindow(a)
-		if $PTT.button_pressed:
+		$VoxDetector.addwindow(a)
+		if currentlytalking:
 			recordedsamples.append(audiosamples)
 			if opusframesize != 0:
 				var opuspacket = $AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(audiosamples)
@@ -103,12 +114,14 @@ func _process(_delta):
 				$MQTTnetwork.transportaudiopacket(audiosamples)
 					
 
-func _on_ptt_button_up():
+func endtalking():
+	currentlytalking = false
 	print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
 	var tm = len(recordedsamples)*audiosamplesize*1.0/audiosamplerate
 	var k = "mem: %d  time: %.01f  byte/s:%d" % [recordedopuspacketsMemSize, tm, int(recordedopuspacketsMemSize/tm)]
 	$FrameCount.text = k
 	$MQTTnetwork.transportaudiopacket(JSON.stringify({"framecount":len(recordedsamples)}).to_ascii_buffer())
+	print("Talked for ", (Time.get_ticks_msec() - talkingstarttime)*0.001, " seconds")
 
 #var D = 0
 #func _input(event):
