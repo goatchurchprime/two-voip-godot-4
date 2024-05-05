@@ -19,3 +19,5 @@ Make sure addons/twovoip/twovoip.gdextension point to these files:
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1YjM0OWE1YmUxMmQ0M2EwOTRiNmY2OGY0YmNlMDQ2OCIsImlhdCI6MTcxNDkxMjY2MywiZXhwIjoyMDMwMjcyNjYzfQ.D6ejMB5DGDTxEQTxAhBZqymlgSqXqMc96KCpZ3w8O5U
 
 wss://192.168.0.101
+
+https://4gkw847c6plmeh6tlc8jn7i86m3f653a.ui.nabu.casa/
