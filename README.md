@@ -23,6 +23,7 @@ Make sure addons/twovoip/twovoip.gdextension point to these files:
 
 First clone Opus and godot-cpp modules before building them
 
+```
 > git clone git@github.com:godotengine/godot-cpp.git
 > cd godot-cpp
 > git checkout 48afa82f29354668c12cffaf6a2474dabfd395ed
@@ -33,3 +34,4 @@ First clone Opus and godot-cpp modules before building them
 > make
 > cd ../..
 > scons  (or python -m SCons on Windows)
+```
