@@ -16,3 +16,6 @@ The build system is defined by the flake.nix file
 
 Make sure addons/twovoip/twovoip.gdextension point to these files:
 
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1YjM0OWE1YmUxMmQ0M2EwOTRiNmY2OGY0YmNlMDQ2OCIsImlhdCI6MTcxNDkxMjY2MywiZXhwIjoyMDMwMjcyNjYzfQ.D6ejMB5DGDTxEQTxAhBZqymlgSqXqMc96KCpZ3w8O5U
+
+wss://192.168.0.101
