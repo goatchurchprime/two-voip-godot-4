@@ -40,3 +40,4 @@ first clone Opus and godot-cpp modules before building them
 > cd ../..
 > scons  (or python -m SCons on Windows)
 ```
+For MAC see the instructions on the one-voip here: https://github.com/RevoluPowered/one-voip-godot-4/?tab=readme-ov-file#mac
