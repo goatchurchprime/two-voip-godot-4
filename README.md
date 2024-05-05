@@ -28,6 +28,8 @@ First clone Opus and godot-cpp modules before building them
 > cd godot-cpp
 > git checkout 48afa82f29354668c12cffaf6a2474dabfd395ed
 > cd ..
+> git clone git@github.com:xiph/opus.git
+> cd opus
 > git checkout c85499757c148fede8604cffa12454206b6138ba
 > cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 > cd build
