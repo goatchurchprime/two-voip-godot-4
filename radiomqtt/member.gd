@@ -58,5 +58,7 @@ func _process(_delta):
 	while len(audiopacketsbuffer) > 0 and audiostreamgeneratorplayback.get_frames_available() > len(audiopacketsbuffer[0]):
 		var audiosamples = audiopacketsbuffer.pop_front()
 		#print(D, " ", len(audiosamples), " samples pushed into available ", audiostreamgeneratorplayback.get_frames_available(), "  ", audiostreamgeneratorplayback.get_skips())
+		var a = $HandyOpusDecoder.maxabsvalue(audiosamples)
+		$ColorRect2.scale.x = 0.1 + a
 		audiostreamgeneratorplayback.push_buffer(audiosamples)
 
