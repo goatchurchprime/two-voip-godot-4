@@ -14,6 +14,7 @@ void HandyOpusNode::_bind_methods() {
     ClassDB::bind_method(D_METHOD("createdecoder", "opussamplerate", "opusframesize", "audiosamplerate", "audiosamplesize"), &HandyOpusNode::createdecoder); 
     ClassDB::bind_method(D_METHOD("decodeopuspacket", "bytepacket", "decode_fec"), &HandyOpusNode::decodeopuspacket); 
     ClassDB::bind_method(D_METHOD("resampledecodedopuspacket", "lopusframebuffer"), &HandyOpusNode::resampledecodedopuspacket); 
+    ClassDB::bind_method(D_METHOD("decodeopuspacketSP", "bytepacket", "decode_fec", "audiostreamgeneratorplayback"), &HandyOpusNode::decodeopuspacketSP); 
 
     ClassDB::bind_method(D_METHOD("destroyallsamplers"), &HandyOpusNode::destroyallsamplers); 
 }
@@ -158,23 +159,19 @@ PackedVector2Array HandyOpusNode::decodeopuspacket(const PackedByteArray& bytepa
     return audiosamplesOut;
 }
 
-//	int target_buffer_size = mix_rate * buffer_len;
-//	playback->buffer.resize(nearest_shift(target_buffer_size));
-
-
-bool HandyOpusNode::decodeopuspacketSP(const PackedByteArray& bytepacket, int decode_fec, AudioStreamGeneratorPlayback& audiostreamgeneratorplayback) {
+bool HandyOpusNode::decodeopuspacketSP(const PackedByteArray& bytepacket, int decode_fec, AudioStreamGeneratorPlayback* audiostreamgeneratorplayback) {
     int decodedsamples = opus_decode_float(opusdecoder, bytepacket.ptr(), bytepacket.size(), (float*)opusframebuffer.ptrw(), opusframesize, decode_fec);
     assert (decodedsamples > 0);
     if (speexresampler == NULL) {
         assert (audiosamplesize == opusframesize); 
-        return audiostreamgeneratorplayback.push_buffer(opusframebuffer);
+        return audiostreamgeneratorplayback->push_buffer(opusframebuffer);
     }
     unsigned int Nopusframebuffer = opusframebuffer.size();
     assert (Nopusframebuffer == opusframesize); 
     unsigned int Nsamples = audiosamplesOut.size();
     assert (Nsamples == audiosamplesize); 
     int resampling_result = speex_resampler_process_interleaved_float(speexresampler, (float*)opusframebuffer.ptr(), &Nopusframebuffer, (float*)audiosamplesOut.ptrw(), &Nsamples);
-    return audiostreamgeneratorplayback.push_buffer(audiosamplesOut);
+    return audiostreamgeneratorplayback->push_buffer(audiosamplesOut);
 }
 
 PackedVector2Array HandyOpusNode::resampledecodedopuspacket(const PackedVector2Array& lopusframebuffer) {
@@ -188,5 +185,82 @@ PackedVector2Array HandyOpusNode::resampledecodedopuspacket(const PackedVector2A
     assert (Nsamples == audiosamplesize); 
     int resampling_result = speex_resampler_process_interleaved_float(speexresampler, (float*)lopusframebuffer.ptr(), &Nopusframebuffer, (float*)audiosamplesOut.ptrw(), &Nsamples);
     return audiosamplesOut;
+}
+
+
+
+////////////////////////
+void OpusEncoderNode::_bind_methods() {
+//    ClassDB::bind_method(D_METHOD("send_test_packets"), &VOIPInputCapture::send_test_packets);
+
+    ClassDB::bind_method(D_METHOD("set_opussamplerate", "opussamplerate"), &OpusEncoderNode::set_opussamplerate);
+    ClassDB::bind_method(D_METHOD("get_opussamplerate"), &OpusEncoderNode::get_opussamplerate);
+    ClassDB::bind_method(D_METHOD("set_opusframesize", "opusframesize"), &OpusEncoderNode::set_opusframesize);
+    ClassDB::bind_method(D_METHOD("get_opusframesize"), &OpusEncoderNode::get_opusframesize);
+    ClassDB::bind_method(D_METHOD("set_opusbitrate", "opusbitrate"), &OpusEncoderNode::set_opusbitrate);
+    ClassDB::bind_method(D_METHOD("get_opusbitrate"), &OpusEncoderNode::get_opusbitrate);
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "opussamplerate", PROPERTY_HINT_RANGE, "8000,48000,4000"), "set_opussamplerate", "get_opussamplerate");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "opusframesize", PROPERTY_HINT_RANGE, "20,2880,2"), "set_opusframesize", "get_opusframesize");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "opusbitrate", PROPERTY_HINT_RANGE, "3000,24000,1000"), "set_opusbitrate", "get_opusbitrate");
+
+    ClassDB::bind_method(D_METHOD("captureaudio", "audioeffectcapture"), &OpusEncoderNode::captureaudio);
+}
+
+void OpusEncoderNode::destructencoder() {
+    if (opusencoder != NULL) {
+        opus_encoder_destroy(opusencoder);
+        opusencoder = NULL;
+    }
+}
+
+void OpusEncoderNode::set_opussamplerate(int lopussamplerate) {
+    destructencoder();
+    opussamplerate = lopussamplerate;
+}
+int OpusEncoderNode::get_opussamplerate() {
+    return opussamplerate;
+}
+
+void OpusEncoderNode::set_opusframesize(int lopusframesize) {
+    destructencoder();
+    opusframesize = lopusframesize;
+}
+int OpusEncoderNode::get_opusframesize() {
+    return opusframesize;
+}
+
+void OpusEncoderNode::set_opusbitrate(int lopusbitrate) {
+    destructencoder();
+    opusbitrate = lopusbitrate;
+}
+int OpusEncoderNode::get_opusbitrate() {
+    return opusbitrate;
+}
+
+OpusEncoderNode::OpusEncoderNode() {
+    opusencoder = NULL;
+    speexresampler = NULL;
+}
+
+OpusEncoderNode::~OpusEncoderNode() {
+    destructencoder();
+    speexresampler = NULL;
+}
+
+float OpusEncoderNode::captureaudio(AudioEffectCapture* audioeffectcapture) {
+    if (audioeffectcapture->can_get_buffer(audiosamplesize)) {
+        capturedaudioframe = audioeffectcapture->get_buffer(audiosamplesize);
+
+        float r = 0.0F;
+        float* p = (float*)capturedaudioframe.ptr();
+        int N = capturedaudioframe.size()*2;
+        for (int i = 0; i < N; i++) {
+            float s = fabs(p[i]);
+            if (s > r)
+                r = s;
+        }
+        return r;
+    }
+    return -1.0F;
 }
 

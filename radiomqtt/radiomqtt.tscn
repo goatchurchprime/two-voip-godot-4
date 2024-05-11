@@ -172,6 +172,8 @@ bus = &"MicrophoneBus"
 
 [node name="HandyOpusEncoder" type="HandyOpusNode" parent="AudioStreamMicrophone"]
 
+[node name="OpusEncoderNode" type="OpusEncoderNode" parent="AudioStreamMicrophone"]
+
 [node name="LowFreq" type="ColorRect" parent="."]
 layout_mode = 0
 offset_left = 49.0

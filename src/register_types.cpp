@@ -16,6 +16,7 @@ void initialize_two_voip_module(ModuleInitializationLevel p_level) {
     }
 
     ClassDB::register_class<HandyOpusNode>();
+    ClassDB::register_class<OpusEncoderNode>();
 }
 
 void uninitialize_two_voip_module(ModuleInitializationLevel p_level) {
@@ -36,3 +37,4 @@ GDExtensionBool GDE_EXPORT two_voip_library_init(GDExtensionInterfaceGetProcAddr
     return init_obj.init();
 }
 }
+

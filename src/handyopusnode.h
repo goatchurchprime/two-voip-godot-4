@@ -3,6 +3,7 @@
 
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/audio_stream_generator_playback.hpp>
+#include <godot_cpp/classes/audio_effect_capture.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include "opus.h"
@@ -40,7 +41,7 @@ public:
 
     int createdecoder(int opussamplerate, int opusframesize, int audiosamplerate, int audiosamplesize); 
     PackedVector2Array decodeopuspacket(const PackedByteArray& bytepacket, int decode_fec);
-    bool decodeopuspacketSP(const PackedByteArray& bytepacket, int decode_fec, AudioStreamGeneratorPlayback& audiostreamgeneratorplayback);
+    bool decodeopuspacketSP(const PackedByteArray& bytepacket, int decode_fec, AudioStreamGeneratorPlayback* audiostreamgeneratorplayback);
 
     PackedVector2Array resampledecodedopuspacket(const PackedVector2Array& lopusframebuffer);
 
@@ -53,6 +54,41 @@ public:
 
 
 
+class OpusEncoderNode : public Node {
+    GDCLASS(OpusEncoderNode, Node)
+
+protected:
+    static void _bind_methods();
+
+private:
+    PackedVector2Array capturedaudioframe;
+
+    OpusEncoder* opusencoder = NULL;
+    SpeexResamplerState* speexresampler = NULL;
+    int opussamplerate = 48000;
+    int opusframesize = 960;
+    int opusbitrate = 24000;
+    
+    int audiosamplerate = 44100;
+    int audiosamplesize = 441;
+
+    void destructencoder();
+    
+public:
+    void set_opussamplerate(int lopussamplerate);
+    int get_opussamplerate();
+    void set_opusframesize(int lopusframesize);
+    int get_opusframesize();
+    void set_opusbitrate(int lopusbitrate);
+    int get_opusbitrate();
+    
+    float captureaudio(AudioEffectCapture* audioeffectcapture);
+    
+    OpusEncoderNode();
+    ~OpusEncoderNode();
+    
+
+};
 
 }
 
