@@ -158,6 +158,25 @@ PackedVector2Array HandyOpusNode::decodeopuspacket(const PackedByteArray& bytepa
     return audiosamplesOut;
 }
 
+//	int target_buffer_size = mix_rate * buffer_len;
+//	playback->buffer.resize(nearest_shift(target_buffer_size));
+
+
+bool HandyOpusNode::decodeopuspacketSP(const PackedByteArray& bytepacket, int decode_fec, AudioStreamGeneratorPlayback& audiostreamgeneratorplayback) {
+    int decodedsamples = opus_decode_float(opusdecoder, bytepacket.ptr(), bytepacket.size(), (float*)opusframebuffer.ptrw(), opusframesize, decode_fec);
+    assert (decodedsamples > 0);
+    if (speexresampler == NULL) {
+        assert (audiosamplesize == opusframesize); 
+        return audiostreamgeneratorplayback.push_buffer(opusframebuffer);
+    }
+    unsigned int Nopusframebuffer = opusframebuffer.size();
+    assert (Nopusframebuffer == opusframesize); 
+    unsigned int Nsamples = audiosamplesOut.size();
+    assert (Nsamples == audiosamplesize); 
+    int resampling_result = speex_resampler_process_interleaved_float(speexresampler, (float*)opusframebuffer.ptr(), &Nopusframebuffer, (float*)audiosamplesOut.ptrw(), &Nsamples);
+    return audiostreamgeneratorplayback.push_buffer(audiosamplesOut);
+}
+
 PackedVector2Array HandyOpusNode::resampledecodedopuspacket(const PackedVector2Array& lopusframebuffer) {
     if (speexresampler == NULL) {
         assert (audiosamplesize == opusframesize); 

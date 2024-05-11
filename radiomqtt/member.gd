@@ -51,12 +51,12 @@ var D = 0
 func _process(_delta):
 	D += 1
 	$ColorRect.visible = (len(audiopacketsbuffer) > 0)
-	while len(opuspacketsbuffer) != 0:
-		var opuspacket = opuspacketsbuffer.pop_front()
-		var samples = $HandyOpusDecoder.decodeopuspacket(opuspacket, 0)
-		audiopacketsbuffer.push_back(samples)
+	#print("audiostreamgeneratorplayback", audiostreamgeneratorplayback.get_buffer_length())
 	while len(audiopacketsbuffer) > 0 and audiostreamgeneratorplayback.get_frames_available() > len(audiopacketsbuffer[0]):
 		var audiosamples = audiopacketsbuffer.pop_front()
 		#print(D, " ", len(audiosamples), " samples pushed into available ", audiostreamgeneratorplayback.get_frames_available(), "  ", audiostreamgeneratorplayback.get_skips())
 		audiostreamgeneratorplayback.push_buffer(audiosamples)
+	while len(opuspacketsbuffer) > 0 and audiostreamgeneratorplayback.get_frames_available() > audiosamplesize:
+		var opuspacket = opuspacketsbuffer.pop_front()
+		$HandyOpusDecoder.decodeopuspacketSP(opuspacket, 0, audiostreamgeneratorplayback)
 

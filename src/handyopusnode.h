@@ -2,6 +2,7 @@
 #define HANDYOPUSNODE_H
 
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/audio_stream_generator_playback.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include "opus.h"
@@ -39,6 +40,7 @@ public:
 
     int createdecoder(int opussamplerate, int opusframesize, int audiosamplerate, int audiosamplesize); 
     PackedVector2Array decodeopuspacket(const PackedByteArray& bytepacket, int decode_fec);
+    bool decodeopuspacketSP(const PackedByteArray& bytepacket, int decode_fec, AudioStreamGeneratorPlayback& audiostreamgeneratorplayback);
 
     PackedVector2Array resampledecodedopuspacket(const PackedVector2Array& lopusframebuffer);
 
