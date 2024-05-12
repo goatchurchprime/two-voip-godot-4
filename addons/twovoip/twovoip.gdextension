@@ -1,0 +1,9 @@
+[configuration]
+
+entry_symbol = "two_voip_library_init"
+compatibility_minimum = 4.2
+
+[libraries]
+
+linux.x86_64="res://addons/twovoip/libtwovoip.linux.template_debug.x86_64.so"
+android.debug.arm64 = "res://addons/twovoip/libtwovoip.android.template_debug.arm64.so"
