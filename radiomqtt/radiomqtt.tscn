@@ -303,6 +303,8 @@ offset_right = 345.0
 offset_bottom = 84.0
 text = "myplace"
 
+[node name="Label3D" type="Label3D" parent="."]
+
 [connection signal="value_changed" from="VoxDetector/HSliderVox" to="VoxDetector" method="_on_h_slider_vox_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]

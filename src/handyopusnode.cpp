@@ -199,17 +199,29 @@ void OpusEncoderNode::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_opusframesize"), &OpusEncoderNode::get_opusframesize);
     ClassDB::bind_method(D_METHOD("set_opusbitrate", "opusbitrate"), &OpusEncoderNode::set_opusbitrate);
     ClassDB::bind_method(D_METHOD("get_opusbitrate"), &OpusEncoderNode::get_opusbitrate);
+    ClassDB::bind_method(D_METHOD("set_audiosamplerate", "audiosamplerate"), &OpusEncoderNode::set_audiosamplerate);
+    ClassDB::bind_method(D_METHOD("get_audiosamplerate"), &OpusEncoderNode::get_audiosamplerate);
+    ClassDB::bind_method(D_METHOD("set_audiosamplesize", "audiosamplesize"), &OpusEncoderNode::set_audiosamplesize);
+    ClassDB::bind_method(D_METHOD("get_audiosamplesize"), &OpusEncoderNode::get_audiosamplesize);
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opussamplerate", PROPERTY_HINT_RANGE, "8000,48000,4000"), "set_opussamplerate", "get_opussamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opusframesize", PROPERTY_HINT_RANGE, "20,2880,2"), "set_opusframesize", "get_opusframesize");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opusbitrate", PROPERTY_HINT_RANGE, "3000,24000,1000"), "set_opusbitrate", "get_opusbitrate");
 
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplerate", PROPERTY_HINT_RANGE, "41000,41000,1"), "set_audiosamplerate", "get_audiosamplerate");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplesize", PROPERTY_HINT_RANGE, "10,900,1"), "set_audiosamplesize", "get_audiosamplesize");
+
     ClassDB::bind_method(D_METHOD("captureaudio", "audioeffectcapture"), &OpusEncoderNode::captureaudio);
+    ClassDB::bind_method(D_METHOD("convertaudio"), &OpusEncoderNode::convertaudio);
 }
 
 void OpusEncoderNode::destructencoder() {
     if (opusencoder != NULL) {
         opus_encoder_destroy(opusencoder);
         opusencoder = NULL;
+    }
+    if (speexresampler != NULL) {
+        speex_resampler_destroy(speexresampler);
+        speexresampler = NULL;
     }
 }
 
@@ -237,6 +249,22 @@ int OpusEncoderNode::get_opusbitrate() {
     return opusbitrate;
 }
 
+void OpusEncoderNode::set_audiosamplerate(int laudiosamplerate) {
+    destructencoder();
+    audiosamplerate = laudiosamplerate;
+}
+int OpusEncoderNode::get_audiosamplerate() {
+    return audiosamplerate;
+}
+
+void OpusEncoderNode::set_audiosamplesize(int laudiosamplesize) {
+    destructencoder();
+    audiosamplesize = laudiosamplesize;
+}
+int OpusEncoderNode::get_audiosamplesize() {
+    return audiosamplesize;
+}
+
 OpusEncoderNode::OpusEncoderNode() {
     opusencoder = NULL;
     speexresampler = NULL;
@@ -262,5 +290,39 @@ float OpusEncoderNode::captureaudio(AudioEffectCapture* audioeffectcapture) {
         return r;
     }
     return -1.0F;
+}
+
+
+PackedByteArray OpusEncoderNode::convertaudio() {
+    if ((speexresampler == NULL) && (audiosamplerate != opussamplerate)) {
+        int channels = 2;
+        int speexerror = 0; 
+        int resamplingquality = 10;
+        speexresampler = speex_resampler_init(channels, audiosamplerate, opussamplerate, resamplingquality, &speexerror);
+        resampledaudioframe.resize(opusframesize);
+    }
+    if (opusencoder == NULL) {
+        int opusapplication = OPUS_APPLICATION_VOIP;
+        int channels = 2;
+        int opuserror = 0;
+        opusencoder = opus_encoder_create(opussamplerate, channels, opusapplication, &opuserror);
+        opus_encoder_ctl(opusencoder, OPUS_SET_BITRATE(opusbitrate));
+        opuspacketbuffer.resize(sizeof(float)*channels*opusframesize);
+    }
+    
+    int opuspacketsize = 0;
+    if (speexresampler != NULL) {
+        unsigned int Nsamples = capturedaudioframe.size();
+        unsigned int Nopusframebuffer = resampledaudioframe.size();
+        int sxerr = speex_resampler_process_interleaved_float(speexresampler, 
+                (float*)capturedaudioframe.ptr(), &Nsamples, 
+                (float*)resampledaudioframe.ptrw(), &Nopusframebuffer);
+        opuspacketsize = opus_encode_float(opusencoder, (float*)resampledaudioframe.ptr(), resampledaudioframe.size(), 
+                                                        (unsigned char*)opuspacketbuffer.ptrw(), opuspacketbuffer.size());
+    } else {
+        opuspacketsize = opus_encode_float(opusencoder, (float*)capturedaudioframe.ptr(), capturedaudioframe.size(), 
+                                                (unsigned char*)opuspacketbuffer.ptrw(), opuspacketbuffer.size());
+    }
+    return opuspacketbuffer.slice(0, opuspacketsize);
 }
 

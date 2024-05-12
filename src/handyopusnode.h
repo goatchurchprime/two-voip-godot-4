@@ -62,9 +62,12 @@ protected:
 
 private:
     PackedVector2Array capturedaudioframe;
+    PackedVector2Array resampledaudioframe;
+    PackedByteArray opuspacketbuffer;
 
     OpusEncoder* opusencoder = NULL;
     SpeexResamplerState* speexresampler = NULL;
+
     int opussamplerate = 48000;
     int opusframesize = 960;
     int opusbitrate = 24000;
@@ -81,13 +84,17 @@ public:
     int get_opusframesize();
     void set_opusbitrate(int lopusbitrate);
     int get_opusbitrate();
+    void set_audiosamplerate(int laudiosamplerate);
+    int get_audiosamplerate();
+    void set_audiosamplesize(int laudiosamplesize);
+    int get_audiosamplesize();
     
     float captureaudio(AudioEffectCapture* audioeffectcapture);
-    
+    PackedByteArray convertaudio();
+
     OpusEncoderNode();
     ~OpusEncoderNode();
     
-
 };
 
 }
