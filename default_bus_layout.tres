@@ -1,4 +1,4 @@
-[gd_resource type="AudioBusLayout" load_steps=3 format=3 uid="uid://orx4iw038t0c"]
+[gd_resource type="AudioBusLayout" load_steps=4 format=3 uid="uid://orx4iw038t0c"]
 
 [sub_resource type="AudioEffectCapture" id="AudioEffectCapture_blbcn"]
 resource_name = "Capture"
@@ -7,6 +7,9 @@ buffer_length = 0.2
 [sub_resource type="AudioEffectSpectrumAnalyzer" id="AudioEffectSpectrumAnalyzer_qv5cd"]
 resource_name = "SpectrumAnalyzer"
 buffer_length = 1.0
+
+[sub_resource type="AudioEffectOpusChunked" id="AudioEffectOpusChunked_cm14n"]
+resource_name = "OpusChunked"
 
 [resource]
 bus/1/name = &"MicrophoneBus"
@@ -19,3 +22,5 @@ bus/1/effect/0/effect = SubResource("AudioEffectCapture_blbcn")
 bus/1/effect/0/enabled = true
 bus/1/effect/1/effect = SubResource("AudioEffectSpectrumAnalyzer_qv5cd")
 bus/1/effect/1/enabled = true
+bus/1/effect/2/effect = SubResource("AudioEffectOpusChunked_cm14n")
+bus/1/effect/2/enabled = true

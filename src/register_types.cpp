@@ -1,6 +1,7 @@
 #include "register_types.h"
 
 #include "handyopusnode.h"
+#include "audio_effect_opus_chunked.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
@@ -17,6 +18,9 @@ void initialize_two_voip_module(ModuleInitializationLevel p_level) {
 
     ClassDB::register_class<HandyOpusNode>();
     ClassDB::register_class<OpusEncoderNode>();
+
+    ClassDB::register_class<AudioEffectOpusChunked>();
+    ClassDB::register_class<AudioEffectOpusChunkedInstance>();
 }
 
 void uninitialize_two_voip_module(ModuleInitializationLevel p_level) {
