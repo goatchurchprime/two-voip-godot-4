@@ -2,24 +2,18 @@ extends Control
 
 
 @onready var microphoneidx = AudioServer.get_bus_index("MicrophoneBus")
-var audiocaptureeffect : AudioEffectCapture
+
+var audioopuschunkedeffect : AudioEffectOpusChunked
 var audiospectrumeffect : AudioEffectSpectrumAnalyzer
 var audiospectrumeffectinstance : AudioEffectSpectrumAnalyzerInstance
-var audioopuschunkedeffect : AudioEffectOpusChunked
-
 
 var recordedsamples = [ ]
 var recordedopuspackets = [ ]
 var recordedopuspacketsMemSize = 0
 var recordedheader = { }
 
-const opussamplerate = 48000
-var opusframesize = 480
-var audiosamplerate = 44100
-var audiosamplesize = 441
-var opusbitrate = 24000; # bits / second from 500 to 512000
-
 func resamplerecordedsamples(orgsamples, newsamplesize):
+	assert (newsamplesize > 0)
 	var res = [ ]
 	var currentsample = PackedVector2Array()
 	while len(orgsamples) != 0:
@@ -30,49 +24,45 @@ func resamplerecordedsamples(orgsamples, newsamplesize):
 		else:
 			currentsample.append_array(s)
 		while len(currentsample) >= newsamplesize:
-			res.append(currentsample + s.slice(0, newsamplesize))
-			currentsample = s.slice(newsamplesize)
+			res.append(currentsample.slice(0, newsamplesize))
+			currentsample = currentsample.slice(newsamplesize)
 	return res
 			
 func updatesamplerates():
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
-	opusbitrate = int($VBoxFrameLength/HBoxBitRate/BitRate.text)
-	opusframesize = int(opussamplerate*frametimems/1000)
+	audioopuschunkedeffect.opusbitrate = int($VBoxFrameLength/HBoxBitRate/BitRate.text)
+	audioopuschunkedeffect.opusframesize = int(audioopuschunkedeffect.opussamplerate*frametimems/1000)
 	var i = $VBoxFrameLength/HBoxAudioFrame/ResampleState.get_selected_id()
 	if i == 0:  # uncompressed
-		audiosamplerate = 44100
-		audiosamplesize = int(audiosamplerate*frametimems/1000)
+		audioopuschunkedeffect.audiosamplesize = int(audioopuschunkedeffect.audiosamplerate*frametimems/1000)
 		recordedopuspackets = [ ]
-		opusframesize = 0
+		audioopuschunkedeffect.opusframesize = 0
 	elif i == 1: # Speexresample
-		audiosamplerate = 44100
-		audiosamplesize = int(audiosamplerate*frametimems/1000)
+		audioopuschunkedeffect.audiosamplesize = int(audioopuschunkedeffect.audiosamplerate*frametimems/1000)
 	else:  # 441.1k as 48k fakery
-		audiosamplerate = opussamplerate
-		audiosamplesize = opusframesize
+		audioopuschunkedeffect.audiosamplesize = audioopuschunkedeffect.opusframesize
 		
-	$VBoxFrameLength/HBoxOpusFrame/LabFrameLength.text = "%d samples" % opusframesize
-	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples" % audiosamplesize
-	if opusframesize != 0:
-		$AudioStreamMicrophone/HandyOpusEncoder.createencoder(audiosamplerate, audiosamplesize, opussamplerate, opusframesize, opusbitrate); 
-		print("createencoder ", audiosamplerate, " ", audiosamplesize, " ", opussamplerate, " ", opusframesize)
-	else:
-		$AudioStreamMicrophone/HandyOpusEncoder.destroyallsamplers()
-	recordedheader = { "opusframesize":opusframesize, "audiosamplesize":audiosamplesize, "opussamplerate":opussamplerate, "audiosamplerate":audiosamplerate }
-	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audiosamplesize:
-		recordedsamples = resamplerecordedsamples(recordedsamples, audiosamplesize)
-	if opusframesize != 0:
+	$VBoxFrameLength/HBoxOpusFrame/LabFrameLength.text = "%d samples" % audioopuschunkedeffect.opusframesize
+	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples" % audioopuschunkedeffect.audiosamplesize
+	recordedheader = { "opusframesize":audioopuschunkedeffect.opusframesize, "audiosamplesize":audioopuschunkedeffect.audiosamplesize, "opussamplerate":audioopuschunkedeffect.opussamplerate, "audiosamplerate":audioopuschunkedeffect.audiosamplerate }
+	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audioopuschunkedeffect.audiosamplesize:
+		recordedsamples = resamplerecordedsamples(recordedsamples, audioopuschunkedeffect.audiosamplesize)
+	if audioopuschunkedeffect.opusframesize != 0:
 		recordedopuspackets = [ ]
+		recordedopuspacketsMemSize = 0
 		for s in recordedsamples:
-			recordedopuspackets.append($AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(s))
-	
+			recordedopuspackets.append(audioopuschunkedeffect.chunk_to_opus_packet(s, 0))
+			recordedopuspacketsMemSize += recordedopuspackets[-1].size() 
+	var tm = len(recordedsamples)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
+	var k = "Smem: %d  time: %.01f  byte/s:%d" % [recordedopuspacketsMemSize, tm, int(recordedopuspacketsMemSize/tm)]
+	if recordedopuspacketsMemSize != 0:
+		$FrameCount.text = k
 
 func _ready():
 	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
-	audiocaptureeffect = AudioServer.get_bus_effect(microphoneidx, 0)
+	audioopuschunkedeffect = AudioServer.get_bus_effect(microphoneidx, 0)
 	audiospectrumeffect = AudioServer.get_bus_effect(microphoneidx, 1)
 	audiospectrumeffectinstance = AudioServer.get_bus_effect_instance(microphoneidx, 1)
-	audioopuschunkedeffect = AudioServer.get_bus_effect(microphoneidx, 2)
 	updatesamplerates()
 
 var currentlytalking = false
@@ -82,6 +72,7 @@ func starttalking():
 	recordedsamples = [ ]
 	recordedopuspackets = [ ]
 	recordedopuspacketsMemSize = 0
+	print("start talking")
 	$MQTTnetwork.transportaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
 	talkingstarttime = Time.get_ticks_msec()
 
@@ -92,10 +83,6 @@ func _process(_delta):
 	$MidFreq.size.x = s1.x*1000 + 2
 	var s2 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(2000, 20000)
 	$HighFreq.size.x = s2.x*10000 + 2
-#	while audioopuschunkedeffect.chunk_available():
-#		var bb = audioopuschunkedeffect.chunk_max()
-#		$HighFreq.size.x = bb*1000 + 2
-#		audioopuschunkedeffect.drop_chunk()
 	
 	var talking = $PTT.button_pressed or ($VoxDetector/EnableVox.button_pressed and $VoxDetector/ColorRectThreshold.visible)
 	if talking and not currentlytalking:
@@ -104,16 +91,13 @@ func _process(_delta):
 		endtalking()
 
 	while audioopuschunkedeffect.chunk_available():
-#		var bb = audioopuschunkedeffect.chunk_max()
-#		$HighFreq.size.x = bb*1000 + 2
-#		audioopuschunkedeffect.drop_chunk()
 		var audiosamples = audioopuschunkedeffect.read_chunk()
 		var a = audioopuschunkedeffect.chunk_max()
 		$NoiseGraph.addwindow(a)
 		$VoxDetector.addwindow(a)
 		if currentlytalking:
 			recordedsamples.append(audiosamples)
-			if opusframesize != 0:
+			if audioopuschunkedeffect.opusframesize != 0:
 				var opuspacket = audioopuschunkedeffect.pop_opus_packet()
 				recordedopuspackets.append(opuspacket)
 				$MQTTnetwork.transportaudiopacket(opuspacket)
@@ -123,27 +107,12 @@ func _process(_delta):
 				$MQTTnetwork.transportaudiopacket(audiosamples)
 		else:
 			audioopuschunkedeffect.drop_chunk()
-
-#	while audiocaptureeffect.get_frames_available() >= audiosamplesize:
-#		var audiosamples = audiocaptureeffect.get_buffer(audiosamplesize)
-#		var a = $AudioStreamMicrophone/HandyOpusEncoder.maxabsvalue(audiosamples)
-#		$NoiseGraph.addwindow(a)
-#		$VoxDetector.addwindow(a)
-#		if currentlytalking:
-#			recordedsamples.append(audiosamples)
-#			if opusframesize != 0:
-#				var opuspacket = $AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(audiosamples)
-#				recordedopuspackets.append(opuspacket)
-#				$MQTTnetwork.transportaudiopacket(opuspacket)
-#				recordedopuspacketsMemSize += opuspacket.size()
-#			else:
-#				$MQTTnetwork.transportaudiopacket(audiosamples)
-					
-
+	
 func endtalking():
 	currentlytalking = false
 	print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
-	var tm = len(recordedsamples)*audiosamplesize*1.0/audiosamplerate
+	var tm = len(recordedsamples)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
+	print(len(recordedsamples), " audioopuschunkedeffect.audiosamplesize ", audioopuschunkedeffect.audiosamplesize, "  ", audioopuschunkedeffect.audiosamplerate)
 	var k = "mem: %d  time: %.01f  byte/s:%d" % [recordedopuspacketsMemSize, tm, int(recordedopuspacketsMemSize/tm)]
 	$FrameCount.text = k
 	$MQTTnetwork.transportaudiopacket(JSON.stringify({"framecount":len(recordedsamples)}).to_ascii_buffer())

@@ -17,5 +17,5 @@ func addwindow(v):
 	if len(x) == 50:
 		$Line2D.points = PackedVector2Array(x)
 		x = [ ]
-		print("Mx ", Mx)
+		#print("Mx ", Mx)
 		Mx = 0

@@ -20,7 +20,7 @@
 /* included in all copies or substantial portions of the Software.        */
 /*                                                                        */
 /* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED httpTO THE WARRANTIES OF     */
 /* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
 /* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
 /* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
@@ -90,32 +90,32 @@ void AudioEffectOpusChunked::createencoder() {
 	audiosamplebuffer.resize(audiosamplesize*audiosamplechunks); 
 	chunknumber = 0;
 	bufferend = 0;
-
+	if (opusframesize == 0)
+		return; 
+	
 	int channels = 2;
+	float Dtimeframeopus = opusframesize*1.0F/opussamplerate;
+	float Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
     if (audiosamplesize != opusframesize) {
         int speexerror = 0; 
         int resamplingquality = 10;
         // the speex resampler needs sample rates to be consistent with the sample buffer sizes
         speexresampler = speex_resampler_init(channels, audiosamplerate, opussamplerate, resamplingquality, &speexerror);
 		audioresampledbuffer.resize(opusframesize);
-	    printf("Encoder timeframeopus equating different sample rates\n"); 
+	    printf("Encoder timeframeopus resampler %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
     } else {
-		float Dtimeframeopus = opusframesize*1.0F/opussamplerate;
-    	float Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
-	    printf("Encoder timeframeopus %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
+	    printf("Encoder timeframeopus equating %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
 	}
 
     // opussamplerate is one of 8000,12000,16000,24000,48000
     // opussamplesize is 480 for 10ms at 48000
-	if (opusframesize != 0) {
-		int opusapplication = OPUS_APPLICATION_VOIP; // this option includes in-band forward error correction
-		int opuserror = 0;
-		opusencoder = opus_encoder_create(opussamplerate, channels, opusapplication, &opuserror);
-		opus_encoder_ctl(opusencoder, OPUS_SET_BITRATE(opusbitrate));
-		opusbytebuffer.resize(sizeof(float)*channels*opusframesize);
-		if (opuserror != 0) 
-			printf("We have an opus error*** %d\n", opuserror); 
-	}
+	int opusapplication = OPUS_APPLICATION_VOIP; // this option includes in-band forward error correction
+	int opuserror = 0;
+	opusencoder = opus_encoder_create(opussamplerate, channels, opusapplication, &opuserror);
+	opus_encoder_ctl(opusencoder, OPUS_SET_BITRATE(opusbitrate));
+	opusbytebuffer.resize(sizeof(float)*channels*opusframesize);
+	if (opuserror != 0) 
+		printf("We have an opus error*** %d\n", opuserror); 
 }
 
 void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count) {
@@ -126,14 +126,12 @@ void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame 
 	for (int i = 0; i < p_frame_count; i++) {
 		p_dst_frames[i] = p_src_frames[i];
 		audiosamplebuffer.set(bufferend, Vector2(p_src_frames[i].left, p_src_frames[i].right));
+		bufferend += 1; 
 		if (bufferend == chunkstart) {
-			chunknumber += 1; 
-			if (chunknumber == audiosamplechunks) 
-				chunknumber = 0;
+			drop_chunk(); 
 			chunkstart = chunknumber*audiosamplesize;
 			discardedchunks += 1; 
 		}
-		bufferend += 1; 
 		if (bufferend == audiosamplebuffer.size())
 			bufferend = 0;
 	}
@@ -174,6 +172,8 @@ PackedVector2Array AudioEffectOpusChunked::read_chunk() {
 }
 
 PackedByteArray AudioEffectOpusChunked::chunk_to_opus_packet(const PackedVector2Array& audiosamplebuffer, int begin) {
+	if (chunknumber == -1) 
+		createencoder();
 	float* paudiosamples = (float*)audiosamplebuffer.ptr() + begin*2; 
     if (audiosamplesize != opusframesize) {
 		unsigned int Uaudiosamplesize = audiosamplesize;
