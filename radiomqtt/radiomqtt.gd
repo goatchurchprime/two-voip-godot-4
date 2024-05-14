@@ -91,11 +91,11 @@ func _process(_delta):
 	var s1 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(500, 2000)
 	$MidFreq.size.x = s1.x*1000 + 2
 	var s2 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(2000, 20000)
-	#$HighFreq.size.x = s2.x*10000 + 2
-	while audioopuschunkedeffect.chunk_available():
-		var bb = audioopuschunkedeffect.chunk_max()
-		$HighFreq.size.x = bb*1000 + 2
-		audioopuschunkedeffect.pop_chunk(false)
+	$HighFreq.size.x = s2.x*10000 + 2
+#	while audioopuschunkedeffect.chunk_available():
+#		var bb = audioopuschunkedeffect.chunk_max()
+#		$HighFreq.size.x = bb*1000 + 2
+#		audioopuschunkedeffect.drop_chunk()
 	
 	var talking = $PTT.button_pressed or ($VoxDetector/EnableVox.button_pressed and $VoxDetector/ColorRectThreshold.visible)
 	if talking and not currentlytalking:
@@ -103,20 +103,41 @@ func _process(_delta):
 	elif not talking and currentlytalking:
 		endtalking()
 
-	while audiocaptureeffect.get_frames_available() >= audiosamplesize:
-		var audiosamples = audiocaptureeffect.get_buffer(audiosamplesize)
-		var a = $AudioStreamMicrophone/HandyOpusEncoder.maxabsvalue(audiosamples)
+	while audioopuschunkedeffect.chunk_available():
+#		var bb = audioopuschunkedeffect.chunk_max()
+#		$HighFreq.size.x = bb*1000 + 2
+#		audioopuschunkedeffect.drop_chunk()
+		var audiosamples = audioopuschunkedeffect.read_chunk()
+		var a = audioopuschunkedeffect.chunk_max()
 		$NoiseGraph.addwindow(a)
 		$VoxDetector.addwindow(a)
 		if currentlytalking:
 			recordedsamples.append(audiosamples)
 			if opusframesize != 0:
-				var opuspacket = $AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(audiosamples)
+				var opuspacket = audioopuschunkedeffect.pop_opus_packet()
 				recordedopuspackets.append(opuspacket)
 				$MQTTnetwork.transportaudiopacket(opuspacket)
 				recordedopuspacketsMemSize += opuspacket.size()
 			else:
+				audioopuschunkedeffect.drop_chunk()
 				$MQTTnetwork.transportaudiopacket(audiosamples)
+		else:
+			audioopuschunkedeffect.drop_chunk()
+
+#	while audiocaptureeffect.get_frames_available() >= audiosamplesize:
+#		var audiosamples = audiocaptureeffect.get_buffer(audiosamplesize)
+#		var a = $AudioStreamMicrophone/HandyOpusEncoder.maxabsvalue(audiosamples)
+#		$NoiseGraph.addwindow(a)
+#		$VoxDetector.addwindow(a)
+#		if currentlytalking:
+#			recordedsamples.append(audiosamples)
+#			if opusframesize != 0:
+#				var opuspacket = $AudioStreamMicrophone/HandyOpusEncoder.encodeopuspacket(audiosamples)
+#				recordedopuspackets.append(opuspacket)
+#				$MQTTnetwork.transportaudiopacket(opuspacket)
+#				recordedopuspacketsMemSize += opuspacket.size()
+#			else:
+#				$MQTTnetwork.transportaudiopacket(audiosamples)
 					
 
 func endtalking():

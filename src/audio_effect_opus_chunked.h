@@ -56,29 +56,30 @@ protected:
 	static void _bind_methods() {;};
 
 public:
-	virtual void _process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) override;
-	virtual bool _process_silence() const override;
+	virtual void _process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) override; 
+	virtual bool _process_silence() const override { return true; }
 };
 
 class AudioEffectOpusChunked : public AudioEffect {
 	GDCLASS(AudioEffectOpusChunked, AudioEffect)
 	friend class AudioEffectOpusChunkedInstance;
 
-    OpusEncoder* opusencoder = NULL;
-    SpeexResamplerState* speexresampler = NULL;
-
-    int opussamplerate = 48000;
-    int opusframesize = 960;
-    int opusbitrate = 24000;
-    
     int audiosamplerate = 44100;
-    int audiosamplesize = 441;
+    int audiosamplesize = 881;
     int audiosamplechunks = 50;
 
 	PackedVector2Array audiosamplebuffer;
 	int chunknumber = -1;
 	int bufferend = 0;
 	int discardedchunks = 0;
+
+    int opussamplerate = 48000;
+    int opusframesize = 960;
+    int opusbitrate = 24000;
+    SpeexResamplerState* speexresampler = NULL;
+	PackedVector2Array audioresampledbuffer;
+    OpusEncoder* opusencoder = NULL;
+	PackedByteArray opusbytebuffer;
 
 	void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
 
@@ -88,23 +89,31 @@ protected:
 public:
 	virtual Ref<AudioEffectInstance> _instantiate() override;
 
+	void createencoder();
 	void resetencoder();
+
 	bool chunk_available();
 	float chunk_max();
-	PackedVector2Array pop_chunk(bool keep=false);
-
-    void set_opussamplerate(int lopussamplerate);
-    int get_opussamplerate();
-    void set_opusframesize(int lopusframesize);
-    int get_opusframesize();
-    void set_opusbitrate(int lopusbitrate);
-    int get_opusbitrate();
-    void set_audiosamplerate(int laudiosamplerate);
-    int get_audiosamplerate();
-    void set_audiosamplesize(int laudiosamplesize);
-    int get_audiosamplesize();
+	void drop_chunk();
+	PackedVector2Array read_chunk();
+	PackedByteArray pop_opus_packet();
+	PackedByteArray chunk_to_opus_packet(const PackedVector2Array& audiosamplebuffer, int begin);
+	
+    void set_opussamplerate(int lopussamplerate) { resetencoder(); opussamplerate = lopussamplerate; };
+    int get_opussamplerate() { return opussamplerate; };
+    void set_opusframesize(int lopusframesize) { resetencoder(); opusframesize = lopusframesize; };
+    int get_opusframesize() { return opusframesize; };
+    void set_opusbitrate(int lopusbitrate) { resetencoder(); opusbitrate = lopusbitrate; };
+    int get_opusbitrate() { return opusbitrate; };
+    void set_audiosamplerate(int laudiosamplerate) { resetencoder(); audiosamplerate = laudiosamplerate; };
+    int get_audiosamplerate() { return audiosamplerate; };
+    void set_audiosamplesize(int laudiosamplesize) { resetencoder(); audiosamplesize = laudiosamplesize; };
+    int get_audiosamplesize() { return audiosamplesize; };
     void set_audiosamplechunks(int laudiosamplechunks) { resetencoder(); audiosamplechunks = laudiosamplechunks; };
     int get_audiosamplechunks() { return audiosamplechunks; };
+
+	AudioEffectOpusChunked() {;};
+	~AudioEffectOpusChunked() { resetencoder(); };
 };
 
 }
