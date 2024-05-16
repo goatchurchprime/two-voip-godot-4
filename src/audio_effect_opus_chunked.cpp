@@ -118,6 +118,10 @@ void AudioEffectOpusChunked::createencoder() {
 		printf("We have an opus error*** %d\n", opuserror); 
 }
 
+void AudioEffectOpusChunkedInstance::_process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) {
+	base->process((const AudioFrame *)src_buffer, p_dst_frames, p_frame_count); 
+}
+
 void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count) {
 	if (chunknumber == -1) 
 		createencoder();
@@ -196,8 +200,5 @@ PackedByteArray AudioEffectOpusChunked::pop_opus_packet() {
 	return chunk_to_opus_packet(audiosamplebuffer, begin);
 }
 
-void AudioEffectOpusChunkedInstance::_process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) {
-	base->process((const AudioFrame *)src_buffer, p_dst_frames, p_frame_count); 
-}
 
 

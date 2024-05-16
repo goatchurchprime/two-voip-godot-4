@@ -2,6 +2,7 @@
 
 #include "handyopusnode.h"
 #include "audio_effect_opus_chunked.h"
+#include "audio_stream_opus_chunked.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
