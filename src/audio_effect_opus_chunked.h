@@ -96,8 +96,8 @@ public:
 	float chunk_max();
 	void drop_chunk();
 	PackedVector2Array read_chunk();
-	PackedByteArray pop_opus_packet();
-	PackedByteArray chunk_to_opus_packet(const PackedVector2Array& audiosamplebuffer, int begin);
+	PackedByteArray pop_opus_packet(const PackedByteArray& prefixbytes);
+	PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamplebuffer, int begin);
 	
     void set_opussamplerate(int lopussamplerate) { resetencoder(); opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };

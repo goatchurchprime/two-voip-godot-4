@@ -47,11 +47,15 @@ func updatesamplerates():
 	recordedheader = { "opusframesize":audioopuschunkedeffect.opusframesize, "audiosamplesize":audioopuschunkedeffect.audiosamplesize, "opussamplerate":audioopuschunkedeffect.opussamplerate, "audiosamplerate":audioopuschunkedeffect.audiosamplerate }
 	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audioopuschunkedeffect.audiosamplesize:
 		recordedsamples = resamplerecordedsamples(recordedsamples, audioopuschunkedeffect.audiosamplesize)
+	var prefixbytes = PackedByteArray([0])
 	if audioopuschunkedeffect.opusframesize != 0:
 		recordedopuspackets = [ ]
 		recordedopuspacketsMemSize = 0
+		prefixbytes.set(0,99)
 		for s in recordedsamples:
-			recordedopuspackets.append(audioopuschunkedeffect.chunk_to_opus_packet(s, 0))
+			var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, s, 0)
+			print(opuspacket[0])
+			recordedopuspackets.append(opuspacket.slice(1))
 			recordedopuspacketsMemSize += recordedopuspackets[-1].size() 
 	var tm = len(recordedsamples)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
 	var k = "Smem: %d  time: %.01f  byte/s:%d" % [recordedopuspacketsMemSize, tm, int(recordedopuspacketsMemSize/tm)]
@@ -90,6 +94,7 @@ func _process(_delta):
 	elif not talking and currentlytalking:
 		endtalking()
 
+	var prefixbytes = PackedByteArray()
 	while audioopuschunkedeffect.chunk_available():
 		var audiosamples = audioopuschunkedeffect.read_chunk()
 		var a = audioopuschunkedeffect.chunk_max()
@@ -98,7 +103,7 @@ func _process(_delta):
 		if currentlytalking:
 			recordedsamples.append(audiosamples)
 			if audioopuschunkedeffect.opusframesize != 0:
-				var opuspacket = audioopuschunkedeffect.pop_opus_packet()
+				var opuspacket = audioopuschunkedeffect.pop_opus_packet(prefixbytes)
 				recordedopuspackets.append(opuspacket)
 				$MQTTnetwork.transportaudiopacket(opuspacket)
 				recordedopuspacketsMemSize += opuspacket.size()
