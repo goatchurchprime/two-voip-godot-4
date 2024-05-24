@@ -124,7 +124,6 @@ int HandyOpusNode::createdecoder(int opussamplerate, int opusframesize, int audi
     this->audiosamplesize = audiosamplesize;
     this->Dtimeframeopus = opusframesize*1.0F/opussamplerate;
     this->Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
-    assert (Dtimeframeopus == Dtimeframeaudio);
     printf("Decoder timeframeopus %f timeframeaudio %f ***  %f \n\n", Dtimeframeopus, Dtimeframeaudio, 0.888); 
     
     int channels = 2;
@@ -135,7 +134,7 @@ int HandyOpusNode::createdecoder(int opussamplerate, int opusframesize, int audi
         opusframebuffer.resize(opusframesize);
     }
     
-    if (audiosamplerate != opussamplerate) {
+    if (opusframesize != audiosamplesize) {
         int speexerror = 0; 
         int resamplingquality = 10;
         speexresampler = speex_resampler_init(channels, opussamplerate, audiosamplerate, resamplingquality, &speexerror);

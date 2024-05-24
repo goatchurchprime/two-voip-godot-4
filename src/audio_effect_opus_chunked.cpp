@@ -96,19 +96,19 @@ void AudioEffectOpusChunked::createencoder() {
 	int channels = 2;
 	float Dtimeframeopus = opusframesize*1.0F/opussamplerate;
 	float Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
-    if (audiosamplesize != opusframesize) {
-        int speexerror = 0; 
-        int resamplingquality = 10;
-        // the speex resampler needs sample rates to be consistent with the sample buffer sizes
-        speexresampler = speex_resampler_init(channels, audiosamplerate, opussamplerate, resamplingquality, &speexerror);
+	if (audiosamplesize != opusframesize) {
+		int speexerror = 0; 
+		int resamplingquality = 10;
+		// the speex resampler needs sample rates to be consistent with the sample buffer sizes
+		speexresampler = speex_resampler_init(channels, audiosamplerate, opussamplerate, resamplingquality, &speexerror);
 		audioresampledbuffer.resize(opusframesize);
 	    printf("Encoder timeframeopus resampler %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
-    } else {
+	} else {
 	    printf("Encoder timeframeopus equating %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
 	}
 
-    // opussamplerate is one of 8000,12000,16000,24000,48000
-    // opussamplesize is 480 for 10ms at 48000
+// opussamplerate is one of 8000,12000,16000,24000,48000
+// opussamplesize is 480 for 10ms at 48000
 	int opusapplication = OPUS_APPLICATION_VOIP; // this option includes in-band forward error correction
 	int opuserror = 0;
 	opusencoder = opus_encoder_create(opussamplerate, channels, opusapplication, &opuserror);
