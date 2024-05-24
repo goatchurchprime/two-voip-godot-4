@@ -47,15 +47,13 @@ func updatesamplerates():
 	recordedheader = { "opusframesize":audioopuschunkedeffect.opusframesize, "audiosamplesize":audioopuschunkedeffect.audiosamplesize, "opussamplerate":audioopuschunkedeffect.opussamplerate, "audiosamplerate":audioopuschunkedeffect.audiosamplerate }
 	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audioopuschunkedeffect.audiosamplesize:
 		recordedsamples = resamplerecordedsamples(recordedsamples, audioopuschunkedeffect.audiosamplesize)
-	var prefixbytes = PackedByteArray([0])
+	var prefixbytes = PackedByteArray()
 	if audioopuschunkedeffect.opusframesize != 0:
 		recordedopuspackets = [ ]
 		recordedopuspacketsMemSize = 0
-		prefixbytes.set(0,99)
 		for s in recordedsamples:
 			var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, s, 0)
-			print(opuspacket[0])
-			recordedopuspackets.append(opuspacket.slice(1))
+			recordedopuspackets.append(opuspacket)
 			recordedopuspacketsMemSize += recordedopuspackets[-1].size() 
 	var tm = len(recordedsamples)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
 	var k = "Smem: %d  time: %.01f  byte/s:%d" % [recordedopuspacketsMemSize, tm, int(recordedopuspacketsMemSize/tm)]
@@ -145,6 +143,7 @@ func _on_play_pressed():
 			Dresampler.destroyallsamplers()
 		else:
 			lrecordedsamples = recordedsamples.duplicate()
+		$MQTTnetwork/Members/Self.processheaderpacket(recordedheader.duplicate())
 		$MQTTnetwork/Members/Self.audiopacketsbuffer = lrecordedsamples
 
 func _on_frame_duration_item_selected(index):

@@ -1,6 +1,7 @@
 extends Control
 
 var audiostreamgeneratorplayback : AudioStreamGeneratorPlayback
+var audiostreamopuschunked : AudioStream
 var opuspacketsbuffer = [ ]
 var audiopacketsbuffer = [ ]
 
@@ -11,8 +12,10 @@ var audiosamplesize = 441
 
 func _ready():
 	$AudioStreamPlayer.play()
+	$AudioStreamPlayer2.play()
 	audiostreamgeneratorplayback = $AudioStreamPlayer.get_stream_playback()
 	$HandyOpusDecoder.createdecoder(opussamplerate, opusframesize, audiosamplerate, audiosamplesize); 
+	audiostreamopuschunked = $AudioStreamPlayer2.stream
 	print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
 
 func setname(lname):
@@ -28,9 +31,15 @@ func processheaderpacket(h):
 		audiosamplesize = h["audiosamplesize"]
 		opussamplerate = h["opussamplerate"]
 		audiosamplerate = h["audiosamplerate"]
+		audiostreamopuschunked.opusframesize = h["opusframesize"]
+		audiostreamopuschunked.audiosamplesize = h["audiosamplesize"]
+		audiostreamopuschunked.opussamplerate = h["opussamplerate"]
+		audiostreamopuschunked.audiosamplerate = h["audiosamplerate"]
 		if opusframesize != 0:
 			$HandyOpusDecoder.createdecoder(opussamplerate, opusframesize, audiosamplerate, audiosamplesize); 
 			print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
+			#$AudioStreamPlayer.play()
+			$AudioStreamPlayer2.play()
 		else:
 			$HandyOpusDecoder.destroyallsamplers()
 
@@ -47,8 +56,18 @@ func receivemqttmessage(msg):
 		else:
 			audiopacketsbuffer.push_back(msg)
 
-var D = 0
 func _process(_delta):
+	$ColorRect.visible = (len(audiopacketsbuffer) > 0)
+	while audiostreamopuschunked.chunk_space_available():
+		if len(audiopacketsbuffer) != 0:
+			audiostreamopuschunked.push_audio_chunk(audiopacketsbuffer.pop_front())
+		elif len(opuspacketsbuffer) != 0:
+			audiostreamopuschunked.push_opus_packet(opuspacketsbuffer.pop_front(), 0, 0)
+		else:
+			break
+
+var D = 0
+func D_process(_delta):
 	D += 1
 	$ColorRect.visible = (len(audiopacketsbuffer) > 0)
 	#print("audiostreamgeneratorplayback", audiostreamgeneratorplayback.get_buffer_length())

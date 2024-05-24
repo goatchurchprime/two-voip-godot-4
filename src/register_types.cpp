@@ -22,6 +22,9 @@ void initialize_two_voip_module(ModuleInitializationLevel p_level) {
 
     ClassDB::register_class<AudioEffectOpusChunked>();
     ClassDB::register_class<AudioEffectOpusChunkedInstance>();
+
+    ClassDB::register_class<AudioStreamOpusChunked>();
+    ClassDB::register_class<AudioStreamPlaybackOpusChunked>();
 }
 
 void uninitialize_two_voip_module(ModuleInitializationLevel p_level) {

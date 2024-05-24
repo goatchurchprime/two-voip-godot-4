@@ -1,9 +1,11 @@
-[gd_scene load_steps=3 format=3 uid="uid://c1ibcb1toyerh"]
+[gd_scene load_steps=4 format=3 uid="uid://c1ibcb1toyerh"]
 
 [ext_resource type="Script" path="res://radiomqtt/member.gd" id="1_o3hks"]
 
 [sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_ngiei"]
 buffer_length = 0.2
+
+[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_xegf5"]
 
 [node name="Member" type="Control"]
 custom_minimum_size = Vector2(0, 28)
@@ -33,3 +35,6 @@ offset_top = 6.0
 offset_right = 57.0
 offset_bottom = 20.0
 color = Color(1, 1, 0.113725, 1)
+
+[node name="AudioStreamPlayer2" type="AudioStreamPlayer" parent="."]
+stream = SubResource("AudioStreamOpusChunked_xegf5")

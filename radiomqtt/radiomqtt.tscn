@@ -170,8 +170,6 @@ stream = SubResource("AudioStreamMicrophone_itmlg")
 autoplay = true
 bus = &"MicrophoneBus"
 
-[node name="HandyOpusEncoder" type="HandyOpusNode" parent="AudioStreamMicrophone"]
-
 [node name="OpusEncoderNode" type="OpusEncoderNode" parent="AudioStreamMicrophone"]
 
 [node name="LowFreq" type="ColorRect" parent="."]

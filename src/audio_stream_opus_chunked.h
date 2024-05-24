@@ -75,19 +75,19 @@ class AudioStreamOpusChunked : public AudioStream {
 
     int opussamplerate = 48000;
     int opusframesize = 960;
-    int opusbitrate = 24000;
- 	PackedVector2Array audiopreresampledbuffer;
     OpusDecoder* opusdecoder = NULL;
-	PackedByteArray opusbytebuffer;
+ 	PackedVector2Array audiopreresampledbuffer;
 
     SpeexResamplerState* speexresampler = NULL;
     int audiosamplerate = 44100;
     int audiosamplesize = 881;
-    int audiosamplechunks = 50;
+ 	PackedVector2Array Daudioresampledbuffer;
 
 	PackedVector2Array audiosamplebuffer;
+    int audiosamplechunks = 50;
 	int chunknumber = -1;
 	int bufferbegin = 0;
+	int buffertail = 0;
 	int missingsamples = 0;
 
 protected:
@@ -106,14 +106,12 @@ public:
 	bool chunk_space_available();
 	int buffered_audiosamples();
 	void push_audio_chunk(const PackedVector2Array& audiochunk);
-	void push_opus_packet(const PackedByteArray& opusbytepacket);
+	void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
 
     void set_opussamplerate(int lopussamplerate) { resetdecoder(); opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
     void set_opusframesize(int lopusframesize) { resetdecoder(); opusframesize = lopusframesize; };
     int get_opusframesize() { return opusframesize; };
-    void set_opusbitrate(int lopusbitrate) { resetdecoder(); opusbitrate = lopusbitrate; };
-    int get_opusbitrate() { return opusbitrate; };
     void set_audiosamplerate(int laudiosamplerate) { resetdecoder(); audiosamplerate = laudiosamplerate; };
     int get_audiosamplerate() { return audiosamplerate; };
     void set_audiosamplesize(int laudiosamplesize) { resetdecoder(); audiosamplesize = laudiosamplesize; };

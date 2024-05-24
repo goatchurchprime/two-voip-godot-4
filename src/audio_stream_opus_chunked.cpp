@@ -57,13 +57,14 @@ void AudioStreamOpusChunked::_bind_methods() {
 
     ClassDB::bind_method(D_METHOD("chunk_space_available"), &AudioStreamOpusChunked::chunk_space_available);
     ClassDB::bind_method(D_METHOD("push_audio_chunk", "audiochunk"), &AudioStreamOpusChunked::push_audio_chunk);
-    ClassDB::bind_method(D_METHOD("push_opus_packet", "opusbytepacket"), &AudioStreamOpusChunked::push_opus_packet);
+    ClassDB::bind_method(D_METHOD("push_opus_packet", "opusbytepacket", "begin", "decode_fec"), &AudioStreamOpusChunked::push_opus_packet);
 }
 
 Ref<AudioStreamPlayback> AudioStreamOpusChunked::_instantiate_playback() const {
     Ref<AudioStreamPlaybackOpusChunked> playback;
     playback.instantiate();
     playback->base = Ref<AudioStreamOpusChunked>(this);
+    printf(" instantiate_playback\n");
     return playback;
 }
 
@@ -81,13 +82,12 @@ void AudioStreamOpusChunked::resetdecoder() {
 
 void AudioStreamOpusChunked::createdecoder() {
 	resetdecoder();  // In case called from GDScript
-	audiosamplebuffer.resize(audiosamplesize*audiosamplechunks); 
-	chunknumber = 0;
-	bufferbegin = 0;
-	if (opusframesize == 0)
-		return; 
-	
+    int opuserror = 0;
 	int channels = 2;
+    opusdecoder = opus_decoder_create(opussamplerate, channels, &opuserror);
+	if (opuserror != 0) 
+		printf("We have an opus error*** %d\n", opuserror); 
+
 	float Dtimeframeopus = opusframesize*1.0F/opussamplerate;
 	float Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
     if (audiosamplesize != opusframesize) {
@@ -99,61 +99,76 @@ void AudioStreamOpusChunked::createdecoder() {
     } else {
 	    printf("Decoder timeframeopus equating %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
 	}
+    Daudioresampledbuffer.resize(audiosamplesize);
 
-    // opussamplerate is one of 8000,12000,16000,24000,48000
-    int opuserror = 0;
-    opusdecoder = opus_decoder_create(opussamplerate, channels, &opuserror);
-	if (opuserror != 0) 
-		printf("We have an opus error*** %d\n", opuserror); 
+	audiosamplebuffer.resize(audiosamplesize*audiosamplechunks); 
+	bufferbegin = 0;
+    buffertail = 0; 
+	chunknumber = 0;
 }
 
 bool AudioStreamOpusChunked::chunk_space_available() {
+	if (chunknumber == -1) 
+		createdecoder();
+    //buffertail = chunknumber*audiosamplesize; 
 	return ((chunknumber != -1) && 
-		((bufferbegin < chunknumber*audiosamplesize) || (bufferbegin >= (chunknumber + 1)*audiosamplesize))); 
+		((bufferbegin <= buffertail) || (bufferbegin > buffertail + audiosamplesize))); 
 }
 
 int AudioStreamOpusChunked::buffered_audiosamples() {
-    int chunkbegin = chunknumber*audiosamplesize;
-    return chunkbegin - bufferbegin;  // do the negative case
+    return (bufferbegin < bufferbegin ? buffertail - bufferbegin : buffertail - bufferbegin + audiosamplesize*audiosamplechunks);
 }
 
 void AudioStreamOpusChunked::push_audio_chunk(const PackedVector2Array& audiochunk) {
-    int chunkbegin = chunknumber*audiosamplesize;
+	if (chunknumber == -1) 
+		createdecoder();
+    if (audiochunk.size() != audiosamplesize)
+        printf("Error mismatch audiochunk size");
     for (int i = 0; i < audiosamplesize; i++) 
-        audiosamplebuffer.set(chunkbegin + i, audiochunk[i]);
+        audiosamplebuffer.set(buffertail + i, audiochunk[i]);
     chunknumber += 1;
     if (chunknumber == audiosamplechunks)
         chunknumber = 0;
+    buffertail = chunknumber*audiosamplesize; 
+    printf("audiochunk push buffertail %d \n", buffertail);
 }
 
-void AudioStreamOpusChunked::push_opus_packet(const PackedByteArray& opusbytepacket) {
-/*	int chunknumber = -1;
-	int bufferbegin = 0;
-	int missingsamples = 0;
 
-
-
+void AudioStreamOpusChunked::push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec) {
 	if (chunknumber == -1) 
-		createencoder();
-	float* paudiosamples = (float*)audiosamplebuffer.ptr() + begin*2; 
-    if (audiosamplesize != opusframesize) {
-		unsigned int Uaudiosamplesize = audiosamplesize;
-		unsigned int Uopusframesize = opusframesize;
-        int sxerr = speex_resampler_process_interleaved_float(speexresampler, 
-                paudiosamples, &Uaudiosamplesize, 
-                (float*)audioresampledbuffer.ptrw(), &Uopusframesize);
-		paudiosamples = (float*)audioresampledbuffer.ptr(); 
+		createdecoder();
+    int decodedsamples = opus_decode_float(opusdecoder, opusbytepacket.ptr() + begin, opusbytepacket.size() - begin, 
+                                           (float*)audiopreresampledbuffer.ptrw(), opusframesize, decode_fec);
+    if (audiosamplesize == opusframesize) {
+        push_audio_chunk(audiopreresampledbuffer); 
+        return;
     }
-	int bytepacketsize = opus_encode_float(opusencoder, paudiosamples, opusframesize, 
-										  (unsigned char*)opusbytebuffer.ptrw(), opusbytebuffer.size());
-    return opusbytebuffer.slice(0, bytepacketsize);
-*/
+    unsigned int Uaudiosamplesize = audiosamplesize;
+    unsigned int Uopusframesize = opusframesize;
+    int resampling_result = speex_resampler_process_interleaved_float(speexresampler, (float*)audiopreresampledbuffer.ptr(), &Uopusframesize, 
+                            (float*)Daudioresampledbuffer.ptrw(), &Uaudiosamplesize);
+    push_audio_chunk(Daudioresampledbuffer); 
 }
 
 // this needs to call the resampled one that lets us vary the speed and keep the 
 // buffer from starving, or to run it up to catch up to the rest
 int32_t AudioStreamPlaybackOpusChunked::_mix(AudioFrame *buffer, double rate_scale, int32_t frames) {
-    memset(buffer, 0, sizeof(AudioFrame) * frames);
+	if ((base->chunknumber == -1) || (base->bufferbegin == base->buffertail)) {
+        memset(buffer, 0, sizeof(AudioFrame)*frames);
+        return frames;
+    }
+    printf("_mix called %d f %d t %d  rate %f\n", base->bufferbegin, frames, base->buffertail, rate_scale);
+    for (int i = 0; i < frames; i++) {
+        if (base->bufferbegin != base->buffertail) {
+            buffer[i] = { base->audiosamplebuffer[base->bufferbegin].x, base->audiosamplebuffer[base->bufferbegin].y };
+            base->bufferbegin += 1; 
+            if (base->bufferbegin == base->audiosamplesize*base->audiosamplechunks) 
+                base->bufferbegin = 0;
+        } else {
+            buffer[i] = { 0.0F, 0.0F };
+        }
+    }
+    //memset(buffer, 0, sizeof(AudioFrame) * frames);
     //base->jitter_buffer.pop_samples(buffer, frames);
     return frames;
 }
