@@ -34,6 +34,7 @@
 
 #include <godot_cpp/classes/audio_stream.hpp>
 #include <godot_cpp/classes/audio_stream_playback.hpp>
+#include <godot_cpp/classes/audio_stream_playback_resampled.hpp>
 #include <godot_cpp/classes/audio_frame.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
@@ -49,8 +50,8 @@ class AudioStreamOpusChunked;
 
 
 // This should use AudioStreamPlaybackResampled, so we get the mix_rate done automatically
-class AudioStreamPlaybackOpusChunked : public AudioStreamPlayback {
-    GDCLASS(AudioStreamPlaybackOpusChunked, AudioStreamPlayback)
+class AudioStreamPlaybackOpusChunked : public AudioStreamPlaybackResampled {
+    GDCLASS(AudioStreamPlaybackOpusChunked, AudioStreamPlaybackResampled)
     friend class AudioStreamOpusChunked;
     Ref<AudioStreamOpusChunked> base;
     
@@ -58,14 +59,8 @@ protected:
     static void _bind_methods() {;};
 
 public:
-    virtual void _start(double p_from_pos = 0.0) override {;};
-    virtual void _stop() override {;};
-    virtual bool _is_playing() const override { return false; };
-    virtual int32_t _mix(AudioFrame *buffer, double rate_scale, int32_t frames) override;
-    
-    virtual int _get_loop_count() const override { return 0; }
-    virtual double _get_playback_position() const override { return 0; }
-    virtual void _seek(double p_time) override {;};
+	virtual int32_t _mix_resampled(AudioFrame *dst_buffer, int32_t frame_count) override;
+	virtual double _get_stream_sampling_rate() const override { return 44100.0F; };
 };
 
 

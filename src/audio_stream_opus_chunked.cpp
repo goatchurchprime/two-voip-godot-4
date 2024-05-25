@@ -39,8 +39,6 @@ void AudioStreamOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_opussamplerate"), &AudioStreamOpusChunked::get_opussamplerate);
     ClassDB::bind_method(D_METHOD("set_opusframesize", "opusframesize"), &AudioStreamOpusChunked::set_opusframesize);
     ClassDB::bind_method(D_METHOD("get_opusframesize"), &AudioStreamOpusChunked::get_opusframesize);
-    ClassDB::bind_method(D_METHOD("set_opusbitrate", "opusbitrate"), &AudioStreamOpusChunked::set_opusbitrate);
-    ClassDB::bind_method(D_METHOD("get_opusbitrate"), &AudioStreamOpusChunked::get_opusbitrate);
     ClassDB::bind_method(D_METHOD("set_audiosamplerate", "audiosamplerate"), &AudioStreamOpusChunked::set_audiosamplerate);
     ClassDB::bind_method(D_METHOD("get_audiosamplerate"), &AudioStreamOpusChunked::get_audiosamplerate);
     ClassDB::bind_method(D_METHOD("set_audiosamplesize", "audiosamplesize"), &AudioStreamOpusChunked::set_audiosamplesize);
@@ -49,7 +47,6 @@ void AudioStreamOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_audiosamplechunks"), &AudioStreamOpusChunked::get_audiosamplechunks);
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opussamplerate", PROPERTY_HINT_RANGE, "8000,48000,4000"), "set_opussamplerate", "get_opussamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opusframesize", PROPERTY_HINT_RANGE, "20,2880,2"), "set_opusframesize", "get_opusframesize");
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "opusbitrate", PROPERTY_HINT_RANGE, "3000,24000,1000"), "set_opusbitrate", "get_opusbitrate");
 
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplerate", PROPERTY_HINT_RANGE, "44100,44100,1"), "set_audiosamplerate", "get_audiosamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplesize", PROPERTY_HINT_RANGE, "10,4000,1"), "set_audiosamplesize", "get_audiosamplesize");
@@ -105,14 +102,27 @@ void AudioStreamOpusChunked::createdecoder() {
 	bufferbegin = 0;
     buffertail = 0; 
 	chunknumber = 0;
+
+    //printf("before beginresample\n");
+    //playback->begin_resample();
+    //printf("after beginresample\n");
 }
 
 bool AudioStreamOpusChunked::chunk_space_available() {
 	if (chunknumber == -1) 
 		createdecoder();
     //buffertail = chunknumber*audiosamplesize; 
-	return ((chunknumber != -1) && 
-		((bufferbegin <= buffertail) || (bufferbegin > buffertail + audiosamplesize))); 
+	if (chunknumber == -1)
+        return false;
+    if (buffertail == bufferbegin)
+        return true;
+    int nbuffertail = buffertail + audiosamplesize;
+    if ((bufferbegin > buffertail) && (bufferbegin <= nbuffertail))
+        return false;
+    int nbufferlength = audiosamplesize*audiosamplechunks;
+    if ((bufferbegin > buffertail - nbufferlength) && (bufferbegin <= nbuffertail - nbufferlength))
+        return false;
+    return true;
 }
 
 int AudioStreamOpusChunked::buffered_audiosamples() {
@@ -130,7 +140,7 @@ void AudioStreamOpusChunked::push_audio_chunk(const PackedVector2Array& audiochu
     if (chunknumber == audiosamplechunks)
         chunknumber = 0;
     buffertail = chunknumber*audiosamplesize; 
-    printf("audiochunk push buffertail %d \n", buffertail);
+    printf("audiochunk push buffertail %d beg %d \n", buffertail, bufferbegin);
 }
 
 
@@ -152,12 +162,12 @@ void AudioStreamOpusChunked::push_opus_packet(const PackedByteArray& opusbytepac
 
 // this needs to call the resampled one that lets us vary the speed and keep the 
 // buffer from starving, or to run it up to catch up to the rest
-int32_t AudioStreamPlaybackOpusChunked::_mix(AudioFrame *buffer, double rate_scale, int32_t frames) {
+int32_t AudioStreamPlaybackOpusChunked::_mix_resampled(AudioFrame *buffer, int32_t frames) {
 	if ((base->chunknumber == -1) || (base->bufferbegin == base->buffertail)) {
         memset(buffer, 0, sizeof(AudioFrame)*frames);
         return frames;
     }
-    printf("_mix called %d f %d t %d  rate %f\n", base->bufferbegin, frames, base->buffertail, rate_scale);
+    printf("_mix_resampled called %d f %d t %d\n", base->bufferbegin, frames, base->buffertail);
     for (int i = 0; i < frames; i++) {
         if (base->bufferbegin != base->buffertail) {
             buffer[i] = { base->audiosamplebuffer[base->bufferbegin].x, base->audiosamplebuffer[base->bufferbegin].y };

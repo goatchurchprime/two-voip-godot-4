@@ -16,6 +16,8 @@ func _ready():
 	audiostreamgeneratorplayback = $AudioStreamPlayer.get_stream_playback()
 	$HandyOpusDecoder.createdecoder(opussamplerate, opusframesize, audiosamplerate, audiosamplesize); 
 	audiostreamopuschunked = $AudioStreamPlayer2.stream
+	var audiostreamopyschunkedplayback = $AudioStreamPlayer2.get_stream_playback()
+	audiostreamopyschunkedplayback.begin_resample()
 	print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
 
 func setname(lname):
@@ -55,6 +57,13 @@ func receivemqttmessage(msg):
 			opuspacketsbuffer.push_back(msg)
 		else:
 			audiopacketsbuffer.push_back(msg)
+
+func _input(event):
+	if event is InputEventKey and event.pressed and event.keycode == KEY_I:
+		var audiostreamopyschunkedplayback = $AudioStreamPlayer2.get_stream_playback()
+		audiostreamopyschunkedplayback.begin_resample()
+
+
 
 func _process(_delta):
 	$ColorRect.visible = (len(audiopacketsbuffer) > 0)
