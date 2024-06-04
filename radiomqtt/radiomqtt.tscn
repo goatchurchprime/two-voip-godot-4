@@ -225,10 +225,10 @@ text = "0
 
 [node name="MQTTnetwork" type="Control" parent="."]
 anchors_preset = 0
-offset_left = 544.0
-offset_top = 316.0
-offset_right = 925.0
-offset_bottom = 477.0
+offset_left = 566.0
+offset_top = 319.0
+offset_right = 947.0
+offset_bottom = 480.0
 script = ExtResource("2_y485j")
 
 [node name="MQTT" parent="MQTTnetwork" instance=ExtResource("2_4wm5t")]
@@ -259,44 +259,36 @@ offset_bottom = 7.0
 toggle_mode = true
 text = "Connect MQTT"
 
-[node name="LabelMQTT" type="Label" parent="MQTTnetwork"]
-layout_mode = 1
-anchors_preset = -1
-anchor_right = 0.035
-anchor_bottom = 0.035
-offset_left = 192.0
-offset_top = -17.0
-offset_right = 277.665
-offset_bottom = 0.365
+[node name="VBoxMQTT" type="VBoxContainer" parent="MQTTnetwork"]
+layout_mode = 0
+offset_right = 337.0
+offset_bottom = 57.0
+
+[node name="HBoxBroker" type="HBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
+layout_mode = 2
+
+[node name="LabelMQTT" type="Label" parent="MQTTnetwork/VBoxMQTT/HBoxBroker"]
+layout_mode = 2
 text = "MQTTBroker
 "
 
-[node name="MQTTBroker" type="LineEdit" parent="MQTTnetwork"]
-layout_mode = 0
-offset_left = 49.0
-offset_top = 15.0
-offset_right = 310.0
-offset_bottom = 46.0
+[node name="MQTTBroker" type="LineEdit" parent="MQTTnetwork/VBoxMQTT/HBoxBroker"]
+layout_mode = 2
+size_flags_horizontal = 3
 text = "mosquitto.doesliverpool.xyz"
 
-[node name="Labelroom" type="Label" parent="MQTTnetwork"]
-layout_mode = 1
-anchors_preset = -1
-anchor_right = 0.035
-anchor_bottom = 0.035
-offset_left = -42.0
-offset_top = 61.0
-offset_right = 30.72
-offset_bottom = 78.365
+[node name="HBoxRoom" type="HBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Labelroom" type="Label" parent="MQTTnetwork/VBoxMQTT/HBoxRoom"]
+layout_mode = 2
 text = "roomname
 "
 
-[node name="roomname" type="LineEdit" parent="MQTTnetwork"]
-layout_mode = 0
-offset_left = 84.0
-offset_top = 53.0
-offset_right = 345.0
-offset_bottom = 84.0
+[node name="roomname" type="LineEdit" parent="MQTTnetwork/VBoxMQTT/HBoxRoom"]
+layout_mode = 2
+size_flags_horizontal = 3
 text = "myplace"
 
 [node name="Label3D" type="Label3D" parent="."]

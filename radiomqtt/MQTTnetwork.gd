@@ -17,23 +17,23 @@ func received_mqtt(topic, msg):
 				var member = load("res://radiomqtt/member.tscn").instantiate()
 				member.setname(membername)
 				$Members.add_child(member)
-				$MQTT.subscribe("twovoip/%s/%s/audio" % [$roomname.text, membername])
+				$MQTT.subscribe("twovoip/%s/%s/audio" % [$VBoxMQTT/HBoxRoom/roomname.text, membername])
 			elif msg == "dead".to_ascii_buffer():
 				var member = $Members.get_node_or_null(membername)
 				if member:
 					$Members.remove_child(member)
-					$MQTT.unsubscribe("twovoip/%s/%s/audio" % [$roomname.text, membername])
+					$MQTT.unsubscribe("twovoip/%s/%s/audio" % [$VBoxMQTT/HBoxRoom/roomname.text, membername])
 		if stopic[3] == "audio":
 			$Members.get_node(membername).receivemqttmessage(msg)
 			
 func on_broker_connect():
-	$roomname.editable = false
-	$MQTT.subscribe("twovoip/%s/+/status" % $roomname.text)
+	$VBoxMQTT/HBoxRoom/roomname.editable = false
+	$MQTT.subscribe("twovoip/%s/+/status" % $VBoxMQTT/HBoxRoom/roomname.text)
 	$MQTT.publish(statustopic, "alive".to_ascii_buffer(), true)
 
 func on_broker_disconnect():
 	print("MQTT broker disconnected")
-	$roomname.editable = true
+	$VBoxMQTT/HBoxRoom/roomname.editable = true
 
 func _on_connect_mqtt_toggled(toggled_on):
 	if toggled_on:
@@ -43,11 +43,11 @@ func _on_connect_mqtt_toggled(toggled_on):
 		randomize()
 		$MQTT.client_id = "c%d" % (2 + (randi()%0x7ffffff8))
 		myname = $MQTT.client_id
-		audioouttopic = "twovoip/%s/%s/audio" % [$roomname.text, myname]
-		statustopic = "twovoip/%s/%s/status" % [$roomname.text, myname]
-		$MQTTBroker.editable = true
+		audioouttopic = "twovoip/%s/%s/audio" % [$VBoxMQTT/HBoxRoom/roomname.text, myname]
+		statustopic = "twovoip/%s/%s/status" % [$VBoxMQTT/HBoxRoom/roomname.text, myname]
+		$VBoxMQTT/HBoxBroker/MQTTBroker.editable = false
 		$MQTT.set_last_will(statustopic, "dead".to_ascii_buffer(), true)
-		$MQTT.connect_to_broker($MQTTBroker.text)
+		$MQTT.connect_to_broker($VBoxMQTT/HBoxBroker/MQTTBroker.text)
 				
 	else:
 		print("Disconnecting MQTT")
@@ -58,5 +58,6 @@ func _on_connect_mqtt_toggled(toggled_on):
 		$MQTT.disconnect_from_server()
 		for m in $Members.get_children():
 			$Members.remove_child(m)
+		$VBoxMQTT/HBoxBroker/MQTTBroker.editable = false
 		audioouttopic = ""
 		statustopic = ""
