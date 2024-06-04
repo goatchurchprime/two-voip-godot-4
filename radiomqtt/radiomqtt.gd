@@ -121,28 +121,13 @@ func endtalking():
 	$MQTTnetwork.transportaudiopacket(JSON.stringify({"framecount":len(recordedsamples)}).to_ascii_buffer())
 	print("Talked for ", (Time.get_ticks_msec() - talkingstarttime)*0.001, " seconds")
 
-#var D = 0
-#func _input(event):
-#	if event is InputEventKey:
-#		D += 1
-#		print(D, " ", event.pressed, " ", event.keycode)
-
 func _on_play_pressed():
 	if recordedopuspackets:
 		$MQTTnetwork/Members/Self.processheaderpacket(recordedheader.duplicate())
 		$MQTTnetwork/Members/Self.opuspacketsbuffer = recordedopuspackets.duplicate()
 	else:
 		var lrecordedsamples = [ ]
-		if false:  # inline resample uncompressed case
-			var Dresampler = HandyOpusNode.new()
-			#Dresampler.createdecoder(48000, 0, 44100, 441); 
-			Dresampler.createdecoder(44100, 0, 20000, 200); 
-			print("Using local Dresampler")
-			for audiosample in recordedsamples:
-				lrecordedsamples.append(Dresampler.resampledecodedopuspacket(audiosample))
-			Dresampler.destroyallsamplers()
-		else:
-			lrecordedsamples = recordedsamples.duplicate()
+		lrecordedsamples = recordedsamples.duplicate()
 		$MQTTnetwork/Members/Self.processheaderpacket(recordedheader.duplicate())
 		$MQTTnetwork/Members/Self.audiopacketsbuffer = lrecordedsamples
 

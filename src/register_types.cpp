@@ -1,6 +1,5 @@
 #include "register_types.h"
 
-#include "handyopusnode.h"
 #include "audio_effect_opus_chunked.h"
 #include "audio_stream_opus_chunked.h"
 
@@ -16,10 +15,6 @@ void initialize_two_voip_module(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
         return;
     }
-
-    ClassDB::register_class<HandyOpusNode>();
-    ClassDB::register_class<OpusEncoderNode>();
-
     ClassDB::register_class<AudioEffectOpusChunked>();
     ClassDB::register_class<AudioEffectOpusChunkedInstance>();
 

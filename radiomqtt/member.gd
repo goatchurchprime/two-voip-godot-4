@@ -1,7 +1,6 @@
 extends Control
 
 var audiostreamopuschunked : AudioStreamOpusChunked
-var audiostreamgenerator : AudioStreamGenerator
 var audiostreamgeneratorplayback : AudioStreamGeneratorPlayback
 var opuspacketsbuffer = [ ]
 var audiopacketsbuffer = [ ]
@@ -15,15 +14,11 @@ func _ready():
 		audiostreamopyschunkedplayback.begin_resample()
 	elif audiostream.is_class("AudioStreamGenerator"):
 		audiostreamopuschunked = AudioStreamOpusChunked.new()
-		audiostreamgenerator = audiostream
 		audiostreamgeneratorplayback = $AudioStreamPlayer.get_stream_playback()
 
 		var frames_available = audiostreamgeneratorplayback.get_frames_available()
 		for i in range(frames_available):
 			audiostreamgeneratorplayback.push_frame(Vector2.ONE * sin(i*0.09))
-
-
-
 	else:
 		printerr("Incorrect AudioStream type ", audiostream)
 
