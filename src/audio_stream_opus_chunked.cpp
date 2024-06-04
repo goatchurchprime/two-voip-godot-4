@@ -55,6 +55,7 @@ void AudioStreamOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("chunk_space_available"), &AudioStreamOpusChunked::chunk_space_available);
     ClassDB::bind_method(D_METHOD("push_audio_chunk", "audiochunk"), &AudioStreamOpusChunked::push_audio_chunk);
     ClassDB::bind_method(D_METHOD("push_opus_packet", "opusbytepacket", "begin", "decode_fec"), &AudioStreamOpusChunked::push_opus_packet);
+    ClassDB::bind_method(D_METHOD("opus_packet_to_chunk", "opusbytepacket", "begin", "decode_fec"), &AudioStreamOpusChunked::opus_packet_to_chunk);
 }
 
 Ref<AudioStreamPlayback> AudioStreamOpusChunked::_instantiate_playback() const {
@@ -140,25 +141,33 @@ void AudioStreamOpusChunked::push_audio_chunk(const PackedVector2Array& audiochu
     if (chunknumber == audiosamplechunks)
         chunknumber = 0;
     buffertail = chunknumber*audiosamplesize; 
-    printf("audiochunk push buffertail %d beg %d \n", buffertail, bufferbegin);
+    //printf("audiochunk push buffertail %d beg %d \n", buffertail, bufferbegin);
 }
 
 
-void AudioStreamOpusChunked::push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec) {
+PackedVector2Array* AudioStreamOpusChunked::Popus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec) {
 	if (chunknumber == -1) 
 		createdecoder();
     int decodedsamples = opus_decode_float(opusdecoder, opusbytepacket.ptr() + begin, opusbytepacket.size() - begin, 
                                            (float*)audiopreresampledbuffer.ptrw(), opusframesize, decode_fec);
     if (audiosamplesize == opusframesize) {
-        push_audio_chunk(audiopreresampledbuffer); 
-        return;
+        return &audiopreresampledbuffer; 
     }
     unsigned int Uaudiosamplesize = audiosamplesize;
     unsigned int Uopusframesize = opusframesize;
     int resampling_result = speex_resampler_process_interleaved_float(speexresampler, (float*)audiopreresampledbuffer.ptr(), &Uopusframesize, 
                             (float*)Daudioresampledbuffer.ptrw(), &Uaudiosamplesize);
-    push_audio_chunk(Daudioresampledbuffer); 
+    return &Daudioresampledbuffer; 
 }
+
+void AudioStreamOpusChunked::push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec) {
+    push_audio_chunk(*Popus_packet_to_chunk(opusbytepacket, begin, decode_fec)); 
+}
+
+PackedVector2Array AudioStreamOpusChunked::opus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec) {
+    return *Popus_packet_to_chunk(opusbytepacket, begin, decode_fec); 
+}
+
 
 // this needs to call the resampled one that lets us vary the speed and keep the 
 // buffer from starving, or to run it up to catch up to the rest
@@ -167,7 +176,7 @@ int32_t AudioStreamPlaybackOpusChunked::_mix_resampled(AudioFrame *buffer, int32
         memset(buffer, 0, sizeof(AudioFrame)*frames);
         return frames;
     }
-    printf("_mix_resampled called %d f %d t %d\n", base->bufferbegin, frames, base->buffertail);
+    //printf("_mix_resampled called %d f %d t %d\n", base->bufferbegin, frames, base->buffertail);
     for (int i = 0; i < frames; i++) {
         if (base->bufferbegin != base->buffertail) {
             buffer[i] = { base->audiosamplebuffer[base->bufferbegin].x, base->audiosamplebuffer[base->bufferbegin].y };

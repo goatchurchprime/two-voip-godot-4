@@ -19,7 +19,7 @@ The build system is defined by the flake.nix file
 
 Make sure addons/twovoip/twovoip.gdextension point to these files:
 
-### Otherwise by hand
+### Otherwise by hand when developing
 
 Since we've not got submodules here we need to 
 first clone Opus and godot-cpp modules before building them

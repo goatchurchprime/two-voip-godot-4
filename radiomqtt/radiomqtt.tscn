@@ -170,8 +170,6 @@ stream = SubResource("AudioStreamMicrophone_itmlg")
 autoplay = true
 bus = &"MicrophoneBus"
 
-[node name="OpusEncoderNode" type="OpusEncoderNode" parent="AudioStreamMicrophone"]
-
 [node name="LowFreq" type="ColorRect" parent="."]
 layout_mode = 0
 offset_left = 49.0
@@ -247,7 +245,7 @@ offset_bottom = 208.725
 [node name="Self" parent="MQTTnetwork/Members" instance=ExtResource("4_w5dv2")]
 layout_mode = 2
 
-[node name="Label" parent="MQTTnetwork/Members/Self" index="2"]
+[node name="Label" parent="MQTTnetwork/Members/Self" index="1"]
 text = "self
 
 "

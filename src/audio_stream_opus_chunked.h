@@ -84,6 +84,7 @@ class AudioStreamOpusChunked : public AudioStream {
 	int bufferbegin = 0;
 	int buffertail = 0;
 	int missingsamples = 0;
+	PackedVector2Array* Popus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
 
 protected:
 	static void _bind_methods();
@@ -102,6 +103,14 @@ public:
 	int buffered_audiosamples();
 	void push_audio_chunk(const PackedVector2Array& audiochunk);
 	void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
+	PackedVector2Array opus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
+
+    // we should have a pop audio packet (from the pushed one) that works only when no resampling and not instantiated
+	// 
+    //void pop_audio_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
+    // also shouldn't resetdecoder if we keep setting the same sample rates etc
+    // also the example should re-implement the non-streaming, and just have these are classes made in the code 
+    // and decoding using the Generator and Capture modes
 
     void set_opussamplerate(int lopussamplerate) { resetdecoder(); opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
