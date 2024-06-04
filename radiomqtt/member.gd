@@ -6,29 +6,17 @@ var opuspacketsbuffer = [ ]
 var audiopacketsbuffer = [ ]
 
 func _ready():
-	$AudioStreamPlayer.play()
 	var audiostream = $AudioStreamPlayer.stream
+	$AudioStreamPlayer.play()
 	if audiostream.is_class("AudioStreamOpusChunked"):
 		audiostreamopuschunked = audiostream
 		var audiostreamopyschunkedplayback = $AudioStreamPlayer.get_stream_playback()
-		audiostreamopyschunkedplayback.begin_resample()
+		#audiostreamopyschunkedplayback.begin_resample()
 	elif audiostream.is_class("AudioStreamGenerator"):
 		audiostreamopuschunked = AudioStreamOpusChunked.new()
 		audiostreamgeneratorplayback = $AudioStreamPlayer.get_stream_playback()
-
-		var frames_available = audiostreamgeneratorplayback.get_frames_available()
-		for i in range(frames_available):
-			audiostreamgeneratorplayback.push_frame(Vector2.ONE * sin(i*0.09))
 	else:
 		printerr("Incorrect AudioStream type ", audiostream)
-
-
-func _input(event):
-	if event is InputEventKey and event.pressed and event.keycode == KEY_P:
-		var frames_available = audiostreamgeneratorplayback.get_frames_available()
-		for i in range(frames_available):
-			audiostreamgeneratorplayback.push_frame(Vector2.ONE * sin(i*0.07))
-
 
 func setname(lname):
 	set_name(lname)

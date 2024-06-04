@@ -23,6 +23,8 @@ func received_mqtt(topic, msg):
 				if member:
 					$Members.remove_child(member)
 					$MQTT.unsubscribe("twovoip/%s/%s/audio" % [$VBoxMQTT/HBoxRoom/roomname.text, membername])
+				else:
+					$MQTT.publish("twovoip/%s/%s/status" % [$VBoxMQTT/HBoxRoom/roomname.text, membername], "".to_ascii_buffer(), true)
 		if stopic[3] == "audio":
 			$Members.get_node(membername).receivemqttmessage(msg)
 			
@@ -43,6 +45,7 @@ func _on_connect_mqtt_toggled(toggled_on):
 		randomize()
 		$MQTT.client_id = "c%d" % (2 + (randi()%0x7ffffff8))
 		myname = $MQTT.client_id
+		$VBoxMQTT/HBoxConnect/Myname.text = myname
 		audioouttopic = "twovoip/%s/%s/audio" % [$VBoxMQTT/HBoxRoom/roomname.text, myname]
 		statustopic = "twovoip/%s/%s/status" % [$VBoxMQTT/HBoxRoom/roomname.text, myname]
 		$VBoxMQTT/HBoxBroker/MQTTBroker.editable = false
@@ -59,5 +62,7 @@ func _on_connect_mqtt_toggled(toggled_on):
 		for m in $Members.get_children():
 			$Members.remove_child(m)
 		$VBoxMQTT/HBoxBroker/MQTTBroker.editable = false
+		myname = ""
+		$VBoxMQTT/HBoxConnect/Myname.text = ""
 		audioouttopic = ""
 		statustopic = ""

@@ -55,12 +55,25 @@ class AudioStreamPlaybackOpusChunked : public AudioStreamPlaybackResampled {
     friend class AudioStreamOpusChunked;
     Ref<AudioStreamOpusChunked> base;
     
+	int skips = 0;
+	bool active = false;
+	float mixed = 0.0;
+
 protected:
     static void _bind_methods() {;};
 
 public:
 	virtual int32_t _mix_resampled(AudioFrame *dst_buffer, int32_t frame_count) override;
 	virtual double _get_stream_sampling_rate() const override { return 44100.0F; };
+
+
+	virtual void _start(double p_from_pos = 0.0) override;
+	virtual void _stop() override;
+	virtual bool _is_playing() const override;
+	virtual int _get_loop_count() const override; 
+	virtual double _get_playback_position() const override;
+	virtual void _seek(double p_time) override;
+	virtual void _tag_used_streams() override;
 };
 
 

@@ -28,7 +28,7 @@ func addwindow(v):
 			$ColorRectThreshold.visible = true
 		else:
 			visthreshold = max(visthreshold, v)
-		$ColorRectThreshold.position.x = $HSliderVox.position.x + visthreshold*$HSliderVox.size.x - outlinewidth/2
+		$ColorRectThreshold.position.x = $HSliderVox.position.x + visthreshold*$HSliderVox.size.x - outlinewidth/2.0
 		samplescountdown = samplesrunon
 	elif samplescountdown > 0:
 		samplescountdown -= 1

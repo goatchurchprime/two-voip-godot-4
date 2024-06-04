@@ -200,6 +200,21 @@ offset_bottom = 73.0
 text = "Play
 "
 
+[node name="Self" parent="." instance=ExtResource("4_w5dv2")]
+layout_mode = 2
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 437.0
+offset_top = 42.0
+offset_right = 570.0
+offset_bottom = 70.0
+
+[node name="Label" parent="Self" index="1"]
+text = "self
+
+"
+
 [node name="Label" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = -1
@@ -227,42 +242,35 @@ text = "0
 anchors_preset = 0
 offset_left = 566.0
 offset_top = 319.0
-offset_right = 947.0
-offset_bottom = 480.0
+offset_right = 882.0
+offset_bottom = 376.0
 script = ExtResource("2_y485j")
 
 [node name="MQTT" parent="MQTTnetwork" instance=ExtResource("2_4wm5t")]
 verbose_level = 1
 binarymessages = true
 
-[node name="Members" type="VBoxContainer" parent="MQTTnetwork"]
-layout_mode = 0
-offset_left = -1.0
-offset_top = 104.0
-offset_right = 197.008
-offset_bottom = 208.725
+[node name="VBoxMQTT" type="VBoxContainer" parent="MQTTnetwork"]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.068
+offset_left = -20.0
+offset_top = -105.0
+offset_right = 307.092
+offset_bottom = -1.0
 
-[node name="Self" parent="MQTTnetwork/Members" instance=ExtResource("4_w5dv2")]
+[node name="HBoxConnect" type="HBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
 layout_mode = 2
 
-[node name="Label" parent="MQTTnetwork/Members/Self" index="1"]
-text = "self
-
-"
-
-[node name="ConnectMQTT" type="Button" parent="MQTTnetwork"]
-layout_mode = 0
-offset_left = -25.0
-offset_top = -34.0
-offset_right = 97.0
-offset_bottom = 7.0
+[node name="ConnectMQTT" type="Button" parent="MQTTnetwork/VBoxMQTT/HBoxConnect"]
+layout_mode = 2
 toggle_mode = true
 text = "Connect MQTT"
 
-[node name="VBoxMQTT" type="VBoxContainer" parent="MQTTnetwork"]
-layout_mode = 0
-offset_right = 337.0
-offset_bottom = 57.0
+[node name="Myname" type="LineEdit" parent="MQTTnetwork/VBoxMQTT/HBoxConnect"]
+layout_mode = 2
+size_flags_horizontal = 3
+editable = false
 
 [node name="HBoxBroker" type="HBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
 layout_mode = 2
@@ -291,6 +299,13 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "myplace"
 
+[node name="Members" type="VBoxContainer" parent="MQTTnetwork"]
+layout_mode = 0
+offset_left = -14.0
+offset_top = 7.0
+offset_right = 232.0
+offset_bottom = 89.0
+
 [node name="Label3D" type="Label3D" parent="."]
 
 [connection signal="value_changed" from="VoxDetector/HSliderVox" to="VoxDetector" method="_on_h_slider_vox_value_changed"]
@@ -300,6 +315,6 @@ text = "myplace"
 [connection signal="button_down" from="PTT" to="." method="_on_ptt_button_down"]
 [connection signal="button_up" from="PTT" to="." method="_on_ptt_button_up"]
 [connection signal="pressed" from="Play" to="." method="_on_play_pressed"]
-[connection signal="toggled" from="MQTTnetwork/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
+[connection signal="toggled" from="MQTTnetwork/VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
 
-[editable path="MQTTnetwork/Members/Self"]
+[editable path="Self"]

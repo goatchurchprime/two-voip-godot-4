@@ -123,19 +123,19 @@ func endtalking():
 
 func _on_play_pressed():
 	if recordedopuspackets:
-		$MQTTnetwork/Members/Self.processheaderpacket(recordedheader.duplicate())
-		$MQTTnetwork/Members/Self.opuspacketsbuffer = recordedopuspackets.duplicate()
+		$Self.processheaderpacket(recordedheader.duplicate())
+		$Self.opuspacketsbuffer = recordedopuspackets.duplicate()
 	else:
 		var lrecordedsamples = [ ]
 		lrecordedsamples = recordedsamples.duplicate()
-		$MQTTnetwork/Members/Self.processheaderpacket(recordedheader.duplicate())
-		$MQTTnetwork/Members/Self.audiopacketsbuffer = lrecordedsamples
+		$Self.processheaderpacket(recordedheader.duplicate())
+		$Self.audiopacketsbuffer = lrecordedsamples
 
-func _on_frame_duration_item_selected(index):
+func _on_frame_duration_item_selected(_index):
 	updatesamplerates()
 
-func _on_resample_state_item_selected(index):
+func _on_resample_state_item_selected(_index):
 	updatesamplerates()
 
-func _on_option_button_item_selected(index):
+func _on_option_button_item_selected(_index):
 	updatesamplerates()

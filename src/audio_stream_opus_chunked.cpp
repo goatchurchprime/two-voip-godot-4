@@ -185,12 +185,44 @@ int32_t AudioStreamPlaybackOpusChunked::_mix_resampled(AudioFrame *buffer, int32
                 base->bufferbegin = 0;
         } else {
             buffer[i] = { 0.0F, 0.0F };
+            skips++;
         }
     }
-    //memset(buffer, 0, sizeof(AudioFrame) * frames);
-    //base->jitter_buffer.pop_samples(buffer, frames);
+    mixed += frames/_get_stream_sampling_rate();
     return frames;
 }
 
+void AudioStreamPlaybackOpusChunked::_start(double p_from_pos) {
+	if (mixed == 0.0) {
+		begin_resample();
+	}
+	skips = 0;
+	active = true;
+	mixed = 0.0;
+}
+
+void AudioStreamPlaybackOpusChunked::_stop() {
+	active = false;
+}
+
+bool AudioStreamPlaybackOpusChunked::_is_playing() const {
+	return active;
+}
+
+int AudioStreamPlaybackOpusChunked::_get_loop_count() const {
+	return 0;
+}
+
+double AudioStreamPlaybackOpusChunked::_get_playback_position() const {
+	return mixed;
+}
+
+void AudioStreamPlaybackOpusChunked::_seek(double p_time) {
+	//no seek possible
+}
+
+void AudioStreamPlaybackOpusChunked::_tag_used_streams() {
+	//base->tag_used(0);
+}
 
 
