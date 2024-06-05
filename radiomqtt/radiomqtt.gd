@@ -97,7 +97,6 @@ func _process(_delta):
 		var audiosamples = audioopuschunkedeffect.read_chunk()
 		var chunkv1 = audioopuschunkedeffect.chunk_max()
 		var chunkv2 = audioopuschunkedeffect.chunk_rms()
-		$NoiseGraph.addwindow(chunkv1)
 		$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2)
 		if currentlytalking:
 			recordedsamples.append(audiosamples)
