@@ -1,4 +1,4 @@
-extends HSlider
+extends HBoxContainer
 
 const outlinewidth = 4
 var samplesrunon = 17
@@ -6,39 +6,39 @@ var samplescountdown = 0
 var voxthreshold = 1.0
 var visthreshold = 1.0
 
-func _on_h_slider_vox_value_changed(v):
-	voxthreshold = v/max_value
+func _on_h_slider_vox_value_changed(value):
+	voxthreshold = value/$HSliderVox.max_value
 	
 func _ready():
 	await get_tree().process_frame 
-	$ColorRectBackground.size = size
-	$ColorRectLoudness.size = size
-	$ColorRectLoudness2.size = Vector2(size.x, size.y/3)
-	$ColorRectThreshold.position.y = 0
-	$ColorRectThreshold.size.y = size.y
-	$ColorRectThreshold.size.x = outlinewidth
-	_on_h_slider_vox_value_changed(value)
+	$HSliderVox/ColorRectBackground.size = $HSliderVox.size
+	$HSliderVox/ColorRectLoudness.size = $HSliderVox.size
+	$HSliderVox/ColorRectLoudness2.size = Vector2($HSliderVox.size.x, $HSliderVox.size.y/3)
+	$HSliderVox/ColorRectThreshold.position.y = 0
+	$HSliderVox/ColorRectThreshold.size.y = $HSliderVox.size.y
+	$HSliderVox/ColorRectThreshold.size.x = outlinewidth
+	_on_h_slider_vox_value_changed($HSliderVox.value)
 	
 func loudnessvalues(chunkv1, chunkv2):
-	$ColorRectLoudness.size.x = size.x*chunkv1
-	$ColorRectLoudness2.size.x = size.x*chunkv2
+	$HSliderVox/ColorRectLoudness.size.x = $HSliderVox.size.x*chunkv1
+	$HSliderVox/ColorRectLoudness2.size.x = $HSliderVox.size.x*chunkv2
 	if chunkv1 >= voxthreshold:
-		if not $ColorRectThreshold.visible:
+		if not $HSliderVox/ColorRectThreshold.visible:
 			visthreshold = chunkv1
-			$ColorRectThreshold.visible = true
-			if get_node("../Vox").pressed:
-				get_node("../PTT").set_pressed(true)
+			$HSliderVox/ColorRectThreshold.visible = true
+			if $Vox.pressed:
+				$PTT.set_pressed(true)
 		else:
 			visthreshold = max(visthreshold, chunkv1)
-		$ColorRectThreshold.position.x = size.x*visthreshold - outlinewidth/2.0
+		$HSliderVox/ColorRectThreshold.position.x = $HSliderVox.size.x*visthreshold - outlinewidth/2.0
 		samplescountdown = samplesrunon
 	elif samplescountdown > 0:
 		samplescountdown -= 1
 		if samplescountdown == 0:
-			$ColorRectThreshold.visible = false
-			if get_node("../Vox").pressed:
-				get_node("../PTT").set_pressed(false)
+			$HSliderVox/ColorRectThreshold.visible = false
+			if $Vox.pressed:
+				$PTT.set_pressed(false)
 		
 func _on_vox_toggled(toggled_on):
-	get_node("../PTT").toggle_mode = toggled_on
-	get_node("../PTT").set_pressed($ColorRectThreshold.visible and toggled_on)
+	$PTT.toggle_mode = toggled_on
+	$PTT.set_pressed($HSliderVox/ColorRectThreshold.visible and toggled_on)

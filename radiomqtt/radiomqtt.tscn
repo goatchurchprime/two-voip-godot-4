@@ -25,18 +25,21 @@ script = ExtResource("1_anot2")
 
 [node name="HBoxMicTalk" type="HBoxContainer" parent="."]
 layout_mode = 0
-offset_left = 25.0
-offset_top = 255.0
+offset_left = 21.0
+offset_top = 253.0
 offset_right = 521.0
 offset_bottom = 327.0
+script = ExtResource("3_qvq17")
 
 [node name="PTT" type="Button" parent="HBoxMicTalk"]
 layout_mode = 2
+tooltip_text = "Hold down to talk"
 text = "PTT
 "
 
 [node name="Vox" type="Button" parent="HBoxMicTalk"]
 layout_mode = 2
+tooltip_text = "Voice operated mode set by threshold"
 toggle_mode = true
 text = "Vox"
 
@@ -46,7 +49,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 1
 value = 20.0
-script = ExtResource("3_qvq17")
 
 [node name="ColorRectBackground" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
 z_index = -3
@@ -316,10 +318,8 @@ offset_top = 7.0
 offset_right = 232.0
 offset_bottom = 89.0
 
-[connection signal="button_down" from="HBoxMicTalk/PTT" to="." method="_on_ptt_button_down"]
-[connection signal="button_up" from="HBoxMicTalk/PTT" to="." method="_on_ptt_button_up"]
-[connection signal="toggled" from="HBoxMicTalk/Vox" to="HBoxMicTalk/HSliderVox" method="_on_vox_toggled"]
-[connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk/HSliderVox" method="_on_h_slider_vox_value_changed"]
+[connection signal="toggled" from="HBoxMicTalk/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
+[connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
