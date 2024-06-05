@@ -86,7 +86,7 @@ func _process(_delta):
 	var s2 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(2000, 20000)
 	$HighFreq.size.x = s2.x*10000 + 2
 	
-	var talking = $PTT.button_pressed or ($VoxDetector/EnableVox.button_pressed and $VoxDetector/ColorRectThreshold.visible)
+	var talking = $HBoxMicTalk/PTT.button_pressed
 	if talking and not currentlytalking:
 		starttalking()
 	elif not talking and currentlytalking:
@@ -95,9 +95,10 @@ func _process(_delta):
 	var prefixbytes = PackedByteArray()
 	while audioopuschunkedeffect.chunk_available():
 		var audiosamples = audioopuschunkedeffect.read_chunk()
-		var a = audioopuschunkedeffect.chunk_max()
-		$NoiseGraph.addwindow(a)
-		$VoxDetector.addwindow(a)
+		var chunkv1 = audioopuschunkedeffect.chunk_max()
+		var chunkv2 = audioopuschunkedeffect.chunk_rms()
+		$NoiseGraph.addwindow(chunkv1)
+		$HBoxMicTalk/HSliderVox.loudnessvalues(chunkv1, chunkv2)
 		if currentlytalking:
 			recordedsamples.append(audiosamples)
 			if audioopuschunkedeffect.opusframesize != 0:

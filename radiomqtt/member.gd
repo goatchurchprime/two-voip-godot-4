@@ -1,5 +1,6 @@
 extends Control
 
+# AudioStreamPlayer can either be AudioStreamOpusChunked or AudioStreamGeneratorPlayback
 var audiostreamopuschunked : AudioStreamOpusChunked
 var audiostreamgeneratorplayback : AudioStreamGeneratorPlayback
 var opuspacketsbuffer = [ ]
@@ -11,7 +12,7 @@ func _ready():
 	$AudioStreamPlayer.play()
 	if audiostream.is_class("AudioStreamOpusChunked"):
 		audiostreamopuschunked = audiostream
-		var audiostreamopyschunkedplayback = $AudioStreamPlayer.get_stream_playback()
+		#var audiostreamopyschunkedplayback = $AudioStreamPlayer.get_stream_playback()
 		#audiostreamopyschunkedplayback.begin_resample()
 	elif audiostream.is_class("AudioStreamGenerator"):
 		audiostreamopuschunked = AudioStreamOpusChunked.new()

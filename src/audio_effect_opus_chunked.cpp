@@ -59,6 +59,7 @@ void AudioEffectOpusChunked::_bind_methods() {
 
     ClassDB::bind_method(D_METHOD("chunk_available"), &AudioEffectOpusChunked::chunk_available);
     ClassDB::bind_method(D_METHOD("chunk_max"), &AudioEffectOpusChunked::chunk_max);
+    ClassDB::bind_method(D_METHOD("chunk_rms"), &AudioEffectOpusChunked::chunk_rms);
     ClassDB::bind_method(D_METHOD("read_chunk"), &AudioEffectOpusChunked::read_chunk);
     ClassDB::bind_method(D_METHOD("drop_chunk"), &AudioEffectOpusChunked::drop_chunk);
     ClassDB::bind_method(D_METHOD("pop_opus_packet", "prefixbytes"), &AudioEffectOpusChunked::pop_opus_packet);

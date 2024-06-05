@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=9 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
@@ -8,6 +8,9 @@
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 
 [sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_itmlg"]
+
+[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_eh8ms"]
+resource_local_to_scene = true
 
 [node name="radiomqtt" type="Control"]
 layout_mode = 3
@@ -19,6 +22,64 @@ offset_bottom = -150.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_anot2")
+
+[node name="HBoxMicTalk" type="HBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 25.0
+offset_top = 255.0
+offset_right = 521.0
+offset_bottom = 327.0
+
+[node name="PTT" type="Button" parent="HBoxMicTalk"]
+layout_mode = 2
+text = "PTT
+"
+
+[node name="Vox" type="Button" parent="HBoxMicTalk"]
+layout_mode = 2
+toggle_mode = true
+text = "Vox"
+
+[node name="HSliderVox" type="HSlider" parent="HBoxMicTalk"]
+z_index = 3
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+value = 20.0
+script = ExtResource("3_qvq17")
+
+[node name="ColorRectBackground" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
+z_index = -3
+layout_mode = 0
+offset_right = 378.0
+offset_bottom = 35.0
+mouse_filter = 1
+color = Color(0.255659, 0.255659, 0.255659, 1)
+
+[node name="ColorRectLoudness" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
+z_index = -2
+layout_mode = 0
+offset_right = 111.0
+offset_bottom = 24.0
+mouse_filter = 1
+color = Color(0.224055, 0.434373, 0.715477, 1)
+
+[node name="ColorRectLoudness2" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
+z_index = -2
+layout_mode = 0
+offset_top = 4.0
+offset_right = 111.0
+offset_bottom = 28.0
+mouse_filter = 1
+color = Color(0.223529, 0.541176, 0.713726, 1)
+
+[node name="ColorRectThreshold" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
+z_index = -1
+layout_mode = 0
+offset_right = 4.0
+offset_bottom = 32.0
+mouse_filter = 1
+color = Color(0.689579, 0.760623, 0.0826142, 1)
 
 [node name="NoiseGraph" type="Control" parent="."]
 layout_mode = 1
@@ -32,54 +93,8 @@ script = ExtResource("2_bp5o4")
 
 [node name="Line2D" type="Line2D" parent="NoiseGraph"]
 scale = Vector2(200, 40)
+points = PackedVector2Array(-1.47, 6.625)
 width = 0.02
-
-[node name="VoxDetector" type="Control" parent="."]
-anchors_preset = 0
-offset_left = 47.0
-offset_top = 260.0
-offset_right = 461.0
-offset_bottom = 327.0
-script = ExtResource("3_qvq17")
-
-[node name="ColorRectOutline" type="ColorRect" parent="VoxDetector"]
-layout_mode = 0
-offset_left = -5.0
-offset_top = -10.0
-offset_right = 145.0
-offset_bottom = 30.0
-color = Color(0.255659, 0.255659, 0.255659, 1)
-
-[node name="ColorRectLoudness" type="ColorRect" parent="VoxDetector"]
-layout_mode = 0
-offset_left = 1.0
-offset_top = -6.0
-offset_right = 124.0
-offset_bottom = 26.0
-color = Color(0.224055, 0.434373, 0.715477, 1)
-
-[node name="ColorRectThreshold" type="ColorRect" parent="VoxDetector"]
-layout_mode = 0
-offset_left = 80.0
-offset_top = -6.0
-offset_right = 84.0
-offset_bottom = 26.0
-color = Color(0.689579, 0.760623, 0.0826142, 1)
-
-[node name="HSliderVox" type="HSlider" parent="VoxDetector"]
-layout_mode = 0
-offset_right = 257.0
-offset_bottom = 16.0
-value = 20.0
-
-[node name="EnableVox" type="CheckBox" parent="VoxDetector"]
-layout_mode = 0
-offset_left = 1.0
-offset_top = 36.0
-offset_right = 25.0
-offset_bottom = 60.0
-text = "Enable Vox
-"
 
 [node name="VBoxFrameLength" type="VBoxContainer" parent="."]
 layout_mode = 0
@@ -157,14 +172,6 @@ popup/item_3/id = 3
 popup/item_4/text = "3000"
 popup/item_4/id = 4
 
-[node name="PTT" type="Button" parent="."]
-layout_mode = 0
-offset_left = 34.0
-offset_top = 34.0
-offset_right = 137.0
-offset_bottom = 75.0
-text = "Push to Talk"
-
 [node name="AudioStreamMicrophone" type="AudioStreamPlayer" parent="."]
 stream = SubResource("AudioStreamMicrophone_itmlg")
 autoplay = true
@@ -209,6 +216,9 @@ offset_left = 437.0
 offset_top = 42.0
 offset_right = 570.0
 offset_bottom = 70.0
+
+[node name="AudioStreamPlayer" parent="Self" index="0"]
+stream = SubResource("AudioStreamOpusChunked_eh8ms")
 
 [node name="Label" parent="Self" index="1"]
 text = "self
@@ -306,14 +316,13 @@ offset_top = 7.0
 offset_right = 232.0
 offset_bottom = 89.0
 
-[node name="Label3D" type="Label3D" parent="."]
-
-[connection signal="value_changed" from="VoxDetector/HSliderVox" to="VoxDetector" method="_on_h_slider_vox_value_changed"]
+[connection signal="button_down" from="HBoxMicTalk/PTT" to="." method="_on_ptt_button_down"]
+[connection signal="button_up" from="HBoxMicTalk/PTT" to="." method="_on_ptt_button_up"]
+[connection signal="toggled" from="HBoxMicTalk/Vox" to="HBoxMicTalk/HSliderVox" method="_on_vox_toggled"]
+[connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk/HSliderVox" method="_on_h_slider_vox_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
-[connection signal="button_down" from="PTT" to="." method="_on_ptt_button_down"]
-[connection signal="button_up" from="PTT" to="." method="_on_ptt_button_up"]
 [connection signal="pressed" from="Play" to="." method="_on_play_pressed"]
 [connection signal="toggled" from="MQTTnetwork/VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
 
