@@ -4,8 +4,6 @@ extends Control
 @onready var microphoneidx = AudioServer.get_bus_index("MicrophoneBus")
 
 var audioopuschunkedeffect : AudioEffectOpusChunked
-var audiospectrumeffect : AudioEffectSpectrumAnalyzer
-var audiospectrumeffectinstance : AudioEffectSpectrumAnalyzerInstance
 
 var recordedsamples = [ ]
 var recordedopuspackets = [ ]
@@ -63,8 +61,6 @@ func updatesamplerates():
 func _ready():
 	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
 	audioopuschunkedeffect = AudioServer.get_bus_effect(microphoneidx, 0)
-	audiospectrumeffect = AudioServer.get_bus_effect(microphoneidx, 1)
-	audiospectrumeffectinstance = AudioServer.get_bus_effect_instance(microphoneidx, 1)
 	updatesamplerates()
 
 var currentlytalking = false
@@ -79,13 +75,6 @@ func starttalking():
 	talkingstarttime = Time.get_ticks_msec()
 
 func _process(_delta):
-	var s0 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(20, 500)
-	$LowFreq.size.x = s0.x*1000 + 2
-	var s1 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(500, 2000)
-	$MidFreq.size.x = s1.x*1000 + 2
-	var s2 = audiospectrumeffectinstance.get_magnitude_for_frequency_range(2000, 20000)
-	$HighFreq.size.x = s2.x*10000 + 2
-	
 	var talking = $HBoxMicTalk/PTT.button_pressed
 	if talking and not currentlytalking:
 		starttalking()

@@ -163,27 +163,6 @@ stream = SubResource("AudioStreamMicrophone_itmlg")
 autoplay = true
 bus = &"MicrophoneBus"
 
-[node name="LowFreq" type="ColorRect" parent="."]
-layout_mode = 0
-offset_left = 49.0
-offset_top = 130.0
-offset_right = 89.0
-offset_bottom = 150.0
-
-[node name="MidFreq" type="ColorRect" parent="."]
-layout_mode = 0
-offset_left = 52.0
-offset_top = 155.0
-offset_right = 92.0
-offset_bottom = 175.0
-
-[node name="HighFreq" type="ColorRect" parent="."]
-layout_mode = 0
-offset_left = 50.0
-offset_top = 183.0
-offset_right = 90.0
-offset_bottom = 203.0
-
 [node name="Play" type="Button" parent="."]
 layout_mode = 0
 offset_left = 342.0
