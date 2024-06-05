@@ -1,6 +1,6 @@
 [gd_resource type="AudioBusLayout" load_steps=2 format=3 uid="uid://orx4iw038t0c"]
 
-[sub_resource type="AudioEffectOpusChunked" id="AudioEffectOpusChunked_cm14n"]
+[sub_resource type="AudioEffectOpusChunked" id="AudioEffectOpusChunked_qwc56"]
 resource_name = "OpusChunked"
 
 [resource]
@@ -10,5 +10,5 @@ bus/1/mute = true
 bus/1/bypass_fx = false
 bus/1/volume_db = 0.0
 bus/1/send = &"Master"
-bus/1/effect/0/effect = SubResource("AudioEffectOpusChunked_cm14n")
+bus/1/effect/0/effect = SubResource("AudioEffectOpusChunked_qwc56")
 bus/1/effect/0/enabled = true

@@ -17,17 +17,17 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_right = -171.0
-offset_bottom = -150.0
+offset_bottom = -173.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_anot2")
 
 [node name="HBoxMicTalk" type="HBoxContainer" parent="."]
 layout_mode = 0
-offset_left = 21.0
-offset_top = 253.0
-offset_right = 521.0
-offset_bottom = 327.0
+offset_left = 18.0
+offset_top = 50.0
+offset_right = 601.0
+offset_bottom = 115.0
 script = ExtResource("3_qvq17")
 
 [node name="PTT" type="Button" parent="HBoxMicTalk"]
@@ -84,10 +84,10 @@ color = Color(0.689579, 0.760623, 0.0826142, 1)
 
 [node name="VBoxFrameLength" type="VBoxContainer" parent="."]
 layout_mode = 0
-offset_left = 537.0
-offset_top = 73.0
-offset_right = 967.0
-offset_bottom = 146.0
+offset_left = 665.0
+offset_top = 41.0
+offset_right = 1089.0
+offset_bottom = 161.0
 
 [node name="HBoxOpusFrame" type="HBoxContainer" parent="VBoxFrameLength"]
 layout_mode = 2
@@ -163,56 +163,6 @@ stream = SubResource("AudioStreamMicrophone_itmlg")
 autoplay = true
 bus = &"MicrophoneBus"
 
-[node name="Play" type="Button" parent="."]
-layout_mode = 0
-offset_left = 342.0
-offset_top = 32.0
-offset_right = 410.0
-offset_bottom = 73.0
-text = "Play
-"
-
-[node name="Self" parent="." instance=ExtResource("4_w5dv2")]
-layout_mode = 2
-anchors_preset = 0
-anchor_right = 0.0
-anchor_bottom = 0.0
-offset_left = 437.0
-offset_top = 42.0
-offset_right = 570.0
-offset_bottom = 70.0
-
-[node name="AudioStreamPlayer" parent="Self" index="0"]
-stream = SubResource("AudioStreamOpusChunked_eh8ms")
-
-[node name="Label" parent="Self" index="1"]
-text = "self
-
-"
-
-[node name="Label" type="Label" parent="."]
-layout_mode = 1
-anchors_preset = -1
-anchor_right = 0.035
-anchor_bottom = 0.035
-offset_left = 51.0
-offset_top = 99.0
-offset_right = 206.0
-offset_bottom = 101.0
-text = "Recorded opus frames: "
-
-[node name="FrameCount" type="Label" parent="."]
-layout_mode = 1
-anchors_preset = -1
-anchor_right = 0.035
-anchor_bottom = 0.035
-offset_left = 256.0
-offset_top = 104.0
-offset_right = 398.68
-offset_bottom = 106.0
-text = "0
-"
-
 [node name="MQTTnetwork" type="Control" parent="."]
 anchors_preset = 0
 offset_left = 566.0
@@ -278,15 +228,51 @@ text = "myplace"
 layout_mode = 0
 offset_left = -14.0
 offset_top = 7.0
-offset_right = 232.0
+offset_right = 354.0
 offset_bottom = 89.0
+
+[node name="HBoxPlaycount" type="HBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 259.0
+offset_right = 414.0
+offset_bottom = 321.0
+
+[node name="Play" type="Button" parent="HBoxPlaycount"]
+layout_mode = 2
+text = "Play
+"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HBoxPlaycount"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxPlaycount/VBoxContainer"]
+layout_mode = 2
+text = "Recorded opus frames: "
+
+[node name="FrameCount" type="Label" parent="HBoxPlaycount/VBoxContainer"]
+layout_mode = 2
+text = "0
+"
+
+[node name="Self" parent="HBoxPlaycount" instance=ExtResource("4_w5dv2")]
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="AudioStreamPlayer" parent="HBoxPlaycount/Self" index="0"]
+stream = SubResource("AudioStreamOpusChunked_eh8ms")
+
+[node name="Label" parent="HBoxPlaycount/Self" index="1"]
+text = "self
+
+"
 
 [connection signal="toggled" from="HBoxMicTalk/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
-[connection signal="pressed" from="Play" to="." method="_on_play_pressed"]
 [connection signal="toggled" from="MQTTnetwork/VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
+[connection signal="pressed" from="HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 
-[editable path="Self"]
+[editable path="HBoxPlaycount/Self"]

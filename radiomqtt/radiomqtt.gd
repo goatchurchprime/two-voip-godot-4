@@ -3,12 +3,23 @@ extends Control
 
 @onready var microphoneidx = AudioServer.get_bus_index("MicrophoneBus")
 
+var audioeffectcapture : AudioEffectCapture = null
 var audioopuschunkedeffect : AudioEffectOpusChunked
 
 var recordedsamples = [ ]
 var recordedopuspackets = [ ]
 var recordedopuspacketsMemSize = 0
 var recordedheader = { }
+
+func _ready():
+	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
+	var audioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, 0)
+	if audioeffectonmic.is_class("AudioEffectOpusChunked"):
+		audioopuschunkedeffect = audioeffectonmic
+	elif audioeffectonmic.is_class("AudioEffectCapture"):
+		audioeffectcapture = audioeffectonmic
+		audioopuschunkedeffect = AudioEffectOpusChunked.new()
+	updatesamplerates()
 
 func resamplerecordedsamples(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
@@ -56,12 +67,8 @@ func updatesamplerates():
 	var tm = len(recordedsamples)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
 	var k = "Smem: %d  time: %.01f  byte/s:%d" % [recordedopuspacketsMemSize, tm, int(recordedopuspacketsMemSize/tm)]
 	if recordedopuspacketsMemSize != 0:
-		$FrameCount.text = k
+		$HBoxPlaycount/VBoxContainer/FrameCount.text = k
 
-func _ready():
-	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
-	audioopuschunkedeffect = AudioServer.get_bus_effect(microphoneidx, 0)
-	updatesamplerates()
 
 var currentlytalking = false
 var talkingstarttime = 0
@@ -82,43 +89,68 @@ func _process(_delta):
 		endtalking()
 
 	var prefixbytes = PackedByteArray()
-	while audioopuschunkedeffect.chunk_available():
-		var audiosamples = audioopuschunkedeffect.read_chunk()
-		var chunkv1 = audioopuschunkedeffect.chunk_max()
-		var chunkv2 = audioopuschunkedeffect.chunk_rms()
-		$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2)
-		if currentlytalking:
-			recordedsamples.append(audiosamples)
-			if audioopuschunkedeffect.opusframesize != 0:
-				var opuspacket = audioopuschunkedeffect.pop_opus_packet(prefixbytes)
-				recordedopuspackets.append(opuspacket)
-				$MQTTnetwork.transportaudiopacket(opuspacket)
-				recordedopuspacketsMemSize += opuspacket.size()
+	if audioeffectcapture == null:
+		while audioopuschunkedeffect.chunk_available():
+			var audiosamples = audioopuschunkedeffect.read_chunk()
+			var chunkv1 = audioopuschunkedeffect.chunk_max()
+			var chunkv2 = audioopuschunkedeffect.chunk_rms()
+			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2)
+			if currentlytalking:
+				recordedsamples.append(audiosamples)
+				if audioopuschunkedeffect.opusframesize != 0:
+					var opuspacket = audioopuschunkedeffect.pop_opus_packet(prefixbytes)
+					recordedopuspackets.append(opuspacket)
+					$MQTTnetwork.transportaudiopacket(opuspacket)
+					recordedopuspacketsMemSize += opuspacket.size()
+				else:
+					audioopuschunkedeffect.drop_chunk()
+					$MQTTnetwork.transportaudiopacket(audiosamples)
 			else:
 				audioopuschunkedeffect.drop_chunk()
-				$MQTTnetwork.transportaudiopacket(audiosamples)
-		else:
-			audioopuschunkedeffect.drop_chunk()
-	
+	else:
+		while audioeffectcapture.get_frames_available() > audioopuschunkedeffect.audiosamplesize:
+			var audiosamples = audioeffectcapture.get_buffer(audioopuschunkedeffect.audiosamplesize)
+			var chunkv1 = 0.0
+			var schunkv2 = 0.0
+			for i in range(len(audiosamples)):
+				var v = audiosamples[i]
+				var vm = max(abs(v.x), abs(v.y))
+				if vm > chunkv1:
+					chunkv1 = vm
+				schunkv2 = v.x*v.x + v.y*v.y
+			var chunkv2 = sqrt(schunkv2/(len(audiosamples)*2))
+			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2)
+			if currentlytalking:
+				recordedsamples.append(audiosamples)
+				if audioopuschunkedeffect.opusframesize != 0:
+					var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, audiosamples, 0);
+					recordedopuspackets.append(opuspacket)
+					$MQTTnetwork.transportaudiopacket(opuspacket)
+					recordedopuspacketsMemSize += opuspacket.size()
+				else:
+					$MQTTnetwork.transportaudiopacket(audiosamples)
+			else:
+				audioopuschunkedeffect.drop_chunk()
+		
 func endtalking():
 	currentlytalking = false
 	print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
 	var tm = len(recordedsamples)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
 	print(len(recordedsamples), " audioopuschunkedeffect.audiosamplesize ", audioopuschunkedeffect.audiosamplesize, "  ", audioopuschunkedeffect.audiosamplerate)
 	var k = "mem: %d  time: %.01f  byte/s:%d" % [recordedopuspacketsMemSize, tm, int(recordedopuspacketsMemSize/tm)]
-	$FrameCount.text = k
+	$HBoxPlaycount/VBoxContainer/FrameCount.text = k
 	$MQTTnetwork.transportaudiopacket(JSON.stringify({"framecount":len(recordedsamples)}).to_ascii_buffer())
 	print("Talked for ", (Time.get_ticks_msec() - talkingstarttime)*0.001, " seconds")
 
 func _on_play_pressed():
 	if recordedopuspackets:
-		$Self.processheaderpacket(recordedheader.duplicate())
-		$Self.opuspacketsbuffer = recordedopuspackets.duplicate()
+		$HBoxPlaycount/Self.processheaderpacket(recordedheader.duplicate())
+		$HBoxPlaycount/Self.opuspacketsbuffer = recordedopuspackets.duplicate()
 	else:
 		var lrecordedsamples = [ ]
 		lrecordedsamples = recordedsamples.duplicate()
-		$Self.processheaderpacket(recordedheader.duplicate())
-		$Self.audiopacketsbuffer = lrecordedsamples
+		$HBoxPlaycount/Self.processheaderpacket(recordedheader.duplicate())
+		$HBoxPlaycount/Self.audiopacketsbuffer = lrecordedsamples
 
 func _on_frame_duration_item_selected(_index):
 	updatesamplerates()
