@@ -94,6 +94,7 @@ public:
 
 	bool chunk_available();
 	float chunk_max();
+	float chunk_rms();
 	void drop_chunk();
 	PackedVector2Array read_chunk();
 	PackedByteArray pop_opus_packet(const PackedByteArray& prefixbytes);

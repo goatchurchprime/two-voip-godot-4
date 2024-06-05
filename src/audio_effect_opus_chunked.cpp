@@ -161,6 +161,17 @@ float AudioEffectOpusChunked::chunk_max() {
 	return r;
 }
 
+float AudioEffectOpusChunked::chunk_rms() {
+	if (chunknumber == -1) 
+		return -1.0;
+	float s = 0.0F;
+	float* p = (float*)audiosamplebuffer.ptr() + 2*chunknumber*audiosamplesize;
+	for (int i = 0; i < audiosamplesize*2; i++) {
+		s += p[i]*p[i];
+	}
+	return sqrt(s/(audiosamplesize*2));
+}
+
 void AudioEffectOpusChunked::drop_chunk() {
 	if (chunknumber == -1) 
 		return;

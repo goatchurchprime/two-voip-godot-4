@@ -7,6 +7,7 @@ var audiopacketsbuffer = [ ]
 
 func _ready():
 	var audiostream = $AudioStreamPlayer.stream
+	assert (audiostream.resource_local_to_scene)
 	$AudioStreamPlayer.play()
 	if audiostream.is_class("AudioStreamOpusChunked"):
 		audiostreamopuschunked = audiostream
@@ -69,5 +70,3 @@ func _process(_delta):
 				audiostreamgeneratorplayback.push_buffer(audiochunk)
 			else:
 				break
-
-

@@ -2,7 +2,8 @@
 
 [ext_resource type="Script" path="res://radiomqtt/member.gd" id="1_o3hks"]
 
-[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_481un"]
+[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_vai8h"]
+resource_local_to_scene = true
 
 [node name="Member" type="Control"]
 custom_minimum_size = Vector2(0, 28)
@@ -14,7 +15,7 @@ offset_bottom = 5.32
 script = ExtResource("1_o3hks")
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
-stream = SubResource("AudioStreamOpusChunked_481un")
+stream = SubResource("AudioStreamOpusChunked_vai8h")
 
 [node name="Label" type="Label" parent="."]
 layout_mode = 0
