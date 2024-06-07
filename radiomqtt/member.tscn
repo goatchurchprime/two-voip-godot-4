@@ -2,12 +2,12 @@
 
 [ext_resource type="Script" path="res://radiomqtt/member.gd" id="1_o3hks"]
 
-[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_ngiei"]
-buffer_length = 0.2
+[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_vai8h"]
+resource_local_to_scene = true
 
-[node name="Member" type="Control"]
+[node name="Member" type="HBoxContainer"]
 custom_minimum_size = Vector2(0, 28)
-layout_mode = 3
+anchors_preset = -1
 anchor_right = 0.028
 anchor_bottom = 0.035
 offset_right = 111.744
@@ -15,21 +15,27 @@ offset_bottom = 5.32
 script = ExtResource("1_o3hks")
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
-stream = SubResource("AudioStreamGenerator_ngiei")
-
-[node name="HandyOpusDecoder" type="HandyOpusNode" parent="."]
+stream = SubResource("AudioStreamOpusChunked_vai8h")
 
 [node name="Label" type="Label" parent="."]
-layout_mode = 0
-offset_left = 65.0
-offset_right = 115.0
-offset_bottom = 23.0
+layout_mode = 2
 text = "empty"
 
-[node name="ColorRect" type="ColorRect" parent="."]
+[node name="Node" type="Control" parent="."]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+
+[node name="ColorRect2" type="ColorRect" parent="Node"]
+custom_minimum_size = Vector2(100, 30)
 layout_mode = 0
-offset_left = 10.0
-offset_top = 6.0
-offset_right = 57.0
+offset_right = 100.0
 offset_bottom = 20.0
-color = Color(1, 1, 0.113725, 1)
+color = Color(0.937255, 0.952941, 0, 1)
+
+[node name="ColorRect" type="ColorRect" parent="Node"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 8.0
+offset_right = 49.0
+offset_bottom = 21.0
+color = Color(0.0352941, 0.788235, 1, 1)

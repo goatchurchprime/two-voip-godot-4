@@ -2,12 +2,14 @@
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
-[ext_resource type="Script" path="res://radiomqtt/NoiseGraph.gd" id="2_bp5o4"]
 [ext_resource type="Script" path="res://radiomqtt/MQTTnetwork.gd" id="2_y485j"]
 [ext_resource type="Script" path="res://radiomqtt/voxdetector.gd" id="3_qvq17"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 
 [sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_itmlg"]
+
+[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_eh8ms"]
+resource_local_to_scene = true
 
 [node name="radiomqtt" type="Control"]
 layout_mode = 3
@@ -15,78 +17,77 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_right = -171.0
-offset_bottom = -150.0
+offset_bottom = -173.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_anot2")
 
-[node name="NoiseGraph" type="Control" parent="."]
-layout_mode = 1
-anchor_right = 0.345
-anchor_bottom = 0.04
-offset_left = 476.0
-offset_top = 5.0
-offset_right = 407.555
-offset_bottom = 38.08
-script = ExtResource("2_bp5o4")
-
-[node name="Line2D" type="Line2D" parent="NoiseGraph"]
-scale = Vector2(200, 40)
-width = 0.02
-
-[node name="VoxDetector" type="Control" parent="."]
-anchors_preset = 0
-offset_left = 47.0
-offset_top = 260.0
-offset_right = 461.0
-offset_bottom = 327.0
+[node name="HBoxMicTalk" type="HBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 50.0
+offset_right = 601.0
+offset_bottom = 115.0
 script = ExtResource("3_qvq17")
 
-[node name="ColorRectOutline" type="ColorRect" parent="VoxDetector"]
-layout_mode = 0
-offset_left = -5.0
-offset_top = -10.0
-offset_right = 145.0
-offset_bottom = 30.0
-color = Color(0.255659, 0.255659, 0.255659, 1)
+[node name="PTT" type="Button" parent="HBoxMicTalk"]
+layout_mode = 2
+tooltip_text = "Hold down to talk"
+text = "PTT
+"
 
-[node name="ColorRectLoudness" type="ColorRect" parent="VoxDetector"]
-layout_mode = 0
-offset_left = 1.0
-offset_top = -6.0
-offset_right = 124.0
-offset_bottom = 26.0
-color = Color(0.224055, 0.434373, 0.715477, 1)
+[node name="Vox" type="Button" parent="HBoxMicTalk"]
+layout_mode = 2
+tooltip_text = "Voice operated mode set by threshold"
+toggle_mode = true
+text = "Vox"
 
-[node name="ColorRectThreshold" type="ColorRect" parent="VoxDetector"]
-layout_mode = 0
-offset_left = 80.0
-offset_top = -6.0
-offset_right = 84.0
-offset_bottom = 26.0
-color = Color(0.689579, 0.760623, 0.0826142, 1)
-
-[node name="HSliderVox" type="HSlider" parent="VoxDetector"]
-layout_mode = 0
-offset_right = 257.0
-offset_bottom = 16.0
+[node name="HSliderVox" type="HSlider" parent="HBoxMicTalk"]
+z_index = 3
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
 value = 20.0
 
-[node name="EnableVox" type="CheckBox" parent="VoxDetector"]
+[node name="ColorRectBackground" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
+z_index = -3
 layout_mode = 0
-offset_left = 1.0
-offset_top = 36.0
-offset_right = 25.0
-offset_bottom = 60.0
-text = "Enable Vox
-"
+offset_right = 378.0
+offset_bottom = 35.0
+mouse_filter = 1
+color = Color(0.255659, 0.255659, 0.255659, 1)
+
+[node name="ColorRectLoudness" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
+z_index = -2
+layout_mode = 0
+offset_right = 111.0
+offset_bottom = 24.0
+mouse_filter = 1
+color = Color(0.224055, 0.434373, 0.715477, 1)
+
+[node name="ColorRectLoudness2" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
+z_index = -2
+layout_mode = 0
+offset_top = 4.0
+offset_right = 111.0
+offset_bottom = 28.0
+mouse_filter = 1
+color = Color(0.223529, 0.541176, 0.713726, 1)
+
+[node name="ColorRectThreshold" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
+z_index = -1
+layout_mode = 0
+offset_right = 4.0
+offset_bottom = 32.0
+mouse_filter = 1
+color = Color(0.689579, 0.760623, 0.0826142, 1)
 
 [node name="VBoxFrameLength" type="VBoxContainer" parent="."]
 layout_mode = 0
-offset_left = 537.0
-offset_top = 73.0
-offset_right = 967.0
-offset_bottom = 146.0
+offset_left = 665.0
+offset_top = 41.0
+offset_right = 1089.0
+offset_bottom = 161.0
 
 [node name="HBoxOpusFrame" type="HBoxContainer" parent="VBoxFrameLength"]
 layout_mode = 2
@@ -157,157 +158,127 @@ popup/item_3/id = 3
 popup/item_4/text = "3000"
 popup/item_4/id = 4
 
-[node name="PTT" type="Button" parent="."]
-layout_mode = 0
-offset_left = 34.0
-offset_top = 34.0
-offset_right = 137.0
-offset_bottom = 75.0
-text = "Push to Talk"
-
 [node name="AudioStreamMicrophone" type="AudioStreamPlayer" parent="."]
 stream = SubResource("AudioStreamMicrophone_itmlg")
 autoplay = true
 bus = &"MicrophoneBus"
 
-[node name="HandyOpusEncoder" type="HandyOpusNode" parent="AudioStreamMicrophone"]
-
-[node name="LowFreq" type="ColorRect" parent="."]
-layout_mode = 0
-offset_left = 49.0
-offset_top = 130.0
-offset_right = 89.0
-offset_bottom = 150.0
-
-[node name="MidFreq" type="ColorRect" parent="."]
-layout_mode = 0
-offset_left = 52.0
-offset_top = 155.0
-offset_right = 92.0
-offset_bottom = 175.0
-
-[node name="HighFreq" type="ColorRect" parent="."]
-layout_mode = 0
-offset_left = 50.0
-offset_top = 183.0
-offset_right = 90.0
-offset_bottom = 203.0
-
-[node name="Play" type="Button" parent="."]
-layout_mode = 0
-offset_left = 342.0
-offset_top = 32.0
-offset_right = 410.0
-offset_bottom = 73.0
-text = "Play
-"
-
-[node name="Label" type="Label" parent="."]
-layout_mode = 1
-anchors_preset = -1
-anchor_right = 0.035
-anchor_bottom = 0.035
-offset_left = 51.0
-offset_top = 99.0
-offset_right = 206.0
-offset_bottom = 101.0
-text = "Recorded opus frames: "
-
-[node name="FrameCount" type="Label" parent="."]
-layout_mode = 1
-anchors_preset = -1
-anchor_right = 0.035
-anchor_bottom = 0.035
-offset_left = 256.0
-offset_top = 104.0
-offset_right = 398.68
-offset_bottom = 106.0
-text = "0
-"
-
 [node name="MQTTnetwork" type="Control" parent="."]
 anchors_preset = 0
-offset_left = 544.0
-offset_top = 316.0
-offset_right = 925.0
-offset_bottom = 477.0
+offset_left = 566.0
+offset_top = 319.0
+offset_right = 882.0
+offset_bottom = 376.0
 script = ExtResource("2_y485j")
 
 [node name="MQTT" parent="MQTTnetwork" instance=ExtResource("2_4wm5t")]
 verbose_level = 1
 binarymessages = true
 
-[node name="Members" type="VBoxContainer" parent="MQTTnetwork"]
-layout_mode = 0
-offset_left = -1.0
-offset_top = 104.0
-offset_right = 197.008
-offset_bottom = 208.725
+[node name="VBoxMQTT" type="VBoxContainer" parent="MQTTnetwork"]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.068
+offset_left = -20.0
+offset_top = -105.0
+offset_right = 307.092
+offset_bottom = -1.0
 
-[node name="Self" parent="MQTTnetwork/Members" instance=ExtResource("4_w5dv2")]
+[node name="HBoxConnect" type="HBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
 layout_mode = 2
 
-[node name="Label" parent="MQTTnetwork/Members/Self" index="2"]
+[node name="ConnectMQTT" type="Button" parent="MQTTnetwork/VBoxMQTT/HBoxConnect"]
+layout_mode = 2
+toggle_mode = true
+text = "Connect MQTT"
+
+[node name="Myname" type="LineEdit" parent="MQTTnetwork/VBoxMQTT/HBoxConnect"]
+layout_mode = 2
+size_flags_horizontal = 3
+editable = false
+
+[node name="HBoxBroker" type="HBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
+layout_mode = 2
+
+[node name="LabelMQTT" type="Label" parent="MQTTnetwork/VBoxMQTT/HBoxBroker"]
+layout_mode = 2
+text = "MQTTBroker
+"
+
+[node name="MQTTBroker" type="OptionButton" parent="MQTTnetwork/VBoxMQTT/HBoxBroker"]
+layout_mode = 2
+size_flags_horizontal = 3
+selected = 0
+item_count = 3
+popup/item_0/text = "mosquitto.doesliverpool.xyz"
+popup/item_1/text = "broker.hivemq.com"
+popup/item_1/id = 1
+popup/item_2/text = "test.mosquitto.org"
+popup/item_2/id = 2
+
+[node name="HBoxRoom" type="HBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Labelroom" type="Label" parent="MQTTnetwork/VBoxMQTT/HBoxRoom"]
+layout_mode = 2
+text = "roomname
+"
+
+[node name="roomname" type="LineEdit" parent="MQTTnetwork/VBoxMQTT/HBoxRoom"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "myplace"
+
+[node name="Members" type="VBoxContainer" parent="MQTTnetwork"]
+layout_mode = 0
+offset_left = -14.0
+offset_top = 7.0
+offset_right = 354.0
+offset_bottom = 89.0
+
+[node name="HBoxPlaycount" type="HBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 259.0
+offset_right = 414.0
+offset_bottom = 321.0
+
+[node name="Play" type="Button" parent="HBoxPlaycount"]
+layout_mode = 2
+text = "Play
+"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HBoxPlaycount"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxPlaycount/VBoxContainer"]
+layout_mode = 2
+text = "Recorded opus frames: "
+
+[node name="FrameCount" type="Label" parent="HBoxPlaycount/VBoxContainer"]
+layout_mode = 2
+text = "0
+"
+
+[node name="Self" parent="HBoxPlaycount" instance=ExtResource("4_w5dv2")]
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="AudioStreamPlayer" parent="HBoxPlaycount/Self" index="0"]
+stream = SubResource("AudioStreamOpusChunked_eh8ms")
+
+[node name="Label" parent="HBoxPlaycount/Self" index="1"]
 text = "self
 
 "
 
-[node name="ConnectMQTT" type="Button" parent="MQTTnetwork"]
-layout_mode = 0
-offset_left = -25.0
-offset_top = -34.0
-offset_right = 97.0
-offset_bottom = 7.0
-toggle_mode = true
-text = "Connect MQTT"
-
-[node name="LabelMQTT" type="Label" parent="MQTTnetwork"]
-layout_mode = 1
-anchors_preset = -1
-anchor_right = 0.035
-anchor_bottom = 0.035
-offset_left = 192.0
-offset_top = -17.0
-offset_right = 277.665
-offset_bottom = 0.365
-text = "MQTTBroker
-"
-
-[node name="MQTTBroker" type="LineEdit" parent="MQTTnetwork"]
-layout_mode = 0
-offset_left = 49.0
-offset_top = 15.0
-offset_right = 310.0
-offset_bottom = 46.0
-text = "mosquitto.doesliverpool.xyz"
-
-[node name="Labelroom" type="Label" parent="MQTTnetwork"]
-layout_mode = 1
-anchors_preset = -1
-anchor_right = 0.035
-anchor_bottom = 0.035
-offset_left = -42.0
-offset_top = 61.0
-offset_right = 30.72
-offset_bottom = 78.365
-text = "roomname
-"
-
-[node name="roomname" type="LineEdit" parent="MQTTnetwork"]
-layout_mode = 0
-offset_left = 84.0
-offset_top = 53.0
-offset_right = 345.0
-offset_bottom = 84.0
-text = "myplace"
-
-[connection signal="value_changed" from="VoxDetector/HSliderVox" to="VoxDetector" method="_on_h_slider_vox_value_changed"]
+[connection signal="toggled" from="HBoxMicTalk/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
+[connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
-[connection signal="button_down" from="PTT" to="." method="_on_ptt_button_down"]
-[connection signal="button_up" from="PTT" to="." method="_on_ptt_button_up"]
-[connection signal="pressed" from="Play" to="." method="_on_play_pressed"]
-[connection signal="toggled" from="MQTTnetwork/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
+[connection signal="toggled" from="MQTTnetwork/VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
+[connection signal="pressed" from="HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 
-[editable path="MQTTnetwork/Members/Self"]
+[editable path="HBoxPlaycount/Self"]

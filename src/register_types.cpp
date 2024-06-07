@@ -1,6 +1,7 @@
 #include "register_types.h"
 
-#include "handyopusnode.h"
+#include "audio_effect_opus_chunked.h"
+#include "audio_stream_opus_chunked.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
@@ -14,8 +15,11 @@ void initialize_two_voip_module(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
         return;
     }
+    ClassDB::register_class<AudioEffectOpusChunked>();
+    ClassDB::register_class<AudioEffectOpusChunkedInstance>();
 
-    ClassDB::register_class<HandyOpusNode>();
+    ClassDB::register_class<AudioStreamOpusChunked>();
+    ClassDB::register_class<AudioStreamPlaybackOpusChunked>();
 }
 
 void uninitialize_two_voip_module(ModuleInitializationLevel p_level) {
@@ -36,3 +40,4 @@ GDExtensionBool GDE_EXPORT two_voip_library_init(GDExtensionInterfaceGetProcAddr
     return init_obj.init();
 }
 }
+
