@@ -53,7 +53,7 @@ func receivemqttmessage(msg):
 
 
 func _process(_delta):
-	$ColorRect.visible = (len(audiopacketsbuffer) > 0)
+	$Node/ColorRect2.visible = (len(audiopacketsbuffer) + len(opuspacketsbuffer) > 0)
 	if audiostreamgeneratorplayback == null:
 		while audiostreamopuschunked.chunk_space_available():
 			if len(audiopacketsbuffer) != 0:
@@ -62,6 +62,8 @@ func _process(_delta):
 				audiostreamopuschunked.push_opus_packet(opuspacketsbuffer.pop_front(), 0, 0)
 			else:
 				break
+		$Node/ColorRect.size.x = audiostreamopuschunked.queue_length_frames()/(50.0*881)*100
+
 	else:
 		while audiostreamgeneratorplayback.get_frames_available() > audiostreamopuschunked.audiosamplesize:
 			if len(audiopacketsbuffer) != 0:

@@ -205,10 +205,16 @@ layout_mode = 2
 text = "MQTTBroker
 "
 
-[node name="MQTTBroker" type="LineEdit" parent="MQTTnetwork/VBoxMQTT/HBoxBroker"]
+[node name="MQTTBroker" type="OptionButton" parent="MQTTnetwork/VBoxMQTT/HBoxBroker"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "mosquitto.doesliverpool.xyz"
+selected = 0
+item_count = 3
+popup/item_0/text = "mosquitto.doesliverpool.xyz"
+popup/item_1/text = "broker.hivemq.com"
+popup/item_1/id = 1
+popup/item_2/text = "test.mosquitto.org"
+popup/item_2/id = 2
 
 [node name="HBoxRoom" type="HBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
 layout_mode = 2

@@ -53,6 +53,7 @@ void AudioStreamOpusChunked::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplechunks", PROPERTY_HINT_RANGE, "1,200,1"), "set_audiosamplechunks", "get_audiosamplechunks");
 
     ClassDB::bind_method(D_METHOD("chunk_space_available"), &AudioStreamOpusChunked::chunk_space_available);
+    ClassDB::bind_method(D_METHOD("queue_length_frames"), &AudioStreamOpusChunked::queue_length_frames);
     ClassDB::bind_method(D_METHOD("push_audio_chunk", "audiochunk"), &AudioStreamOpusChunked::push_audio_chunk);
     ClassDB::bind_method(D_METHOD("push_opus_packet", "opusbytepacket", "begin", "decode_fec"), &AudioStreamOpusChunked::push_opus_packet);
     ClassDB::bind_method(D_METHOD("opus_packet_to_chunk", "opusbytepacket", "begin", "decode_fec"), &AudioStreamOpusChunked::opus_packet_to_chunk);
@@ -125,6 +126,14 @@ bool AudioStreamOpusChunked::chunk_space_available() {
         return false;
     return true;
 }
+
+int AudioStreamOpusChunked::queue_length_frames() {
+    int queueframes = buffertail - bufferbegin;
+    if (queueframes < 0)
+        queueframes += audiosamplesize*audiosamplechunks;
+    return queueframes;
+}
+
 
 int AudioStreamOpusChunked::buffered_audiosamples() {
     return (bufferbegin < bufferbegin ? buffertail - bufferbegin : buffertail - bufferbegin + audiosamplesize*audiosamplechunks);
@@ -222,7 +231,7 @@ void AudioStreamPlaybackOpusChunked::_seek(double p_time) {
 }
 
 void AudioStreamPlaybackOpusChunked::_tag_used_streams() {
-	//base->tag_used(0);
+	//base->_tag_used(0);
 }
 
 

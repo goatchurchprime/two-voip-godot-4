@@ -66,7 +66,6 @@ public:
 	virtual int32_t _mix_resampled(AudioFrame *dst_buffer, int32_t frame_count) override;
 	virtual double _get_stream_sampling_rate() const override { return 44100.0F; };
 
-
 	virtual void _start(double p_from_pos = 0.0) override;
 	virtual void _stop() override;
 	virtual bool _is_playing() const override;
@@ -113,6 +112,7 @@ public:
 	void createdecoder();
 	void resetdecoder();
 	bool chunk_space_available();
+    int queue_length_frames();
 	int buffered_audiosamples();
 	void push_audio_chunk(const PackedVector2Array& audiochunk);
 	void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
