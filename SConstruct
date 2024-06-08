@@ -18,8 +18,10 @@ sources = []
 # Opus (REQUIRES PRECOMPILE)
 
 if env["platform"] == "windows":
-    env.Append(CPPPATH=["opus/include"], LIBS=["opus/build/Release/opus.lib"])
+    env.Append(CPPPATH=["opus/include"], LIBS=["opus/win32/VS2015/x64/Release/opus.lib"])
+    env.Append(CPPPATH=["OVRLipSyncNative/Include"], LIBS=["OVRLipSyncNative/Lib/Win64/OVRLipSyncShim.lib"])
     env.Append(LINKFLAGS = ['/WX:NO'])
+
 else:
     env.Append(CPPPATH=["opus/include"], LIBS=["opus"], LIBPATH="opus/build")
 

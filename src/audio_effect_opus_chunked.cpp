@@ -60,6 +60,7 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("chunk_available"), &AudioEffectOpusChunked::chunk_available);
     ClassDB::bind_method(D_METHOD("chunk_max"), &AudioEffectOpusChunked::chunk_max);
     ClassDB::bind_method(D_METHOD("chunk_rms"), &AudioEffectOpusChunked::chunk_rms);
+    ClassDB::bind_method(D_METHOD("chunk_to_lipsync"), &AudioEffectOpusChunked::chunk_to_lipsync);
     ClassDB::bind_method(D_METHOD("read_chunk"), &AudioEffectOpusChunked::read_chunk);
     ClassDB::bind_method(D_METHOD("drop_chunk"), &AudioEffectOpusChunked::drop_chunk);
     ClassDB::bind_method(D_METHOD("pop_opus_packet", "prefixbytes"), &AudioEffectOpusChunked::pop_opus_packet);
@@ -86,6 +87,16 @@ void AudioEffectOpusChunked::resetencoder() {
         opus_encoder_destroy(opusencoder);
         opusencoder = NULL;
     }
+	if (pctx != NULL) {
+        auto rc = ovrLipSync_DestroyContext(*pctx);
+        rc = ovrLipSync_Shutdown();
+		delete pctx;
+		pctx = NULL;
+	}
+    if (pframe != NULL) {
+		delete pframe;
+		pframe = NULL;
+	}
 }
 
 void AudioEffectOpusChunked::createencoder() {
@@ -96,6 +107,20 @@ void AudioEffectOpusChunked::createencoder() {
 	if (opusframesize == 0)
 		return; 
 	
+	pctx = new ovrLipSyncContext();
+    pframe = new ovrLipSyncFrame();
+	visemes.resize(ovrLipSyncViseme_Count);
+	pframe->visemes = visemes.ptrw();
+	pframe->visemesLength = ovrLipSyncViseme_Count;
+	auto rc = ovrLipSync_Initialize(audiosamplerate, audiosamplesize);
+    if (rc != ovrLipSyncSuccess) {
+        std::cerr << "Failed to initialize ovrLipSync engine: " << rc << std::endl;
+    }
+	rc = ovrLipSync_CreateContextEx(pctx, ovrLipSyncContextProvider_Enhanced, audiosamplerate, true);
+    if (rc !=  ovrLipSyncSuccess) {
+        std::cerr << "Failed to create ovrLipSync context: " << rc << std::endl;
+	}
+
 	int channels = 2;
 	float Dtimeframeopus = opusframesize*1.0F/opussamplerate;
 	float Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
@@ -172,6 +197,26 @@ float AudioEffectOpusChunked::chunk_rms() {
 	}
 	return sqrt(s/(audiosamplesize*2));
 }
+
+int AudioEffectOpusChunked::chunk_to_lipsync() {
+	auto rc = ovrLipSync_ProcessFrameEx(*pctx,
+		(float*)audiosamplebuffer.ptr() + 2*chunknumber*audiosamplesize,
+		audiosamplesize,
+		ovrLipSyncAudioDataType_F32_Stereo,
+		pframe);
+	float* array = (float*)visemes.ptrw();
+    auto maxElement = std::max_element(array, array + ovrLipSyncViseme_Count);
+	return rc; 
+    //return std::distance(array, maxElement);
+}
+
+
+ovrLipSyncResult ovrLipSync_ProcessFrameEx(
+    ovrLipSyncContext context,
+    const void* audioBuffer,
+    int sampleCount,
+    ovrLipSyncAudioDataType dataType,
+    ovrLipSyncFrame* pFrame);
 
 void AudioEffectOpusChunked::drop_chunk() {
 	if (chunknumber == -1) 

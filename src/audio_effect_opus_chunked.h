@@ -42,6 +42,7 @@
 
 #include "opus.h"
 #include "speex_resampler/speex_resampler.h"
+#include "OVRLipSync.h"
 
 namespace godot {
 
@@ -81,6 +82,10 @@ class AudioEffectOpusChunked : public AudioEffect {
     OpusEncoder* opusencoder = NULL;
 	PackedByteArray opusbytebuffer;
 
+    ovrLipSyncContext* pctx = NULL;
+    ovrLipSyncFrame* pframe = NULL;
+    PackedFloat32Array visemes; 
+
 	void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
 
 protected:
@@ -99,6 +104,7 @@ public:
 	PackedVector2Array read_chunk();
 	PackedByteArray pop_opus_packet(const PackedByteArray& prefixbytes);
 	PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamplebuffer, int begin);
+    int chunk_to_lipsync(); 
 	
     void set_opussamplerate(int lopussamplerate) { resetencoder(); opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };

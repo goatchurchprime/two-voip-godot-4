@@ -94,6 +94,8 @@ func _process(_delta):
 			var audiosamples = audioopuschunkedeffect.read_chunk()
 			var chunkv1 = audioopuschunkedeffect.chunk_max()
 			var chunkv2 = audioopuschunkedeffect.chunk_rms()
+			var viseme = audioopuschunkedeffect.chunk_to_lipsync()
+			print(" vv ", viseme, " ", chunkv2)
 			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2)
 			if currentlytalking:
 				recordedsamples.append(audiosamples)
