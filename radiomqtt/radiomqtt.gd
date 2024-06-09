@@ -81,6 +81,9 @@ func starttalking():
 	$MQTTnetwork.transportaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
 	talkingstarttime = Time.get_ticks_msec()
 
+var prevviseme = 0
+var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa", "E", "ih", "oh", "ou" ]
+
 func _process(_delta):
 	var talking = $HBoxMicTalk/PTT.button_pressed
 	if talking and not currentlytalking:
@@ -95,7 +98,9 @@ func _process(_delta):
 			var chunkv1 = audioopuschunkedeffect.chunk_max()
 			var chunkv2 = audioopuschunkedeffect.chunk_rms()
 			var viseme = audioopuschunkedeffect.chunk_to_lipsync()
-			print(" vv ", viseme, " ", chunkv2)
+			if viseme != prevviseme:
+				print(" viseme ", visemes[viseme], " ", chunkv2)
+				prevviseme = viseme
 			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2)
 			if currentlytalking:
 				recordedsamples.append(audiosamples)

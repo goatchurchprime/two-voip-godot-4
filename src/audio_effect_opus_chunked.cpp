@@ -70,15 +70,27 @@ void AudioEffectOpusChunked::_bind_methods() {
 const int MAXPREFIXBYTES = 100;
 
 Ref<AudioEffectInstance> AudioEffectOpusChunked::_instantiate() {
-	resetencoder();
 	Ref<AudioEffectOpusChunkedInstance> ins;
 	ins.instantiate();
 	ins->base = Ref<AudioEffectOpusChunked>(this);
 	return ins;
 }
 
-void AudioEffectOpusChunked::resetencoder() {
-	chunknumber = -1;
+void AudioEffectOpusChunked::resetencoder(int Dreason) {
+	printf("resetting AudioEffectOpusChunked %d\n", Dreason);
+	bool alreadyreset = false;
+	mutex.lock();
+	if (chunknumber == -1) {
+		alreadyreset = true;
+	} else {
+		chunknumber = -1;
+	}
+	mutex.unlock();
+	if (alreadyreset) {
+		printf("AudioEffectOpusChunked Already reset, pctx==NULL:%d\n", (pctx == NULL));
+		return;
+	}
+	
     if (speexresampler != NULL) {
         speex_resampler_destroy(speexresampler);
         speexresampler = NULL;
@@ -87,20 +99,23 @@ void AudioEffectOpusChunked::resetencoder() {
         opus_encoder_destroy(opusencoder);
         opusencoder = NULL;
     }
-	if (pctx != NULL) {
-        auto rc = ovrLipSync_DestroyContext(*pctx);
-        rc = ovrLipSync_Shutdown();
-		delete pctx;
-		pctx = NULL;
-	}
+
     if (pframe != NULL) {
 		delete pframe;
 		pframe = NULL;
 	}
+	if (pctx != NULL) {
+        auto rc = ovrLipSync_DestroyContext(*pctx);
+		printf("lipsync destroy context %d\n", rc); 
+        rc = ovrLipSync_Shutdown();
+		printf("lipsync shutdown %d\n", rc); 
+		delete pctx;
+		pctx = NULL;
+	}
 }
 
 void AudioEffectOpusChunked::createencoder() {
-	resetencoder();  // In case called from GDScript
+	resetencoder(4);  // In case called from GDScript
 	audiosamplebuffer.resize(audiosamplesize*audiosamplechunks); 
 	chunknumber = 0;
 	bufferend = 0;
@@ -116,10 +131,13 @@ void AudioEffectOpusChunked::createencoder() {
     if (rc != ovrLipSyncSuccess) {
         std::cerr << "Failed to initialize ovrLipSync engine: " << rc << std::endl;
     }
+	printf("lipsync init %d\n", rc); 
+
 	rc = ovrLipSync_CreateContextEx(pctx, ovrLipSyncContextProvider_Enhanced, audiosamplerate, true);
     if (rc !=  ovrLipSyncSuccess) {
         std::cerr << "Failed to create ovrLipSync context: " << rc << std::endl;
 	}
+	printf("lipsync create %d\n", rc); 
 
 	int channels = 2;
 	float Dtimeframeopus = opusframesize*1.0F/opussamplerate;
@@ -199,24 +217,17 @@ float AudioEffectOpusChunked::chunk_rms() {
 }
 
 int AudioEffectOpusChunked::chunk_to_lipsync() {
-	auto rc = ovrLipSync_ProcessFrameEx(*pctx,
-		(float*)audiosamplebuffer.ptr() + 2*chunknumber*audiosamplesize,
-		audiosamplesize,
+	auto rc = ovrLipSync_ProcessFrameEx(*pctx, 
+		(float*)audiosamplebuffer.ptr() + 2*chunknumber*audiosamplesize, audiosamplesize,
 		ovrLipSyncAudioDataType_F32_Stereo,
 		pframe);
+
 	float* array = (float*)visemes.ptrw();
     auto maxElement = std::max_element(array, array + ovrLipSyncViseme_Count);
-	return rc; 
-    //return std::distance(array, maxElement);
+	//return rc; 
+    return std::distance(array, maxElement);
 }
 
-
-ovrLipSyncResult ovrLipSync_ProcessFrameEx(
-    ovrLipSyncContext context,
-    const void* audioBuffer,
-    int sampleCount,
-    ovrLipSyncAudioDataType dataType,
-    ovrLipSyncFrame* pFrame);
 
 void AudioEffectOpusChunked::drop_chunk() {
 	if (chunknumber == -1) 
