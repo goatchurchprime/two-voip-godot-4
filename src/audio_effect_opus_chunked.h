@@ -46,7 +46,9 @@
 #include "speex_resampler/speex_resampler.h"
 
 #ifdef OVR_LIP_SYNC
-#include "OVRLipSync.h"
+	#include "OVRLipSync.h"
+#else
+	#include "OVRLipSync_Stub.h"
 #endif
 
 namespace godot {
@@ -65,6 +67,13 @@ public:
 	virtual void _process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) override; 
 	virtual bool _process_silence() const override { return true; }
 };
+
+typedef enum {
+  GovrLipSyncUninitialized,
+  GovrLipSyncValid,
+  GovrLipSyncUnavailable,
+} GovrLipSyncStatus;
+
 
 class AudioEffectOpusChunked : public AudioEffect {
 	GDCLASS(AudioEffectOpusChunked, AudioEffect)
@@ -88,9 +97,10 @@ class AudioEffectOpusChunked : public AudioEffect {
     OpusEncoder* opusencoder = NULL;
 	PackedByteArray opusbytebuffer;
 
-    ovrLipSyncContext* pctx = NULL;
-    ovrLipSyncFrame* pframe = NULL;
+	GovrLipSyncStatus govrlipsyncstatus = GovrLipSyncUninitialized;
     PackedFloat32Array visemes; 
+    ovrLipSyncFrame ovrlipsyncframe;
+    ovrLipSyncContext ovrlipsyncctx = 0;
 
 	void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
 
@@ -106,11 +116,12 @@ public:
 	bool chunk_available();
 	float chunk_max();
 	float chunk_rms();
-	void drop_chunk();
-	PackedVector2Array read_chunk();
-	PackedByteArray pop_opus_packet(const PackedByteArray& prefixbytes);
-	PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamplebuffer, int begin);
     int chunk_to_lipsync(); 
+    PackedFloat32Array read_visemes(); 
+	PackedByteArray pop_opus_packet(const PackedByteArray& prefixbytes);  // this converts and drops chunk all in one
+	PackedVector2Array read_chunk();
+	PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamplebuffer, int begin);
+	void drop_chunk();
 	
     void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
@@ -125,8 +136,8 @@ public:
     void set_audiosamplechunks(int laudiosamplechunks) { chunknumber = -1; audiosamplechunks = laudiosamplechunks; };
     int get_audiosamplechunks() { return audiosamplechunks; };
 
-	AudioEffectOpusChunked() {;};
-	~AudioEffectOpusChunked() { resetencoder(17); };
+	AudioEffectOpusChunked();
+	~AudioEffectOpusChunked();
 };
 
 }

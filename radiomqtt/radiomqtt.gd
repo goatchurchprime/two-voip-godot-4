@@ -11,6 +11,9 @@ var recordedopuspackets = [ ]
 var recordedopuspacketsMemSize = 0
 var recordedheader = { }
 
+var prevviseme = 0
+var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa", "E", "ih", "oh", "ou", "LA" ]
+
 func _ready():
 	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
 	var audioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, 0)
@@ -20,6 +23,12 @@ func _ready():
 		audioeffectcapture = audioeffectonmic
 		audioopuschunkedeffect = AudioEffectOpusChunked.new()
 	updatesamplerates()
+	for i in range(1, len(visemes)):
+		var d = $HBoxVisemes/ColorRect.duplicate()
+		d.get_node("Label").text = visemes[i]
+		$HBoxVisemes.add_child(d)
+		d.size.y = i*8
+		print("dd ", d.size)
 
 func resamplerecordedsamples(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
@@ -81,8 +90,6 @@ func starttalking():
 	$MQTTnetwork.transportaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
 	talkingstarttime = Time.get_ticks_msec()
 
-var prevviseme = 0
-var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa", "E", "ih", "oh", "ou" ]
 
 func _process(_delta):
 	var talking = $HBoxMicTalk/PTT.button_pressed
@@ -101,6 +108,12 @@ func _process(_delta):
 			if viseme != prevviseme:
 				print(" viseme ", visemes[viseme], " ", chunkv2)
 				prevviseme = viseme
+			if viseme != -1:
+				var vv = audioopuschunkedeffect.read_visemes();
+				for i in range($HBoxVisemes.get_child_count()):
+					$HBoxVisemes.get_child(i).size.y = int(50*vv[i])
+				#print(" vvv ", vv[-2], "  ", vv[-1])
+				
 			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2)
 			if currentlytalking:
 				recordedsamples.append(audiosamples)

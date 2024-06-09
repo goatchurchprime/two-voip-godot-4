@@ -273,6 +273,27 @@ text = "self
 
 "
 
+[node name="HBoxVisemes" type="HBoxContainer" parent="."]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 0
+offset_left = 56.0
+offset_top = 138.0
+offset_right = 96.0
+offset_bottom = 188.0
+
+[node name="ColorRect" type="ColorRect" parent="HBoxVisemes"]
+custom_minimum_size = Vector2(25, 0)
+layout_mode = 2
+size_flags_vertical = 8
+color = Color(0.666793, 0.310188, 0.402942, 1)
+
+[node name="Label" type="Label" parent="HBoxVisemes/ColorRect"]
+layout_mode = 0
+offset_left = 2.0
+offset_right = 42.0
+offset_bottom = 23.0
+text = "sil"
+
 [connection signal="toggled" from="HBoxMicTalk/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
