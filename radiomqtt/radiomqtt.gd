@@ -28,7 +28,6 @@ func _ready():
 		d.get_node("Label").text = visemes[i]
 		$HBoxVisemes.add_child(d)
 		d.size.y = i*8
-		print("dd ", d.size)
 
 func resamplerecordedsamples(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
