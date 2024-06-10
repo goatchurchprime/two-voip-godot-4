@@ -38,6 +38,11 @@ if env["platform"] == "linux":
     # And add some linux dependencies.
     env.Append(LIBS=["pthread", "dl"])
 
+# OVRLipSync only available on non-Linux platforms
+if env["platform"] != "linux":
+    env.Append(CPPDEFINES={"OVR_LIP_SYNC": None})
+
+
 # Speex (resampler / jitter buffer)
 
 #env.Append(CPPPATH=["thirdparty/speex/include"])
@@ -47,9 +52,6 @@ if env['arch'] == "amd64" or env['arch'] == "x86_64":
 elif env['arch'] == "arm64":
     env.Append(CPPDEFINES={"USE_NEON": None})
 sources += ["src/speex_resampler/resample.c"]
-
-# etc
-
 
 # OneVOIP Extension
 

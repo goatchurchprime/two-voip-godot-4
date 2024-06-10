@@ -156,47 +156,49 @@ typedef struct {
 
 /// Opaque type def for LipSync context
 typedef unsigned int ovrLipSyncContext;
+/// Callback function type
+typedef void (*ovrLipSyncCallback)(void* opaque, const ovrLipSyncFrame* pFrame, ovrLipSyncResult result);
 
-ovrLipSyncResult ovrLipSync_Initialize(int sampleRate, int bufferSize) { return ovrLipSyncError_Unknown; };
-ovrLipSyncResult ovrLipSync_InitializeEx(int sampleRate, int bufferSize, const char* path) { return ovrLipSyncError_Unknown; };
-ovrLipSyncResult ovrLipSync_Shutdown(void) { return ovrLipSyncError_Unknown; };
-const char* ovrLipSync_GetVersion(int* major, int* minor, int* patch) { return "stub"; };
-ovrLipSyncResult ovrLipSync_CreateContext(
+inline ovrLipSyncResult ovrLipSync_Initialize(int sampleRate, int bufferSize) { return ovrLipSyncError_Unknown; };
+inline ovrLipSyncResult ovrLipSync_InitializeEx(int sampleRate, int bufferSize, const char* path) { return ovrLipSyncError_Unknown; };
+inline ovrLipSyncResult ovrLipSync_Shutdown(void) { return ovrLipSyncError_Unknown; };
+inline const char* ovrLipSync_GetVersion(int* major, int* minor, int* patch) { return "stub"; };
+inline ovrLipSyncResult ovrLipSync_CreateContext(
     ovrLipSyncContext* pContext,
     const ovrLipSyncContextProvider provider) { return ovrLipSyncError_Unknown; };
-ovrLipSyncResult ovrLipSync_CreateContextEx(
+inline ovrLipSyncResult ovrLipSync_CreateContextEx(
     ovrLipSyncContext* pContext,
     const ovrLipSyncContextProvider provider,
     const int sampleRate,
     const bool enableAcceleration) { return ovrLipSyncError_Unknown; };
-ovrLipSyncResult ovrLipSync_CreateContextWithModelFile(
+inline ovrLipSyncResult ovrLipSync_CreateContextWithModelFile(
     ovrLipSyncContext* context,
     const ovrLipSyncContextProvider provider,
     const char* modelPath,
     const int sampleRate,
     const bool enableAcceleration) { return ovrLipSyncError_Unknown; };
-ovrLipSyncResult ovrLipSync_DestroyContext(ovrLipSyncContext context) { return ovrLipSyncError_Unknown; };
-ovrLipSyncResult ovrLipSync_ResetContext(ovrLipSyncContext context) { return ovrLipSyncError_Unknown; };
-ovrLipSyncResult ovrLipSync_SendSignal(
+inline ovrLipSyncResult ovrLipSync_DestroyContext(ovrLipSyncContext context) { return ovrLipSyncError_Unknown; };
+inline ovrLipSyncResult ovrLipSync_ResetContext(ovrLipSyncContext context) { return ovrLipSyncError_Unknown; };
+inline ovrLipSyncResult ovrLipSync_SendSignal(
     ovrLipSyncContext context,
     const ovrLipSyncSignals signal,
     const int arg1,
     const int arg2) { return ovrLipSyncError_Unknown; };
-ovrLipSyncResult ovrLipSync_ProcessFrame(
+inline ovrLipSyncResult ovrLipSync_ProcessFrame(
     ovrLipSyncContext context,
     const float* audioBuffer,
     ovrLipSyncFrame* pFrame) { return ovrLipSyncError_Unknown; };
-ovrLipSyncResult ovrLipSync_ProcessFrameInterleaved(
+inline ovrLipSyncResult ovrLipSync_ProcessFrameInterleaved(
     ovrLipSyncContext context,
     const float* audioBuffer,
     ovrLipSyncFrame* pFrame) { return ovrLipSyncError_Unknown; };
-ovrLipSyncResult ovrLipSync_ProcessFrameEx(
+inline ovrLipSyncResult ovrLipSync_ProcessFrameEx(
     ovrLipSyncContext context,
     const void* audioBuffer,
     int sampleCount,
     ovrLipSyncAudioDataType dataType,
     ovrLipSyncFrame* pFrame) { return ovrLipSyncError_Unknown; };
-ovrLipSyncResult ovrLipSync_ProcessFrameAsync(
+inline ovrLipSyncResult ovrLipSync_ProcessFrameAsync(
     ovrLipSyncContext context,
     const void* audioBuffer,
     int sampleCount,

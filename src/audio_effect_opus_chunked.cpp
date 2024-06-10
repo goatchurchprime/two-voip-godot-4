@@ -232,8 +232,12 @@ int AudioEffectOpusChunked::chunk_to_lipsync() {
 	visemes[ovrLipSyncViseme_Count+1] = ovrlipsyncframe.frameDelay;
 	visemes[ovrLipSyncViseme_Count+2] = ovrlipsyncframe.frameNumber;
 	float* array = (float*)visemes.ptrw();
-    auto maxElement = std::max_element(array, array + ovrLipSyncViseme_Count);
-    return std::distance(array, maxElement);
+	int res = 0;
+	for (int i = 1; i < ovrLipSyncViseme_Count; i++) {
+		if (array[i] > array[res])
+			res = i;
+	}
+    return res;
 }
 
 PackedFloat32Array AudioEffectOpusChunked::read_visemes() {
