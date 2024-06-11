@@ -31,17 +31,23 @@
 #ifndef AUDIO_EFFECT_OPUS_CHUNKED_H
 #define AUDIO_EFFECT_OPUS_CHUNKED_H
 
-
 #include <godot_cpp/classes/audio_effect.hpp>
 #include <godot_cpp/classes/audio_effect_instance.hpp>
 #include <godot_cpp/classes/audio_frame.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/classes/mutex.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/classes/node.hpp>
 
 #include "opus.h"
 #include "speex_resampler/speex_resampler.h"
+
+#ifdef OVR_LIP_SYNC
+	#include "OVRLipSync.h"
+#else
+	#include "OVRLipSync_Stub.h"
+#endif
 
 namespace godot {
 
@@ -60,6 +66,13 @@ public:
 	virtual bool _process_silence() const override { return true; }
 };
 
+typedef enum {
+  GovrLipSyncUninitialized,
+  GovrLipSyncValid,
+  GovrLipSyncUnavailable,
+} GovrLipSyncStatus;
+
+
 class AudioEffectOpusChunked : public AudioEffect {
 	GDCLASS(AudioEffectOpusChunked, AudioEffect)
 	friend class AudioEffectOpusChunkedInstance;
@@ -76,10 +89,16 @@ class AudioEffectOpusChunked : public AudioEffect {
     int opussamplerate = 48000;
     int opusframesize = 960;
     int opusbitrate = 24000;
+
     SpeexResamplerState* speexresampler = NULL;
 	PackedVector2Array audioresampledbuffer;
     OpusEncoder* opusencoder = NULL;
 	PackedByteArray opusbytebuffer;
+
+	GovrLipSyncStatus govrlipsyncstatus = GovrLipSyncUninitialized;
+    PackedFloat32Array visemes; 
+    ovrLipSyncFrame ovrlipsyncframe;
+    ovrLipSyncContext ovrlipsyncctx = 0;
 
 	void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
 
@@ -90,31 +109,33 @@ public:
 	virtual Ref<AudioEffectInstance> _instantiate() override;
 
 	void createencoder();
-	void resetencoder();
+	void resetencoder(int Dreason=3);
 
 	bool chunk_available();
 	float chunk_max();
 	float chunk_rms();
-	void drop_chunk();
+    int chunk_to_lipsync(); 
+    PackedFloat32Array read_visemes(); 
+	PackedByteArray pop_opus_packet(const PackedByteArray& prefixbytes);  // this converts and drops chunk all in one
 	PackedVector2Array read_chunk();
-	PackedByteArray pop_opus_packet(const PackedByteArray& prefixbytes);
 	PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamplebuffer, int begin);
+	void drop_chunk();
 	
-    void set_opussamplerate(int lopussamplerate) { resetencoder(); opussamplerate = lopussamplerate; };
+    void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
-    void set_opusframesize(int lopusframesize) { resetencoder(); opusframesize = lopusframesize; };
+    void set_opusframesize(int lopusframesize) { chunknumber = -1; opusframesize = lopusframesize; };
     int get_opusframesize() { return opusframesize; };
-    void set_opusbitrate(int lopusbitrate) { resetencoder(); opusbitrate = lopusbitrate; };
+    void set_opusbitrate(int lopusbitrate) { chunknumber = -1; opusbitrate = lopusbitrate; };
     int get_opusbitrate() { return opusbitrate; };
-    void set_audiosamplerate(int laudiosamplerate) { resetencoder(); audiosamplerate = laudiosamplerate; };
+    void set_audiosamplerate(int laudiosamplerate) { chunknumber = -1; audiosamplerate = laudiosamplerate; };
     int get_audiosamplerate() { return audiosamplerate; };
-    void set_audiosamplesize(int laudiosamplesize) { resetencoder(); audiosamplesize = laudiosamplesize; };
+    void set_audiosamplesize(int laudiosamplesize) { chunknumber = -1; audiosamplesize = laudiosamplesize; };
     int get_audiosamplesize() { return audiosamplesize; };
-    void set_audiosamplechunks(int laudiosamplechunks) { resetencoder(); audiosamplechunks = laudiosamplechunks; };
+    void set_audiosamplechunks(int laudiosamplechunks) { chunknumber = -1; audiosamplechunks = laudiosamplechunks; };
     int get_audiosamplechunks() { return audiosamplechunks; };
 
-	AudioEffectOpusChunked() {;};
-	~AudioEffectOpusChunked() { resetencoder(); };
+	AudioEffectOpusChunked();
+	~AudioEffectOpusChunked();
 };
 
 }

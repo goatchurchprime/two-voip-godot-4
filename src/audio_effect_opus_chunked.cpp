@@ -32,7 +32,6 @@
 
 using namespace godot;
 
-
 void AudioEffectOpusChunked::_bind_methods() {
 
     ClassDB::bind_method(D_METHOD("set_opussamplerate", "opussamplerate"), &AudioEffectOpusChunked::set_opussamplerate);
@@ -60,6 +59,8 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("chunk_available"), &AudioEffectOpusChunked::chunk_available);
     ClassDB::bind_method(D_METHOD("chunk_max"), &AudioEffectOpusChunked::chunk_max);
     ClassDB::bind_method(D_METHOD("chunk_rms"), &AudioEffectOpusChunked::chunk_rms);
+    ClassDB::bind_method(D_METHOD("chunk_to_lipsync"), &AudioEffectOpusChunked::chunk_to_lipsync);
+    ClassDB::bind_method(D_METHOD("read_visemes"), &AudioEffectOpusChunked::read_visemes);
     ClassDB::bind_method(D_METHOD("read_chunk"), &AudioEffectOpusChunked::read_chunk);
     ClassDB::bind_method(D_METHOD("drop_chunk"), &AudioEffectOpusChunked::drop_chunk);
     ClassDB::bind_method(D_METHOD("pop_opus_packet", "prefixbytes"), &AudioEffectOpusChunked::pop_opus_packet);
@@ -68,16 +69,27 @@ void AudioEffectOpusChunked::_bind_methods() {
 
 const int MAXPREFIXBYTES = 100;
 
+AudioEffectOpusChunked::AudioEffectOpusChunked() {
+	visemes.resize(ovrLipSyncViseme_Count + 3);
+	ovrlipsyncframe.visemes = visemes.ptrw();
+	ovrlipsyncframe.visemesLength = ovrLipSyncViseme_Count;
+}
+
+AudioEffectOpusChunked::~AudioEffectOpusChunked() 
+{
+	resetencoder(17);
+};
+
+
 Ref<AudioEffectInstance> AudioEffectOpusChunked::_instantiate() {
-	resetencoder();
 	Ref<AudioEffectOpusChunkedInstance> ins;
 	ins.instantiate();
 	ins->base = Ref<AudioEffectOpusChunked>(this);
 	return ins;
 }
 
-void AudioEffectOpusChunked::resetencoder() {
-	chunknumber = -1;
+void AudioEffectOpusChunked::resetencoder(int Dreason) {
+	printf("resetting AudioEffectOpusChunked %d\n", Dreason);
     if (speexresampler != NULL) {
         speex_resampler_destroy(speexresampler);
         speexresampler = NULL;
@@ -86,16 +98,52 @@ void AudioEffectOpusChunked::resetencoder() {
         opus_encoder_destroy(opusencoder);
         opusencoder = NULL;
     }
+
+	if (govrlipsyncstatus == GovrLipSyncValid) {
+        auto rc = ovrLipSync_DestroyContext(ovrlipsyncctx);
+		printf("lipsync destroy context %d\n", rc); 
+        rc = ovrLipSync_Shutdown();
+		printf("lipsync shutdown %d\n", rc); 
+		govrlipsyncstatus = GovrLipSyncUninitialized;
+	}
 }
 
 void AudioEffectOpusChunked::createencoder() {
-	resetencoder();  // In case called from GDScript
+	resetencoder(4);  // In case called from GDScript
 	audiosamplebuffer.resize(audiosamplesize*audiosamplechunks); 
 	chunknumber = 0;
 	bufferend = 0;
+	
+#ifdef OVR_LIP_SYNC
+	ovrLipSyncResult rc = ovrLipSync_Initialize(audiosamplerate, audiosamplesize);
+    if (rc == ovrLipSyncSuccess) {
+		ovrLipSyncContextProvider provider = ovrLipSyncContextProvider_EnhancedWithLaughter;
+		//ovrLipSyncContextProvider provider = ovrLipSyncContextProvider_Enhanced;
+		rc = ovrLipSync_CreateContextEx(&ovrlipsyncctx, provider, audiosamplerate, true);
+		if (rc == ovrLipSyncSuccess) {
+			govrlipsyncstatus = GovrLipSyncValid;
+			printf("lipsync context successfully created: %d\n", ovrlipsyncctx); 
+		} else {
+			std::cerr << "Failed to create ovrLipSync context: " << rc << std::endl;
+			rc = ovrLipSync_Shutdown();
+			std::cerr << "lipsync shutdown due to lack of context: " << rc << std::endl;
+			govrlipsyncstatus = GovrLipSyncUnavailable;
+		}
+	} else {
+		if (rc == ovrLipSyncError_MissingDLL)
+			std::cerr << "Failed to initialize ovrLipSync engine: Cannot find OVRLipSync.DLL." << std::endl;
+		else
+			std::cerr << "Failed to initialize ovrLipSync engine: " << rc << std::endl;
+		govrlipsyncstatus = GovrLipSyncUnavailable;
+    }
+#else
+	govrlipsyncstatus = GovrLipSyncUnavailable;
+#endif
+
+
 	if (opusframesize == 0)
 		return; 
-	
+
 	int channels = 2;
 	float Dtimeframeopus = opusframesize*1.0F/opussamplerate;
 	float Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
@@ -172,6 +220,29 @@ float AudioEffectOpusChunked::chunk_rms() {
 	}
 	return sqrt(s/(audiosamplesize*2));
 }
+
+int AudioEffectOpusChunked::chunk_to_lipsync() {
+	if (govrlipsyncstatus != GovrLipSyncValid)
+		return -1;
+	auto rc = ovrLipSync_ProcessFrameEx(ovrlipsyncctx, 
+		(float*)audiosamplebuffer.ptr() + 2*chunknumber*audiosamplesize, audiosamplesize,
+		ovrLipSyncAudioDataType_F32_Stereo, &ovrlipsyncframe);
+	visemes[ovrLipSyncViseme_Count] = ovrlipsyncframe.laughterScore;
+	visemes[ovrLipSyncViseme_Count+1] = ovrlipsyncframe.frameDelay;
+	visemes[ovrLipSyncViseme_Count+2] = ovrlipsyncframe.frameNumber;
+	float* array = (float*)visemes.ptrw();
+	int res = 0;
+	for (int i = 1; i < ovrLipSyncViseme_Count; i++) {
+		if (array[i] > array[res])
+			res = i;
+	}
+    return res;
+}
+
+PackedFloat32Array AudioEffectOpusChunked::read_visemes() {
+	return visemes;
+}
+
 
 void AudioEffectOpusChunked::drop_chunk() {
 	if (chunknumber == -1) 
