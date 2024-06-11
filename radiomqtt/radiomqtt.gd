@@ -90,7 +90,12 @@ func starttalking():
 	talkingstarttime = Time.get_ticks_msec()
 
 
+func _on_force_mic_button_button_down():
+	$AudioStreamMicrophone.playing = true
+
 func _process(_delta):
+	$DebugLabel.text = " MIC ON" if $AudioStreamMicrophone.playing else " ** MIC OFF"
+	
 	var talking = $HBoxMicTalk/PTT.button_pressed
 	if talking and not currentlytalking:
 		starttalking()
@@ -103,7 +108,7 @@ func _process(_delta):
 			var audiosamples = audioopuschunkedeffect.read_chunk()
 			var chunkv1 = audioopuschunkedeffect.chunk_max()
 			var chunkv2 = audioopuschunkedeffect.chunk_rms()
-			var viseme = audioopuschunkedeffect.chunk_to_lipsync()
+			var viseme = -1 # audioopuschunkedeffect.chunk_to_lipsync()
 			if viseme != prevviseme:
 				print(" viseme ", visemes[viseme], " ", chunkv2)
 				prevviseme = viseme

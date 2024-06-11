@@ -21,9 +21,21 @@ if env["platform"] == "windows":
     env.Append(CPPPATH=["opus/include"], LIBS=["opus/win32/VS2015/x64/Release/opus.lib"])
     env.Append(CPPPATH=["OVRLipSyncNative/Include"], LIBS=["OVRLipSyncNative/Lib/Win64/OVRLipSyncShim.lib"])
     env.Append(LINKFLAGS = ['/WX:NO'])
+    env.Append(CPPDEFINES={"OVR_LIP_SYNC": None})
 
 else:
     env.Append(CPPPATH=["opus/include"], LIBS=["opus"], LIBPATH="opus/build")
+
+# Couldn't get OVR_LIP_SYNC from Android
+# Tried nix develop;genericBuilder, then look at linking function.  The ldd-ar not able to unpack libOVRLipSyncShim.a
+# Since the GDExtension can only carry one .so file, a fake addon pointing to OverLipSync.so inserted it into the apk file under Lib
+# (use apktool decode to check the structure), but it didn't work.  This is still a potential way to inject executables into Android
+if env["platform"] == "android":
+    #env.Append(CPPDEFINES={"OVR_LIP_SYNC": None})
+    #env.Append(CPPPATH=["OVRLipSyncNative/Include"], LIBS=["OVRLipSyncShim"], LIBPATH=["OVRLipSyncNative/Lib/Android64"])
+    pass
+# OVRLipSync not available on Linux
+
 
 if env["platform"] == "linux":
     env.Append(CXXFLAGS = ['-fpermissive'])
@@ -38,9 +50,6 @@ if env["platform"] == "linux":
     # And add some linux dependencies.
     env.Append(LIBS=["pthread", "dl"])
 
-# OVRLipSync only available on non-Linux platforms
-if env["platform"] != "linux":
-    env.Append(CPPDEFINES={"OVR_LIP_SYNC": None})
 
 
 # Speex (resampler / jitter buffer)

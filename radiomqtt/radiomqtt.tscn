@@ -294,6 +294,22 @@ offset_right = 42.0
 offset_bottom = 23.0
 text = "sil"
 
+[node name="DebugLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 89.0
+offset_top = 363.0
+offset_right = 143.0
+offset_bottom = 386.0
+text = "TESSST"
+
+[node name="ForceMicButton" type="Button" parent="DebugLabel"]
+layout_mode = 0
+offset_left = 73.0
+offset_top = -4.0
+offset_right = 182.0
+offset_bottom = 27.0
+text = "Force Mic On"
+
 [connection signal="toggled" from="HBoxMicTalk/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
@@ -301,5 +317,6 @@ text = "sil"
 [connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
 [connection signal="toggled" from="MQTTnetwork/VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
 [connection signal="pressed" from="HBoxPlaycount/Play" to="." method="_on_play_pressed"]
+[connection signal="button_down" from="DebugLabel/ForceMicButton" to="." method="_on_force_mic_button_button_down"]
 
 [editable path="HBoxPlaycount/Self"]

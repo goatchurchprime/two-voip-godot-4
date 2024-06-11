@@ -32,7 +32,6 @@
 
 using namespace godot;
 
-
 void AudioEffectOpusChunked::_bind_methods() {
 
     ClassDB::bind_method(D_METHOD("set_opussamplerate", "opussamplerate"), &AudioEffectOpusChunked::set_opussamplerate);
