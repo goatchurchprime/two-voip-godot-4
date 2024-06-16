@@ -11,8 +11,13 @@ var recordedopuspackets = [ ]
 var recordedopuspacketsMemSize = 0
 var recordedheader = { }
 
+var audiosampleframedata : PackedByteArray
+var audiosampleframedata2 : PackedVector2Array
+var audiosampleframetextureimage : Image
+var audiosampleframetexture : ImageTexture
 var prevviseme = 0
 var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa", "E", "ih", "oh", "ou", "LA" ]
+
 
 func _ready():
 	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
@@ -77,7 +82,35 @@ func updatesamplerates():
 	if recordedopuspacketsMemSize != 0:
 		$HBoxPlaycount/VBoxContainer/FrameCount.text = k
 
+	setupaudioshader()
 
+	
+func setupaudioshader():
+	audiosampleframedata = PackedByteArray()
+	audiosampleframedata.resize(audioopuschunkedeffect.audiosamplesize)
+	for j in range(audioopuschunkedeffect.audiosamplesize):
+		audiosampleframedata.set(j, (j*10)%256)
+
+	audiosampleframedata2 = PackedVector2Array()
+	audiosampleframedata2.resize(audioopuschunkedeffect.audiosamplesize)
+	for j in range(audioopuschunkedeffect.audiosamplesize):
+		audiosampleframedata2.set(j, Vector2(-0.5,0.9) if (j%10)<5 else Vector2(0.6,0.1))
+
+	audiosampleframetextureimage = Image.create_from_data(audioopuschunkedeffect.audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata2.to_byte_array())
+	audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
+	$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
+	
+func audiosamplestoshader(audiosamples):
+	assert (len(audiosamples)== audioopuschunkedeffect.audiosamplesize)
+	for j in range(audioopuschunkedeffect.audiosamplesize):
+		var v = audiosamples[j]
+		audiosampleframedata.set(j, int((v.x + 1.0)/2.0*255))
+	audiosampleframetextureimage.set_data(audioopuschunkedeffect.audiosamplesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
+	audiosampleframetexture.update(audiosampleframetextureimage)
+
+	#$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
+
+	
 var currentlytalking = false
 var talkingstarttime = 0
 func starttalking():
@@ -106,6 +139,7 @@ func _process(_delta):
 	if audioeffectcapture == null:
 		while audioopuschunkedeffect.chunk_available():
 			var audiosamples = audioopuschunkedeffect.read_chunk()
+			audiosamplestoshader(audiosamples)
 			var chunkv1 = audioopuschunkedeffect.chunk_max()
 			var chunkv2 = audioopuschunkedeffect.chunk_rms()
 			var viseme = -1 # audioopuschunkedeffect.chunk_to_lipsync()
@@ -117,6 +151,9 @@ func _process(_delta):
 				for i in range($HBoxVisemes.get_child_count()):
 					$HBoxVisemes.get_child(i).size.y = int(50*vv[i])
 				#print(" vvv ", vv[-2], "  ", vv[-1])
+				$HBoxVisemes.visible = true
+			else:
+				$HBoxVisemes.visible = false
 				
 			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2)
 			if currentlytalking:
@@ -128,12 +165,13 @@ func _process(_delta):
 					recordedopuspacketsMemSize += opuspacket.size()
 				else:
 					audioopuschunkedeffect.drop_chunk()
-					$MQTTnetwork.transportaudiopacket(audiosamples)
+					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples))
 			else:
 				audioopuschunkedeffect.drop_chunk()
 	else:
 		while audioeffectcapture.get_frames_available() > audioopuschunkedeffect.audiosamplesize:
 			var audiosamples = audioeffectcapture.get_buffer(audioopuschunkedeffect.audiosamplesize)
+			audiosamplestoshader(audiosamples)
 			var chunkv1 = 0.0
 			var schunkv2 = 0.0
 			for i in range(len(audiosamples)):
@@ -152,7 +190,7 @@ func _process(_delta):
 					$MQTTnetwork.transportaudiopacket(opuspacket)
 					recordedopuspacketsMemSize += opuspacket.size()
 				else:
-					$MQTTnetwork.transportaudiopacket(audiosamples)
+					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples))
 			else:
 				audioopuschunkedeffect.drop_chunk()
 		

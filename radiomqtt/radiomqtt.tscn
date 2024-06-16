@@ -1,10 +1,32 @@
-[gd_scene load_steps=8 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=11 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
 [ext_resource type="Script" path="res://radiomqtt/MQTTnetwork.gd" id="2_y485j"]
+[ext_resource type="Texture2D" uid="uid://ntugtt86knrh" path="res://icon.svg" id="3_eh2h5"]
 [ext_resource type="Script" path="res://radiomqtt/voxdetector.gd" id="3_qvq17"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
+
+[sub_resource type="Shader" id="Shader_022wp"]
+code = "// NOTE: Shader automatically converted from Godot Engine 4.3.beta's CanvasItemMaterial.
+
+shader_type canvas_item;
+render_mode blend_mix;
+
+uniform float blue = 1.0; // you can assign a default value to uniforms
+uniform sampler2D voice : repeat_enable;
+
+void fragment() {
+  COLOR = vec4(UV, 0.5, 1.0);
+  vec4 v = texture(voice, UV);
+  float d = UV.y*2.0 - v.r*4.0 - 1.0;
+  COLOR = (abs(d) < 0.1 ? vec4(0.8,0.8,0.9,1.0) : vec4(0.1,0.1,0.1,1.0));
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_cklni"]
+shader = SubResource("Shader_022wp")
+shader_parameter/blue = 1.0
+shader_parameter/voice = ExtResource("3_eh2h5")
 
 [sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_itmlg"]
 
@@ -51,6 +73,7 @@ value = 20.0
 
 [node name="ColorRectBackground" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
 z_index = -3
+material = SubResource("ShaderMaterial_cklni")
 layout_mode = 0
 offset_right = 378.0
 offset_bottom = 35.0
@@ -65,7 +88,7 @@ offset_bottom = 24.0
 mouse_filter = 1
 color = Color(0.224055, 0.434373, 0.715477, 1)
 
-[node name="ColorRectLoudness2" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
+[node name="ColorRectLoudnessRMS" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
 z_index = -2
 layout_mode = 0
 offset_top = 4.0

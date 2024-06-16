@@ -20,6 +20,11 @@ The build system is defined by the flake.nix file
 > nix build .#android
 > cp result/addons/twovoip/*so addons/twovoip
 
+ * Windows version:
+(incomplete)
+Start the project in Visual Studio and let it clone and compile the opus project
+> python -m SCons
+
 Make sure addons/twovoip/twovoip.gdextension point to these files:
 
 ### Otherwise by hand when developing
@@ -37,13 +42,22 @@ first clone Opus and godot-cpp modules before building them
 > git clone git@github.com:xiph/opus.git
 > cd opus
 > git checkout c85499757c148fede8604cffa12454206b6138ba
+
+On Linux:
 > cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 > cd build
 > make
 > cd ../..
 > scons  (or python -m SCons on Windows)
+
+On Windows:
+Use Visual Studio 2022 Community Edition with CMake option to open opus
+directory and convert cmake script to sln and then compile.
+> cd ../..
+> scons  (or python -m SCons on Windows)
 ```
-For MAC see the instructions on the one-voip here: https://github.com/RevoluPowered/one-voip-godot-4/?tab=readme-ov-file#mac
+On Mac:
+See the instructions on the one-voip here: https://github.com/RevoluPowered/one-voip-godot-4/?tab=readme-ov-file#mac
 
 ## With OVRLipSync
 
