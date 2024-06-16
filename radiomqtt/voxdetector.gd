@@ -12,16 +12,17 @@ func _on_h_slider_vox_value_changed(value):
 func _ready():
 	await get_tree().process_frame 
 	$HSliderVox/ColorRectBackground.size = $HSliderVox.size
-	$HSliderVox/ColorRectLoudness.size = $HSliderVox.size
-	$HSliderVox/ColorRectLoudness2.size = Vector2($HSliderVox.size.x, $HSliderVox.size.y/3)
-	$HSliderVox/ColorRectThreshold.position.y = 0
-	$HSliderVox/ColorRectThreshold.size.y = $HSliderVox.size.y
-	$HSliderVox/ColorRectThreshold.size.x = outlinewidth
+	$HSliderVox/ColorRectLoudness.size = Vector2($HSliderVox.size.x, $HSliderVox.size.y/2)
+	$HSliderVox/ColorRectLoudness.position = Vector2(0, $HSliderVox.size.y/4)
+	$HSliderVox/ColorRectLoudnessRMS.size = Vector2($HSliderVox.size.x, $HSliderVox.size.y/4)
+	$HSliderVox/ColorRectLoudnessRMS.position = Vector2(0, $HSliderVox.size.y*3/8)
+	$HSliderVox/ColorRectThreshold.size = Vector2(outlinewidth, $HSliderVox.size.y)
+	$HSliderVox/ColorRectThreshold.position = Vector2(0,0)
 	_on_h_slider_vox_value_changed($HSliderVox.value)
 	
 func loudnessvalues(chunkv1, chunkv2):
 	$HSliderVox/ColorRectLoudness.size.x = $HSliderVox.size.x*chunkv1
-	$HSliderVox/ColorRectLoudness2.size.x = $HSliderVox.size.x*chunkv2
+	$HSliderVox/ColorRectLoudnessRMS.size.x = $HSliderVox.size.x*chunkv2
 	if chunkv1 >= voxthreshold:
 		if not $HSliderVox/ColorRectThreshold.visible:
 			visthreshold = chunkv1

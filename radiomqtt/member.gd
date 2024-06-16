@@ -49,7 +49,7 @@ func receivemqttmessage(msg):
 		if audiostreamopuschunked.opusframesize != 0:
 			opuspacketsbuffer.push_back(msg)
 		else:
-			audiopacketsbuffer.push_back(msg)
+			audiopacketsbuffer.push_back(bytes_to_var(msg))
 
 
 func _process(_delta):
