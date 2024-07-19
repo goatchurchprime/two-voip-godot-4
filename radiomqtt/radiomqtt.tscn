@@ -88,7 +88,7 @@ layout_mode = 2
 bbcode_enabled = true
 text = "[b]Instructions:[/b] Hold PTT to record (Vox to activate automatically by volume). 
 Playback is of your recording post-compression with the selected settings.
-Connect to an MQTT broker to on a topic to send and receive packets to another computer.
+Connect to an MQTT broker to on a topic to send and receive packets to another computer.  Hold [b]Sil[/b] down to set the silcence threshold for Vox
 "
 fit_content = true
 
@@ -126,7 +126,7 @@ text = "Vox"
 [node name="Silence" type="Button" parent="HBoxBigButtons"]
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
-tooltip_text = "Hold this down to "
+tooltip_text = "Hold this down to set the Vox silence threshold"
 text = "Sil"
 
 [node name="HSeparator2" type="HSeparator" parent="."]
@@ -297,6 +297,7 @@ fit_content = true
 layout_mode = 2
 
 [node name="Play" type="Button" parent="HBoxPlaycount"]
+custom_minimum_size = Vector2(60, 0)
 layout_mode = 2
 text = "Play
 "
@@ -337,18 +338,9 @@ text = "Bytes/s:"
 layout_mode = 2
 editable = false
 
-[node name="VBoxContainer" type="VBoxContainer" parent="HBoxPlaycount"]
-visible = false
+[node name="VSeparator" type="VSeparator" parent="HBoxPlaycount"]
+custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
-
-[node name="Label" type="Label" parent="HBoxPlaycount/VBoxContainer"]
-layout_mode = 2
-text = "Recorded opus frames: "
-
-[node name="FrameCount" type="Label" parent="HBoxPlaycount/VBoxContainer"]
-layout_mode = 2
-text = "0
-"
 
 [node name="Self" parent="HBoxPlaycount" instance=ExtResource("4_w5dv2")]
 layout_mode = 2
@@ -361,6 +353,9 @@ stream = SubResource("AudioStreamOpusChunked_eh8ms")
 text = "self
 
 "
+
+[node name="Node" parent="HBoxPlaycount/Self" index="2"]
+size_flags_vertical = 4
 
 [node name="HSeparator5" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
@@ -459,6 +454,7 @@ text = "sil"
 
 [connection signal="finished" from="AudioStreamMicrophone" to="." method="_on_audio_stream_microphone_finished"]
 [connection signal="toggled" from="HBoxBigButtons/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
+[connection signal="button_down" from="HBoxBigButtons/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]

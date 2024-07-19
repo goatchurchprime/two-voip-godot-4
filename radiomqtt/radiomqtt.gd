@@ -226,10 +226,6 @@ func _process(_delta):
 func endtalking():
 	currentlytalking = false
 	print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
-	var tm = len(recordedsamples)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
-	print(len(recordedsamples), " audioopuschunkedeffect.audiosamplesize ", audioopuschunkedeffect.audiosamplesize, "  ", audioopuschunkedeffect.audiosamplerate)
-	var k = "mem: %d  time: %.01f  byte/s:%d" % [recordedopuspacketsMemSize, tm, int(recordedopuspacketsMemSize/tm)]
-	$HBoxPlaycount/VBoxContainer/FrameCount.text = k
 	$MQTTnetwork.transportaudiopacket(JSON.stringify({"framecount":len(recordedsamples)}).to_ascii_buffer())
 	print("Talked for ", (Time.get_ticks_msec() - talkingstarttime)*0.001, " seconds")
 
