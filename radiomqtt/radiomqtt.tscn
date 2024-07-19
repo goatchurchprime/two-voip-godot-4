@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=18 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
@@ -6,6 +6,27 @@
 [ext_resource type="Texture2D" uid="uid://ntugtt86knrh" path="res://icon.svg" id="3_eh2h5"]
 [ext_resource type="Script" path="res://radiomqtt/voxdetector.gd" id="3_qvq17"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
+
+[sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_itmlg"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kcsl6"]
+bg_color = Color(0.0705882, 0.0235294, 0.564706, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ljq7l"]
+bg_color = Color(0.101961, 0.101961, 0.101961, 1)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_30le3"]
+bg_color = Color(0.909804, 0.392157, 0.435294, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_k6a7f"]
+bg_color = Color(0.6, 0.6, 0.0470588, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3io8e"]
+bg_color = Color(0, 0.545098, 0.290196, 1)
 
 [sub_resource type="Shader" id="Shader_022wp"]
 code = "// NOTE: Shader automatically converted from Godot Engine 4.3.beta's CanvasItemMaterial.
@@ -28,41 +49,102 @@ shader = SubResource("Shader_022wp")
 shader_parameter/blue = 1.0
 shader_parameter/voice = ExtResource("3_eh2h5")
 
-[sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_itmlg"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_onpxr"]
+bg_color = Color(0.427451, 0.439216, 0, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_67wxx"]
+bg_color = Color(0.290196, 0.505882, 0.490196, 1)
 
 [sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_eh8ms"]
 resource_local_to_scene = true
 
-[node name="radiomqtt" type="Control"]
-layout_mode = 3
+[node name="radiomqtt" type="VBoxContainer"]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_right = -171.0
-offset_bottom = -173.0
+offset_left = 10.0
+offset_right = -10.0
+offset_bottom = 70.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_anot2")
 
-[node name="HBoxMicTalk" type="HBoxContainer" parent="."]
-layout_mode = 0
-offset_left = 18.0
-offset_top = 50.0
-offset_right = 601.0
-offset_bottom = 115.0
-script = ExtResource("3_qvq17")
+[node name="AudioStreamMicrophone" type="AudioStreamPlayer" parent="."]
+stream = SubResource("AudioStreamMicrophone_itmlg")
+autoplay = true
+bus = &"MicrophoneBus"
 
-[node name="PTT" type="Button" parent="HBoxMicTalk"]
+[node name="LabelTitle" type="Label" parent="."]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_type_variation = &"HeaderSmall"
+theme_override_styles/normal = SubResource("StyleBoxFlat_kcsl6")
+text = "Voice Opus Compressed Packets over MQTT Demo"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Label" type="RichTextLabel" parent="."]
+layout_mode = 2
+bbcode_enabled = true
+text = "[b]Instructions:[/b] Hold PTT to record (Vox to activate automatically by volume). 
+Playback is of your recording post-compression with the selected settings.
+Connect to an MQTT broker to on a topic to send and receive packets to another computer.
+"
+fit_content = true
+
+[node name="HSeparator3" type="HSeparator" parent="."]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="HBoxBigButtons" type="HBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 4
+
+[node name="PTT" type="Button" parent="HBoxBigButtons"]
+custom_minimum_size = Vector2(250, 100)
 layout_mode = 2
 tooltip_text = "Hold down to talk"
+theme_override_font_sizes/font_size = 50
+theme_override_styles/normal = SubResource("StyleBoxFlat_ljq7l")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_30le3")
 text = "PTT
 "
 
-[node name="Vox" type="Button" parent="HBoxMicTalk"]
+[node name="VSeparator" type="VSeparator" parent="HBoxBigButtons"]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+
+[node name="Vox" type="Button" parent="HBoxBigButtons"]
+custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
 tooltip_text = "Voice operated mode set by threshold"
+theme_override_font_sizes/font_size = 50
+theme_override_styles/pressed = SubResource("StyleBoxFlat_k6a7f")
 toggle_mode = true
 text = "Vox"
+
+[node name="Silence" type="Button" parent="HBoxBigButtons"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+tooltip_text = "Hold this down to "
+text = "Sil"
+
+[node name="HSeparator2" type="HSeparator" parent="."]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="HBoxMicTalk" type="HBoxContainer" parent="."]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+script = ExtResource("3_qvq17")
+
+[node name="MicWorking" type="Button" parent="HBoxMicTalk"]
+layout_mode = 2
+tooltip_text = "AudioStreamMicrophone is playing"
+theme_override_styles/pressed = SubResource("StyleBoxFlat_3io8e")
+toggle_mode = true
+text = "Mic
+Mic"
 
 [node name="HSliderVox" type="HSlider" parent="HBoxMicTalk"]
 z_index = 3
@@ -105,25 +187,56 @@ offset_bottom = 32.0
 mouse_filter = 1
 color = Color(0.689579, 0.760623, 0.0826142, 1)
 
+[node name="HSeparator" type="HSeparator" parent="."]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
 [node name="VBoxFrameLength" type="VBoxContainer" parent="."]
-layout_mode = 0
-offset_left = 665.0
-offset_top = 41.0
-offset_right = 1089.0
-offset_bottom = 161.0
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBoxFrameLength"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_onpxr")
+text = "LibOpus compression and resampling"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HBoxBitRate" type="HBoxContainer" parent="VBoxFrameLength"]
+layout_mode = 2
+
+[node name="LabBitRate" type="Label" parent="VBoxFrameLength/HBoxBitRate"]
+layout_mode = 2
+text = "Opus Bit Rate"
+
+[node name="BitRate" type="OptionButton" parent="VBoxFrameLength/HBoxBitRate"]
+layout_mode = 2
+item_count = 5
+popup/item_0/text = "24000"
+popup/item_0/id = 0
+popup/item_1/text = "12000"
+popup/item_1/id = 1
+popup/item_2/text = "10000"
+popup/item_2/id = 2
+popup/item_3/text = "6000"
+popup/item_3/id = 3
+popup/item_4/text = "3000"
+popup/item_4/id = 4
 
 [node name="HBoxOpusFrame" type="HBoxContainer" parent="VBoxFrameLength"]
 layout_mode = 2
+size_flags_horizontal = 0
 
 [node name="LabFrameDuration" type="Label" parent="VBoxFrameLength/HBoxOpusFrame"]
 layout_mode = 2
-text = "Opus Frame duration:"
+text = "Frame duration"
 
 [node name="FrameDuration" type="OptionButton" parent="VBoxFrameLength/HBoxOpusFrame"]
 layout_mode = 2
-selected = 3
 item_count = 6
 popup/item_0/text = "2.5ms"
+popup/item_0/id = 0
 popup/item_1/text = "5ms"
 popup/item_1/id = 1
 popup/item_2/text = "10ms"
@@ -141,6 +254,7 @@ text = "---"
 
 [node name="HBoxAudioFrame" type="HBoxContainer" parent="VBoxFrameLength"]
 layout_mode = 2
+size_flags_horizontal = 0
 
 [node name="LabAudioSampler" type="Label" parent="VBoxFrameLength/HBoxAudioFrame"]
 layout_mode = 2
@@ -148,9 +262,9 @@ text = "Audio sampler"
 
 [node name="ResampleState" type="OptionButton" parent="VBoxFrameLength/HBoxAudioFrame"]
 layout_mode = 2
-selected = 1
 item_count = 3
 popup/item_0/text = "Uncompressed"
+popup/item_0/id = 0
 popup/item_1/text = "Speex Resample"
 popup/item_1/id = 1
 popup/item_2/text = "44.1k as 48k"
@@ -160,38 +274,101 @@ popup/item_2/id = 2
 layout_mode = 2
 text = "---"
 
-[node name="HBoxBitRate" type="HBoxContainer" parent="VBoxFrameLength"]
+[node name="HSeparator4" type="HSeparator" parent="."]
+custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 
-[node name="LabBitRate" type="Label" parent="VBoxFrameLength/HBoxBitRate"]
+[node name="Label2" type="Label" parent="."]
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-text = "Opus Bit Rate"
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_67wxx")
+text = "Recording Playback"
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="BitRate" type="OptionButton" parent="VBoxFrameLength/HBoxBitRate"]
+[node name="Label3" type="RichTextLabel" parent="."]
 layout_mode = 2
-selected = 0
-item_count = 5
-popup/item_0/text = "24000"
-popup/item_1/text = "12000"
-popup/item_1/id = 1
-popup/item_2/text = "10000"
-popup/item_2/id = 2
-popup/item_3/text = "6000"
-popup/item_3/id = 3
-popup/item_4/text = "3000"
-popup/item_4/id = 4
+bbcode_enabled = true
+text = "Play back the previous recording after compression at different rates defined above.  Compression is applied to the raw recording."
+fit_content = true
 
-[node name="AudioStreamMicrophone" type="AudioStreamPlayer" parent="."]
-stream = SubResource("AudioStreamMicrophone_itmlg")
-autoplay = true
-bus = &"MicrophoneBus"
+[node name="HBoxPlaycount" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Play" type="Button" parent="HBoxPlaycount"]
+layout_mode = 2
+text = "Play
+"
+
+[node name="GridContainer" type="GridContainer" parent="HBoxPlaycount"]
+layout_mode = 2
+columns = 4
+
+[node name="Label2" type="Label" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+text = "Time (s):"
+
+[node name="TimeSecs" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+editable = false
+
+[node name="Label3" type="Label" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+text = "Bytes:"
+
+[node name="Totalbytes" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+editable = false
+
+[node name="Label" type="Label" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+text = "Frames:"
+
+[node name="FrameCount" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+editable = false
+
+[node name="Label4" type="Label" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+text = "Bytes/s:"
+
+[node name="Bytespersec" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+editable = false
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HBoxPlaycount"]
+visible = false
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxPlaycount/VBoxContainer"]
+layout_mode = 2
+text = "Recorded opus frames: "
+
+[node name="FrameCount" type="Label" parent="HBoxPlaycount/VBoxContainer"]
+layout_mode = 2
+text = "0
+"
+
+[node name="Self" parent="HBoxPlaycount" instance=ExtResource("4_w5dv2")]
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="AudioStreamPlayer" parent="HBoxPlaycount/Self" index="0"]
+stream = SubResource("AudioStreamOpusChunked_eh8ms")
+
+[node name="Label" parent="HBoxPlaycount/Self" index="1"]
+text = "self
+
+"
+
+[node name="HSeparator5" type="HSeparator" parent="."]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
 
 [node name="MQTTnetwork" type="Control" parent="."]
-anchors_preset = 0
-offset_left = 566.0
-offset_top = 319.0
-offset_right = 882.0
-offset_bottom = 376.0
+custom_minimum_size = Vector2(0, 200)
+layout_mode = 2
 script = ExtResource("2_y485j")
 
 [node name="MQTT" parent="MQTTnetwork" instance=ExtResource("2_4wm5t")]
@@ -201,11 +378,6 @@ binarymessages = true
 [node name="VBoxMQTT" type="VBoxContainer" parent="MQTTnetwork"]
 layout_mode = 1
 anchors_preset = -1
-anchor_right = 0.068
-offset_left = -20.0
-offset_top = -105.0
-offset_right = 307.092
-offset_bottom = -1.0
 
 [node name="HBoxConnect" type="HBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
 layout_mode = 2
@@ -231,9 +403,9 @@ text = "MQTTBroker
 [node name="MQTTBroker" type="OptionButton" parent="MQTTnetwork/VBoxMQTT/HBoxBroker"]
 layout_mode = 2
 size_flags_horizontal = 3
-selected = 0
 item_count = 3
 popup/item_0/text = "mosquitto.doesliverpool.xyz"
+popup/item_0/id = 0
 popup/item_1/text = "broker.hivemq.com"
 popup/item_1/id = 1
 popup/item_2/text = "test.mosquitto.org"
@@ -253,56 +425,24 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "myplace"
 
-[node name="Members" type="VBoxContainer" parent="MQTTnetwork"]
+[node name="Members" type="VBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
+layout_mode = 2
+
+[node name="DebugLabel" type="Label" parent="."]
+layout_mode = 2
+text = "TESSST"
+
+[node name="ForceMicButton" type="Button" parent="DebugLabel"]
 layout_mode = 0
-offset_left = -14.0
-offset_top = 7.0
-offset_right = 354.0
-offset_bottom = 89.0
-
-[node name="HBoxPlaycount" type="HBoxContainer" parent="."]
-layout_mode = 0
-offset_left = 24.0
-offset_top = 259.0
-offset_right = 414.0
-offset_bottom = 321.0
-
-[node name="Play" type="Button" parent="HBoxPlaycount"]
-layout_mode = 2
-text = "Play
-"
-
-[node name="VBoxContainer" type="VBoxContainer" parent="HBoxPlaycount"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="HBoxPlaycount/VBoxContainer"]
-layout_mode = 2
-text = "Recorded opus frames: "
-
-[node name="FrameCount" type="Label" parent="HBoxPlaycount/VBoxContainer"]
-layout_mode = 2
-text = "0
-"
-
-[node name="Self" parent="HBoxPlaycount" instance=ExtResource("4_w5dv2")]
-layout_mode = 2
-size_flags_vertical = 4
-
-[node name="AudioStreamPlayer" parent="HBoxPlaycount/Self" index="0"]
-stream = SubResource("AudioStreamOpusChunked_eh8ms")
-
-[node name="Label" parent="HBoxPlaycount/Self" index="1"]
-text = "self
-
-"
+offset_left = 73.0
+offset_top = -4.0
+offset_right = 182.0
+offset_bottom = 27.0
+text = "Force Mic On"
 
 [node name="HBoxVisemes" type="HBoxContainer" parent="."]
 custom_minimum_size = Vector2(0, 50)
-layout_mode = 0
-offset_left = 56.0
-offset_top = 138.0
-offset_right = 96.0
-offset_bottom = 188.0
+layout_mode = 2
 
 [node name="ColorRect" type="ColorRect" parent="HBoxVisemes"]
 custom_minimum_size = Vector2(25, 0)
@@ -317,29 +457,14 @@ offset_right = 42.0
 offset_bottom = 23.0
 text = "sil"
 
-[node name="DebugLabel" type="Label" parent="."]
-layout_mode = 0
-offset_left = 89.0
-offset_top = 363.0
-offset_right = 143.0
-offset_bottom = 386.0
-text = "TESSST"
-
-[node name="ForceMicButton" type="Button" parent="DebugLabel"]
-layout_mode = 0
-offset_left = 73.0
-offset_top = -4.0
-offset_right = 182.0
-offset_bottom = 27.0
-text = "Force Mic On"
-
-[connection signal="toggled" from="HBoxMicTalk/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
+[connection signal="finished" from="AudioStreamMicrophone" to="." method="_on_audio_stream_microphone_finished"]
+[connection signal="toggled" from="HBoxBigButtons/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
+[connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
-[connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
-[connection signal="toggled" from="MQTTnetwork/VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
 [connection signal="pressed" from="HBoxPlaycount/Play" to="." method="_on_play_pressed"]
+[connection signal="toggled" from="MQTTnetwork/VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
 [connection signal="button_down" from="DebugLabel/ForceMicButton" to="." method="_on_force_mic_button_button_down"]
 
 [editable path="HBoxPlaycount/Self"]

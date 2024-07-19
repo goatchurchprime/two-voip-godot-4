@@ -20,6 +20,16 @@ var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa
 
 
 func _ready():
+	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
+		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
+	if $VBoxFrameLength/HBoxAudioFrame/ResampleState.selected == -1:
+		$VBoxFrameLength/HBoxAudioFrame/ResampleState.select(1)
+	if $VBoxFrameLength/HBoxBitRate/BitRate.selected == -1:
+		$VBoxFrameLength/HBoxBitRate/BitRate.select(2)
+	if $VBoxFrameLength/HBoxBitRate/BitRate.selected == -1:
+		$VBoxFrameLength/HBoxBitRate/BitRate.select(2)
+	if $MQTTnetwork/VBoxMQTT/HBoxBroker/MQTTBroker.selected == -1:
+		$MQTTnetwork/VBoxMQTT/HBoxBroker/MQTTBroker.select(0)
 	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
 	var audioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, 0)
 	if audioeffectonmic.is_class("AudioEffectOpusChunked"):
@@ -63,27 +73,29 @@ func updatesamplerates():
 		audioopuschunkedeffect.audiosamplesize = int(audioopuschunkedeffect.audiosamplerate*frametimems/1000)
 	else:  # 441.1k as 48k fakery
 		audioopuschunkedeffect.audiosamplesize = audioopuschunkedeffect.opusframesize
-		
-	$VBoxFrameLength/HBoxOpusFrame/LabFrameLength.text = "%d samples" % audioopuschunkedeffect.opusframesize
-	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples" % audioopuschunkedeffect.audiosamplesize
+				
+	$VBoxFrameLength/HBoxOpusFrame/LabFrameLength.text = "%d samples at 48KHz" % audioopuschunkedeffect.opusframesize
+	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples at 44.1KHz" % audioopuschunkedeffect.audiosamplesize
 	recordedheader = { "opusframesize":audioopuschunkedeffect.opusframesize, "audiosamplesize":audioopuschunkedeffect.audiosamplesize, "opussamplerate":audioopuschunkedeffect.opussamplerate, "audiosamplerate":audioopuschunkedeffect.audiosamplerate }
 	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audioopuschunkedeffect.audiosamplesize:
 		recordedsamples = resamplerecordedsamples(recordedsamples, audioopuschunkedeffect.audiosamplesize)
 	var prefixbytes = PackedByteArray()
+	recordedopuspacketsMemSize = 0
 	if audioopuschunkedeffect.opusframesize != 0:
 		recordedopuspackets = [ ]
-		recordedopuspacketsMemSize = 0
 		for s in recordedsamples:
 			var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, s, 0)
 			recordedopuspackets.append(opuspacket)
-			recordedopuspacketsMemSize += recordedopuspackets[-1].size() 
-	var tm = len(recordedsamples)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
-	var k = "Smem: %d  time: %.01f  byte/s:%d" % [recordedopuspacketsMemSize, tm, int(recordedopuspacketsMemSize/tm)]
-	if recordedopuspacketsMemSize != 0:
-		$HBoxPlaycount/VBoxContainer/FrameCount.text = k
-
+			recordedopuspacketsMemSize += opuspacket.size() 
+		$HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
+	else:
+		if len(recordedsamples):
+			recordedopuspacketsMemSize = len(recordedsamples)*len(recordedsamples[0])*4
+		$HBoxPlaycount/GridContainer/FrameCount.text = "1"
+	$HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
+	var tm = len(recordedsamples)*frametimems*0.001
+	$HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
 	setupaudioshader()
-
 	
 func setupaudioshader():
 	audiosampleframedata = PackedByteArray()
@@ -98,6 +110,7 @@ func setupaudioshader():
 
 	audiosampleframetextureimage = Image.create_from_data(audioopuschunkedeffect.audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata2.to_byte_array())
 	audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
+	assert (audiosampleframetexture != null)
 	$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
 	
 func audiosamplestoshader(audiosamples):
@@ -110,26 +123,34 @@ func audiosamplestoshader(audiosamples):
 
 	#$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
 
-	
 var currentlytalking = false
 var talkingstarttime = 0
 func starttalking():
 	currentlytalking = true
 	recordedsamples = [ ]
 	recordedopuspackets = [ ]
+	$HBoxPlaycount/GridContainer/FrameCount.text = ""
+	$HBoxPlaycount/GridContainer/TimeSecs.text = ""
 	recordedopuspacketsMemSize = 0
+	$HBoxPlaycount/GridContainer/Totalbytes.text = str(0)
+	$HBoxPlaycount/GridContainer/Bytespersec.text = str(0)
+	
 	print("start talking")
 	$MQTTnetwork.transportaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
 	talkingstarttime = Time.get_ticks_msec()
 
 
 func _on_force_mic_button_button_down():
-	$AudioStreamMicrophone.playing = true
+	print("_on_force_mic_button_button_down ", $AudioStreamMicrophone.playing)
+	$AudioStreamMicrophone.play()
 
 func _process(_delta):
+	$HBoxMicTalk/MicWorking.button_pressed = $AudioStreamMicrophone.playing
 	$DebugLabel.text = " MIC ON" if $AudioStreamMicrophone.playing else " ** MIC OFF"
 	
-	var talking = $HBoxMicTalk/PTT.button_pressed
+	var talking = $HBoxBigButtons/PTT.button_pressed
+	if talking:
+		$HBoxPlaycount/GridContainer/TimeSecs.text = "%.1f" % ((Time.get_ticks_msec() - talkingstarttime)*0.001)
 	if talking and not currentlytalking:
 		starttalking()
 	elif not talking and currentlytalking:
@@ -162,7 +183,11 @@ func _process(_delta):
 					var opuspacket = audioopuschunkedeffect.pop_opus_packet(prefixbytes)
 					recordedopuspackets.append(opuspacket)
 					$MQTTnetwork.transportaudiopacket(opuspacket)
+					$HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
 					recordedopuspacketsMemSize += opuspacket.size()
+					$HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
+					var tm = len(recordedopuspackets)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
+					$HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
 				else:
 					audioopuschunkedeffect.drop_chunk()
 					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples))
@@ -187,8 +212,12 @@ func _process(_delta):
 				if audioopuschunkedeffect.opusframesize != 0:
 					var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, audiosamples, 0);
 					recordedopuspackets.append(opuspacket)
+					$HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
 					$MQTTnetwork.transportaudiopacket(opuspacket)
 					recordedopuspacketsMemSize += opuspacket.size()
+					$HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
+					var tm = len(recordedopuspackets)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
+					$HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
 				else:
 					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples))
 			else:
@@ -222,3 +251,6 @@ func _on_resample_state_item_selected(_index):
 
 func _on_option_button_item_selected(_index):
 	updatesamplerates()
+
+func _on_audio_stream_microphone_finished():
+	print("_on_audio_stream_microphone_finished")

@@ -2,9 +2,12 @@ extends HBoxContainer
 
 const outlinewidth = 4
 var samplesrunon = 17
-var samplescountdown = 0
+var samplescountdown = 1
 var voxthreshold = 1.0
 var visthreshold = 1.0
+
+@onready var PTT = get_node("../HBoxBigButtons/PTT")
+@onready var Vox = get_node("../HBoxBigButtons/Vox")
 
 func _on_h_slider_vox_value_changed(value):
 	voxthreshold = value/$HSliderVox.max_value
@@ -27,8 +30,8 @@ func loudnessvalues(chunkv1, chunkv2):
 		if not $HSliderVox/ColorRectThreshold.visible:
 			visthreshold = chunkv1
 			$HSliderVox/ColorRectThreshold.visible = true
-			if $Vox.pressed:
-				$PTT.set_pressed(true)
+			if Vox.pressed:
+				PTT.set_pressed(true)
 		else:
 			visthreshold = max(visthreshold, chunkv1)
 		$HSliderVox/ColorRectThreshold.position.x = $HSliderVox.size.x*visthreshold - outlinewidth/2.0
@@ -37,9 +40,9 @@ func loudnessvalues(chunkv1, chunkv2):
 		samplescountdown -= 1
 		if samplescountdown == 0:
 			$HSliderVox/ColorRectThreshold.visible = false
-			if $Vox.pressed:
-				$PTT.set_pressed(false)
+			if Vox.pressed:
+				PTT.set_pressed(false)
 		
 func _on_vox_toggled(toggled_on):
-	$PTT.toggle_mode = toggled_on
-	$PTT.set_pressed($HSliderVox/ColorRectThreshold.visible and toggled_on)
+	PTT.toggle_mode = toggled_on
+	PTT.set_pressed($HSliderVox/ColorRectThreshold.visible and toggled_on)
