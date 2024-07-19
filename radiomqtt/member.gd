@@ -62,7 +62,7 @@ func _process(_delta):
 				audiostreamopuschunked.push_opus_packet(opuspacketsbuffer.pop_front(), 0, 0)
 			else:
 				break
-		$Node/ColorRect.size.x = audiostreamopuschunked.queue_length_frames()/(50.0*881)*100
+		$Node/ColorRect.size.x = audiostreamopuschunked.queue_length_frames()/(50.0*881)*$Node/ColorRect2.size.x
 
 	else:
 		while audiostreamgeneratorplayback.get_frames_available() > audiostreamopuschunked.audiosamplesize:
