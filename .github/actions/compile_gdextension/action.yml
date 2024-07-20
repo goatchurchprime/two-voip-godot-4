@@ -164,7 +164,10 @@ runs:
       if: inputs.platform == 'web'
       shell: bash
       run: |
-        echo "::group::🛠️ Opus Compilation (WASM32 TBD) 🛠️"
+        echo "::group::🛠️ Opus Compilation (WASM32) 🛠️"
+        cd opus
+        emconfigure ./configure --disable-intrinsics --disable-rtcd CFLAGS='-O2'
+        make
 
     - name: Add msbuild to PATH
       if: runner.os == 'Windows'
