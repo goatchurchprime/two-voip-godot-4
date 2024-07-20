@@ -33,23 +33,31 @@ Since we've not got submodules here we need to
 first clone Opus and godot-cpp modules before building them
 
 ```
-> git clone --recurse-submodules git@github.com:goatchurchprime/two-voip-godot-4.git
-> cd two-voip-godot-4
+git clone --recurse-submodules git@github.com:goatchurchprime/two-voip-godot-4.git
+cd two-voip-godot-4
+```
 
 On Linux:
-> cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-> cd build
-> make
-> cd ../..
-> scons  (or python -m SCons on Windows)
+
+```
+cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+cd build
+make
+cd ../..
+scons  (or python -m SCons on Windows)
+```
 
 On Windows:
+
 Use Visual Studio 2022 Community Edition with CMake option to open opus
 directory and convert cmake script to sln and then compile.
-> cd ../..
-> scons  (or python -m SCons on Windows)
+
+```
+cd ../..
+scons  (or python -m SCons on Windows)
 ```
 On Mac:
+
 See the instructions on the one-voip here: https://github.com/RevoluPowered/one-voip-godot-4/?tab=readme-ov-file#mac
 
 ## With OVRLipSync
