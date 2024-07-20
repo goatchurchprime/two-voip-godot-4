@@ -1,0 +1,6 @@
+[
+  "audio_effect_opus_chunked.cpp",
+  "register_types.cpp",
+  "audio_stream_opus_chunked.cpp",
+  "speex_resampler/resample.c"
+]
