@@ -104,7 +104,10 @@ runs:
       if: inputs.platform == 'macos'
       shell: bash
       run: |
-        echo "::group::🛠️ Opus Compilation (MacOS TBD) 🛠️"
+        echo "::group::🛠️ Opus Compilation (MacOS) 🛠️"
+        cmake -Bbuild -G "Unix Makefiles" -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
+        cd build
+        make
 
     - name: Build Opus (iOS)
       if: inputs.platform == 'ios'
