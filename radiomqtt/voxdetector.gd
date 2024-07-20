@@ -28,7 +28,7 @@ func _ready():
 func loudnessvalues(chunkv1, chunkv2):
 	$HSliderVox/ColorRectLoudness.size.x = $HSliderVox.size.x*chunkv1
 	$HSliderVox/ColorRectLoudnessRMS.size.x = $HSliderVox.size.x*chunkv2
-	if Sil.pressed:
+	if Sil.button_pressed:
 		if Vox.pressed:
 			PTT.set_pressed(false)
 		if chunkv1 >= voxthreshold:

@@ -2,6 +2,7 @@ extends Control
 
 
 @onready var microphoneidx = AudioServer.get_bus_index("MicrophoneBus")
+@onready var SelfMember = $Members/Self
 
 var audioeffectcapture : AudioEffectCapture = null
 var audioopuschunkedeffect : AudioEffectOpusChunked
@@ -28,8 +29,6 @@ func _ready():
 		$VBoxFrameLength/HBoxBitRate/BitRate.select(2)
 	if $VBoxFrameLength/HBoxBitRate/BitRate.selected == -1:
 		$VBoxFrameLength/HBoxBitRate/BitRate.select(2)
-	if $MQTTnetwork/VBoxMQTT/HBoxBroker/MQTTBroker.selected == -1:
-		$MQTTnetwork/VBoxMQTT/HBoxBroker/MQTTBroker.select(0)
 	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
 	var audioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, 0)
 	if audioeffectonmic.is_class("AudioEffectOpusChunked"):
@@ -94,7 +93,7 @@ func updatesamplerates():
 		$HBoxPlaycount/GridContainer/FrameCount.text = "1"
 	$HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
 	var tm = len(recordedsamples)*frametimems*0.001
-	$HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
+	$HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm if tm else 0))
 	setupaudioshader()
 	
 func setupaudioshader():
@@ -129,8 +128,8 @@ func starttalking():
 	currentlytalking = true
 	recordedsamples = [ ]
 	recordedopuspackets = [ ]
-	$HBoxPlaycount/GridContainer/FrameCount.text = ""
-	$HBoxPlaycount/GridContainer/TimeSecs.text = ""
+	$HBoxPlaycount/GridContainer/FrameCount.text = str(0)
+	$HBoxPlaycount/GridContainer/TimeSecs.text = str(0)
 	recordedopuspacketsMemSize = 0
 	$HBoxPlaycount/GridContainer/Totalbytes.text = str(0)
 	$HBoxPlaycount/GridContainer/Bytespersec.text = str(0)
@@ -146,7 +145,6 @@ func _on_force_mic_button_button_down():
 
 func _process(_delta):
 	$HBoxMicTalk/MicWorking.button_pressed = $AudioStreamMicrophone.playing
-	$DebugLabel.text = " MIC ON" if $AudioStreamMicrophone.playing else " ** MIC OFF"
 	
 	var talking = $HBoxBigButtons/PTT.button_pressed
 	if talking:
@@ -231,13 +229,13 @@ func endtalking():
 
 func _on_play_pressed():
 	if recordedopuspackets:
-		$HBoxPlaycount/Self.processheaderpacket(recordedheader.duplicate())
-		$HBoxPlaycount/Self.opuspacketsbuffer = recordedopuspackets.duplicate()
+		SelfMember.processheaderpacket(recordedheader.duplicate())
+		SelfMember.opuspacketsbuffer = recordedopuspackets.duplicate()
 	else:
 		var lrecordedsamples = [ ]
 		lrecordedsamples = recordedsamples.duplicate()
-		$HBoxPlaycount/Self.processheaderpacket(recordedheader.duplicate())
-		$HBoxPlaycount/Self.audiopacketsbuffer = lrecordedsamples
+		SelfMember.processheaderpacket(recordedheader.duplicate())
+		SelfMember.audiopacketsbuffer = lrecordedsamples
 
 func _on_frame_duration_item_selected(_index):
 	updatesamplerates()

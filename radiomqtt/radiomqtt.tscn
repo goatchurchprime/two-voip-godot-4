@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=20 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
@@ -55,16 +55,22 @@ bg_color = Color(0.427451, 0.439216, 0, 1)
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_67wxx"]
 bg_color = Color(0.290196, 0.505882, 0.490196, 1)
 
-[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_eh8ms"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7rhvb"]
+bg_color = Color(0.470588, 0.211765, 0.533333, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_q145v"]
+bg_color = Color(0.654902, 0.266667, 0.345098, 1)
+
+[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_ensh7"]
 resource_local_to_scene = true
 
 [node name="radiomqtt" type="VBoxContainer"]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 10.0
-offset_right = -10.0
-offset_bottom = 70.0
+offset_left = 7.0
+offset_right = -3.0
+offset_bottom = -11.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_anot2")
@@ -86,10 +92,7 @@ vertical_alignment = 1
 [node name="Label" type="RichTextLabel" parent="."]
 layout_mode = 2
 bbcode_enabled = true
-text = "[b]Instructions:[/b] Hold PTT to record (Vox to activate automatically by volume). 
-Playback is of your recording post-compression with the selected settings.
-Connect to an MQTT broker to on a topic to send and receive packets to another computer.  Hold [b]Sil[/b] down to set the silcence threshold for Vox
-"
+text = "[b]Instructions:[/b] Hold down [u]PTT[/u] to record. Toggle [u]Vox[/u] to activate PTT automatically by volume. Hold down [u]Sil[/u] to set the silnce threshold for Vox."
 fit_content = true
 
 [node name="HSeparator3" type="HSeparator" parent="."]
@@ -290,17 +293,22 @@ vertical_alignment = 1
 [node name="Label3" type="RichTextLabel" parent="."]
 layout_mode = 2
 bbcode_enabled = true
-text = "Play back the previous recording after compression at different rates defined above.  Compression is applied to the raw recording."
+text = "Playback the previous recording after compression at different rates defined above.  Compression is applied to the raw recording."
 fit_content = true
 
 [node name="HBoxPlaycount" type="HBoxContainer" parent="."]
 layout_mode = 2
+size_flags_horizontal = 4
 
 [node name="Play" type="Button" parent="HBoxPlaycount"]
 custom_minimum_size = Vector2(60, 0)
 layout_mode = 2
 text = "Play
 "
+
+[node name="VSeparator" type="VSeparator" parent="HBoxPlaycount"]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
 
 [node name="GridContainer" type="GridContainer" parent="HBoxPlaycount"]
 layout_mode = 2
@@ -312,6 +320,7 @@ text = "Time (s):"
 
 [node name="TimeSecs" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
 layout_mode = 2
+text = "0"
 editable = false
 
 [node name="Label3" type="Label" parent="HBoxPlaycount/GridContainer"]
@@ -338,31 +347,21 @@ text = "Bytes/s:"
 layout_mode = 2
 editable = false
 
-[node name="VSeparator" type="VSeparator" parent="HBoxPlaycount"]
-custom_minimum_size = Vector2(20, 0)
-layout_mode = 2
-
-[node name="Self" parent="HBoxPlaycount" instance=ExtResource("4_w5dv2")]
-layout_mode = 2
-size_flags_vertical = 4
-
-[node name="AudioStreamPlayer" parent="HBoxPlaycount/Self" index="0"]
-stream = SubResource("AudioStreamOpusChunked_eh8ms")
-
-[node name="Label" parent="HBoxPlaycount/Self" index="1"]
-text = "self
-
-"
-
-[node name="Node" parent="HBoxPlaycount/Self" index="2"]
-size_flags_vertical = 4
-
 [node name="HSeparator5" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 
-[node name="MQTTnetwork" type="Control" parent="."]
-custom_minimum_size = Vector2(0, 200)
+[node name="Label4" type="Label" parent="."]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_7rhvb")
+text = "MQTT transmission
+"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MQTTnetwork" type="HBoxContainer" parent="."]
 layout_mode = 2
 script = ExtResource("2_y485j")
 
@@ -370,79 +369,132 @@ script = ExtResource("2_y485j")
 verbose_level = 1
 binarymessages = true
 
-[node name="VBoxMQTT" type="VBoxContainer" parent="MQTTnetwork"]
-layout_mode = 1
-anchors_preset = -1
-
-[node name="HBoxConnect" type="HBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
+[node name="Connect" type="Button" parent="MQTTnetwork"]
 layout_mode = 2
-
-[node name="ConnectMQTT" type="Button" parent="MQTTnetwork/VBoxMQTT/HBoxConnect"]
-layout_mode = 2
+theme_override_styles/pressed = SubResource("StyleBoxFlat_q145v")
 toggle_mode = true
-text = "Connect MQTT"
+text = "Connect"
 
-[node name="Myname" type="LineEdit" parent="MQTTnetwork/VBoxMQTT/HBoxConnect"]
-layout_mode = 2
-size_flags_horizontal = 3
-editable = false
-
-[node name="HBoxBroker" type="HBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
+[node name="VSeparator" type="VSeparator" parent="MQTTnetwork"]
 layout_mode = 2
 
-[node name="LabelMQTT" type="Label" parent="MQTTnetwork/VBoxMQTT/HBoxBroker"]
+[node name="GridContainer" type="GridContainer" parent="MQTTnetwork"]
 layout_mode = 2
-text = "MQTTBroker
+columns = 5
+
+[node name="Label" type="Label" parent="MQTTnetwork/GridContainer"]
+layout_mode = 2
+text = "Broker:"
+
+[node name="broker" type="LineEdit" parent="MQTTnetwork/GridContainer"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+
+[node name="Label3" type="Label" parent="MQTTnetwork/GridContainer"]
+layout_mode = 2
+text = "User:"
+
+[node name="mqttuser" type="LineEdit" parent="MQTTnetwork/GridContainer"]
+layout_mode = 2
+
+[node name="Label5" type="Label" parent="MQTTnetwork/GridContainer"]
+layout_mode = 2
+text = "presets:"
+
+[node name="Label2" type="Label" parent="MQTTnetwork/GridContainer"]
+layout_mode = 2
+text = "topic
 "
 
-[node name="MQTTBroker" type="OptionButton" parent="MQTTnetwork/VBoxMQTT/HBoxBroker"]
-layout_mode = 2
-size_flags_horizontal = 3
-item_count = 3
-popup/item_0/text = "mosquitto.doesliverpool.xyz"
-popup/item_0/id = 0
-popup/item_1/text = "broker.hivemq.com"
-popup/item_1/id = 1
-popup/item_2/text = "test.mosquitto.org"
-popup/item_2/id = 2
-
-[node name="HBoxRoom" type="HBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="Labelroom" type="Label" parent="MQTTnetwork/VBoxMQTT/HBoxRoom"]
-layout_mode = 2
-text = "roomname
-"
-
-[node name="roomname" type="LineEdit" parent="MQTTnetwork/VBoxMQTT/HBoxRoom"]
+[node name="topic" type="LineEdit" parent="MQTTnetwork/GridContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "myplace"
 
-[node name="Members" type="VBoxContainer" parent="MQTTnetwork/VBoxMQTT"]
+[node name="Label4" type="Label" parent="MQTTnetwork/GridContainer"]
+layout_mode = 2
+text = "Passwd:"
+
+[node name="mqttpassword" type="LineEdit" parent="MQTTnetwork/GridContainer"]
 layout_mode = 2
 
-[node name="DebugLabel" type="Label" parent="."]
+[node name="presets" type="OptionButton" parent="MQTTnetwork/GridContainer"]
 layout_mode = 2
-text = "TESSST"
+size_flags_horizontal = 3
+item_count = 4
+popup/item_0/text = "doesliverpool"
+popup/item_0/id = 0
+popup/item_1/text = "hivemq"
+popup/item_1/id = 1
+popup/item_2/text = "m.org"
+popup/item_2/id = 2
+popup/item_3/text = "hass"
+popup/item_3/id = 3
 
-[node name="ForceMicButton" type="Button" parent="DebugLabel"]
-layout_mode = 0
-offset_left = 73.0
-offset_top = -4.0
-offset_right = 182.0
-offset_bottom = 27.0
-text = "Force Mic On"
+[node name="VBoxMQTT" type="VBoxContainer" parent="."]
+visible = false
+layout_mode = 2
+
+[node name="HBoxConnect" type="HBoxContainer" parent="VBoxMQTT"]
+layout_mode = 2
+
+[node name="ConnectMQTT" type="Button" parent="VBoxMQTT/HBoxConnect"]
+layout_mode = 2
+toggle_mode = true
+text = "Connect MQTT"
+
+[node name="Myname" type="LineEdit" parent="VBoxMQTT/HBoxConnect"]
+layout_mode = 2
+size_flags_horizontal = 3
+editable = false
+
+[node name="HBoxBroker" type="HBoxContainer" parent="VBoxMQTT"]
+layout_mode = 2
+
+[node name="LabelMQTT" type="Label" parent="VBoxMQTT/HBoxBroker"]
+layout_mode = 2
+text = "MQTTBroker
+"
+
+[node name="HBoxRoom" type="HBoxContainer" parent="VBoxMQTT"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Labelroom" type="Label" parent="VBoxMQTT/HBoxRoom"]
+layout_mode = 2
+text = "roomname
+"
+
+[node name="RichTextLabel" type="RichTextLabel" parent="."]
+custom_minimum_size = Vector2(550, 0)
+layout_mode = 2
+size_flags_horizontal = 4
+bbcode_enabled = true
+text = "Table of users connected on the on the same topic (including self).
+"
+fit_content = true
+
+[node name="Members" type="GridContainer" parent="."]
+layout_mode = 2
+columns = 3
+
+[node name="Self" parent="Members" instance=ExtResource("4_w5dv2")]
+layout_mode = 2
+
+[node name="AudioStreamPlayer" parent="Members/Self" index="0"]
+stream = SubResource("AudioStreamOpusChunked_ensh7")
+
+[node name="Label" parent="Members/Self" index="1"]
+text = "Self"
 
 [node name="HBoxVisemes" type="HBoxContainer" parent="."]
+visible = false
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 
 [node name="ColorRect" type="ColorRect" parent="HBoxVisemes"]
 custom_minimum_size = Vector2(25, 0)
 layout_mode = 2
-size_flags_vertical = 8
 color = Color(0.666793, 0.310188, 0.402942, 1)
 
 [node name="Label" type="Label" parent="HBoxVisemes/ColorRect"]
@@ -460,7 +512,8 @@ text = "sil"
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
 [connection signal="pressed" from="HBoxPlaycount/Play" to="." method="_on_play_pressed"]
-[connection signal="toggled" from="MQTTnetwork/VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
-[connection signal="button_down" from="DebugLabel/ForceMicButton" to="." method="_on_force_mic_button_button_down"]
+[connection signal="toggled" from="MQTTnetwork/Connect" to="MQTTnetwork" method="_on_connect_toggled"]
+[connection signal="item_selected" from="MQTTnetwork/GridContainer/presets" to="MQTTnetwork" method="_on_mqtt_broker_item_selected"]
+[connection signal="toggled" from="VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
 
-[editable path="HBoxPlaycount/Self"]
+[editable path="Members/Self"]
