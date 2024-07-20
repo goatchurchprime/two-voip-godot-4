@@ -5,9 +5,9 @@ import json
 import re
 from patches import unity_tools
 
-lib_readable_name = "Debug Draw 3D"
-lib_name = "dd3d"
-output_dir = os.path.join("addons", "debug_draw_3d", "libs")
+lib_readable_name = "TwoVoIP"
+lib_name = "twovoip"
+output_dir = os.path.join("addons", "twovoip", "libs")
 src_folder = "src"
 
 
