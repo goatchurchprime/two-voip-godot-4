@@ -184,7 +184,7 @@ runs:
         cd opus
         cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON -G "Visual Studio 17 2022" -A x64
         cd build
-        msbuild Opus.sln
+        msbuild Opus.sln /p:Configuration=Release
 
     - name: Build godot-cpp
       shell: bash
