@@ -105,6 +105,7 @@ runs:
       shell: bash
       run: |
         echo "::group::🛠️ Opus Compilation (MacOS) 🛠️"
+        cd opus
         cmake -Bbuild -G "Unix Makefiles" -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
         cd build
         make
