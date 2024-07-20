@@ -87,7 +87,7 @@ jobs:
       fail-fast: false
       matrix:
         arch: [x86_64]
-        target: [template_release]
+        target: [template_debug, template_release]
 
     steps:
       - name: Checkout
@@ -109,33 +109,33 @@ jobs:
 
 # ============================================
 
-  macos-gdextension:
-    name: 🍏 MacOS
-    runs-on: macos-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [universal]
-        target: [template_release]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Compile GDExtension
-        uses: ./.github/actions/compile_gdextension
-        with:
-          platform: macos
-          target: ${{matrix.target}}
-          arch: ${{matrix.arch}}
-          artifact: macos.${{matrix.target}}.${{matrix.arch}}
-          additional: lto=yes macos_deployment_target=10.14
-          output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
-          use_cache: ${{env.USE_CACHE}}
-          token: ${{secrets.TELEMETRY_TOKEN}}
+#  macos-gdextension:
+#    name: 🍏 MacOS
+#    runs-on: macos-latest
+#
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        arch: [universal]
+#        target: [template_debug, template_release]
+#
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v4
+#        with:
+#          submodules: recursive
+#
+#      - name: Compile GDExtension
+#        uses: ./.github/actions/compile_gdextension
+#        with:
+#          platform: macos
+#          target: ${{matrix.target}}
+#          arch: ${{matrix.arch}}
+#          artifact: macos.${{matrix.target}}.${{matrix.arch}}
+#          additional: lto=yes macos_deployment_target=10.14
+#          output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
+#          use_cache: ${{env.USE_CACHE}}
+#          token: ${{secrets.TELEMETRY_TOKEN}}
 
   # ============================================
 
@@ -219,44 +219,44 @@ jobs:
 
   # ============================================
 
-  web-gdextension:
-    name: 🕸 Web
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [wasm32]
-        target: [template_debug, template_release]
-
-    env:
-      EM_VERSION: 3.1.39
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Download Emscripten
-        uses: mymindstorm/setup-emsdk@v14
-        # Continue if failed to cache
-        # https://github.com/mymindstorm/setup-emsdk/issues/20
-        continue-on-error: true
-        with:
-          version: ${{env.EM_VERSION}}
-          actions-cache-folder: obj/emsdk_cache
-
-      - name: Compile GDExtension
-        uses: ./.github/actions/compile_gdextension
-        with:
-          platform: web
-          target: ${{matrix.target}}
-          arch: ${{matrix.arch}}
-          artifact: web.${{matrix.target}}.${{matrix.arch}}
-          additional: lto=yes
-          output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
-          use_cache: ${{env.USE_CACHE}}
+#  web-gdextension:
+#    name: 🕸 Web
+#    runs-on: ubuntu-latest
+#
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        arch: [wasm32]
+#        target: [template_debug, template_release]
+#
+#    env:
+#      EM_VERSION: 3.1.39
+#
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v4
+#        with:
+#          submodules: recursive
+#
+#      - name: Download Emscripten
+#        uses: mymindstorm/setup-emsdk@v14
+#        # Continue if failed to cache
+#        # https://github.com/mymindstorm/setup-emsdk/issues/20
+#        continue-on-error: true
+#        with:
+#          version: ${{env.EM_VERSION}}
+#          actions-cache-folder: obj/emsdk_cache
+#
+#      - name: Compile GDExtension
+#        uses: ./.github/actions/compile_gdextension
+#        with:
+#          platform: web
+#          target: ${{matrix.target}}
+#          arch: ${{matrix.arch}}
+#          artifact: web.${{matrix.target}}.${{matrix.arch}}
+#          additional: lto=yes
+#          output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
+#          use_cache: ${{env.USE_CACHE}}
 
   # ============================================
 
@@ -265,9 +265,9 @@ jobs:
       [
         windows-gdextension,
         linux-gdextension,
-        macos-gdextension,
+#        macos-gdextension,
         android-gdextension,
-        web-gdextension,
+#        web-gdextension,
         ios-gdextension,
       ]
     name: 📦 Collect GDExtension binaries
