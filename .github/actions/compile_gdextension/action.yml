@@ -134,11 +134,8 @@ runs:
               strip -u "$file"
           done <<< "$found_files"
         else
-          echo "Finding files"
-          ls -la
-          ls -l addons
-          ls -l addons/twovoip
-          found_files=$(find -L ${{inputs.output_libs_path}} -type f -exec file {} + | grep "ELF" | cut -d: -f1)
+          #found_files=$(find -L ${{inputs.output_libs_path}} -type f -exec file {} + | grep "ELF" | cut -d: -f1)
+          found_files=$(find -L addons -type f -exec file {} + | grep "ELF" | cut -d: -f1)
           echo "Found files: $found_files"
           strip $found_files
         fi
