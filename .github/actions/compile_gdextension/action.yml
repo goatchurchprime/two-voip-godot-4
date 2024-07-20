@@ -90,25 +90,101 @@ runs:
           sudo apt install gcc-multilib g++-multilib
         fi
 
-    - name: Build Opus
-      if: runner.os != 'Windows'
+    - name: Build Opus (Linux)
+      if: inputs.platform == 'linux'
       shell: bash
       run: |
-        echo "::group::🛠️ Opus Compilation 🛠️"
+        echo "::group::🛠️ Opus Compilation (Linux) 🛠️"
         cd opus
         cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         cd build
         make
 
-    - name: Build Opus
-      if: runner.os == 'Windows'
+    - name: Build Opus (MacOS)
+      if: inputs.platform == 'macos'
       shell: bash
       run: |
-        echo "::group::🛠️ Opus Compilation 🛠️"
+        echo "::group::🛠️ Opus Compilation (MacOS TBD) 🛠️"
+
+    - name: Build Opus (iOS)
+      if: inputs.platform == 'ios'
+      shell: bash
+      run: |
+        echo "::group::🛠️ Opus Compilation (iOS) 🛠️"
+        cd opus
+        cmake -Bbuild -G "Unix Makefiles" -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64
+        cd build
+        make
+
+    - name: Build Opus (Android arm32)
+      if: inputs.platform == 'android' && inputs.arch == 'arm32'
+      shell: bash
+      run: |
+        echo "::group::🛠️ Opus Compilation (Android arm32) 🛠️"
+        cd opus
+        cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=${ANDROID_HOME}/ndk/25.2.9519653/build/cmake/android.toolchain.cmake -DANDROID_ABI=armeabi-v7a
+        cd build
+        make
+
+    - name: Build Opus (Android arm64)
+      if: inputs.platform == 'android' && inputs.arch == 'arm64'
+      shell: bash
+      run: |
+        echo "::group::🛠️ Opus Compilation (Android arm64) 🛠️"
+        cd opus
+        cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=${ANDROID_HOME}/ndk/25.2.9519653/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a
+        cd build
+        make
+
+    - name: Build Opus (Android x86_32)
+      if: inputs.platform == 'android' && inputs.arch == 'x86_32'
+      shell: bash
+      run: |
+        echo "::group::🛠️ Opus Compilation (Android x86_32) 🛠️"
+        cd opus
+        cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=${ANDROID_HOME}/ndk/25.2.9519653/build/cmake/android.toolchain.cmake -DANDROID_ABI=x86
+        cd build
+        make
+
+    - name: Build Opus (Android x86_64)
+      if: inputs.platform == 'android' && inputs.arch == 'x86_64'
+      shell: bash
+      run: |
+        echo "::group::🛠️ Opus Compilation (Android x86_64) 🛠️"
+        cd opus
+        cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=${ANDROID_HOME}/ndk/25.2.9519653/build/cmake/android.toolchain.cmake -DANDROID_ABI=x86_64
+        cd build
+        make
+
+    - name: Build Opus (Web)
+      if: inputs.platform == 'web'
+      shell: bash
+      run: |
+        echo "::group::🛠️ Opus Compilation (WASM32 TBD) 🛠️"
+
+    - name: Add msbuild to PATH
+      if: runner.os == 'Windows'
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Build Opus (Windows Debug)
+      if: inputs.platform == 'Windows' && inputs.target == 'template_debug'
+      shell: powershell
+      run: |
+        echo "::group::🛠️ Opus Compilation (Windows Debug) 🛠️"
         cd opus
         cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON -G "Visual Studio 17 2022" -A x64
         cd build
-        make
+        msbuild Opus.sln
+
+    - name: Build Opus (Windows Release)
+      if: inputs.platform == 'Windows' && inputs.target == 'template_release'
+      shell: powershell
+      run: |
+        echo "::group::🛠️ Opus Compilation (Windows Debug) 🛠️"
+        cd opus
+        cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON -G "Visual Studio 17 2022" -A x64
+        cd build
+        msbuild Opus.sln
 
     - name: Build godot-cpp
       shell: bash
