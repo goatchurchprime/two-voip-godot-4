@@ -13,19 +13,32 @@ if you download it and are not on Linux.
 The build system is defined by the flake.nix file
 
  * makes a result directory that needs to be copied into addons
-> nix build
-> cp result/addons/twovoip/*so addons/twovoip
+
+```
+nix build
+cp result/addons/twovoip/*so addons/twovoip
+```
 
  * android version:
-> nix build .#android
-> cp result/addons/twovoip/*so addons/twovoip
+
+```
+nix build .#android
+cp result/addons/twovoip/*so addons/twovoip
+```
 
  * Windows version:
-(incomplete)
-Start the project in Visual Studio and let it clone and compile the opus project
-> python -m SCons
 
-Make sure addons/twovoip/twovoip.gdextension point to these files:
+```
+TBD
+```
+
+Start the project in Visual Studio and let it clone and compile the opus project
+
+```
+python -m SCons
+```
+
+Make sure `addons/twovoip/twovoip.gdextension` point to these files:
 
 ### Otherwise by hand when developing
 
@@ -33,30 +46,32 @@ Since we've not got submodules here we need to
 first clone Opus and godot-cpp modules before building them
 
 ```
-> git clone git@github.com:goatchurchprime/two-voip-godot-4.git
-> cd two-voip-godot-4
-> git clone git@github.com:godotengine/godot-cpp.git
-> cd godot-cpp
-> git checkout 48afa82f29354668c12cffaf6a2474dabfd395ed
-> cd ..
-> git clone git@github.com:xiph/opus.git
-> cd opus
-> git checkout c85499757c148fede8604cffa12454206b6138ba
+git clone --recurse-submodules git@github.com:goatchurchprime/two-voip-godot-4.git
+cd two-voip-godot-4
+```
 
 On Linux:
-> cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-> cd build
-> make
-> cd ../..
-> scons  (or python -m SCons on Windows)
+
+```
+cd godot-cpp
+cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+cd build
+make
+cd ../..
+scons
+```
 
 On Windows:
+
 Use Visual Studio 2022 Community Edition with CMake option to open opus
 directory and convert cmake script to sln and then compile.
-> cd ../..
-> scons  (or python -m SCons on Windows)
+
+```
+cd ../..
+python -m SCons
 ```
 On Mac:
+
 See the instructions on the one-voip here: https://github.com/RevoluPowered/one-voip-godot-4/?tab=readme-ov-file#mac
 
 ## With OVRLipSync

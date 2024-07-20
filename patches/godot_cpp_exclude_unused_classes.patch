@@ -1,0 +1,55 @@
+diff --git a/binding_generator.py b/binding_generator.py
+index 7911a7e..58188f7 100644
+--- a/binding_generator.py
++++ b/binding_generator.py
+@@ -5,6 +5,11 @@ import re
+ import shutil
+ from pathlib import Path
+ 
++import sys
++
++sys.path.insert(0, "../patches")
++import get_used_classes
++
+ 
+ def generate_mod_version(argcount, const=False, returns=False):
+     s = """
+@@ -76,6 +81,7 @@ def get_file_list(api_filepath, output_dir, headers=False, sources=False, profil
+     with open(api_filepath, encoding="utf-8") as api_file:
+         api = json.load(api_file)
+ 
++    get_used_classes.scan_dependencies(api)
+     build_profile = parse_build_profile(profile_filepath, api)
+ 
+     core_gen_folder = Path(output_dir) / "gen" / "include" / "godot_cpp" / "core"
+@@ -133,6 +139,7 @@ def get_file_list(api_filepath, output_dir, headers=False, sources=False, profil
+         utility_functions_source_path = source_gen_folder / "variant" / "utility_functions.cpp"
+         files.append(str(utility_functions_source_path.as_posix()))
+ 
++    files = get_used_classes.delete_useless(files)
+     return files
+ 
+ 
+@@ -230,6 +237,8 @@ def parse_build_profile(profile_filepath, api):
+ 
+ 
+ def scons_emit_files(target, source, env):
++    get_used_classes.setup(env.get("exclude_unused_classes", True), env.get("folder_to_include_classes", "../src"))
++
+     profile_filepath = env.get("build_profile", "")
+     if profile_filepath and not Path(profile_filepath).is_absolute():
+         profile_filepath = str((Path(env.Dir("#").abspath) / profile_filepath).as_posix())
+diff --git a/tools/godotcpp.py b/tools/godotcpp.py
+index cc2b02f..d138052 100644
+--- a/tools/godotcpp.py
++++ b/tools/godotcpp.py
+@@ -322,6 +322,9 @@ def options(opts, env):
+     opts.Add(BoolVariable("dev_build", "Developer build with dev-only debugging code (DEV_ENABLED)", False))
+     opts.Add(BoolVariable("verbose", "Enable verbose output for the compilation", False))
+ 
++    opts.Add(BoolVariable("exclude_unused_classes", "Disable generation of unused classes.", True))
++    opts.Add(PathVariable("folder_to_include_classes", "Path to the directory containing extension sources", "../src", PathVariable.PathIsDir))
++
+     # Add platform options (custom tools can override platforms)
+     for pl in sorted(set(platforms + custom_platforms)):
+         tool = Tool(pl, toolpath=get_platform_tools_paths(env))
