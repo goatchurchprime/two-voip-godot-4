@@ -91,11 +91,22 @@ runs:
         fi
 
     - name: Build Opus
+      if: runner.os != 'Windows'
       shell: bash
       run: |
         echo "::group::🛠️ Opus Compilation 🛠️"
         cd opus
         cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+        cd build
+        make
+
+    - name: Build Opus
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        echo "::group::🛠️ Opus Compilation 🛠️"
+        cd opus
+        cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON -G "Visual Studio 17 2022" -A x64
         cd build
         make
 
