@@ -43,7 +43,7 @@ env:
   SCONS_CACHE: ${{github.workspace}}/.scons-cache/
   USE_CACHE: ${{!format('{0}', inputs.use_cache) && 'true' || format('{0}', inputs.use_cache)}} # Default true
   PRODUCTION_BUILD: ${{!format('{0}', inputs.production_build) && 'false' || format('{0}', inputs.production_build)}} # Default false
-  OUTPUT_LIBS_PATH: addons
+  OUTPUT_LIBS_PATH: bin
   FORCE_DISABLE_UNITY: yes
   GH_TOKEN: ${{ github.token }}
 

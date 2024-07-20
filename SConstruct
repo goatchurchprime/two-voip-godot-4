@@ -79,7 +79,7 @@ if env["platform"] == "macos":
     )
 else:
     library = env.SharedLibrary(
-        "addons/twovoip/libtwovoip{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
+        "bin/twovoip/libtwovoip{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
         source=sources,
     )
 
