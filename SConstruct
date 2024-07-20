@@ -70,17 +70,9 @@ if env["platform"] == "windows":
 # env.Append(CPPDEFINES={"NDEBUG": None}) # For release builds
 sources += Glob("src/*.cpp")
 
-if env["platform"] == "macos":
-    library = env.SharedLibrary(
-        "demo_rtc/bin/libonevoip.{}.{}.framework/libonevoip.{}.{}.{}{}".format(
-            env["platform"], env["target"], env["platform"], env["target"], env["arch"], env["SHLIBSUFFIX"]
-        ),
-        source=sources,
-    )
-else:
-    library = env.SharedLibrary(
-        "bin/twovoip/libtwovoip{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
-        source=sources,
-    )
+library = env.SharedLibrary(
+  "bin/twovoip/libtwovoip{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
+  source=sources,
+)
 
 Default(library)
