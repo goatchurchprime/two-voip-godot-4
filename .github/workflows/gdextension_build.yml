@@ -106,3 +106,293 @@ jobs:
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
           token: ${{secrets.TELEMETRY_TOKEN}}
+
+# ============================================
+
+  macos-gdextension:
+    name: 🍏 MacOS
+    runs-on: macos-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [universal]
+        target: [editor, template_release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Compile GDExtension
+        uses: ./.github/actions/compile_gdextension
+        with:
+          platform: macos
+          target: ${{matrix.target}}
+          arch: ${{matrix.arch}}
+          artifact: macos.${{matrix.target}}.${{matrix.arch}}
+          additional: lto=yes macos_deployment_target=10.14
+          output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
+          use_cache: ${{env.USE_CACHE}}
+          token: ${{secrets.TELEMETRY_TOKEN}}
+
+  # ============================================
+
+  ios-gdextension:
+    name: 🍏 Ios
+    runs-on: macos-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [universal]
+        target: [template_debug, template_release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Compile GDExtension
+        uses: ./.github/actions/compile_gdextension
+        with:
+          platform: ios
+          target: ${{matrix.target}}
+          arch: ${{matrix.arch}}
+          artifact: ios.${{matrix.target}}.${{matrix.arch}}
+          additional: lto=yes
+          output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
+          use_cache: ${{env.USE_CACHE}}
+          token: ${{secrets.TELEMETRY_TOKEN}}
+
+  # ============================================
+
+  android-gdextension:
+    name: 🤖 Android
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm32, arm64, x86_32, x86_64]
+        target: [template_debug, template_release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Android NDK r23c
+        uses: nttld/setup-ndk@v1.4.1
+        id: setup-ndk
+        with:
+          ndk-version: r23c
+          link-to-sdk: true
+          local-cache: true
+
+      # TODO revisit after some updates of nttld/setup-ndk
+      - name: Restore Android Symlinks
+        run: |
+          directory="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+          find "$directory" -type l | while read link; do
+              current_target=$(readlink "$link")
+              new_target="$directory/$(basename "$current_target")"
+              ln -sf "$new_target" "$link"
+              echo "Changed $(basename "$link") from $current_target to $new_target"
+          done
+
+      - name: Compile GDExtension
+        uses: ./.github/actions/compile_gdextension
+        with:
+          platform: android
+          target: ${{matrix.target}}
+          arch: ${{matrix.arch}}
+          artifact: android.${{matrix.target}}.${{matrix.arch}}
+          additional: lto=yes
+          additional_enabled_dd3d: false
+          output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
+          use_cache: ${{env.USE_CACHE}}
+
+  # ============================================
+
+  web-gdextension:
+    name: 🕸 Web
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [wasm32]
+        target: [template_debug, template_release]
+
+    env:
+      EM_VERSION: 3.1.39
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        # Continue if failed to cache
+        # https://github.com/mymindstorm/setup-emsdk/issues/20
+        continue-on-error: true
+        with:
+          version: ${{env.EM_VERSION}}
+          actions-cache-folder: obj/emsdk_cache
+
+      - name: Compile GDExtension
+        uses: ./.github/actions/compile_gdextension
+        with:
+          platform: web
+          target: ${{matrix.target}}
+          arch: ${{matrix.arch}}
+          artifact: web.${{matrix.target}}.${{matrix.arch}}
+          additional: lto=yes
+          output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
+          use_cache: ${{env.USE_CACHE}}
+
+  # ============================================
+
+  collect-gdextension:
+    needs:
+      [
+        windows-gdextension,
+        linux-gdextension,
+        macos-gdextension,
+        android-gdextension,
+        web-gdextension,
+        ios-gdextension,
+      ]
+    name: 📦 Collect GDExtension binaries
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_name: ${{steps.output_info.outputs.artifact_name}}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: extracted_files
+
+      - name: Store all libraries in one directory
+        run: |
+          arch_dirs=$(find extracted_files/ -mindepth 1 -maxdepth 1 -type d)
+          echo "Original structure:"
+          find extracted_files -mindepth 1
+          mv -f extracted_files/**/* extracted_files
+          rm -rf $arch_dirs
+          echo "Final structure:"
+          find extracted_files -mindepth 1
+          touch extracted_files/.gdignore
+
+      - name: Output file information
+        id: output_info
+        run: |
+          cd extracted_files
+          echo "Total size: $(du -ch -b | grep total | cut -f1 | awk '{printf "%.2f", $1/1048576}') MB, Total number of files: $(find . -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
+
+          echo "artifact_name=${{env.PRODUCTION_BUILD == 'true' && '.gdextension_libs_production' || '.gdextension_libs'}}" >> $GITHUB_OUTPUT
+
+      - name: Upload GDExtension
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{steps.output_info.outputs.artifact_name}}
+          retention-days: 7
+          path: extracted_files/*
+
+  # ============================================
+
+  test_api_integration:
+    name: "🧪 Testing API: ${{matrix.runner-os}}, Godot-${{matrix.file_suffix}}"
+    runs-on: ${{matrix.runner-os}}
+    needs: collect-gdextension
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # sync with other jobs
+        runner-os: [ubuntu-20.04, macos-latest, windows-latest]
+        include:
+          - runner-os: ubuntu-20.04
+            file_suffix: "stable_linux.x86_64.zip"
+          - runner-os: macos-latest
+            file_suffix: "stable_macos.universal.zip"
+          - runner-os: windows-latest
+            file_suffix: "stable_win64.exe.zip"
+
+    env:
+      # Sync with container: image:
+      GODOT_VERSION: 4.2.1-stable
+      PROJECT_PATH: dd3d_web_build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Delete old libs folder
+        shell: bash
+        run: |
+          rm -rf addons/debug_draw_3d/libs
+
+      - name: Download Binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: addons/debug_draw_3d/libs
+          name: ${{needs.collect-gdextension.outputs.artifact_name}}
+
+      - name: Prepare Test Project
+        shell: bash
+        run: |
+          cp -r addons ${{env.PROJECT_PATH}}/addons
+          cp -r examples_dd3d ${{env.PROJECT_PATH}}/examples_dd3d
+          find ${{env.PROJECT_PATH}} -mindepth 1
+
+      - name: Setup Godot
+        uses: ./.github/actions/setup_godot
+        id: setup_godot
+        with:
+          tag: ${{env.GODOT_VERSION}}
+          file_suffix: ${{matrix.file_suffix}}
+          download_export_templates: false
+          is_mono: false
+
+      - name: macOS dependencies
+        shell: bash
+        if: runner.os == 'macOS'
+        run: |
+          brew install coreutils
+          alias timeout="gtimeout"
+
+      - name: Test run
+        shell: bash --noprofile --norc -o pipefail {0}
+        run: |
+          max_attempts=3
+          current_attempt=1
+          last_exit_code=0
+
+          until [ $current_attempt -gt $max_attempts ]; do
+              current_attempt=$((current_attempt + 1))
+              timeout 2m ${{steps.setup_godot.outputs.godot}} -v -e --headless --path ${{env.PROJECT_PATH}} --quit || true
+              timeout 2m ${{steps.setup_godot.outputs.godot}} -v --headless --path ${{env.PROJECT_PATH}} res://headless_test.tscn || true
+
+              if [ ! -f "${{env.PROJECT_PATH}}/SUCCESS" ]; then
+                  echo "The file reporting success has not been created! Failed."
+                  last_exit_code=1
+              else
+                  echo "The file reporting success has been created! Success!"
+                  exit 0
+              fi
+          done
+
+          echo "The maximum number of attempts has been reached. Last error code: $?"
+          exit $last_exit_code
