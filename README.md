@@ -33,15 +33,8 @@ Since we've not got submodules here we need to
 first clone Opus and godot-cpp modules before building them
 
 ```
-> git clone git@github.com:goatchurchprime/two-voip-godot-4.git
+> git clone --recurse-submodules git@github.com:goatchurchprime/two-voip-godot-4.git
 > cd two-voip-godot-4
-> git clone git@github.com:godotengine/godot-cpp.git
-> cd godot-cpp
-> git checkout 48afa82f29354668c12cffaf6a2474dabfd395ed
-> cd ..
-> git clone git@github.com:xiph/opus.git
-> cd opus
-> git checkout c85499757c148fede8604cffa12454206b6138ba
 
 On Linux:
 > cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
