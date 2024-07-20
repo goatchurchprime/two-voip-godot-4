@@ -98,7 +98,8 @@ runs:
         cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         cd build
         make
-    - name: Compilation
+
+    - name: Build godot-cpp
       shell: bash
       run: |
         echo "::group::🛠️ GDExtension Compilation 🛠️"
@@ -133,6 +134,8 @@ runs:
               strip -u "$file"
           done <<< "$found_files"
         else
+          echo "Finding files"
+          ls -la
           found_files=$(find -L ${{inputs.output_libs_path}} -type f -exec file {} + | grep "ELF" | cut -d: -f1)
           echo "Found files: $found_files"
           strip $found_files
