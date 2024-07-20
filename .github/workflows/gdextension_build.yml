@@ -1,0 +1,80 @@
+name: 🛠️ GDExtension Build
+on:
+  push:
+    paths:
+      [
+        src/**,
+        .github/**,
+        "!.github/**/util_*",
+        "patches/**",
+        lib_utils.py,
+        SConstruct,
+      ]
+  pull_request:
+    paths:
+      [
+        src/**,
+        .github/**,
+        "!.github/**/util_*",
+        "patches/**",
+        lib_utils.py,
+        SConstruct,
+      ]
+  workflow_dispatch:
+    inputs:
+      production_build:
+        description: Production build
+        default: true
+        type: boolean
+      use_cache:
+        description: Use Cache
+        default: true
+        type: boolean
+
+# Stop the same workflow actions
+concurrency:
+  group: ${{github.workflow}}-${{github.event.pull_request.number || github.ref}}
+  cancel-in-progress: true
+
+permissions:
+  actions: write
+
+env:
+  SCONS_CACHE: ${{github.workspace}}/.scons-cache/
+  USE_CACHE: ${{!format('{0}', inputs.use_cache) && 'true' || format('{0}', inputs.use_cache)}} # Default true
+  PRODUCTION_BUILD: ${{!format('{0}', inputs.production_build) && 'false' || format('{0}', inputs.production_build)}} # Default false
+  OUTPUT_LIBS_PATH: bin
+  FORCE_DISABLE_UNITY: yes
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+
+# ============================================
+
+  linux-gdextension:
+    name: 🐧 Linux
+    runs-on: ubuntu-20.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64]
+        target: [editor, template_release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Compile GDExtension
+        uses: ./.github/actions/compile_gdextension
+        with:
+          platform: linux
+          target: ${{matrix.target}}
+          arch: ${{matrix.arch}}
+          artifact: linux.${{matrix.target}}.${{matrix.arch}}
+          additional: lto=yes
+          output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
+          use_cache: ${{env.USE_CACHE}}
+          token: ${{secrets.TELEMETRY_TOKEN}}
