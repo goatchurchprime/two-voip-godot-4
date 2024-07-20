@@ -49,6 +49,34 @@ env:
 
 jobs:
 
+  windows-gdextension:
+    name: 🏁 Windows
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64]
+        target: [editor, template_release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Compile GDExtension
+        uses: ./.github/actions/compile_gdextension
+        with:
+          platform: windows
+          target: ${{matrix.target}}
+          arch: ${{matrix.arch}}
+          artifact: windows.${{matrix.target}}.${{matrix.arch}}
+          additional: lto=yes
+          output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
+          use_cache: ${{env.USE_CACHE}}
+          token: ${{secrets.TELEMETRY_TOKEN}}
+
 # ============================================
 
   linux-gdextension:
