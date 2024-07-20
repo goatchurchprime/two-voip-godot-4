@@ -1,0 +1,78 @@
+diff --git a/binding_generator.py b/binding_generator.py
+index 49664d1..d125d11 100644
+--- a/binding_generator.py
++++ b/binding_generator.py
+@@ -407,6 +407,10 @@ def generate_builtin_class_header(builtin_api, size, used_classes, fully_used_cl
+     result.append(f"class {class_name} {{")
+     result.append(f"\tstatic constexpr size_t {snake_class_name}_SIZE = {size};")
+     result.append(f"\tuint8_t opaque[{snake_class_name}_SIZE] = {{}};")
++    if class_name == "String" or class_name == "StringName":
++        result.append("#ifdef DEV_ENABLED")
++        result.append("\tCharString str;")
++        result.append("#endif")
+ 
+     result.append("")
+     result.append("\tfriend class Variant;")
+@@ -885,6 +889,13 @@ def generate_builtin_class_source(builtin_api, size, used_classes, fully_used_cl
+             method_call += ");"
+ 
+             result.append(method_call)
++            if class_name == "String" or class_name == "StringName" :
++                result.append("#ifdef DEV_ENABLED")
++                if class_name == "StringName":
++                    result.append("\tstr = String(*this).utf8();")
++                else:
++                    result.append("\tstr = utf8();")
++                result.append("#endif")
+             result.append("}")
+             result.append("")
+ 
+@@ -896,6 +907,13 @@ def generate_builtin_class_source(builtin_api, size, used_classes, fully_used_cl
+         )
+     else:
+         result.append("\tstd::swap(opaque, other.opaque);")
++    if class_name == "String" or class_name == "StringName":
++        result.append("#ifdef DEV_ENABLED")
++        if class_name == "StringName":
++            result.append("\tstr = String(*this).utf8();")
++        else:
++            result.append("\tstr = utf8();")
++        result.append("#endif")
+     result.append("}")
+     result.append("")
+ 
+diff --git a/src/variant/char_string.cpp b/src/variant/char_string.cpp
+index 856037c..c21b714 100644
+--- a/src/variant/char_string.cpp
++++ b/src/variant/char_string.cpp
+@@ -158,18 +158,30 @@ template class CharStringT<wchar_t>;
+ 
+ String::String(const char *from) {
+ 	internal::gdextension_interface_string_new_with_latin1_chars(_native_ptr(), from);
++#ifdef DEV_ENABLED
++	str = utf8();
++#endif
+ }
+ 
+ String::String(const wchar_t *from) {
+ 	internal::gdextension_interface_string_new_with_wide_chars(_native_ptr(), from);
++#ifdef DEV_ENABLED
++	str = utf8();
++#endif
+ }
+ 
+ String::String(const char16_t *from) {
+ 	internal::gdextension_interface_string_new_with_utf16_chars(_native_ptr(), from);
++#ifdef DEV_ENABLED
++	str = utf8();
++#endif
+ }
+ 
+ String::String(const char32_t *from) {
+ 	internal::gdextension_interface_string_new_with_utf32_chars(_native_ptr(), from);
++#ifdef DEV_ENABLED
++	str = utf8();
++#endif
+ }
+ 
+ String String::utf8(const char *from, int len) {
