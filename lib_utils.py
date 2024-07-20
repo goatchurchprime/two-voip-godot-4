@@ -84,7 +84,7 @@ def get_library_object(env, arguments=None, gen_help=None):
         # store all obj's in a dedicated folder
         env["SHOBJPREFIX"] = "#obj/"
 
-    generate_sources_for_resources(env, src)
+#    generate_sources_for_resources(env, src)
 
     # some additional tags
     additional_tags = ""
