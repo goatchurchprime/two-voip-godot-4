@@ -13,19 +13,32 @@ if you download it and are not on Linux.
 The build system is defined by the flake.nix file
 
  * makes a result directory that needs to be copied into addons
-> nix build
-> cp result/addons/twovoip/*so addons/twovoip
+
+```
+nix build
+cp result/addons/twovoip/*so addons/twovoip
+```
 
  * android version:
-> nix build .#android
-> cp result/addons/twovoip/*so addons/twovoip
+
+```
+nix build .#android
+cp result/addons/twovoip/*so addons/twovoip
+```
 
  * Windows version:
-(incomplete)
-Start the project in Visual Studio and let it clone and compile the opus project
-> python -m SCons
 
-Make sure addons/twovoip/twovoip.gdextension point to these files:
+```
+TBD
+```
+
+Start the project in Visual Studio and let it clone and compile the opus project
+
+```
+python -m SCons
+```
+
+Make sure `addons/twovoip/twovoip.gdextension` point to these files:
 
 ### Otherwise by hand when developing
 
@@ -40,11 +53,12 @@ cd two-voip-godot-4
 On Linux:
 
 ```
+cd godot-cpp
 cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 cd build
 make
 cd ../..
-scons  (or python -m SCons on Windows)
+scons
 ```
 
 On Windows:
@@ -54,7 +68,7 @@ directory and convert cmake script to sln and then compile.
 
 ```
 cd ../..
-scons  (or python -m SCons on Windows)
+python -m SCons
 ```
 On Mac:
 
