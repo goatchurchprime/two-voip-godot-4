@@ -41,7 +41,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/classes/node.hpp>
 
-#include "../opus/include/opus.h"
+#include "opus.h"
 #include "speex_resampler/speex_resampler.h"
 
 namespace godot {

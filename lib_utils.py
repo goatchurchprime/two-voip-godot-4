@@ -52,7 +52,20 @@ def setup_defines_and_flags(env, src_out):
         env.Append(CPPDEFINES=["TRACY_ENABLE", "TRACY_ON_DEMAND", "TRACY_DELAYED_INIT", "TRACY_MANUAL_LIFETIME"])
         src_out.append("src/thirdparty/tracy/public/TracyClient.cpp")
 
-    if env["platform"] == "linux":
+    env.Append(
+    	CPPPATH="opus/include",
+        LIBS=["opus"],
+        LIBPATH=["opus/build", "opus/build/Debug", "opus/build/Release"]
+	)
+
+    if env["platform"] == "windows":
+        env.Append(
+            LINKFLAGS=[
+                "/WX:NO"
+            ]
+        )
+
+    if env["platform"] == "linux" or env["platform"] == "android":
         env.Append(
             LINKFLAGS=[
                 "-static-libgcc",
