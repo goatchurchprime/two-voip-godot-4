@@ -8,6 +8,7 @@ on:
         "!.github/**/util_*",
         "patches/**",
         lib_utils.py,
+        lib_utils_external.py,
         SConstruct,
       ]
   pull_request:
@@ -18,6 +19,7 @@ on:
         "!.github/**/util_*",
         "patches/**",
         lib_utils.py,
+        lib_utils_external.py,
         SConstruct,
       ]
   workflow_dispatch:
@@ -40,6 +42,8 @@ permissions:
   actions: write
 
 env:
+  PROJECT_NAME: TwoVoIP
+  LIBRARY_NAME: twovoip
   SCONS_CACHE: ${{github.workspace}}/.scons-cache/
   USE_CACHE: ${{!format('{0}', inputs.use_cache) && 'true' || format('{0}', inputs.use_cache)}} # Default true
   PRODUCTION_BUILD: ${{!format('{0}', inputs.production_build) && 'false' || format('{0}', inputs.production_build)}} # Default false
@@ -57,7 +61,7 @@ jobs:
       fail-fast: false
       matrix:
         arch: [x86_64]
-        target: [template_release]
+        target: [template_debug, template_release]
 
     steps:
       - name: Checkout
@@ -75,7 +79,6 @@ jobs:
           additional: lto=yes
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
-          token: ${{secrets.TELEMETRY_TOKEN}}
 
 # ============================================
 
@@ -105,7 +108,6 @@ jobs:
           additional: lto=yes
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
-          token: ${{secrets.TELEMETRY_TOKEN}}
 
 # ============================================
 
@@ -135,7 +137,6 @@ jobs:
           additional: lto=yes macos_deployment_target=10.14
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
-          token: ${{secrets.TELEMETRY_TOKEN}}
 
   # ============================================
 
@@ -165,7 +166,6 @@ jobs:
           additional: lto=yes
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
-          token: ${{secrets.TELEMETRY_TOKEN}}
 
   # ============================================
 
@@ -213,50 +213,50 @@ jobs:
           arch: ${{matrix.arch}}
           artifact: android.${{matrix.target}}.${{matrix.arch}}
           additional: lto=yes
-          additional_enabled_dd3d: false
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
 
   # ============================================
 
-#  web-gdextension:
-#    name: 🕸 Web
-#    runs-on: ubuntu-latest
-#
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        arch: [wasm32]
-#        target: [template_debug, template_release]
-#
-#    env:
-#      EM_VERSION: 3.1.39
-#
-#    steps:
-#      - name: Checkout
-#        uses: actions/checkout@v4
-#        with:
-#          submodules: recursive
-#
-#      - name: Download Emscripten
-#        uses: mymindstorm/setup-emsdk@v14
-#        # Continue if failed to cache
-#        # https://github.com/mymindstorm/setup-emsdk/issues/20
-#        continue-on-error: true
-#        with:
-#          version: ${{env.EM_VERSION}}
-#          actions-cache-folder: obj/emsdk_cache
-#
-#      - name: Compile GDExtension
-#        uses: ./.github/actions/compile_gdextension
-#        with:
-#          platform: web
-#          target: ${{matrix.target}}
-#          arch: ${{matrix.arch}}
-#          artifact: web.${{matrix.target}}.${{matrix.arch}}
-#          additional: lto=yes
-#          output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
-#          use_cache: ${{env.USE_CACHE}}
+  web-gdextension:
+    name: 🕸 Web
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [wasm32]
+        target: [template_debug, template_release]
+        threads: [yes, no]
+
+    env:
+      EM_VERSION: 3.1.63
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        # Continue if failed to cache
+        # https://github.com/mymindstorm/setup-emsdk/issues/20
+        continue-on-error: true
+        with:
+          version: ${{env.EM_VERSION}}
+          actions-cache-folder: obj/emsdk_cache
+
+      - name: Compile GDExtension
+        uses: ./.github/actions/compile_gdextension
+        with:
+          platform: web
+          target: ${{matrix.target}}
+          arch: ${{matrix.arch}}
+          artifact: web.${{matrix.target}}.${{matrix.arch}}.threads_${{matrix.threads}}
+          additional: lto=yes threads=${{matrix.threads}}
+          output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
+          use_cache: ${{env.USE_CACHE}}
 
   # ============================================
 
@@ -267,7 +267,7 @@ jobs:
         linux-gdextension,
         macos-gdextension,
         android-gdextension,
-#        web-gdextension,
+        web-gdextension,
         ios-gdextension,
       ]
     name: 📦 Collect GDExtension binaries
@@ -309,3 +309,32 @@ jobs:
           name: ${{steps.output_info.outputs.artifact_name}}
           retention-days: 7
           path: extracted_files/*
+
+  # ============================================
+
+  pack-release:
+    needs: [collect-gdextension]
+    name: 🏁 Pack release archive
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: addons/${{env.LIBRARY_NAME}}/libs
+          name: ${{needs.collect-gdextension.outputs.artifact_name}}
+
+      - name: Move addons to the new root folder
+        run: |
+          mkdir upload
+          mv addons/ upload/addons/
+
+      - name: Upload GDExtension
+        uses: actions/upload-artifact@v4
+        with:
+          name: ".${{env.PROJECT_NAME}}"
+          retention-days: 7
+          path: upload/*

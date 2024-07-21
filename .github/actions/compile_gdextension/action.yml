@@ -19,9 +19,6 @@ inputs:
   additional:
     description: Any additional arguments
     default: ""
-  additional_enabled_dd3d:
-    description: Use force_enabled_dd3d if possible
-    default: "true"
   output_libs_path:
     description: Path to compiled libraries
     required: true
@@ -29,11 +26,6 @@ inputs:
   use_cache:
     description: Use cache
     default: "true"
-  token:
-    description: Secrets token
-  telemetry_version:
-    description: Telemetry version
-    default: 92c1c576739703018a935417cdc7a6ff210b7975
 runs:
   using: composite
   steps:
@@ -42,17 +34,6 @@ runs:
       id: get_godot_cpp_sha
       run: |
         echo "sha=$(git rev-parse @:./godot-cpp)" >> $GITHUB_OUTPUT
-
-    - name: Checkout telemetry repo
-      uses: actions/checkout@v4
-      id: checkout_tele_repo
-      if: ${{env.PRODUCTION_BUILD == 'true' && inputs.target == 'editor'}}
-      continue-on-error: true
-      with:
-        repository: ${{github.repository_owner}}/my_telemetry_modules
-        token: ${{inputs.token}}
-        ref: ${{inputs.telemetry_version}}
-        path: src/editor/my_telemetry_modules
 
     - name: Restore .scons_cache directory
       if: inputs.use_cache != 'false'
@@ -83,134 +64,30 @@ runs:
 
     - name: Linux dependencies
       shell: bash
-      if: (runner.os == 'Linux') && (inputs.platform == 'linux')
+      if: (runner.os == 'Linux')
       run: |
         sudo apt update
-        if [[ "${{inputs.arch}}" == *"32" ]];then
+        sudo apt install ninja-build
+
+        if [[ "${{inputs.platform}}" == "linux" ]] && [[ "${{inputs.arch}}" == *"32" ]]; then
           sudo apt install gcc-multilib g++-multilib
         fi
 
-    - name: Build Opus (Linux)
-      if: inputs.platform == 'linux'
+    - name: macOS dependencies
       shell: bash
+      if: (runner.os == 'macOS')
       run: |
-        echo "::group::🛠️ Opus Compilation (Linux) 🛠️"
-        cd opus
-        cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-        cd build
-        make
-
-    - name: Build Opus (MacOS)
-      if: inputs.platform == 'macos'
-      shell: bash
-      run: |
-        echo "::group::🛠️ Opus Compilation (MacOS) 🛠️"
-        cd opus
-        cmake -Bbuild -G "Unix Makefiles" -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
-        cd build
-        make
-
-    - name: Build Opus (iOS)
-      if: inputs.platform == 'ios'
-      shell: bash
-      run: |
-        echo "::group::🛠️ Opus Compilation (iOS) 🛠️"
-        cd opus
-        cmake -Bbuild -G "Unix Makefiles" -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64
-        cd build
-        make
-
-    - name: Build Opus (Android arm32)
-      if: inputs.platform == 'android' && inputs.arch == 'arm32'
-      shell: bash
-      run: |
-        echo "::group::🛠️ Opus Compilation (Android arm32) 🛠️"
-        cd opus
-        cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=${ANDROID_HOME}/ndk/25.2.9519653/build/cmake/android.toolchain.cmake -DANDROID_ABI=armeabi-v7a
-        cd build
-        make
-
-    - name: Build Opus (Android arm64)
-      if: inputs.platform == 'android' && inputs.arch == 'arm64'
-      shell: bash
-      run: |
-        echo "::group::🛠️ Opus Compilation (Android arm64) 🛠️"
-        cd opus
-        cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=${ANDROID_HOME}/ndk/25.2.9519653/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a
-        cd build
-        make
-
-    - name: Build Opus (Android x86_32)
-      if: inputs.platform == 'android' && inputs.arch == 'x86_32'
-      shell: bash
-      run: |
-        echo "::group::🛠️ Opus Compilation (Android x86_32) 🛠️"
-        cd opus
-        cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=${ANDROID_HOME}/ndk/25.2.9519653/build/cmake/android.toolchain.cmake -DANDROID_ABI=x86
-        cd build
-        make
-
-    - name: Build Opus (Android x86_64)
-      if: inputs.platform == 'android' && inputs.arch == 'x86_64'
-      shell: bash
-      run: |
-        echo "::group::🛠️ Opus Compilation (Android x86_64) 🛠️"
-        cd opus
-        cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=${ANDROID_HOME}/ndk/25.2.9519653/build/cmake/android.toolchain.cmake -DANDROID_ABI=x86_64
-        cd build
-        make
-
-    - name: Build Opus (Web)
-      if: inputs.platform == 'web'
-      shell: bash
-      run: |
-        echo "::group::🛠️ Opus Compilation (WASM32) 🛠️"
-        cd opus
-        emconfigure ./configure --disable-intrinsics --disable-rtcd CFLAGS='-O2'
-        make
-
-    - name: Add msbuild to PATH
-      if: runner.os == 'Windows'
-      uses: microsoft/setup-msbuild@v2
-
-    - name: Build Opus (Windows Debug)
-      if: inputs.platform == 'Windows' && inputs.target == 'template_debug'
-      shell: powershell
-      run: |
-        echo "::group::🛠️ Opus Compilation (Windows Debug) 🛠️"
-        cd opus
-        cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON -G "Visual Studio 17 2022" -A x64
-        cd build
-        msbuild Opus.sln
-
-    - name: Build Opus (Windows Release)
-      if: inputs.platform == 'Windows' && inputs.target == 'template_release'
-      shell: powershell
-      run: |
-        echo "::group::🛠️ Opus Compilation (Windows Debug) 🛠️"
-        cd opus
-        cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON -G "Visual Studio 17 2022" -A x64
-        cd build
-        msbuild Opus.sln /p:Configuration=Release
+        brew install ninja
 
     - name: Build godot-cpp
       shell: bash
       run: |
         echo "::group::🛠️ GDExtension Compilation 🛠️"
-        cd godot-cpp
-        git apply --ignore-space-change --ignore-whitespace ../patches/godot_cpp_exclude_unused_classes.patch
-        git apply --ignore-space-change --ignore-whitespace ../patches/unity_build.patch
-        cd ..
-
-        telemetry_args=""
-        if [ "${{env.PRODUCTION_BUILD}}" == "true" ] && [ "${{inputs.target}}" == "editor" ] && [ "${{steps.checkout_tele_repo.conclusion}}" == "success" ]; then
-          telemetry_args="telemetry_enabled=yes"
-        fi
-
-        scons platform=${{inputs.platform}} arch=${{inputs.arch}} target=${{inputs.target}} addon_output_dir=${{inputs.output_libs_path}} ${{inputs.additional}} $telemetry_args
-        if [ "${{inputs.target}}" == "template_release" ] && [ "${{inputs.additional_enabled_dd3d}}" == "true" ]; then
-          scons platform=${{inputs.platform}} arch=${{inputs.arch}} target=${{inputs.target}} addon_output_dir=${{inputs.output_libs_path}} force_enabled_dd3d=yes ${{inputs.additional}}
-        fi
+        scons_params="platform=${{inputs.platform}} arch=${{inputs.arch}} target=${{inputs.target}} addon_output_dir=${{inputs.output_libs_path}} ${{inputs.additional}}"
+        
+        scons apply_patches
+        scons build_opus $scons_params
+        scons $scons_params
         echo "::endgroup::"
 
     - name: Prepare artifact Unix

@@ -42,7 +42,7 @@ Make sure `addons/twovoip/twovoip.gdextension` point to these files:
 
 ### Otherwise by hand when developing
 
-Since we've not got submodules here we need to 
+Since we've not got submodules here we need to
 first clone Opus and godot-cpp modules before building them
 
 ```
@@ -73,6 +73,27 @@ python -m SCons
 On Mac:
 
 See the instructions on the one-voip here: https://github.com/RevoluPowered/one-voip-godot-4/?tab=readme-ov-file#mac
+
+### Using scons
+
+Build a library for the current platform:
+
+```bash
+scons apply_patches # optional
+scons build_opus # build opus using cmake
+scons # build this library
+```
+
+Build a library for another platform:
+
+```bash
+scons apply_patches # optional
+# The scons arguments for build_opus and the build of the library itself must match!
+scons platform=web target=template_release build_opus # build opus using cmake
+scons platform=web target=template_release # build this library
+```
+
+To build with lipsync support, you need to add the `lipsync=yes` flag and download the libraries from the section below.
 
 ## With OVRLipSync
 
