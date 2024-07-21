@@ -1,6 +1,7 @@
 [submodule "godot-cpp"]
 	path = godot-cpp
-	url = git@github.com:godotengine/godot-cpp.git
+	url = https://github.com/godotengine/godot-cpp.git
+	branch = 4.1
 [submodule "opus"]
 	path = opus
-	url = git@github.com:xiph/opus.git
+	url = https://github.com/xiph/opus.git
