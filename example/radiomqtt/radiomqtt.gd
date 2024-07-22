@@ -221,7 +221,7 @@ func _process(_delta):
 			audiosamplestoshader(audiosamples)
 			var chunkv1 = audioopuschunkedeffect.chunk_max()
 			var chunkv2 = audioopuschunkedeffect.chunk_rms()
-			var viseme = -1 # audioopuschunkedeffect.chunk_to_lipsync()
+			var viseme = audioopuschunkedeffect.chunk_to_lipsync()
 			if viseme != prevviseme:
 				print(" viseme ", visemes[viseme], " ", chunkv2)
 				prevviseme = viseme

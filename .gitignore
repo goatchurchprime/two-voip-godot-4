@@ -1,12 +1,21 @@
-# Godot 4+ specific ignores
+.scons-cache/
 .godot/
-addons/twovoip/libs/*
 .vscode/
+.vs/
 __pycache__/
-OVRLipSyncNative/
 obj/
 
 *.pyc
 *.so
+*.o
 *.a
+*.dll
+*.obj
+*.lib
 .sconsign.dblite
+
+addons/twovoip/libs/*
+addons/twovoip_lipsync/libs/*
+addons/twovoip_lipsync/OVRLipSyncNative/*
+example/addons/twovoip*
+example/android/*
