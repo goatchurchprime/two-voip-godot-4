@@ -189,6 +189,14 @@ func set_last_will(stopic, smsg, retain=false, qos=0):
 	if verbose_level:
 		print("LASTWILL%s topic=%s msg=%s" % [ " <retain>" if retain else "", stopic, smsg])
 
+func set_user_pass(suser, spswd):
+	if suser != null:
+		self.user = suser.to_ascii_buffer()
+		self.pswd = spswd.to_ascii_buffer()
+	else:
+		self.user = null
+		self.pswd = null
+
 func firstmessagetoserver():
 	var clean_session = true
 	var msg = PackedByteArray()
@@ -227,12 +235,12 @@ func firstmessagetoserver():
 		msg.append(len(self.lw_msg) & 0xFF)
 		msg.append_array(self.lw_msg)
 	if self.user != null:
-		msg.append(self.user.length() >> 8)
-		msg.append(self.user.length() & 0xFF)
-		msg.append_array(self.user.to_ascii_buffer())
-		msg.append(self.pswd.length() >> 8)
-		msg.append(self.pswd.length() & 0xFF)
-		msg.append_array(self.pswd.to_ascii_buffer())
+		msg.append(len(self.user) >> 8)
+		msg.append(len(self.user) & 0xFF)
+		msg.append_array(self.user)
+		msg.append(len(self.pswd) >> 8)
+		msg.append(len(self.pswd) & 0xFF)
+		msg.append_array(self.pswd)
 	return msg
 
 func cleanupsockets(retval=false):
