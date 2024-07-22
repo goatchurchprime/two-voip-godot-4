@@ -79,6 +79,12 @@ runs:
       run: |
         brew install ninja
 
+    - name: Setup OVRLipSync
+      uses: ./.github/actions/setup_ovrlipsync
+      if: contains(inputs.additional, 'lipsync=yes')
+      with:
+        extract_directory: "addons/${{env.LIBRARY_NAME}}_lipsync"
+
     - name: Build godot-cpp
       shell: bash
       run: |
@@ -94,14 +100,11 @@ runs:
       if: runner.os != 'Windows' && inputs.platform != 'android' && inputs.platform != 'web'
       shell: bash
       run: |
-        if [ "${{inputs.platform}}" == 'macos' ]; then
-          found_files=$(find -L ${{inputs.output_libs_path}} -type f -exec file {} + | grep "Mach-O universal" | cut -d: -f1)
-          echo "Found files: $found_files"
-          strip -u $found_files
-        elif [ "${{inputs.platform}}" == 'ios' ]; then
-          found_files=$(find -L ${{inputs.output_libs_path}} -type f -exec file {} + | grep ".dylib" | cut -d: -f1)
+        if [ "${{inputs.platform}}" == 'ios' ] || [ "${{inputs.platform}}" == 'macos' ]; then
+          found_files=$(find -L ${{inputs.output_libs_path}} -type f -iname "*.dylib")
           echo "Found files: $found_files"
           while IFS= read -r file; do
+              echo "Strip '$file'"
               strip -u "$file"
           done <<< "$found_files"
         else
@@ -124,7 +127,7 @@ runs:
         path: ${{inputs.output_libs_path}}/*
 
     - name: Save .scons_cache directory
-      if: inputs.use_cache != 'false'
+      if: inputs.use_cache == 'true' && steps.restore_scons_cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
         path: ${{env.SCONS_CACHE}}

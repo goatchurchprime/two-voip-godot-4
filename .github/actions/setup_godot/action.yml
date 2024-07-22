@@ -48,7 +48,7 @@ runs:
         fi
 
     - name: Restore cache directory
-      id: restore_scons_cache
+      id: restore_godot_cache
       uses: actions/cache/restore@v4
       with:
         path: ${{steps.store_folder.outputs.path}}
@@ -56,7 +56,7 @@ runs:
 
     - name: Download Godot Engine
       uses: robinraju/release-downloader@v1.10
-      if: ${{!steps.restore_scons_cache.outputs.cache-hit}}
+      if: steps.restore_godot_cache.outputs.cache-hit != 'true'
       with:
         repository: "godotengine/godot"
         tag: "${{inputs.tag}}"
@@ -66,7 +66,7 @@ runs:
 
     - name: Download templates
       uses: robinraju/release-downloader@v1.10
-      if: ${{!steps.restore_scons_cache.outputs.cache-hit && inputs.download_export_templates == 'true'}}
+      if: ${{!steps.restore_godot_cache.outputs.cache-hit && inputs.download_export_templates == 'true'}}
       with:
         repository: "godotengine/godot"
         tag: "${{inputs.tag}}"
@@ -74,7 +74,7 @@ runs:
         out-file-path: "temp_download"
 
     - name: Finish preparation
-      if: ${{!steps.restore_scons_cache.outputs.cache-hit}}
+      if: steps.restore_godot_cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         if [ "${{inputs.is_mono}}" == "true" ]; then
@@ -128,7 +128,7 @@ runs:
         fi
 
     - name: Save cache directory
-      if: ${{!steps.restore_scons_cache.outputs.cache-hit}}
+      if: steps.restore_godot_cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
         path: ${{steps.store_folder.outputs.path}}

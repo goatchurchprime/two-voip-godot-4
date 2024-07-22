@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from SCons.Script import SConscript
-from SCons.Environment import Environment
+from SCons.Script.SConscript import SConsEnvironment
 
 import SCons, SCons.Script
 import os, platform
@@ -14,7 +14,8 @@ if platform.system() == "Windows":
 # Project config
 project_name = "TwoVoIP"
 lib_name = "twovoip"
-output_dir = os.path.join("addons", "twovoip", "libs")
+default_output_dir = os.path.join("addons", "twovoip", "libs")
+default_output_lipsync_dir = os.path.join("addons", "twovoip_lipsync", "libs")
 src_folder = "src"
 
 # If necessary, add patches from the code
@@ -29,84 +30,96 @@ print("To apply git patches, use 'scons apply_patches'.")
 print("To build the opus library, use 'scons build_opus'.")
 
 # Additional console arguments
-def setup_options(env: Environment, arguments):
+def setup_options(env: SConsEnvironment, arguments):
     from SCons.Variables import Variables, BoolVariable, EnumVariable, PathVariable
     opts = Variables([], arguments)
 
     # It must be here for lib_utils.py
-    opts.Add(PathVariable("addon_output_dir", "Path to the output directory", output_dir, PathVariable.PathIsDirCreate))
+    opts.Add(PathVariable("addon_output_dir", "Path to the output directory", default_output_dir, PathVariable.PathIsDirCreate))
+    opts.Add(PathVariable("ovrlipsync_dir", "Path to the OVRLipSyncNative directory", os.path.join(os.path.dirname(default_output_lipsync_dir), "OVRLipSyncNative"), PathVariable.PathIsDirCreate))
 
     opts.Add(BoolVariable("lipsync", "Enable lipsync support", False))
     opts.Add(BoolVariable("lto", "Link-time optimization", False))
 
     opts.Update(env)
-    Help(opts.GenerateHelpText(env))
+    env.Help(opts.GenerateHelpText(env))
 
 
 # Additional compilation flags
-def setup_defines_and_flags(env: Environment, src_out):
+def setup_defines_and_flags(env: SConsEnvironment, src_out):
     # Add more sources to `src_out` if needed
 
     if env["lto"]:
         if env.get("is_msvc", False):
-            env.AppendUnique(CCFLAGS=["/GL"])
-            env.AppendUnique(ARFLAGS=["/LTCG"])
-            env.AppendUnique(LINKFLAGS=["/LTCG"])
+            env.AppendUnique(CCFLAGS=["/GL"],
+                             ARFLAGS=["/LTCG"],
+                             LINKFLAGS=["/LTCG"],)
         else:
-            env.AppendUnique(CCFLAGS=["-flto"])
-            env.AppendUnique(LINKFLAGS=["-flto"])
+            env.AppendUnique(CCFLAGS=["-flto"],
+                             LINKFLAGS=["-flto"],)
 
     env.Append(CPPPATH="opus/include", LIBS=["opus"], LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "opus")])
     if env["lipsync"]:
         lipsync_lib_path = ""
+        ovrlipsync_dir = env["ovrlipsync_dir"]
+
         if env["platform"] == "windows":
-            lipsync_lib_path = "OVRLipSyncNative/Lib/Win64"
-        elif env["platform"] == "macos":
-            lipsync_lib_path = "OVRLipSyncNative/Lib/MacOS"
+            lipsync_lib_path = os.path.join(ovrlipsync_dir, "Lib", "Win64")
+        elif env["platform"] == "macos" and env["arch"] == "x86_64":
+            lipsync_lib_path = os.path.join(ovrlipsync_dir, "Lib", "MacOS")
         elif env["platform"] == "android":
             if env["arch"] == "arm32":
-                lipsync_lib_path = "OVRLipSyncNative/Lib/Android32"
+                lipsync_lib_path = os.path.join(ovrlipsync_dir, "Lib", "Android32")
             elif env["arch"] == "arm64":
-                lipsync_lib_path = "OVRLipSyncNative/Lib/Android64"
+                lipsync_lib_path = os.path.join(ovrlipsync_dir, "Lib", "Android64")
             else:
                 print("Lipsync is supported only on arm32 and arm64.")
                 env.Exit(1)
         else:
-            print(f"Lipsync is not supported by the {env["platform"]} platform.")
+            print(f"Lipsync is not supported by the {env["platform"]}:{env["arch"]} platform.")
             env.Exit(1)
 
-        env.Append(CPPPATH="OVRLipSyncNative/Include",
-                    LIBS=["OVRLipSyncShim"],
+        dbg_suffix = "d" if env["dev_build"] else ""
+        env.Append(CPPPATH=os.path.join(ovrlipsync_dir, "Include"),
+                    LIBS=["OVRLipSyncShim" + dbg_suffix],
                     LIBPATH=[lipsync_lib_path],
                     CPPDEFINES=["OVR_LIP_SYNC"])
 
-    if env["platform"] == "windows":
+    if env.get("is_msvc", False):
         env.Append(LINKFLAGS=["/WX:NO"])
 
-    if env["platform"] in ["linux", "android"]:
+    if env["platform"] in ["linux"]: # , "android"?
         env.Append(
             LINKFLAGS=[
                 "-static-libgcc",
                 "-static-libstdc++",
             ]
         )
+    if env["platform"] == "android":
+        env.Append(
+            LIBS=[
+                "log",
+            ]
+        )
     print()
 
 
-def apply_patches(target, source, env: Environment):
+def apply_patches(target, source, env: SConsEnvironment):
     return lib_utils_external.apply_git_patches(env, patches_to_apply)
 
 
-def build_opus(target, source, env: Environment):
+def build_opus(target, source, env: SConsEnvironment):
     extra_flags = []
     if env["platform"] == "web":
         extra_flags += ["-DOPUS_STACK_PROTECTOR=0"]
     if env["platform"] in ["linux", "web"]:
         extra_flags += ["-DCMAKE_POSITION_INDEPENDENT_CODE=ON"]
+    if env["platform"] in ["macos", "ios"]:
+        extra_flags += ["-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64", "-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15"]
 
     return lib_utils_external.cmake_build_project(env, "opus", extra_flags)
 
-env: Environment = SConscript("godot-cpp/SConstruct")
+env: SConsEnvironment = SConscript("godot-cpp/SConstruct")
 env = env.Clone()
 
 args = ARGUMENTS
@@ -114,7 +127,12 @@ additional_src = []
 setup_options(env, args)
 setup_defines_and_flags(env, additional_src)
 
-lib_utils.get_library_object(env, project_name, lib_name, env["addon_output_dir"], src_folder, additional_src)
+output_path = env["addon_output_dir"]
+if output_path == default_output_dir:
+    if env["lipsync"]:
+        output_path = default_output_lipsync_dir
+
+lib_utils.get_library_object(env, project_name, lib_name, output_path, src_folder, additional_src)
 
 # Register console commands
 env.Command("apply_patches", [], apply_patches)

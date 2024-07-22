@@ -97,13 +97,15 @@ To build with lipsync support, you need to add the `lipsync=yes` flag and downlo
 
 ## With OVRLipSync
 
-This is a highly speculative component that takes advantage of the chunking feature in the OpusChunked effect, 
+This is a highly speculative component that takes advantage of the chunking feature in the OpusChunked effect,
 but which is currently closed source.  There is no Linux version.
 See https://github.com/godotengine/godot-proposals/discussions/9718
 
-Download the OVRLipSync libraries from https://developer.oculus.com/documentation/native/audio-ovrlipsync-native/ 
-and unzip into top level as OVRLipSyncNative directory in this project.  There is a stub include file 
+Download the OVRLipSync libraries from https://developer.oculus.com/documentation/native/audio-ovrlipsync-native/
+and unzip into top level as OVRLipSyncNative directory in this project.  There is a stub include file
 for Linux that allows this GDExtension to compile and work without this library.
 
-On Windows you may need to copy the `OVRLipSyncNative/Lib/Win64/OVRLipSync.dll` file to the same directory 
-as your `GodotEngine.exe` so that it finds and links it. 
+On Windows you may need to copy the `OVRLipSyncNative/Lib/Win64/OVRLipSync.dll` file to the same directory
+as your `GodotEngine.exe` so that it finds and links it.
+
+For the addon to work correctly, `twovoip_lipsync` and `twovoip` cannot be used in the same project.
