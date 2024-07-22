@@ -434,9 +434,16 @@ popup/item_3/id = 3
 [node name="HBoxMosquitto" type="HBoxContainer" parent="."]
 layout_mode = 2
 
+[node name="Label2" type="Label" parent="HBoxMosquitto"]
+layout_mode = 2
+text = "Friendly name:"
+
+[node name="FriendlyName" type="LineEdit" parent="HBoxMosquitto"]
+layout_mode = 2
+
 [node name="Label" type="Label" parent="HBoxMosquitto"]
 layout_mode = 2
-text = "$> "
+text = "Shell $> "
 
 [node name="Cmd" type="LineEdit" parent="HBoxMosquitto"]
 layout_mode = 2

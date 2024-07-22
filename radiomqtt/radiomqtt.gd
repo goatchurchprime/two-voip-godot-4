@@ -19,6 +19,7 @@ var audiosampleframetexture : ImageTexture
 var prevviseme = 0
 var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa", "E", "ih", "oh", "ou", "LA" ]
 
+var possibleusernames = ["Alice", "Beth", "Cath", "Dan", "Earl", "Fred", "George", "Harry", "Ivan", "John", "Kevin", "Larry", "Martin", "Oliver", "Peter", "Quentin", "Robert", "Samuel", "Thomas", "Ulrik", "Victor", "Wayne", "Xavier", "Youngs", "Zephir"]
 
 func _ready():
 	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
@@ -42,6 +43,7 @@ func _ready():
 		d.get_node("Label").text = visemes[i]
 		$HBoxVisemes.add_child(d)
 		d.size.y = i*8
+	$HBoxMosquitto/FriendlyName.text = possibleusernames.pick_random()
 
 func resamplerecordedsamples(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)

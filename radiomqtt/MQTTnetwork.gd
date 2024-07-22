@@ -66,8 +66,8 @@ func _on_connect_toggled(toggled_on):
 		$MQTT.broker_connected.connect(on_broker_connect)
 		$MQTT.broker_disconnected.connect(on_broker_disconnect)
 		randomize()
+		myname = "%s_%x" % [get_node("../HBoxMosquitto/FriendlyName").text, (randi() % 0x10000)]
 		$MQTT.client_id = "c%d" % (2 + (randi()%0x7fffff8))
-		myname = $MQTT.client_id
 		Members.get_node("Self/Label").text = myname
 		$GridContainer/topic.editable = false
 		$GridContainer/broker.editable = false
