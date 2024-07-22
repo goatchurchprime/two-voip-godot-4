@@ -206,7 +206,7 @@ vertical_alignment = 1
 [node name="Label3" type="RichTextLabel" parent="."]
 layout_mode = 2
 bbcode_enabled = true
-text = "Playback the previous recording after compression at different rates defined above.  Compression is applied to the raw recording."
+text = "Playback the current recording after compression at different rates defined below.  Compression is applied to the original raw recording."
 fit_content = true
 
 [node name="HBoxPlaycount" type="HBoxContainer" parent="."]
@@ -261,7 +261,7 @@ layout_mode = 2
 editable = false
 
 [node name="HSeparator4" type="HSeparator" parent="."]
-custom_minimum_size = Vector2(0, 20)
+custom_minimum_size = Vector2(0, 10)
 layout_mode = 2
 
 [node name="VBoxFrameLength" type="VBoxContainer" parent="."]
@@ -431,6 +431,20 @@ popup/item_2/id = 2
 popup/item_3/text = "hass"
 popup/item_3/id = 3
 
+[node name="HBoxMosquitto" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxMosquitto"]
+layout_mode = 2
+text = "$> "
+
+[node name="Cmd" type="LineEdit" parent="HBoxMosquitto"]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Use this shell command to externally monitor messages through the broker"
+text = "mosquitto_sub ..."
+editable = false
+
 [node name="VBoxMQTT" type="VBoxContainer" parent="."]
 visible = false
 layout_mode = 2
@@ -464,6 +478,10 @@ size_flags_vertical = 3
 layout_mode = 2
 text = "roomname
 "
+
+[node name="HSeparator6" type="HSeparator" parent="."]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
 
 [node name="RichTextLabel" type="RichTextLabel" parent="."]
 custom_minimum_size = Vector2(550, 0)

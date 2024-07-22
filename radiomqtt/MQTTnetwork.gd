@@ -77,12 +77,15 @@ func _on_connect_toggled(toggled_on):
 		audioouttopic = "%s/%s/audio" % [roomtopic, myname]
 		statustopic = "%s/%s/status" % [roomtopic, myname]
 		$MQTT.set_last_will(statustopic, "dead".to_ascii_buffer(), true)
+		var userpass = ""
 		if $GridContainer/mqttuser.text != "":
 			$MQTT.set_user_pass($GridContainer/mqttuser.text, $GridContainer/mqttpassword.text)
+			userpass = " -u %s -P %s" % [$GridContainer/mqttuser.text, $GridContainer/mqttpassword.text]
 		else:
 			$MQTT.set_user_pass(null, null)
 		$MQTT.connect_to_broker($GridContainer/broker.text)
-				
+		get_node("../HBoxMosquitto/Cmd").text = "mosquitto_sub -h %s%s -v -t %s/# -T %s/+/audio" % [$GridContainer/broker.text, userpass, $GridContainer/topic.text, $GridContainer/topic.text] 
+
 	else:
 		print("Disconnecting MQTT")
 		$MQTT.received_message.disconnect(received_mqtt)
