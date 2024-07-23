@@ -1,9 +1,6 @@
-[gd_scene load_steps=3 format=3 uid="uid://c1ibcb1toyerh"]
+[gd_scene load_steps=2 format=3 uid="uid://c1ibcb1toyerh"]
 
 [ext_resource type="Script" path="res://radiomqtt/member.gd" id="1_o3hks"]
-
-[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_vai8h"]
-resource_local_to_scene = true
 
 [node name="Member" type="ColorRect"]
 custom_minimum_size = Vector2(170, 40)
@@ -16,7 +13,6 @@ color = Color(0.423529, 0, 0.423529, 1)
 script = ExtResource("1_o3hks")
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
-stream = SubResource("AudioStreamOpusChunked_vai8h")
 
 [node name="Label" type="Label" parent="."]
 layout_mode = 2

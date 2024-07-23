@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=21 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
@@ -70,9 +70,6 @@ bg_color = Color(0.654902, 0.266667, 0.345098, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_m5fk6"]
 bg_color = Color(0.509804, 0.145098, 0.203922, 1)
-
-[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_ensh7"]
-resource_local_to_scene = true
 
 [node name="radiomqtt" type="VBoxContainer"]
 anchors_preset = 15
@@ -538,9 +535,6 @@ columns = 3
 
 [node name="Self" parent="Members" instance=ExtResource("4_w5dv2")]
 layout_mode = 2
-
-[node name="AudioStreamPlayer" parent="Members/Self" index="0"]
-stream = SubResource("AudioStreamOpusChunked_ensh7")
 
 [node name="Label" parent="Members/Self" index="1"]
 text = "Self"

@@ -8,7 +8,17 @@ var audiopacketsbuffer = [ ]
 
 func _ready():
 	var audiostream = $AudioStreamPlayer.stream
-	assert (audiostream.resource_local_to_scene)
+	if audiostream == null:
+		if ClassDB.can_instantiate("AudioStreamOpusChunked"):
+			print("Instantiating AudioStreamOpusChunked")
+			audiostream = ClassDB.instantiate("AudioStreamOpusChunked")
+		else:
+			print("Instantiating AudioStreamGenerator")
+			audiostream = AudioStreamGenerator.new()
+		$AudioStreamPlayer.stream = audiostream
+	else:
+		assert (audiostream.resource_local_to_scene)
+
 	$AudioStreamPlayer.play()
 	if audiostream.is_class("AudioStreamOpusChunked"):
 		audiostreamopuschunked = audiostream
