@@ -146,6 +146,7 @@ text = "Vox"
 
 [node name="Leadtime" type="SpinBox" parent="HBoxBigButtons/VBoxVox"]
 layout_mode = 2
+tooltip_text = "Not yet implemented"
 max_value = 1.0
 step = 0.05
 update_on_text_changed = true

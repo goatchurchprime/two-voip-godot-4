@@ -9,6 +9,7 @@ var visthreshold = 1.0
 @onready var PTT = get_node("../HBoxBigButtons/PTT")
 @onready var Vox = get_node("../HBoxBigButtons/VBoxVox/Vox")
 @onready var Sil = get_node("../HBoxBigButtons/VBoxVox/Silence")
+@onready var Hangtime = get_node("../HBoxBigButtons/VBoxVox/Hangtime")
 
 func _on_h_slider_vox_value_changed(value):
 	voxthreshold = value/$HSliderVox.max_value
@@ -24,7 +25,7 @@ func _ready():
 	$HSliderVox/ColorRectThreshold.position = Vector2(0,0)
 	_on_h_slider_vox_value_changed($HSliderVox.value)
 	
-func loudnessvalues(chunkv1, chunkv2):
+func loudnessvalues(chunkv1, chunkv2, frametimems):
 	$HSliderVox/ColorRectLoudness.size.x = $HSliderVox.size.x*chunkv1
 	$HSliderVox/ColorRectLoudnessRMS.size.x = $HSliderVox.size.x*chunkv2
 	if Sil.button_pressed:
@@ -41,7 +42,7 @@ func loudnessvalues(chunkv1, chunkv2):
 		else:
 			visthreshold = max(visthreshold, chunkv1)
 		$HSliderVox/ColorRectThreshold.position.x = $HSliderVox.size.x*visthreshold - outlinewidth/2.0
-		samplescountdown = 30 # float(Hangtime.text)*
+		samplescountdown = int(Hangtime.value*1000.0/frametimems)
 	elif samplescountdown > 0:
 		samplescountdown -= 1
 		if samplescountdown == 0:

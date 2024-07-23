@@ -222,7 +222,7 @@ func _process(_delta):
 			else:
 				$HBoxVisemes.visible = false
 				
-			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2)
+			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2, frametimems)
 			if currentlytalking:
 				recordedsamples.append(audiosamples)
 				if audioopuschunkedeffect.opusframesize != 0:
@@ -252,7 +252,7 @@ func _process(_delta):
 					chunkv1 = vm
 				schunkv2 = v.x*v.x + v.y*v.y
 			var chunkv2 = sqrt(schunkv2/(len(audiosamples)*2))
-			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2)
+			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2, frametimems)
 			if currentlytalking:
 				recordedsamples.append(audiosamples)
 				var framecount = len(recordedsamples)
