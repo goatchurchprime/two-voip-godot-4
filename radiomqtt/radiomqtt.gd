@@ -253,17 +253,22 @@ func _process(_delta):
 			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2)
 			if currentlytalking:
 				recordedsamples.append(audiosamples)
+				var framecount = len(recordedsamples)
 				if opusframesize != 0:
 					var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, audiosamples, 0);
 					recordedopuspackets.append(opuspacket)
-					$HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
+					framecount = len(recordedopuspackets)
 					$MQTTnetwork.transportaudiopacket(opuspacket)
 					recordedopuspacketsMemSize += opuspacket.size()
-					$HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
-					var tm = len(recordedopuspackets)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
-					$HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
 				else:
-					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples))
+					var rawpacket = var_to_bytes(audiosamples)
+					recordedopuspacketsMemSize += rawpacket.size()
+					$MQTTnetwork.transportaudiopacket(rawpacket)
+				$HBoxPlaycount/GridContainer/FrameCount.text = str(framecount)
+				$HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
+				var tm = framecount*audiosamplesize*1.0/audiosamplerate
+				$HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
+
 			else:
 				if audioopuschunkedeffect != null:
 					audioopuschunkedeffect.drop_chunk()
@@ -295,4 +300,3 @@ func _on_audio_stream_microphone_finished():
 
 func _on_option_button_item_selected(_index):
 	updatesamplerates()
-

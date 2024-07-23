@@ -55,9 +55,13 @@ func processheaderpacket(h):
 			audiostreamopuschunked.opussamplerate = opussamplerate
 			audiostreamopuschunked.audiosamplerate = audiosamplerate
 
-		if opusframesize != 0:
-			print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
+			if opusframesize != 0:
+				print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
 			#$AudioStreamPlayer.play()
+	if opusframesize != 0 and audiostreamopuschunked == null:
+		print("Compressed opus stream received that we cannot decompress")
+				
+			
 
 func receivemqttmessage(msg):
 	if msg[0] == "{".to_ascii_buffer()[0]:
@@ -67,7 +71,7 @@ func receivemqttmessage(msg):
 			if h.has("opusframesize"):
 				processheaderpacket(h)
 	else:
-		if audiostreamopuschunked.opusframesize != 0:
+		if opusframesize != 0:
 			opuspacketsbuffer.push_back(msg)
 		else:
 			audiopacketsbuffer.push_back(bytes_to_var(msg))

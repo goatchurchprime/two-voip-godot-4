@@ -106,5 +106,3 @@ func _on_connect_toggled(toggled_on):
 		SelfMember.setname("Self")
 		audioouttopic = ""
 		statustopic = ""
-
-

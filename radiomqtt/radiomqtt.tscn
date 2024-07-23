@@ -12,15 +12,15 @@
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kcsl6"]
 bg_color = Color(0.0705882, 0.0235294, 0.564706, 1)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_30le3"]
+bg_color = Color(0.909804, 0.392157, 0.435294, 1)
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ljq7l"]
 bg_color = Color(0.101961, 0.101961, 0.101961, 1)
 corner_radius_top_left = 20
 corner_radius_top_right = 20
 corner_radius_bottom_right = 20
 corner_radius_bottom_left = 20
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_30le3"]
-bg_color = Color(0.909804, 0.392157, 0.435294, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_k6a7f"]
 bg_color = Color(0.6, 0.6, 0.0470588, 1)
@@ -123,8 +123,8 @@ custom_minimum_size = Vector2(250, 100)
 layout_mode = 2
 tooltip_text = "Hold down to talk"
 theme_override_font_sizes/font_size = 50
-theme_override_styles/normal = SubResource("StyleBoxFlat_ljq7l")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_30le3")
+theme_override_styles/normal = SubResource("StyleBoxFlat_ljq7l")
 text = "PTT
 "
 
@@ -324,7 +324,6 @@ text = "Opus Bit Rate"
 layout_mode = 2
 item_count = 5
 popup/item_0/text = "24000"
-popup/item_0/id = 0
 popup/item_1/text = "12000"
 popup/item_1/id = 1
 popup/item_2/text = "10000"
@@ -346,7 +345,6 @@ text = "Frame duration"
 layout_mode = 2
 item_count = 6
 popup/item_0/text = "2.5ms"
-popup/item_0/id = 0
 popup/item_1/text = "5ms"
 popup/item_1/id = 1
 popup/item_2/text = "10ms"
@@ -374,7 +372,6 @@ text = "Audio sampler"
 layout_mode = 2
 item_count = 3
 popup/item_0/text = "Uncompressed"
-popup/item_0/id = 0
 popup/item_1/text = "Speex Resample"
 popup/item_1/id = 1
 popup/item_2/text = "44.1k as 48k"
@@ -460,7 +457,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 item_count = 4
 popup/item_0/text = "doesliverpool"
-popup/item_0/id = 0
 popup/item_1/text = "hivemq"
 popup/item_1/id = 1
 popup/item_2/text = "m.org"

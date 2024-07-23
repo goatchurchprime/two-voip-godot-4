@@ -55,4 +55,3 @@ func _on_vox_toggled(toggled_on):
 
 func _on_silence_button_down():
 	$HSliderVox.value = 0
-
