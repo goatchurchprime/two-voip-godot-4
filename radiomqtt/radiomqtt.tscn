@@ -102,7 +102,7 @@ vertical_alignment = 1
 [node name="Label" type="RichTextLabel" parent="."]
 layout_mode = 2
 bbcode_enabled = true
-text = "[b]Instructions:[/b] Hold down [u]PTT[/u] to record. Toggle [u]Vox[/u] to activate PTT automatically by volume. Hold down [u]Sil[/u] to set the silnce threshold for Vox."
+text = "Hold down [u]PTT[/u] (Push-To-Talk) to record, or toggle [u]Vox[/u] to activate PTT automatically by volume. Hold down [u]Sil[/u] to set the silnce threshold for Vox."
 fit_content = true
 
 [node name="HSeparator3" type="HSeparator" parent="."]
@@ -127,16 +127,36 @@ text = "PTT
 custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
 
-[node name="Vox" type="Button" parent="HBoxBigButtons"]
+[node name="VBoxVox" type="VBoxContainer" parent="HBoxBigButtons"]
+layout_mode = 2
+
+[node name="Vox" type="Button" parent="HBoxBigButtons/VBoxVox"]
 custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
 tooltip_text = "Voice operated mode set by threshold"
-theme_override_font_sizes/font_size = 50
+theme_override_font_sizes/font_size = 27
 theme_override_styles/pressed = SubResource("StyleBoxFlat_k6a7f")
 toggle_mode = true
 text = "Vox"
 
-[node name="Silence" type="Button" parent="HBoxBigButtons"]
+[node name="Leadtime" type="SpinBox" parent="HBoxBigButtons/VBoxVox"]
+layout_mode = 2
+max_value = 1.0
+step = 0.05
+update_on_text_changed = true
+prefix = "Leadtime:"
+suffix = "Seconds"
+
+[node name="Hangtime" type="SpinBox" parent="HBoxBigButtons/VBoxVox"]
+layout_mode = 2
+max_value = 5.0
+step = 0.1
+value = 1.5
+update_on_text_changed = true
+prefix = "Hangtime:"
+suffix = "Seconds"
+
+[node name="Silence" type="Button" parent="HBoxBigButtons/VBoxVox"]
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 tooltip_text = "Hold this down to set the Vox silence threshold"
@@ -543,8 +563,8 @@ offset_bottom = 23.0
 text = "sil"
 
 [connection signal="finished" from="AudioStreamMicrophone" to="." method="_on_audio_stream_microphone_finished"]
-[connection signal="toggled" from="HBoxBigButtons/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
-[connection signal="button_down" from="HBoxBigButtons/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
+[connection signal="toggled" from="HBoxBigButtons/VBoxVox/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
+[connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="toggled" from="HBoxMicTalk/MicWorking" to="." method="_on_mic_working_toggled"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="pressed" from="HBoxPlaycount/Play" to="." method="_on_play_pressed"]

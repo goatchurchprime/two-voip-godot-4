@@ -49,7 +49,7 @@ ios.template_release = {}
 
 macos = "libs/libtwovoip.macos.template_debug.universal.framework"
 windows.x86_64 = "libs/libtwovoip.windows.template_debug.x86_64.dll"
-linux.x86_64 = "libs/libtwovoip.linux.template_debug.x86_64.so"
+Dlinux.x86_64 = "libs/libtwovoip.linux.template_debug.x86_64.so"
 
 web.wasm32.nothreads = "libs/libtwovoip.web.template_debug.wasm32.wasm"
 web.wasm32 = "libs/libtwovoip.web.template_debug.wasm32.threads.wasm"

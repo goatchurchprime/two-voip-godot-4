@@ -5,7 +5,7 @@ extends Control
 @onready var SelfMember = $Members/Self
 
 var audioeffectcapture : AudioEffectCapture = null
-var audioopuschunkedeffect : AudioEffectOpusChunked
+var audioopuschunkedeffect # : AudioEffectOpusChunked
 
 var recordedsamples = [ ]
 var recordedopuspackets = [ ]
@@ -31,12 +31,27 @@ func _ready():
 	if $VBoxFrameLength/HBoxBitRate/BitRate.selected == -1:
 		$VBoxFrameLength/HBoxBitRate/BitRate.select(2)
 	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
-	var audioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, 0)
+	var audioeffectonmic : AudioEffect = null
+	for effect_idx in range(AudioServer.get_bus_effect_count(microphoneidx)):
+		var laudioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, effect_idx)
+		if laudioeffectonmic.is_class("AudioEffectOpusChunked") or laudioeffectonmic.is_class("AudioEffectCapture"):
+			audioeffectonmic = laudioeffectonmic
+			break
+	if audioeffectonmic == null:
+		if ClassDB.can_instantiate("AudioEffectOpusChunked"):
+			audioeffectonmic = ClassDB.instantiate("AudioEffectOpusChunked")
+			print("Adding AudioEffectOpusChunked to bus: ", $AudioStreamMicrophone.bus)
+		else:
+			audioeffectonmic = AudioEffectCapture.new()
+			print("Adding AudioEffectCapture to bus: ", $AudioStreamMicrophone.bus)
+		AudioServer.add_bus_effect(microphoneidx, audioeffectonmic)
 	if audioeffectonmic.is_class("AudioEffectOpusChunked"):
 		audioopuschunkedeffect = audioeffectonmic
 	elif audioeffectonmic.is_class("AudioEffectCapture"):
 		audioeffectcapture = audioeffectonmic
-		audioopuschunkedeffect = AudioEffectOpusChunked.new()
+		if ClassDB.can_instantiate("AudioEffectOpusChunked"):
+			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
+
 	updatesamplerates()
 	for i in range(1, len(visemes)):
 		var d = $HBoxVisemes/ColorRect.duplicate()
