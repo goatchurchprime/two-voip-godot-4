@@ -24,6 +24,7 @@ driver/enable_input=true
 window/size/viewport_width=600
 window/size/viewport_height=1000
 window/stretch/mode="viewport"
+window/handheld/orientation=1
 
 [rendering]
 

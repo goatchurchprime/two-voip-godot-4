@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=22 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
@@ -51,6 +51,13 @@ shader_parameter/voice = ExtResource("3_eh2h5")
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_67wxx"]
 bg_color = Color(0.290196, 0.505882, 0.490196, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_icid5"]
+bg_color = Color(0.301961, 0.0627451, 0.0980392, 1)
+corner_radius_top_left = 15
+corner_radius_top_right = 15
+corner_radius_bottom_right = 15
+corner_radius_bottom_left = 15
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_onpxr"]
 bg_color = Color(0.427451, 0.439216, 0, 1)
@@ -150,7 +157,8 @@ tooltip_text = "AudioStreamMicrophone is playing"
 theme_override_styles/pressed = SubResource("StyleBoxFlat_3io8e")
 toggle_mode = true
 text = "Mic
-Mic"
+Ena-
+bled"
 
 [node name="HSliderVox" type="HSlider" parent="HBoxMicTalk"]
 z_index = 3
@@ -219,6 +227,7 @@ size_flags_horizontal = 4
 [node name="Play" type="Button" parent="HBoxPlaycount"]
 custom_minimum_size = Vector2(60, 0)
 layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_icid5")
 text = "Play
 "
 
