@@ -8,12 +8,12 @@ var audioeffectcapture : AudioEffectCapture = null
 var audioopuschunkedeffect # : AudioEffectOpusChunked
 
 # values to use when AudioEffectOpusChunked cannot be instantiated
-var frametimems : float 
-var opusbitrate : int
-var opusframesize : int = 0
+var frametimems : float = 20 
+var opusbitrate : int = 10000
+var opusframesize : int = 20
 var audiosamplerate : int = 44100
 var opussamplerate : int = 48000
-var audiosamplesize : int
+var audiosamplesize : int = 882
 
 var recordedsamples = [ ]
 var recordedopuspackets = [ ]
