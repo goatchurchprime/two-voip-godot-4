@@ -13,7 +13,7 @@ config_version=5
 config/name="Two-voip-godot-4"
 run/main_scene="res://radiomqtt/radiomqtt.tscn"
 config/features=PackedStringArray("4.2", "GL Compatibility")
-config/icon="res://icon.svg"
+config/icon="res://icon.png"
 
 [audio]
 
