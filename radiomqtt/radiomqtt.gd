@@ -9,7 +9,7 @@ var audioopuschunkedeffect # : AudioEffectOpusChunked
 
 # values to use when AudioEffectOpusChunked cannot be instantiated
 var frametimems : float = 20 
-var opusbitrate : int = 10000
+var opusbitrate : int = 0
 var opusframesize : int = 20
 var audiosamplerate : int = 44100
 var opussamplerate : int = 48000
@@ -93,11 +93,13 @@ func updatesamplerates():
 	frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
 	opusbitrate = int($VBoxFrameLength/HBoxBitRate/BitRate.text)
 	if audioopuschunkedeffect != null:
-		audioopuschunkedeffect.opusbitrate = opusbitrate
-		audioopuschunkedeffect.opusframesize = opusframesize
 		audiosamplerate = audioopuschunkedeffect.audiosamplerate
 		opussamplerate = audioopuschunkedeffect.opussamplerate
-	opusframesize = int(opussamplerate*frametimems/1000.0)
+		audioopuschunkedeffect.opusbitrate = opusbitrate
+		opusframesize = int(opussamplerate*frametimems/1000.0)
+		audioopuschunkedeffect.opusframesize = opusframesize
+	else:
+		opusframesize = int(opussamplerate*frametimems/1000.0)
 	
 	var i = $VBoxFrameLength/HBoxAudioFrame/ResampleState.get_selected_id()
 	if i == 0:  # uncompressed
