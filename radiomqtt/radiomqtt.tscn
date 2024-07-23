@@ -1,9 +1,9 @@
-[gd_scene load_steps=20 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=21 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
 [ext_resource type="Script" path="res://radiomqtt/MQTTnetwork.gd" id="2_y485j"]
-[ext_resource type="Texture2D" uid="uid://ntugtt86knrh" path="res://icon.svg" id="3_eh2h5"]
+[ext_resource type="Texture2D" uid="uid://b8avy0xjeycih" path="res://icon.png" id="3_eh2h5"]
 [ext_resource type="Script" path="res://radiomqtt/voxdetector.gd" id="3_qvq17"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 
@@ -49,11 +49,18 @@ shader = SubResource("Shader_022wp")
 shader_parameter/blue = 1.0
 shader_parameter/voice = ExtResource("3_eh2h5")
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_onpxr"]
-bg_color = Color(0.427451, 0.439216, 0, 1)
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_67wxx"]
 bg_color = Color(0.290196, 0.505882, 0.490196, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_icid5"]
+bg_color = Color(0.301961, 0.0627451, 0.0980392, 1)
+corner_radius_top_left = 15
+corner_radius_top_right = 15
+corner_radius_bottom_right = 15
+corner_radius_bottom_left = 15
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_onpxr"]
+bg_color = Color(0.427451, 0.439216, 0, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7rhvb"]
 bg_color = Color(0.470588, 0.211765, 0.533333, 1)
@@ -61,8 +68,8 @@ bg_color = Color(0.470588, 0.211765, 0.533333, 1)
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_q145v"]
 bg_color = Color(0.654902, 0.266667, 0.345098, 1)
 
-[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_ensh7"]
-resource_local_to_scene = true
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_m5fk6"]
+bg_color = Color(0.509804, 0.145098, 0.203922, 1)
 
 [node name="radiomqtt" type="VBoxContainer"]
 anchors_preset = 15
@@ -89,10 +96,18 @@ text = "Voice Opus Compressed Packets over MQTT Demo"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="TwovoipWarning" type="RichTextLabel" parent="."]
+visible = false
+layout_mode = 2
+bbcode_enabled = true
+text = "[bgcolor=black][color=red]Warning: twovoip GDExtension not installed or inoperable.  
+Opus compression is not possible.[/color][/bgcolor]"
+fit_content = true
+
 [node name="Label" type="RichTextLabel" parent="."]
 layout_mode = 2
 bbcode_enabled = true
-text = "[b]Instructions:[/b] Hold down [u]PTT[/u] to record. Toggle [u]Vox[/u] to activate PTT automatically by volume. Hold down [u]Sil[/u] to set the silnce threshold for Vox."
+text = "Hold down [u]PTT[/u] (Push-To-Talk) to record, or toggle [u]Vox[/u] to activate PTT automatically by volume. Hold down [u]Sil[/u] to set the silnce threshold for Vox."
 fit_content = true
 
 [node name="HSeparator3" type="HSeparator" parent="."]
@@ -117,16 +132,37 @@ text = "PTT
 custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
 
-[node name="Vox" type="Button" parent="HBoxBigButtons"]
+[node name="VBoxVox" type="VBoxContainer" parent="HBoxBigButtons"]
+layout_mode = 2
+
+[node name="Vox" type="Button" parent="HBoxBigButtons/VBoxVox"]
 custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
 tooltip_text = "Voice operated mode set by threshold"
-theme_override_font_sizes/font_size = 50
+theme_override_font_sizes/font_size = 27
 theme_override_styles/pressed = SubResource("StyleBoxFlat_k6a7f")
 toggle_mode = true
 text = "Vox"
 
-[node name="Silence" type="Button" parent="HBoxBigButtons"]
+[node name="Leadtime" type="SpinBox" parent="HBoxBigButtons/VBoxVox"]
+layout_mode = 2
+tooltip_text = "Not yet implemented"
+max_value = 1.0
+step = 0.05
+update_on_text_changed = true
+prefix = "Leadtime:"
+suffix = "Seconds"
+
+[node name="Hangtime" type="SpinBox" parent="HBoxBigButtons/VBoxVox"]
+layout_mode = 2
+max_value = 5.0
+step = 0.1
+value = 1.5
+update_on_text_changed = true
+prefix = "Hangtime:"
+suffix = "Seconds"
+
+[node name="Silence" type="Button" parent="HBoxBigButtons/VBoxVox"]
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 tooltip_text = "Hold this down to set the Vox silence threshold"
@@ -147,7 +183,8 @@ tooltip_text = "AudioStreamMicrophone is playing"
 theme_override_styles/pressed = SubResource("StyleBoxFlat_3io8e")
 toggle_mode = true
 text = "Mic
-Mic"
+Ena-
+bled"
 
 [node name="HSliderVox" type="HSlider" parent="HBoxMicTalk"]
 z_index = 3
@@ -192,6 +229,77 @@ color = Color(0.689579, 0.760623, 0.0826142, 1)
 
 [node name="HSeparator" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="Label2" type="Label" parent="."]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_67wxx")
+text = "Recording Playback"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Label3" type="RichTextLabel" parent="."]
+layout_mode = 2
+bbcode_enabled = true
+text = "Playback the current recording after compression at different rates defined below.  Compression is applied to the original raw recording."
+fit_content = true
+
+[node name="HBoxPlaycount" type="HBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 4
+
+[node name="Play" type="Button" parent="HBoxPlaycount"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_icid5")
+text = "Play
+"
+
+[node name="VSeparator" type="VSeparator" parent="HBoxPlaycount"]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+
+[node name="GridContainer" type="GridContainer" parent="HBoxPlaycount"]
+layout_mode = 2
+columns = 4
+
+[node name="Label2" type="Label" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+text = "Time (s):"
+
+[node name="TimeSecs" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+text = "0"
+editable = false
+
+[node name="Label3" type="Label" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+text = "Bytes:"
+
+[node name="Totalbytes" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+editable = false
+
+[node name="Label" type="Label" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+text = "Frames:"
+
+[node name="FrameCount" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+editable = false
+
+[node name="Label4" type="Label" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+text = "Bytes/s:"
+
+[node name="Bytespersec" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
+layout_mode = 2
+editable = false
+
+[node name="HSeparator4" type="HSeparator" parent="."]
+custom_minimum_size = Vector2(0, 10)
 layout_mode = 2
 
 [node name="VBoxFrameLength" type="VBoxContainer" parent="."]
@@ -277,76 +385,6 @@ popup/item_2/id = 2
 layout_mode = 2
 text = "---"
 
-[node name="HSeparator4" type="HSeparator" parent="."]
-custom_minimum_size = Vector2(0, 20)
-layout_mode = 2
-
-[node name="Label2" type="Label" parent="."]
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-theme_override_styles/normal = SubResource("StyleBoxFlat_67wxx")
-text = "Recording Playback"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="Label3" type="RichTextLabel" parent="."]
-layout_mode = 2
-bbcode_enabled = true
-text = "Playback the previous recording after compression at different rates defined above.  Compression is applied to the raw recording."
-fit_content = true
-
-[node name="HBoxPlaycount" type="HBoxContainer" parent="."]
-layout_mode = 2
-size_flags_horizontal = 4
-
-[node name="Play" type="Button" parent="HBoxPlaycount"]
-custom_minimum_size = Vector2(60, 0)
-layout_mode = 2
-text = "Play
-"
-
-[node name="VSeparator" type="VSeparator" parent="HBoxPlaycount"]
-custom_minimum_size = Vector2(20, 0)
-layout_mode = 2
-
-[node name="GridContainer" type="GridContainer" parent="HBoxPlaycount"]
-layout_mode = 2
-columns = 4
-
-[node name="Label2" type="Label" parent="HBoxPlaycount/GridContainer"]
-layout_mode = 2
-text = "Time (s):"
-
-[node name="TimeSecs" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
-layout_mode = 2
-text = "0"
-editable = false
-
-[node name="Label3" type="Label" parent="HBoxPlaycount/GridContainer"]
-layout_mode = 2
-text = "Bytes:"
-
-[node name="Totalbytes" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
-layout_mode = 2
-editable = false
-
-[node name="Label" type="Label" parent="HBoxPlaycount/GridContainer"]
-layout_mode = 2
-text = "Frames:"
-
-[node name="FrameCount" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
-layout_mode = 2
-editable = false
-
-[node name="Label4" type="Label" parent="HBoxPlaycount/GridContainer"]
-layout_mode = 2
-text = "Bytes/s:"
-
-[node name="Bytespersec" type="LineEdit" parent="HBoxPlaycount/GridContainer"]
-layout_mode = 2
-editable = false
-
 [node name="HSeparator5" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
@@ -431,6 +469,28 @@ popup/item_2/id = 2
 popup/item_3/text = "hass"
 popup/item_3/id = 3
 
+[node name="HBoxMosquitto" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Label2" type="Label" parent="HBoxMosquitto"]
+layout_mode = 2
+text = "Friendly name:"
+
+[node name="FriendlyName" type="LineEdit" parent="HBoxMosquitto"]
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_m5fk6")
+
+[node name="Label" type="Label" parent="HBoxMosquitto"]
+layout_mode = 2
+text = "Shell $> "
+
+[node name="Cmd" type="LineEdit" parent="HBoxMosquitto"]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Use this shell command to externally monitor messages through the broker"
+text = "mosquitto_sub ..."
+editable = false
+
 [node name="VBoxMQTT" type="VBoxContainer" parent="."]
 visible = false
 layout_mode = 2
@@ -465,6 +525,10 @@ layout_mode = 2
 text = "roomname
 "
 
+[node name="HSeparator6" type="HSeparator" parent="."]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
 [node name="RichTextLabel" type="RichTextLabel" parent="."]
 custom_minimum_size = Vector2(550, 0)
 layout_mode = 2
@@ -480,9 +544,6 @@ columns = 3
 
 [node name="Self" parent="Members" instance=ExtResource("4_w5dv2")]
 layout_mode = 2
-
-[node name="AudioStreamPlayer" parent="Members/Self" index="0"]
-stream = SubResource("AudioStreamOpusChunked_ensh7")
 
 [node name="Label" parent="Members/Self" index="1"]
 text = "Self"
@@ -505,13 +566,14 @@ offset_bottom = 23.0
 text = "sil"
 
 [connection signal="finished" from="AudioStreamMicrophone" to="." method="_on_audio_stream_microphone_finished"]
-[connection signal="toggled" from="HBoxBigButtons/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
-[connection signal="button_down" from="HBoxBigButtons/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
+[connection signal="toggled" from="HBoxBigButtons/VBoxVox/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
+[connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
+[connection signal="toggled" from="HBoxMicTalk/MicWorking" to="." method="_on_mic_working_toggled"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
+[connection signal="pressed" from="HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
-[connection signal="pressed" from="HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 [connection signal="toggled" from="MQTTnetwork/Connect" to="MQTTnetwork" method="_on_connect_toggled"]
 [connection signal="item_selected" from="MQTTnetwork/GridContainer/presets" to="MQTTnetwork" method="_on_mqtt_broker_item_selected"]
 [connection signal="toggled" from="VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
