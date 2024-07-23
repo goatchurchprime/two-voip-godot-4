@@ -6,6 +6,7 @@ var audioouttopic = "" # "%s/%s/audio"
 var statustopic = ""
 
 @onready var Members = get_node("../Members")
+@onready var SelfMember = get_node("../Members/Self")
 
 func _ready():
 	if $GridContainer/presets.selected == -1:
@@ -66,9 +67,11 @@ func _on_connect_toggled(toggled_on):
 		$MQTT.broker_connected.connect(on_broker_connect)
 		$MQTT.broker_disconnected.connect(on_broker_disconnect)
 		randomize()
-		myname = "%s_%x" % [get_node("../HBoxMosquitto/FriendlyName").text, (randi() % 0x10000)]
+		var FriendlyName = get_node("../HBoxMosquitto/FriendlyName")
+		myname = "%s_%x" % [FriendlyName.text, (randi() % 0x10000)]
 		$MQTT.client_id = "c%d" % (2 + (randi()%0x7fffff8))
-		Members.get_node("Self/Label").text = myname
+		SelfMember.setname(myname)
+		SelfMember.color = FriendlyName.get("theme_override_styles/normal").bg_color
 		$GridContainer/topic.editable = false
 		$GridContainer/broker.editable = false
 		$GridContainer/presets.disabled = true
@@ -83,7 +86,8 @@ func _on_connect_toggled(toggled_on):
 			userpass = " -u %s -P %s" % [$GridContainer/mqttuser.text, $GridContainer/mqttpassword.text]
 		else:
 			$MQTT.set_user_pass(null, null)
-		$MQTT.connect_to_broker($GridContainer/broker.text)
+		if not $MQTT.connect_to_broker($GridContainer/broker.text):
+			$MQTTnetwork/Connect.button_pressed = false
 		get_node("../HBoxMosquitto/Cmd").text = "mosquitto_sub -h %s%s -v -t %s/# -T %s/+/audio" % [$GridContainer/broker.text, userpass, $GridContainer/topic.text, $GridContainer/topic.text] 
 
 	else:
@@ -99,7 +103,7 @@ func _on_connect_toggled(toggled_on):
 		$GridContainer/topic.editable = true
 		$GridContainer/presets.disabled = false
 		myname = ""
-		Members.get_node("Self/Label").text = "Self"
+		SelfMember.setname("Self")
 		audioouttopic = ""
 		statustopic = ""
 

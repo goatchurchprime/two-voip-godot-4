@@ -5,13 +5,14 @@
 [sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_vai8h"]
 resource_local_to_scene = true
 
-[node name="Member" type="HBoxContainer"]
-custom_minimum_size = Vector2(0, 28)
+[node name="Member" type="ColorRect"]
+custom_minimum_size = Vector2(170, 40)
 anchors_preset = -1
 anchor_right = 0.028
 anchor_bottom = 0.035
-offset_right = 111.744
-offset_bottom = 5.32
+offset_right = 148.2
+offset_bottom = 5.0
+color = Color(0.423529, 0, 0.423529, 1)
 script = ExtResource("1_o3hks")
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
@@ -19,23 +20,32 @@ stream = SubResource("AudioStreamOpusChunked_vai8h")
 
 [node name="Label" type="Label" parent="."]
 layout_mode = 2
+offset_top = 8.0
+offset_right = 50.0
+offset_bottom = 31.0
 text = "empty"
 
 [node name="Node" type="Control" parent="."]
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
+anchors_preset = 0
+offset_left = 54.0
+offset_right = 154.0
+offset_bottom = 40.0
 
 [node name="ColorRect2" type="ColorRect" parent="Node"]
 custom_minimum_size = Vector2(80, 30)
 layout_mode = 0
-offset_right = 100.0
-offset_bottom = 20.0
+offset_left = 10.0
+offset_top = 5.0
+offset_right = 110.0
+offset_bottom = 35.0
 color = Color(0.937255, 0.952941, 0, 1)
 
 [node name="ColorRect" type="ColorRect" parent="Node"]
 layout_mode = 0
-offset_left = 4.0
-offset_top = 8.0
-offset_right = 49.0
-offset_bottom = 21.0
+offset_left = 12.0
+offset_top = 14.0
+offset_right = 57.0
+offset_bottom = 27.0
 color = Color(0.0352941, 0.788235, 1, 1)

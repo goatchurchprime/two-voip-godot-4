@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=21 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
@@ -60,6 +60,9 @@ bg_color = Color(0.470588, 0.211765, 0.533333, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_q145v"]
 bg_color = Color(0.654902, 0.266667, 0.345098, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_m5fk6"]
+bg_color = Color(0.509804, 0.145098, 0.203922, 1)
 
 [sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_ensh7"]
 resource_local_to_scene = true
@@ -440,6 +443,7 @@ text = "Friendly name:"
 
 [node name="FriendlyName" type="LineEdit" parent="HBoxMosquitto"]
 layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_m5fk6")
 
 [node name="Label" type="Label" parent="HBoxMosquitto"]
 layout_mode = 2
