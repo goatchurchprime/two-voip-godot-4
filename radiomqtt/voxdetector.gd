@@ -10,7 +10,6 @@ var visthreshold = 1.0
 @onready var Vox = get_node("../HBoxBigButtons/Vox")
 @onready var Sil = get_node("../HBoxBigButtons/Silence")
 
-
 func _on_h_slider_vox_value_changed(value):
 	voxthreshold = value/$HSliderVox.max_value
 	

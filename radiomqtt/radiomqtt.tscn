@@ -532,6 +532,7 @@ text = "sil"
 [connection signal="finished" from="AudioStreamMicrophone" to="." method="_on_audio_stream_microphone_finished"]
 [connection signal="toggled" from="HBoxBigButtons/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
 [connection signal="button_down" from="HBoxBigButtons/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
+[connection signal="toggled" from="HBoxMicTalk/MicWorking" to="." method="_on_mic_working_toggled"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="pressed" from="HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]

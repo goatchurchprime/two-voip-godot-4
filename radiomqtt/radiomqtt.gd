@@ -141,20 +141,26 @@ func starttalking():
 	talkingstarttime = Time.get_ticks_msec()
 
 
-func _on_force_mic_button_button_down():
-	print("_on_force_mic_button_button_down ", $AudioStreamMicrophone.playing)
-	$AudioStreamMicrophone.play()
+func _on_mic_working_toggled(toggled_on):
+	print("_on_mic_working_toggled ", $AudioStreamMicrophone.playing, " to ", toggled_on)
+	if toggled_on:
+		if not $AudioStreamMicrophone.playing:
+			$AudioStreamMicrophone.play()
+	else:
+		if $AudioStreamMicrophone.playing:
+			$AudioStreamMicrophone.stop()
 
 func _process(_delta):
-	$HBoxMicTalk/MicWorking.button_pressed = $AudioStreamMicrophone.playing
-	
 	var talking = $HBoxBigButtons/PTT.button_pressed
 	if talking:
 		$HBoxPlaycount/GridContainer/TimeSecs.text = "%.1f" % ((Time.get_ticks_msec() - talkingstarttime)*0.001)
 	if talking and not currentlytalking:
+		if not $AudioStreamMicrophone.playing:
+			$AudioStreamMicrophone.play()
 		starttalking()
 	elif not talking and currentlytalking:
 		endtalking()
+	$HBoxMicTalk/MicWorking.button_pressed = $AudioStreamMicrophone.playing
 
 	var prefixbytes = PackedByteArray()
 	if audioeffectcapture == null:
@@ -245,8 +251,9 @@ func _on_frame_duration_item_selected(_index):
 func _on_resample_state_item_selected(_index):
 	updatesamplerates()
 
+func _on_audio_stream_microphone_finished():
+	print("_on_audio_stream_microphone_finished")
+
 func _on_option_button_item_selected(_index):
 	updatesamplerates()
 
-func _on_audio_stream_microphone_finished():
-	print("_on_audio_stream_microphone_finished")
