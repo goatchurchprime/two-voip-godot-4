@@ -6,6 +6,11 @@ var audiostreamgeneratorplayback : AudioStreamGeneratorPlayback
 var opuspacketsbuffer = [ ]
 var audiopacketsbuffer = [ ]
 
+var opusframesize : int = 960
+var audiosamplesize : int = 960
+var opussamplerate : int = 48000
+var audiosamplerate : int = 44100
+
 func _ready():
 	var audiostream = $AudioStreamPlayer.stream
 	if audiostream == null:
@@ -39,14 +44,19 @@ func processheaderpacket(h):
 	print(h["audiosamplesize"],  "  ss  ", h["opusframesize"])
 	#h["audiosamplesize"] = 400; h["audiosamplerate"] = 40000
 	#print("setting audiosamplesize wrong on receive ", h)
-	if audiostreamopuschunked.opusframesize != h["opusframesize"] or \
-	   audiostreamopuschunked.audiosamplesize != h["audiosamplesize"]:
-		audiostreamopuschunked.opusframesize = h["opusframesize"]
-		audiostreamopuschunked.audiosamplesize = h["audiosamplesize"]
-		audiostreamopuschunked.opussamplerate = h["opussamplerate"]
-		audiostreamopuschunked.audiosamplerate = h["audiosamplerate"]
-		if audiostreamopuschunked.opusframesize != 0:
-			print("createdecoder ", audiostreamopuschunked.opussamplerate, " ", audiostreamopuschunked.opusframesize, " ", audiostreamopuschunked.audiosamplerate, " ", audiostreamopuschunked.audiosamplesize)
+	if opusframesize != h["opusframesize"] or audiosamplesize != h["audiosamplesize"]:
+		opusframesize = h["opusframesize"]
+		audiosamplesize = h["audiosamplesize"]
+		opussamplerate = h["opussamplerate"]
+		audiosamplerate = h["audiosamplerate"]
+		if audiostreamopuschunked != null:
+			audiostreamopuschunked.opusframesize = opusframesize
+			audiostreamopuschunked.audiosamplesize = audiosamplesize
+			audiostreamopuschunked.opussamplerate = opussamplerate
+			audiostreamopuschunked.audiosamplerate = audiosamplerate
+
+		if opusframesize != 0:
+			print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
 			#$AudioStreamPlayer.play()
 
 func receivemqttmessage(msg):
@@ -76,7 +86,7 @@ func _process(_delta):
 		$Node/ColorRect.size.x = audiostreamopuschunked.queue_length_frames()/(50.0*881)*$Node/ColorRect2.size.x
 
 	else:
-		while audiostreamgeneratorplayback.get_frames_available() > audiostreamopuschunked.audiosamplesize:
+		while audiostreamgeneratorplayback.get_frames_available() > audiosamplesize:
 			if len(audiopacketsbuffer) != 0:
 				audiostreamgeneratorplayback.push_buffer(audiopacketsbuffer.pop_front())
 			elif len(opuspacketsbuffer) != 0:

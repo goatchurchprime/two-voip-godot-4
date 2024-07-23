@@ -96,6 +96,14 @@ text = "Voice Opus Compressed Packets over MQTT Demo"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="TwovoipWarning" type="RichTextLabel" parent="."]
+visible = false
+layout_mode = 2
+bbcode_enabled = true
+text = "[bgcolor=black][color=red]Warning: twovoip GDExtension not installed or inoperable.  
+Opus compression is not possible.[/color][/bgcolor]"
+fit_content = true
+
 [node name="Label" type="RichTextLabel" parent="."]
 layout_mode = 2
 bbcode_enabled = true
