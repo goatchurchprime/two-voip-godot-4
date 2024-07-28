@@ -1,3 +1,9 @@
+## Demo instructions
+1. Clone/Download this project and open in Godot.
+2. Go to assetlib and search for twovoip, and install it.
+3. Run the app try making and playing recordings or connecting with a friend.
+
+
 ## Opus compression audio for Godot
 
 This is a low level operation of the opus library based on https://github.com/RevoluPowered/one-voip-godot-4/
