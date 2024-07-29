@@ -1,7 +1,12 @@
 ## Demo instructions
 1. Clone/Download this project and open in Godot.
 2. Go to assetlib and search for twovoip, and install it.
-3. Run the app try making and playing recordings or connecting with a friend.
+3. Run the app try making and playing recordings (don't forget to hold down PTT) or MQTT-connecting at the same time as someone else.
+
+4. If the microphone is working, then you should see a waveform on the app like this:
+![image](https://github.com/user-attachments/assets/6571635a-a134-4efb-862b-9e62f04854d6)
+
+If there's no response on MacOS, it could be [this issue](https://github.com/quellus/GDTuber/issues/76)  Go to Project Settings (with Advanced Settings selected) -> Audio -> Driver -> Mix rate and set to 48000
 
 
 ## Opus compression audio for Godot
