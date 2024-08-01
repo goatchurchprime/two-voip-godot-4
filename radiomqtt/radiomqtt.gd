@@ -183,12 +183,26 @@ func _on_mic_working_toggled(toggled_on):
 			$AudioStreamMicrophone.stop()
 
 func _input(event):
-	if event is InputEventKey and event.is_pressed() and event.keycode == KEY_P:
-		print("turn off processing")
-		set_process(false)
-		await get_tree().create_timer(2.0).timeout
-		set_process(true)
-		print("turn on processing")
+	if event is InputEventKey and event.is_pressed():
+		if event.keycode == KEY_P:
+			print("turn off processing")
+			set_process(false)
+			await get_tree().create_timer(2.0).timeout
+			set_process(true)
+			print("turn on processing")
+		if event.keycode == KEY_I or event.keycode == KEY_O:
+			var audioeffectonmic : AudioEffect = null
+			for effect_idx in range(AudioServer.get_bus_effect_count(microphoneidx)):
+				var laudioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, effect_idx)
+				if laudioeffectonmic.is_class("AudioEffectAmplify"):
+					audioeffectonmic = laudioeffectonmic
+					break
+			if audioeffectonmic != null:
+				audioeffectonmic.volume_db += (1 if event.keycode == KEY_I else -1)
+				print(audioeffectonmic.volume_db)
+			
+			
+			
 
 func _process(_delta):
 	var talking = $HBoxBigButtons/PTT.button_pressed

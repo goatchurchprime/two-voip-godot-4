@@ -53,6 +53,7 @@ offset_bottom = 40.0
 
 [node name="ColorRectBackground" type="ColorRect" parent="Node"]
 material = SubResource("ShaderMaterial_67gbo")
+layout_mode = 0
 offset_left = 3.0
 offset_top = 5.0
 offset_right = 233.0
@@ -60,6 +61,7 @@ offset_bottom = 35.0
 color = Color(0.255659, 0.255659, 0.255659, 1)
 
 [node name="ColorRectLoudness" type="ColorRect" parent="Node"]
+layout_mode = 0
 offset_left = 1.0
 offset_top = 10.0
 offset_right = 112.0
