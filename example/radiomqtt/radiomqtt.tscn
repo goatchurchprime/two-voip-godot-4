@@ -545,7 +545,6 @@ layout_mode = 2
 columns = 2
 
 [node name="Self" parent="Members" instance=ExtResource("4_w5dv2")]
-custom_minimum_size = Vector2(200, 40)
 layout_mode = 2
 
 [node name="HBoxVisemes" type="HBoxContainer" parent="."]
