@@ -73,6 +73,8 @@ func _ready():
 		d.size.y = i*8
 	$HBoxMosquitto/FriendlyName.text = possibleusernames.pick_random()
 
+	SelfMember.audiobufferregulationtime = 3600.0
+
 func resamplerecordedsamples(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
 	var res = [ ]
@@ -191,18 +193,9 @@ func _input(event):
 			set_process(true)
 			print("turn on processing")
 		if event.keycode == KEY_I or event.keycode == KEY_O:
-			var audioeffectonmic : AudioEffect = null
-			for effect_idx in range(AudioServer.get_bus_effect_count(microphoneidx)):
-				var laudioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, effect_idx)
-				if laudioeffectonmic.is_class("AudioEffectAmplify"):
-					audioeffectonmic = laudioeffectonmic
-					break
-			if audioeffectonmic != null:
-				audioeffectonmic.volume_db += (1 if event.keycode == KEY_I else -1)
-				print(audioeffectonmic.volume_db)
-			
-			
-			
+			$AudioStreamMicrophone.volume_db += (1 if event.keycode == KEY_I else -1)
+			print($AudioStreamMicrophone.volume_db)
+
 
 func _process(_delta):
 	var talking = $HBoxBigButtons/PTT.button_pressed

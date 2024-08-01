@@ -6,16 +6,20 @@ var audiostreamgeneratorplayback : AudioStreamGeneratorPlayback
 var opuspacketsbuffer = [ ]
 var audiopacketsbuffer = [ ]
 
-var opusframesize : int = 960
-var audiosamplesize : int = 960
+var opusframesize : int = 0 # 960
+var audiosamplesize : int = 0 # 882
 var opussamplerate : int = 48000
 var audiosamplerate : int = 44100
 var prefixbyteslength : int = 0
 var chunkcount : int = 0
-var audiobuffersize : int = 50*881
+var audiobuffersize : int = 50*882
 
 var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
+
+var audioserveroutputlatency = 0.015
+var audiobufferregulationtime = 0.7
+var audiobufferregulationpitch = 2.0
 
 func _ready():
 	var audiostream = $AudioStreamPlayer.stream
@@ -72,7 +76,8 @@ func processheaderpacket(h):
 
 	if opusframesize != 0 and audiostreamopuschunked == null:
 		print("Compressed opus stream received that we cannot decompress")
-
+	audioserveroutputlatency = AudioServer.get_output_latency()
+	print("audioserveroutputlatency ", audioserveroutputlatency)
 
 func setupaudioshader():
 	var audiosampleframedata : PackedVector2Array
@@ -125,6 +130,13 @@ func _process(delta):
 			$Node/ColorRectLoudness.size.x = $Node.size.x*chunkv1
 			$Node/ColorRectBackground.visible = true
 			timedelaytohide = 0.1
+			
+		var bufferlengthtime = audioserveroutputlatency + audiostreamopuschunked.queue_length_frames()*1.0/audiosamplerate
+		if bufferlengthtime < audiobufferregulationtime:
+			$AudioStreamPlayer.pitch_scale = 1.0
+		else:
+			var w = inverse_lerp(audiobufferregulationtime, audioserveroutputlatency + audiobuffersize/audiosamplerate, bufferlengthtime)
+			$AudioStreamPlayer.pitch_scale = lerp(1.0, audiobufferregulationpitch, w)
 	
 	else:
 		while audiostreamgeneratorplayback.get_frames_available() > audiosamplesize:
