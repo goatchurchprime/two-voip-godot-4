@@ -14,6 +14,9 @@ var prefixbyteslength : int = 0
 var chunkcount : int = 0
 var audiobuffersize : int = 50*881
 
+var audiosampleframetextureimage : Image
+var audiosampleframetexture : ImageTexture
+
 func _ready():
 	var audiostream = $AudioStreamPlayer.stream
 	if audiostream == null:
@@ -65,8 +68,25 @@ func processheaderpacket(h):
 			if opusframesize != 0:
 				print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
 			#$AudioStreamPlayer.play()
+		setupaudioshader()
+
 	if opusframesize != 0 and audiostreamopuschunked == null:
 		print("Compressed opus stream received that we cannot decompress")
+
+
+func setupaudioshader():
+	var audiosampleframedata : PackedVector2Array
+	audiosampleframedata.resize(audiosamplesize)
+	audiosampleframetextureimage = Image.create_from_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata.to_byte_array())
+	audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
+	assert (audiosampleframetexture != null)
+	$Node/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
+	$Node/ColorRectBackground.visible = false
+	
+func audiosamplestoshader(audiosamples):
+	assert (len(audiosamples)== audiosamplesize)
+	audiosampleframetextureimage.set_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
+	audiosampleframetexture.update(audiosampleframetextureimage)
 
 func receivemqttmessage(msg):
 	if msg[0] == "{".to_ascii_buffer()[0]:
@@ -82,10 +102,12 @@ func receivemqttmessage(msg):
 			audiopacketsbuffer.push_back(bytes_to_var(msg))
 
 
-func _process(_delta):
+var timedelaytohide = 0.1
+func _process(delta):
 	$Node/ColorRect2.visible = (len(audiopacketsbuffer) + len(opuspacketsbuffer) > 0)
 	if audiostreamgeneratorplayback == null:
 		assert (audiostreamopuschunked != null)
+		var chunkv1 = 0.0
 		while audiostreamopuschunked.chunk_space_available():
 			if len(audiopacketsbuffer) != 0:
 				audiostreamopuschunked.push_audio_chunk(audiopacketsbuffer.pop_front())
@@ -95,8 +117,15 @@ func _process(_delta):
 			else:
 				break
 			chunkcount += 1
-		$Node/ColorRect.size.x = min(1.0, audiostreamopuschunked.queue_length_frames()*1.0/audiobuffersize)*size.x
-
+			chunkv1 = audiostreamopuschunked.last_chunk_max()
+		$Node/ColorRectBufferQueue.size.x = min(1.0, audiostreamopuschunked.queue_length_frames()*1.0/audiobuffersize)*size.x
+		if chunkv1 != 0.0:
+			var audiosamples = audiostreamopuschunked.read_last_chunk()
+			audiosamplestoshader(audiosamples)
+			$Node/ColorRectLoudness.size.x = $Node.size.x*chunkv1
+			$Node/ColorRectBackground.visible = true
+			timedelaytohide = 0.1
+	
 	else:
 		while audiostreamgeneratorplayback.get_frames_available() > audiosamplesize:
 			if len(audiopacketsbuffer) != 0:
@@ -107,3 +136,9 @@ func _process(_delta):
 				audiostreamgeneratorplayback.push_buffer(audiochunk)
 			else:
 				break
+
+	if timedelaytohide > 0.0:
+		timedelaytohide -= delta
+		if timedelaytohide <= 0.0:
+			$Node/ColorRectBackground.visible = false
+			$Node/ColorRectLoudness.size.x = 0

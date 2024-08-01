@@ -1,9 +1,31 @@
-[gd_scene load_steps=2 format=3 uid="uid://c1ibcb1toyerh"]
+[gd_scene load_steps=5 format=3 uid="uid://c1ibcb1toyerh"]
 
 [ext_resource type="Script" path="res://radiomqtt/member.gd" id="1_o3hks"]
+[ext_resource type="Texture2D" uid="uid://cv0fhc8pld8su" path="res://icon.png" id="2_atirx"]
+
+[sub_resource type="Shader" id="Shader_022wp"]
+code = "// NOTE: Shader automatically converted from Godot Engine 4.3.beta's CanvasItemMaterial.
+
+shader_type canvas_item;
+render_mode blend_mix;
+
+uniform float blue = 1.0; // you can assign a default value to uniforms
+uniform sampler2D voice : repeat_enable;
+
+void fragment() {
+  COLOR = vec4(UV, 0.5, 1.0);
+  vec4 v = texture(voice, UV);
+  float d = UV.y*2.0 - v.r*4.0 - 1.0;
+  COLOR = (abs(d) < 0.1 ? vec4(0.8,0.8,0.9,1.0) : vec4(0.1,0.1,0.1,1.0));
+}"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_67gbo"]
+shader = SubResource("Shader_022wp")
+shader_parameter/blue = 1.0
+shader_parameter/voice = ExtResource("2_atirx")
 
 [node name="Member" type="ColorRect"]
-custom_minimum_size = Vector2(170, 40)
+custom_minimum_size = Vector2(290, 40)
 anchors_preset = -1
 anchor_right = 0.028
 anchor_bottom = 0.035
@@ -22,26 +44,40 @@ offset_bottom = 31.0
 text = "empty"
 
 [node name="Node" type="Control" parent="."]
-custom_minimum_size = Vector2(100, 0)
+custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
 anchors_preset = 0
 offset_left = 54.0
-offset_right = 154.0
+offset_right = 377.0
 offset_bottom = 40.0
 
-[node name="ColorRect2" type="ColorRect" parent="Node"]
-custom_minimum_size = Vector2(80, 30)
-layout_mode = 0
-offset_left = 10.0
+[node name="ColorRectBackground" type="ColorRect" parent="Node"]
+material = SubResource("ShaderMaterial_67gbo")
+offset_left = 3.0
 offset_top = 5.0
-offset_right = 110.0
+offset_right = 233.0
 offset_bottom = 35.0
-color = Color(0.937255, 0.952941, 0, 1)
+color = Color(0.255659, 0.255659, 0.255659, 1)
 
-[node name="ColorRect" type="ColorRect" parent="Node"]
+[node name="ColorRectLoudness" type="ColorRect" parent="Node"]
+offset_left = 1.0
+offset_top = 10.0
+offset_right = 112.0
+offset_bottom = 34.0
+color = Color(0.223529, 0.435294, 0.713726, 0.537255)
+
+[node name="ColorRectBufferQueue" type="ColorRect" parent="Node"]
 layout_mode = 0
 offset_left = -54.0
 offset_top = 37.0
 offset_right = -5.0
 offset_bottom = 42.0
 color = Color(0.0352941, 0.788235, 1, 1)
+
+[node name="ColorRect2" type="ColorRect" parent="Node"]
+layout_mode = 0
+offset_left = -53.0
+offset_top = 3.0
+offset_right = -10.0
+offset_bottom = 7.0
+color = Color(0.937255, 0.952941, 0, 1)

@@ -21,8 +21,7 @@ var recordedopuspackets = [ ]
 var recordedopuspacketsMemSize = 0
 var recordedheader = { }
 
-var audiosampleframedata : PackedByteArray
-var audiosampleframedata2 : PackedVector2Array
+
 var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
 var prevviseme = 0
@@ -140,26 +139,18 @@ func updatesamplerates():
 	setupaudioshader()
 	
 func setupaudioshader():
-	audiosampleframedata = PackedByteArray()
-	audiosampleframedata.resize(audiosamplesize)
+	var audiosampleframedata_blank = PackedVector2Array()
+	audiosampleframedata_blank.resize(audiosamplesize)
 	for j in range(audiosamplesize):
-		audiosampleframedata.set(j, (j*10)%256)
+		audiosampleframedata_blank.set(j, Vector2(-0.5,0.9) if (j%10)<5 else Vector2(0.6,0.1))
 
-	audiosampleframedata2 = PackedVector2Array()
-	audiosampleframedata2.resize(audiosamplesize)
-	for j in range(audiosamplesize):
-		audiosampleframedata2.set(j, Vector2(-0.5,0.9) if (j%10)<5 else Vector2(0.6,0.1))
-
-	audiosampleframetextureimage = Image.create_from_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata2.to_byte_array())
+	audiosampleframetextureimage = Image.create_from_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata_blank.to_byte_array())
 	audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
 	assert (audiosampleframetexture != null)
 	$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
 	
 func audiosamplestoshader(audiosamples):
 	assert (len(audiosamples)== audiosamplesize)
-	for j in range(audiosamplesize):
-		var v = audiosamples[j]
-		audiosampleframedata.set(j, int((v.x + 1.0)/2.0*255))
 	audiosampleframetextureimage.set_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
 	audiosampleframetexture.update(audiosampleframetextureimage)
 
