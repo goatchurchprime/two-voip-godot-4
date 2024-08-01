@@ -14,6 +14,7 @@ var opusframesize : int = 20
 var audiosamplerate : int = 44100
 var opussamplerate : int = 48000
 var audiosamplesize : int = 882
+var prefixbyteslength : int = 0
 
 var recordedsamples = [ ]
 var recordedopuspackets = [ ]
@@ -117,7 +118,7 @@ func updatesamplerates():
 				
 	$VBoxFrameLength/HBoxOpusFrame/LabFrameLength.text = "%d samples at 48KHz" % opusframesize
 	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples at 44.1KHz" % audiosamplesize
-	recordedheader = { "opusframesize":opusframesize, "audiosamplesize":audiosamplesize, "opussamplerate":opussamplerate, "audiosamplerate":audiosamplerate }
+	recordedheader = { "opusframesize":opusframesize, "audiosamplesize":audiosamplesize, "opussamplerate":opussamplerate, "audiosamplerate":audiosamplerate, "prefixbyteslength":prefixbyteslength }
 	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audiosamplesize:
 		recordedsamples = resamplerecordedsamples(recordedsamples, audiosamplesize)
 	var prefixbytes = PackedByteArray()
@@ -190,6 +191,14 @@ func _on_mic_working_toggled(toggled_on):
 		if $AudioStreamMicrophone.playing:
 			$AudioStreamMicrophone.stop()
 
+func _input(event):
+	if event is InputEventKey and event.is_pressed() and event.keycode == KEY_P:
+		print("turn off processing")
+		set_process(false)
+		await get_tree().create_timer(2.0).timeout
+		set_process(true)
+		print("turn on processing")
+
 func _process(_delta):
 	var talking = $HBoxBigButtons/PTT.button_pressed
 	if talking:
@@ -204,6 +213,7 @@ func _process(_delta):
 
 	var prefixbytes = PackedByteArray()
 	if audioeffectcapture == null:
+		assert (audioopuschunkedeffect != null)
 		while audioopuschunkedeffect.chunk_available():
 			var audiosamples = audioopuschunkedeffect.read_chunk()
 			audiosamplestoshader(audiosamples)
@@ -239,6 +249,7 @@ func _process(_delta):
 					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples))
 			else:
 				audioopuschunkedeffect.drop_chunk()
+
 	else:
 		while audioeffectcapture.get_frames_available() > audiosamplesize:
 			var audiosamples = audioeffectcapture.get_buffer(audiosamplesize)

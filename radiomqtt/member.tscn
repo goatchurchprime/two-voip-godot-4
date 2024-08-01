@@ -7,7 +7,7 @@ custom_minimum_size = Vector2(170, 40)
 anchors_preset = -1
 anchor_right = 0.028
 anchor_bottom = 0.035
-offset_right = 148.2
+offset_right = 366.2
 offset_bottom = 5.0
 color = Color(0.423529, 0, 0.423529, 1)
 script = ExtResource("1_o3hks")
@@ -40,8 +40,8 @@ color = Color(0.937255, 0.952941, 0, 1)
 
 [node name="ColorRect" type="ColorRect" parent="Node"]
 layout_mode = 0
-offset_left = 12.0
-offset_top = 14.0
-offset_right = 57.0
-offset_bottom = 27.0
+offset_left = -54.0
+offset_top = 37.0
+offset_right = -5.0
+offset_bottom = 42.0
 color = Color(0.0352941, 0.788235, 1, 1)
