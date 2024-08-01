@@ -68,7 +68,7 @@ Ref<AudioStreamPlayback> AudioStreamOpusChunked::_instantiate_playback() const {
 }
 
 void AudioStreamOpusChunked::resetdecoder() {
-	chunknumber = -1;
+    chunknumber = -1;
     if (speexresampler != NULL) {
         speex_resampler_destroy(speexresampler);
         speexresampler = NULL;
@@ -80,30 +80,30 @@ void AudioStreamOpusChunked::resetdecoder() {
 }
 
 void AudioStreamOpusChunked::createdecoder() {
-	resetdecoder();  // In case called from GDScript
+    resetdecoder();  // In case called from GDScript
     int opuserror = 0;
-	int channels = 2;
+    int channels = 2;
     opusdecoder = opus_decoder_create(opussamplerate, channels, &opuserror);
-	if (opuserror != 0) 
-		printf("We have an opus error*** %d\n", opuserror); 
+    if (opuserror != 0) 
+        printf("We have an opus error*** %d\n", opuserror); 
 
-	float Dtimeframeopus = opusframesize*1.0F/opussamplerate;
-	float Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
+    float Dtimeframeopus = opusframesize*1.0F/opussamplerate;
+    float Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
     if (audiosamplesize != opusframesize) {
         int speexerror = 0; 
         int resamplingquality = 10;
         speexresampler = speex_resampler_init(channels, opussamplerate, audiosamplerate, resamplingquality, &speexerror);
         audiopreresampledbuffer.resize(opusframesize);
-	    printf("Decoder timeframeopus preresampler %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
+        printf("Decoder timeframeopus preresampler %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
     } else {
-	    printf("Decoder timeframeopus equating %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
-	}
+        printf("Decoder timeframeopus equating %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
+    }
     Daudioresampledbuffer.resize(audiosamplesize);
 
-	audiosamplebuffer.resize(audiosamplesize*audiosamplechunks); 
-	bufferbegin = 0;
+    audiosamplebuffer.resize(audiosamplesize*audiosamplechunks); 
+    bufferbegin = 0;
     buffertail = 0; 
-	chunknumber = 0;
+    chunknumber = 0;
 
     //printf("before beginresample\n");
     //playback->begin_resample();
@@ -111,10 +111,10 @@ void AudioStreamOpusChunked::createdecoder() {
 }
 
 bool AudioStreamOpusChunked::chunk_space_available() {
-	if (chunknumber == -1) 
-		createdecoder();
+    if (chunknumber == -1) 
+        createdecoder();
     //buffertail = chunknumber*audiosamplesize; 
-	if (chunknumber == -1)
+    if (chunknumber == -1)
         return false;
     if (buffertail == bufferbegin)
         return true;
@@ -140,8 +140,8 @@ int AudioStreamOpusChunked::buffered_audiosamples() {
 }
 
 void AudioStreamOpusChunked::push_audio_chunk(const PackedVector2Array& audiochunk) {
-	if (chunknumber == -1) 
-		createdecoder();
+    if (chunknumber == -1) 
+        createdecoder();
     if (audiochunk.size() != audiosamplesize)
         printf("Error mismatch audiochunk size");
     for (int i = 0; i < audiosamplesize; i++) 
@@ -155,8 +155,8 @@ void AudioStreamOpusChunked::push_audio_chunk(const PackedVector2Array& audiochu
 
 
 PackedVector2Array* AudioStreamOpusChunked::Popus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec) {
-	if (chunknumber == -1) 
-		createdecoder();
+    if (chunknumber == -1) 
+        createdecoder();
     int decodedsamples = opus_decode_float(opusdecoder, opusbytepacket.ptr() + begin, opusbytepacket.size() - begin, 
                                            (float*)audiopreresampledbuffer.ptrw(), opusframesize, decode_fec);
     if (audiosamplesize == opusframesize) {
@@ -202,36 +202,36 @@ int32_t AudioStreamPlaybackOpusChunked::_mix_resampled(AudioFrame *buffer, int32
 }
 
 void AudioStreamPlaybackOpusChunked::_start(double p_from_pos) {
-	if (mixed == 0.0) {
-		begin_resample();
-	}
-	skips = 0;
-	active = true;
-	mixed = 0.0;
+    if (mixed == 0.0) {
+        begin_resample();
+    }
+    skips = 0;
+    active = true;
+    mixed = 0.0;
 }
 
 void AudioStreamPlaybackOpusChunked::_stop() {
-	active = false;
+    active = false;
 }
 
 bool AudioStreamPlaybackOpusChunked::_is_playing() const {
-	return active;
+    return active;
 }
 
 int AudioStreamPlaybackOpusChunked::_get_loop_count() const {
-	return 0;
+    return 0;
 }
 
 double AudioStreamPlaybackOpusChunked::_get_playback_position() const {
-	return mixed;
+    return mixed;
 }
 
 void AudioStreamPlaybackOpusChunked::_seek(double p_time) {
-	//no seek possible
+    //no seek possible
 }
 
 void AudioStreamPlaybackOpusChunked::_tag_used_streams() {
-	//base->_tag_used(0);
+    //base->_tag_used(0);
 }
 
 
