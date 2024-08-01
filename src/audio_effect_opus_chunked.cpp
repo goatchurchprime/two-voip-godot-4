@@ -185,6 +185,7 @@ void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame 
             drop_chunk(); 
             chunkstart = chunknumber*audiosamplesize;
             discardedchunks += 1; 
+            printf("Discarding chunk %d\n", discardedchunks); 
         }
         if (bufferend == audiosamplebuffer.size())
             bufferend = 0;
@@ -192,8 +193,8 @@ void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame 
 }
 
 bool AudioEffectOpusChunked::chunk_available() {
-	return ((chunknumber != -1) && 
-		((bufferend < chunknumber*audiosamplesize) || (bufferend >= (chunknumber + 1)*audiosamplesize))); 
+    return ((chunknumber != -1) && 
+        ((bufferend < chunknumber*audiosamplesize) || (bufferend >= (chunknumber + 1)*audiosamplesize))); 
 }
 
 float AudioEffectOpusChunked::chunk_max() {

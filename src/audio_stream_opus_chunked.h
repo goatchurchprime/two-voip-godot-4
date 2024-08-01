@@ -113,17 +113,13 @@ public:
     void resetdecoder();
     bool chunk_space_available();
     int queue_length_frames();
-    int buffered_audiosamples();
     void push_audio_chunk(const PackedVector2Array& audiochunk);
     void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
     PackedVector2Array opus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
 
-    // we should have a pop audio packet (from the pushed one) that works only when no resampling and not instantiated
-    // 
-    //void pop_audio_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
-    // also shouldn't resetdecoder if we keep setting the same sample rates etc
-    // also the example should re-implement the non-streaming, and just have these are classes made in the code 
-    // and decoding using the Generator and Capture modes
+    float last_chunk_max();
+    float last_chunk_rms();
+    PackedVector2Array read_last_chunk();
 
     void set_opussamplerate(int lopussamplerate) { resetdecoder(); opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
