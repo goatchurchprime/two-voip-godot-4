@@ -44,19 +44,20 @@
 #include "speex_resampler/speex_resampler.h"
 
 #ifdef OVR_LIP_SYNC
-	#include "OVRLipSync.h"
+    #include "OVRLipSync.h"
 #else
-	#include "OVRLipSync_Stub.h"
+    #include "OVRLipSync_Stub.h"
 #endif
+
 
 namespace godot {
 
 class AudioEffectOpusChunked;
 
 class AudioEffectOpusChunkedInstance : public AudioEffectInstance {
-	GDCLASS(AudioEffectOpusChunkedInstance, AudioEffectInstance);
-	friend class AudioEffectOpusChunked;
-	Ref<AudioEffectOpusChunked> base;
+    GDCLASS(AudioEffectOpusChunkedInstance, AudioEffectInstance);
+    friend class AudioEffectOpusChunked;
+    Ref<AudioEffectOpusChunked> base;
 
 protected:
 	static void _bind_methods() {;};
@@ -67,60 +68,68 @@ public:
 };
 
 typedef enum {
-  GovrLipSyncUninitialized,
-  GovrLipSyncValid,
-  GovrLipSyncUnavailable,
+    GovrLipSyncUninitialized,
+    GovrLipSyncValid,
+    GovrLipSyncUnavailable,
 } GovrLipSyncStatus;
 
 
+// This AudioEffect copies samples from the microphone input into the ringbuffer audiosamplebuffer of size audiosamplesize*audiosamplechunks
+// The chunking is for the purpose of the opus encoder.  GDScript code consumes these chunks as they become available.
+// There is no reason to leave unprocessed data available in the buffer other than a processing delay.
+// Use chunk_max() or chunk_rms() to determin whether to trigger a Vox signal (Voice Operated theshold) so 
+// that the opus coding does not need to be applied to all the unspoken silence.
+// Use undrop_chunks() to roll-back the buffer to back-date when the Vox should come on and stop pre-clipping
+
 class AudioEffectOpusChunked : public AudioEffect {
-	GDCLASS(AudioEffectOpusChunked, AudioEffect)
-	friend class AudioEffectOpusChunkedInstance;
+    GDCLASS(AudioEffectOpusChunked, AudioEffect)
+    friend class AudioEffectOpusChunkedInstance;
 
     int audiosamplerate = 44100;
     int audiosamplesize = 881;
     int audiosamplechunks = 50;
 
-	PackedVector2Array audiosamplebuffer;
-	int chunknumber = -1;
-	int bufferend = 0;
-	int discardedchunks = 0;
+    PackedVector2Array audiosamplebuffer;
+    int chunknumber = -1;
+    int bufferend = 0;
+    int discardedchunks = 0;
 
     int opussamplerate = 48000;
     int opusframesize = 960;
     int opusbitrate = 24000;
 
     SpeexResamplerState* speexresampler = NULL;
-	PackedVector2Array audioresampledbuffer;
+    PackedVector2Array audioresampledbuffer;
     OpusEncoder* opusencoder = NULL;
-	PackedByteArray opusbytebuffer;
+    PackedByteArray opusbytebuffer;
 
-	GovrLipSyncStatus govrlipsyncstatus = GovrLipSyncUninitialized;
+    GovrLipSyncStatus govrlipsyncstatus = GovrLipSyncUninitialized;
     PackedFloat32Array visemes; 
     ovrLipSyncFrame ovrlipsyncframe;
     ovrLipSyncContext ovrlipsyncctx = 0;
 
-	void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
+    void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
 
 protected:
-	static void _bind_methods();
+    static void _bind_methods();
 
 public:
-	virtual Ref<AudioEffectInstance> _instantiate() override;
+    virtual Ref<AudioEffectInstance> _instantiate() override;
 
-	void createencoder();
-	void resetencoder(int Dreason=3);
+    void createencoder();
+    void resetencoder(int Dreason=3);
 
-	bool chunk_available();
-	float chunk_max();
-	float chunk_rms();
+    bool chunk_available();
+    float chunk_max();
+    float chunk_rms();
     int chunk_to_lipsync(); 
     PackedFloat32Array read_visemes(); 
-	PackedByteArray pop_opus_packet(const PackedByteArray& prefixbytes);  // this converts and drops chunk all in one
-	PackedVector2Array read_chunk();
-	PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamplebuffer, int begin);
-	void drop_chunk();
-	
+    PackedByteArray pop_opus_packet(const PackedByteArray& prefixbytes);  // this converts and drops chunk all in one
+    PackedVector2Array read_chunk();
+    PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamplebuffer, int begin);
+    void drop_chunk();
+    bool undrop_chunk();
+
     void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
     void set_opusframesize(int lopusframesize) { chunknumber = -1; opusframesize = lopusframesize; };
@@ -134,8 +143,8 @@ public:
     void set_audiosamplechunks(int laudiosamplechunks) { chunknumber = -1; audiosamplechunks = laudiosamplechunks; };
     int get_audiosamplechunks() { return audiosamplechunks; };
 
-	AudioEffectOpusChunked();
-	~AudioEffectOpusChunked();
+    AudioEffectOpusChunked();
+    ~AudioEffectOpusChunked();
 };
 
 }

@@ -14,14 +14,14 @@ var opusframesize : int = 20
 var audiosamplerate : int = 44100
 var opussamplerate : int = 48000
 var audiosamplesize : int = 882
+var prefixbyteslength : int = 0
 
 var recordedsamples = [ ]
 var recordedopuspackets = [ ]
 var recordedopuspacketsMemSize = 0
 var recordedheader = { }
 
-var audiosampleframedata : PackedByteArray
-var audiosampleframedata2 : PackedVector2Array
+
 var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
 var prevviseme = 0
@@ -73,6 +73,8 @@ func _ready():
 		d.size.y = i*8
 	$HBoxMosquitto/FriendlyName.text = possibleusernames.pick_random()
 
+	SelfMember.audiobufferregulationtime = 3600.0
+
 func resamplerecordedsamples(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
 	var res = [ ]
@@ -117,7 +119,7 @@ func updatesamplerates():
 				
 	$VBoxFrameLength/HBoxOpusFrame/LabFrameLength.text = "%d samples at 48KHz" % opusframesize
 	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples at 44.1KHz" % audiosamplesize
-	recordedheader = { "opusframesize":opusframesize, "audiosamplesize":audiosamplesize, "opussamplerate":opussamplerate, "audiosamplerate":audiosamplerate }
+	recordedheader = { "opusframesize":opusframesize, "audiosamplesize":audiosamplesize, "opussamplerate":opussamplerate, "audiosamplerate":audiosamplerate, "prefixbyteslength":prefixbyteslength }
 	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audiosamplesize:
 		recordedsamples = resamplerecordedsamples(recordedsamples, audiosamplesize)
 	var prefixbytes = PackedByteArray()
@@ -139,26 +141,18 @@ func updatesamplerates():
 	setupaudioshader()
 	
 func setupaudioshader():
-	audiosampleframedata = PackedByteArray()
-	audiosampleframedata.resize(audiosamplesize)
+	var audiosampleframedata_blank = PackedVector2Array()
+	audiosampleframedata_blank.resize(audiosamplesize)
 	for j in range(audiosamplesize):
-		audiosampleframedata.set(j, (j*10)%256)
+		audiosampleframedata_blank.set(j, Vector2(-0.5,0.9) if (j%10)<5 else Vector2(0.6,0.1))
 
-	audiosampleframedata2 = PackedVector2Array()
-	audiosampleframedata2.resize(audiosamplesize)
-	for j in range(audiosamplesize):
-		audiosampleframedata2.set(j, Vector2(-0.5,0.9) if (j%10)<5 else Vector2(0.6,0.1))
-
-	audiosampleframetextureimage = Image.create_from_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata2.to_byte_array())
+	audiosampleframetextureimage = Image.create_from_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata_blank.to_byte_array())
 	audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
 	assert (audiosampleframetexture != null)
 	$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
 	
 func audiosamplestoshader(audiosamples):
 	assert (len(audiosamples)== audiosamplesize)
-	for j in range(audiosamplesize):
-		var v = audiosamples[j]
-		audiosampleframedata.set(j, int((v.x + 1.0)/2.0*255))
 	audiosampleframetextureimage.set_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
 	audiosampleframetexture.update(audiosampleframetextureimage)
 
@@ -179,6 +173,10 @@ func starttalking():
 	print("start talking")
 	$MQTTnetwork.transportaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
 	talkingstarttime = Time.get_ticks_msec()
+	
+	var leadtimems = $HBoxBigButtons/VBoxVox/Leadtime.value*1000 - frametimems
+	while leadtimems > 0 and audioopuschunkedeffect.undrop_chunk():
+		leadtimems -= frametimems
 
 
 func _on_mic_working_toggled(toggled_on):
@@ -189,6 +187,18 @@ func _on_mic_working_toggled(toggled_on):
 	else:
 		if $AudioStreamMicrophone.playing:
 			$AudioStreamMicrophone.stop()
+
+func _input(event):
+	if event is InputEventKey and event.is_pressed():
+		if event.keycode == KEY_P:
+			print("turn off processing")
+			set_process(false)
+			await get_tree().create_timer(2.0).timeout
+			set_process(true)
+			print("turn on processing")
+		if event.keycode == KEY_I or event.keycode == KEY_O:
+			$AudioStreamMicrophone.volume_db += (1 if event.keycode == KEY_I else -1)
+			print($AudioStreamMicrophone.volume_db)
 
 func _process(_delta):
 	var talking = $HBoxBigButtons/PTT.button_pressed
@@ -204,6 +214,7 @@ func _process(_delta):
 
 	var prefixbytes = PackedByteArray()
 	if audioeffectcapture == null:
+		assert (audioopuschunkedeffect != null)
 		while audioopuschunkedeffect.chunk_available():
 			var audiosamples = audioopuschunkedeffect.read_chunk()
 			audiosamplestoshader(audiosamples)
@@ -239,6 +250,7 @@ func _process(_delta):
 					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples))
 			else:
 				audioopuschunkedeffect.drop_chunk()
+
 	else:
 		while audioeffectcapture.get_frames_available() > audiosamplesize:
 			var audiosamples = audioeffectcapture.get_buffer(audiosamplesize)

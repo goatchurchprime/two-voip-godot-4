@@ -55,24 +55,24 @@ class AudioStreamPlaybackOpusChunked : public AudioStreamPlaybackResampled {
     friend class AudioStreamOpusChunked;
     Ref<AudioStreamOpusChunked> base;
     
-	int skips = 0;
-	bool active = false;
-	float mixed = 0.0;
+    int skips = 0;
+    bool active = false;
+    float mixed = 0.0;
 
 protected:
     static void _bind_methods() {;};
 
 public:
-	virtual int32_t _mix_resampled(AudioFrame *dst_buffer, int32_t frame_count) override;
-	virtual double _get_stream_sampling_rate() const override { return 44100.0F; };
+    virtual int32_t _mix_resampled(AudioFrame *dst_buffer, int32_t frame_count) override;
+    virtual double _get_stream_sampling_rate() const override { return 44100.0F; };
 
-	virtual void _start(double p_from_pos = 0.0) override;
-	virtual void _stop() override;
-	virtual bool _is_playing() const override;
-	virtual int _get_loop_count() const override; 
-	virtual double _get_playback_position() const override;
-	virtual void _seek(double p_time) override;
-	virtual void _tag_used_streams() override;
+    virtual void _start(double p_from_pos = 0.0) override;
+    virtual void _stop() override;
+    virtual bool _is_playing() const override;
+    virtual int _get_loop_count() const override; 
+    virtual double _get_playback_position() const override;
+    virtual void _seek(double p_time) override;
+    virtual void _tag_used_streams() override;
 };
 
 
@@ -83,23 +83,23 @@ class AudioStreamOpusChunked : public AudioStream {
     int opussamplerate = 48000;
     int opusframesize = 960;
     OpusDecoder* opusdecoder = NULL;
- 	PackedVector2Array audiopreresampledbuffer;
+    PackedVector2Array audiopreresampledbuffer;
 
     SpeexResamplerState* speexresampler = NULL;
     int audiosamplerate = 44100;
     int audiosamplesize = 881;
- 	PackedVector2Array Daudioresampledbuffer;
+    PackedVector2Array Daudioresampledbuffer;
 
-	PackedVector2Array audiosamplebuffer;
+    PackedVector2Array audiosamplebuffer;
     int audiosamplechunks = 50;
-	int chunknumber = -1;
-	int bufferbegin = 0;
-	int buffertail = 0;
-	int missingsamples = 0;
-	PackedVector2Array* Popus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
+    int chunknumber = -1;
+    int bufferbegin = 0;
+    int buffertail = 0;
+    int missingsamples = 0;
+    PackedVector2Array* Popus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
 
 protected:
-	static void _bind_methods();
+    static void _bind_methods();
 
 public:
     virtual Ref<AudioStreamPlayback> _instantiate_playback() const override;
@@ -109,21 +109,17 @@ public:
     virtual double _get_bpm() const override { return 0.0; }
     virtual int32_t _get_beat_count() const override { return 0; }
 
-	void createdecoder();
-	void resetdecoder();
-	bool chunk_space_available();
+    void createdecoder();
+    void resetdecoder();
+    bool chunk_space_available();
     int queue_length_frames();
-	int buffered_audiosamples();
-	void push_audio_chunk(const PackedVector2Array& audiochunk);
-	void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
-	PackedVector2Array opus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
+    void push_audio_chunk(const PackedVector2Array& audiochunk);
+    void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
+    PackedVector2Array opus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
 
-    // we should have a pop audio packet (from the pushed one) that works only when no resampling and not instantiated
-	// 
-    //void pop_audio_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
-    // also shouldn't resetdecoder if we keep setting the same sample rates etc
-    // also the example should re-implement the non-streaming, and just have these are classes made in the code 
-    // and decoding using the Generator and Capture modes
+    float last_chunk_max();
+    float last_chunk_rms();
+    PackedVector2Array read_last_chunk();
 
     void set_opussamplerate(int lopussamplerate) { resetdecoder(); opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
@@ -136,8 +132,8 @@ public:
     void set_audiosamplechunks(int laudiosamplechunks) { resetdecoder(); audiosamplechunks = laudiosamplechunks; };
     int get_audiosamplechunks() { return audiosamplechunks; };
 
-	AudioStreamOpusChunked() {;};
-	~AudioStreamOpusChunked() { resetdecoder(); };
+    AudioStreamOpusChunked() {;};
+    ~AudioStreamOpusChunked() { resetdecoder(); };
 };
 
 }

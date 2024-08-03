@@ -28,7 +28,7 @@ bg_color = Color(0.6, 0.6, 0.0470588, 1)
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3io8e"]
 bg_color = Color(0, 0.545098, 0.290196, 1)
 
-[sub_resource type="Shader" id="Shader_022wp"]
+[sub_resource type="Shader" id="Shader_r847e"]
 code = "// NOTE: Shader automatically converted from Godot Engine 4.3.beta's CanvasItemMaterial.
 
 shader_type canvas_item;
@@ -45,7 +45,7 @@ void fragment() {
 }"
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_cklni"]
-shader = SubResource("Shader_022wp")
+shader = SubResource("Shader_r847e")
 shader_parameter/blue = 1.0
 shader_parameter/voice = ExtResource("3_eh2h5")
 
@@ -146,15 +146,17 @@ text = "Vox"
 
 [node name="Leadtime" type="SpinBox" parent="HBoxBigButtons/VBoxVox"]
 layout_mode = 2
-tooltip_text = "Not yet implemented"
+tooltip_text = "Pre-trigger audio time that processing is backdated from before Vox threshold"
 max_value = 1.0
 step = 0.05
+value = 0.1
 update_on_text_changed = true
 prefix = "Leadtime:"
 suffix = "Seconds"
 
 [node name="Hangtime" type="SpinBox" parent="HBoxBigButtons/VBoxVox"]
 layout_mode = 2
+tooltip_text = "Run on recording time after audio has gone below Vox threshold "
 max_value = 5.0
 step = 0.1
 value = 1.5
@@ -540,13 +542,10 @@ fit_content = true
 
 [node name="Members" type="GridContainer" parent="."]
 layout_mode = 2
-columns = 3
+columns = 2
 
 [node name="Self" parent="Members" instance=ExtResource("4_w5dv2")]
 layout_mode = 2
-
-[node name="Label" parent="Members/Self" index="1"]
-text = "Self"
 
 [node name="HBoxVisemes" type="HBoxContainer" parent="."]
 visible = false
@@ -577,5 +576,3 @@ text = "sil"
 [connection signal="toggled" from="MQTTnetwork/Connect" to="MQTTnetwork" method="_on_connect_toggled"]
 [connection signal="item_selected" from="MQTTnetwork/GridContainer/presets" to="MQTTnetwork" method="_on_mqtt_broker_item_selected"]
 [connection signal="toggled" from="VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
-
-[editable path="Members/Self"]
