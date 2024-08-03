@@ -149,6 +149,8 @@ func _process(delta):
 			else:
 				break
 
+	$AudioStreamPlayer.volume_db = $Node/Volume.value
+	
 	if timedelaytohide > 0.0:
 		timedelaytohide -= delta
 		if timedelaytohide <= 0.0:

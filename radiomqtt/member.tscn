@@ -83,3 +83,12 @@ offset_top = 3.0
 offset_right = -10.0
 offset_bottom = 7.0
 color = Color(0.937255, 0.952941, 0, 1)
+
+[node name="Volume" type="SpinBox" parent="Node"]
+layout_mode = 0
+offset_left = 150.0
+offset_top = 4.0
+offset_right = 233.062
+offset_bottom = 35.0
+min_value = -80.0
+max_value = 24.0
