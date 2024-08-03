@@ -19,7 +19,9 @@ if you download it and are not on Linux.
 
 ## Build instructions:
 
-### Nixos
+Only do this locally if you are developing the C++ code.
+
+### Nixos automated
 
 The build system is defined by the flake.nix file
 
@@ -36,20 +38,6 @@ cp result/addons/twovoip/*so addons/twovoip
 nix build .#android
 cp result/addons/twovoip/*so addons/twovoip
 ```
-
- * Windows version:
-
-```
-TBD
-```
-
-Start the project in Visual Studio and let it clone and compile the opus project
-
-```
-python -m SCons
-```
-
-Make sure `addons/twovoip/twovoip.gdextension` point to these files:
 
 ### Otherwise by hand when developing
 
@@ -71,6 +59,8 @@ make
 cd ../..
 scons
 ```
+
+**You may need to copy the much simplified `SConstruct_jgtdev` onto `SConstruct` to make it work.  
 
 On Windows:
 
