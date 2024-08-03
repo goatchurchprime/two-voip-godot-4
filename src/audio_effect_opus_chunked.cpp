@@ -63,6 +63,7 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("read_visemes"), &AudioEffectOpusChunked::read_visemes);
     ClassDB::bind_method(D_METHOD("read_chunk"), &AudioEffectOpusChunked::read_chunk);
     ClassDB::bind_method(D_METHOD("drop_chunk"), &AudioEffectOpusChunked::drop_chunk);
+    ClassDB::bind_method(D_METHOD("undrop_chunk"), &AudioEffectOpusChunked::undrop_chunk);
     ClassDB::bind_method(D_METHOD("pop_opus_packet", "prefixbytes"), &AudioEffectOpusChunked::pop_opus_packet);
     ClassDB::bind_method(D_METHOD("chunk_to_opus_packet", "prefixbytes", "audiosamplebuffer", "begin"), &AudioEffectOpusChunked::chunk_to_opus_packet);
 }
@@ -198,7 +199,7 @@ bool AudioEffectOpusChunked::chunk_available() {
 }
 
 float AudioEffectOpusChunked::chunk_max() {
-    if (chunknumber == -1) 
+    if (!chunk_available()) 
         return -1.0;
     float r = 0.0F;
     float* p = (float*)audiosamplebuffer.ptr() + 2*chunknumber*audiosamplesize;
@@ -211,7 +212,7 @@ float AudioEffectOpusChunked::chunk_max() {
 }
 
 float AudioEffectOpusChunked::chunk_rms() {
-    if (chunknumber == -1) 
+    if (!chunk_available()) 
         return -1.0;
     float s = 0.0F;
     float* p = (float*)audiosamplebuffer.ptr() + 2*chunknumber*audiosamplesize;
@@ -222,6 +223,8 @@ float AudioEffectOpusChunked::chunk_rms() {
 }
 
 int AudioEffectOpusChunked::chunk_to_lipsync() {
+    if (!chunk_available()) 
+        return -1;
     if (govrlipsyncstatus != GovrLipSyncValid)
         return -1;
     auto rc = ovrLipSync_ProcessFrameEx(ovrlipsyncctx, 
@@ -245,15 +248,25 @@ PackedFloat32Array AudioEffectOpusChunked::read_visemes() {
 
 
 void AudioEffectOpusChunked::drop_chunk() {
-    if (chunknumber == -1) 
+    if (!chunk_available()) 
         return;
     chunknumber += 1;
     if (chunknumber == audiosamplechunks)
         chunknumber = 0;
 }
 
-PackedVector2Array AudioEffectOpusChunked::read_chunk() {
+bool AudioEffectOpusChunked::undrop_chunk() {
     if (chunknumber == -1) 
+        return false;
+    int lchunknumber = (chunknumber == 0 ? audiosamplechunks : chunknumber) - 1;
+    if (!((bufferend < lchunknumber*audiosamplesize) || (bufferend >= (lchunknumber + 1)*audiosamplesize)))
+        return false;
+    chunknumber = lchunknumber;
+    return true;
+}
+
+PackedVector2Array AudioEffectOpusChunked::read_chunk() {
+    if (!chunk_available()) 
         return PackedVector2Array();
     int begin = chunknumber*audiosamplesize; 
     int end = (chunknumber+1)*audiosamplesize; 
@@ -287,7 +300,7 @@ PackedByteArray AudioEffectOpusChunked::chunk_to_opus_packet(const PackedByteArr
 }
 
 PackedByteArray AudioEffectOpusChunked::pop_opus_packet(const PackedByteArray& prefixbytes) {
-    if ((chunknumber == -1) || (opusframesize == 0))
+    if (!chunk_available() || (opusframesize == 0))
         return PackedByteArray();
     int begin = chunknumber*audiosamplesize; 
     drop_chunk();

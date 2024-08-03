@@ -146,15 +146,17 @@ text = "Vox"
 
 [node name="Leadtime" type="SpinBox" parent="HBoxBigButtons/VBoxVox"]
 layout_mode = 2
-tooltip_text = "Not yet implemented"
+tooltip_text = "Pre-trigger audio time that processing is backdated from before Vox threshold"
 max_value = 1.0
 step = 0.05
+value = 0.1
 update_on_text_changed = true
 prefix = "Leadtime:"
 suffix = "Seconds"
 
 [node name="Hangtime" type="SpinBox" parent="HBoxBigButtons/VBoxVox"]
 layout_mode = 2
+tooltip_text = "Run on recording time after audio has gone below Vox threshold "
 max_value = 5.0
 step = 0.1
 value = 1.5

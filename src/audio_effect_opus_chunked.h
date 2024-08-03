@@ -74,6 +74,13 @@ typedef enum {
 } GovrLipSyncStatus;
 
 
+// This AudioEffect copies samples from the microphone input into the ringbuffer audiosamplebuffer of size audiosamplesize*audiosamplechunks
+// The chunking is for the purpose of the opus encoder.  GDScript code consumes these chunks as they become available.
+// There is no reason to leave unprocessed data available in the buffer other than a processing delay.
+// Use chunk_max() or chunk_rms() to determin whether to trigger a Vox signal (Voice Operated theshold) so 
+// that the opus coding does not need to be applied to all the unspoken silence.
+// Use undrop_chunks() to roll-back the buffer to back-date when the Vox should come on and stop pre-clipping
+
 class AudioEffectOpusChunked : public AudioEffect {
     GDCLASS(AudioEffectOpusChunked, AudioEffect)
     friend class AudioEffectOpusChunkedInstance;
@@ -121,6 +128,7 @@ public:
     PackedVector2Array read_chunk();
     PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamplebuffer, int begin);
     void drop_chunk();
+    bool undrop_chunk();
 
     void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };

@@ -19,7 +19,7 @@ var audiosampleframetexture : ImageTexture
 
 var audioserveroutputlatency = 0.015
 var audiobufferregulationtime = 0.7
-var audiobufferregulationpitch = 2.0
+var audiobufferregulationpitch = 1.4
 
 func _ready():
 	var audiostream = $AudioStreamPlayer.stream
