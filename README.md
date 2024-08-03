@@ -61,6 +61,10 @@ scons
 ```
 
 **You may need to copy the much simplified `SConstruct_jgtdev` onto `SConstruct` to make it work.  
+Also, the project has been moved down into the example directory, so it's a good idea to go 
+into the example/addons directory and set up the following symlink:
+> ln -s ../../addons/twovoip twovoip
+
 
 On Windows:
 

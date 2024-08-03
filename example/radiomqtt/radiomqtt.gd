@@ -197,24 +197,8 @@ func _input(event):
 			set_process(true)
 			print("turn on processing")
 		if event.keycode == KEY_I or event.keycode == KEY_O:
-<<<<<<< HEAD
 			$AudioStreamMicrophone.volume_db += (1 if event.keycode == KEY_I else -1)
 			print($AudioStreamMicrophone.volume_db)
-
-=======
-			var audioeffectonmic : AudioEffect = null
-			for effect_idx in range(AudioServer.get_bus_effect_count(microphoneidx)):
-				var laudioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, effect_idx)
-				if laudioeffectonmic.is_class("AudioEffectAmplify"):
-					audioeffectonmic = laudioeffectonmic
-					break
-			if audioeffectonmic != null:
-				audioeffectonmic.volume_db += (1 if event.keycode == KEY_I else -1)
-				print(audioeffectonmic.volume_db)
-			
-			
-			
->>>>>>> 6a01ee8 (testing if the gain amplify function works)
 
 func _process(_delta):
 	var talking = $HBoxBigButtons/PTT.button_pressed
