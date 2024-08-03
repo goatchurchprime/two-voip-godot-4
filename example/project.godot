@@ -26,6 +26,10 @@ window/size/viewport_height=1200
 window/stretch/mode="viewport"
 window/handheld/orientation=1
 
+[dotnet]
+
+project/assembly_name="Two-voip-godot-4"
+
 [rendering]
 
 renderer/rendering_method="mobile"

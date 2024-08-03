@@ -1,0 +1,29 @@
+name: Download OVRLipSync
+description: Download OVRLipSync and cache it
+inputs:
+  extract_directory:
+    description: The root directory where the files will be unzipped
+    default: "."
+runs:
+  using: composite
+  steps:
+    - name: Restore OVRLipSync directory
+      uses: actions/cache/restore@v4
+      id: restore_lipsync
+      with:
+        path: ${{inputs.extract_directory}}/OVRLipSyncNative
+        key: OVRLipSync
+
+    - name: Install OVRLipSync
+      if: steps.restore_lipsync.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        curl -L -o ovr_lipsync_native.zip https://securecdn.oculus.com/binaries/download/?id=4458030927545142
+        unzip ovr_lipsync_native.zip -d ${{inputs.extract_directory}}
+
+    - name: Save OVRLipSync directory
+      if: steps.restore_lipsync.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{inputs.extract_directory}}/OVRLipSyncNative
+        key: OVRLipSync

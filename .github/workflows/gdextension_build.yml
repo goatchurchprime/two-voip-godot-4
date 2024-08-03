@@ -24,10 +24,10 @@ on:
       ]
   workflow_dispatch:
     inputs:
-      production_build:
-        description: Production build
-        default: true
-        type: boolean
+      #production_build:
+      #  description: Production build
+      #  default: true
+      #  type: boolean
       use_cache:
         description: Use Cache
         default: true
@@ -46,7 +46,7 @@ env:
   LIBRARY_NAME: twovoip
   SCONS_CACHE: ${{github.workspace}}/.scons-cache/
   USE_CACHE: ${{!format('{0}', inputs.use_cache) && 'true' || format('{0}', inputs.use_cache)}} # Default true
-  PRODUCTION_BUILD: ${{!format('{0}', inputs.production_build) && 'false' || format('{0}', inputs.production_build)}} # Default false
+  #PRODUCTION_BUILD: ${{!format('{0}', inputs.production_build) && 'false' || format('{0}', inputs.production_build)}} # Default false
   OUTPUT_LIBS_PATH: bin
   FORCE_DISABLE_UNITY: yes
   GH_TOKEN: ${{ github.token }}
@@ -62,6 +62,7 @@ jobs:
       matrix:
         arch: [x86_64]
         target: [template_debug, template_release]
+        lipsync: [yes, no] # If necessary, you can simply remove the `yes` from here
 
     steps:
       - name: Checkout
@@ -75,8 +76,8 @@ jobs:
           platform: windows
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
-          artifact: windows.${{matrix.target}}.${{matrix.arch}}
-          additional: lto=yes
+          artifact: windows.${{matrix.target}}.${{matrix.arch}}.${{contains(matrix.lipsync, 'yes') && '-lipsync' || '-base'}}
+          additional: lto=yes lipsync=${{matrix.lipsync}}
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
 
@@ -104,7 +105,7 @@ jobs:
           platform: linux
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
-          artifact: linux.${{matrix.target}}.${{matrix.arch}}
+          artifact: linux.${{matrix.target}}.${{matrix.arch}}-base
           additional: lto=yes
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
@@ -118,8 +119,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [universal]
+        arch: [universal, x86_64]
         target: [template_debug, template_release]
+        lipsync: [yes, no]
+        exclude:
+          - arch: universal
+            lipsync: yes
+          - arch: x86_64
+            lipsync: no
 
     steps:
       - name: Checkout
@@ -133,8 +140,8 @@ jobs:
           platform: macos
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
-          artifact: macos.${{matrix.target}}.${{matrix.arch}}
-          additional: lto=yes macos_deployment_target=10.14
+          artifact: macos.${{matrix.target}}.${{matrix.arch}}${{contains(matrix.lipsync, 'yes') && '-lipsync' || '-base'}}
+          additional: lto=yes lipsync=${{matrix.lipsync}} macos_deployment_target=10.15
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
 
@@ -162,7 +169,7 @@ jobs:
           platform: ios
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
-          artifact: ios.${{matrix.target}}.${{matrix.arch}}
+          artifact: ios.${{matrix.target}}.${{matrix.arch}}-base
           additional: lto=yes
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
@@ -178,6 +185,12 @@ jobs:
       matrix:
         arch: [arm32, arm64, x86_32, x86_64]
         target: [template_debug, template_release]
+        lipsync: [yes, no]
+        exclude:
+          - arch: x86_32
+            lipsync: yes
+          - arch: x86_64
+            lipsync: yes
 
     steps:
       - name: Checkout
@@ -211,8 +224,8 @@ jobs:
           platform: android
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
-          artifact: android.${{matrix.target}}.${{matrix.arch}}
-          additional: lto=yes
+          artifact: android.${{matrix.target}}.${{matrix.arch}}${{contains(matrix.lipsync, 'yes') && '-lipsync' || '-base'}}
+          additional: lto=yes lipsync=${{matrix.lipsync}}
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
 
@@ -253,7 +266,7 @@ jobs:
           platform: web
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
-          artifact: web.${{matrix.target}}.${{matrix.arch}}.threads_${{matrix.threads}}
+          artifact: web.${{matrix.target}}.${{matrix.arch}}.threads_${{matrix.threads}}-base
           additional: lto=yes threads=${{matrix.threads}}
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
@@ -273,47 +286,82 @@ jobs:
     name: 📦 Collect GDExtension binaries
     runs-on: ubuntu-latest
     outputs:
-      artifact_name: ${{steps.output_info.outputs.artifact_name}}
+      is_base_compiled: ${{steps.check_compiled_files.outputs.is_base_compiled}}
+      is_lipsync_compiled: ${{steps.check_compiled_files.outputs.is_lipsync_compiled}}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download Binaries
+      - name: Download Base
         uses: actions/download-artifact@v4
         with:
-          path: extracted_files
+          path: extracted_base
+          pattern: "*-base"
+          merge-multiple: true
 
-      - name: Store all libraries in one directory
+      - name: Download LipSync
+        uses: actions/download-artifact@v4
+        with:
+          path: extracted_lipsync
+          pattern: "*-lipsync"
+          merge-multiple: true
+
+      - name: Check compiled files
+        id: check_compiled_files
         run: |
-          arch_dirs=$(find extracted_files/ -mindepth 1 -maxdepth 1 -type d)
-          echo "Original structure:"
-          find extracted_files -mindepth 1
-          mv -f extracted_files/**/* extracted_files
-          rm -rf $arch_dirs
-          echo "Final structure:"
-          find extracted_files -mindepth 1
-          touch extracted_files/.gdignore
+          if find extracted_base/ -type f | grep -q .; then
+            echo "is_base_compiled=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_base_compiled=false" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Output file information
-        id: output_info
+          if find extracted_lipsync/ -type f | grep -q .; then
+            echo "is_lipsync_compiled=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_lipsync_compiled=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: List all base libs
+        if: steps.check_compiled_files.outputs.is_base_compiled == 'true'
         run: |
-          cd extracted_files
-          echo "Total size: $(du -ch -b | grep total | cut -f1 | awk '{printf "%.2f", $1/1048576}') MB, Total number of files: $(find . -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "Files structure Base:"
+          find extracted_base -mindepth 1
+          cd extracted_base
+          touch .gdignore
+          echo "Total size Base: $(du -ch -b | grep total | cut -f1 | awk '{printf "%.2f", $1/1048576}') MB, Total number of files: $(find . -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-          echo "artifact_name=${{env.PRODUCTION_BUILD == 'true' && '.gdextension_libs_production' || '.gdextension_libs'}}" >> $GITHUB_OUTPUT
+      - name: List all LipSync libs
+        if: steps.check_compiled_files.outputs.is_lipsync_compiled == 'true'
+        run: |
+          echo "Files structure LipSync:"
+          find extracted_lipsync -mindepth 1
+          cd extracted_lipsync
+          touch .gdignore
+          echo "Total size LipSync: $(du -ch -b | grep total | cut -f1 | awk '{printf "%.2f", $1/1048576}') MB, Total number of files: $(find . -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload GDExtension
+      - name: Upload GDExtension Base
+        if: steps.check_compiled_files.outputs.is_base_compiled == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{steps.output_info.outputs.artifact_name}}
+          name: .gdextension_libs_base
           retention-days: 7
-          path: extracted_files/*
+          path: extracted_base/*
+
+      - name: Upload GDExtension LipSync
+        if: steps.check_compiled_files.outputs.is_lipsync_compiled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: .gdextension_libs_lipsync
+          retention-days: 7
+          path: extracted_lipsync/*
 
   # ============================================
 
   pack-release:
-    needs: [collect-gdextension]
+    needs:
+      [collect-gdextension]
     name: 🏁 Pack release archive
     runs-on: ubuntu-latest
 
@@ -321,20 +369,58 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download Binaries
+      - name: Download Base
+        if: needs.collect-gdextension.outputs.is_base_compiled == 'true'
         uses: actions/download-artifact@v4
         with:
           path: addons/${{env.LIBRARY_NAME}}/libs
-          name: ${{needs.collect-gdextension.outputs.artifact_name}}
+          name: .gdextension_libs_base
+          merge-multiple: true
 
-      - name: Move addons to the new root folder
+      - name: Download LipSync
+        if: needs.collect-gdextension.outputs.is_lipsync_compiled == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          path: addons/${{env.LIBRARY_NAME}}_lipsync/libs
+          name: .gdextension_libs_lipsync
+          merge-multiple: true
+
+      - name: Setup OVRLipSync
+        if: needs.collect-gdextension.outputs.is_lipsync_compiled == 'true'
+        uses: ./.github/actions/setup_ovrlipsync
+        with:
+          extract_directory: "addons/${{env.LIBRARY_NAME}}_lipsync"
+
+      - name: Move base addon to the new root folders
+        if: needs.collect-gdextension.outputs.is_base_compiled == 'true'
         run: |
-          mkdir upload
-          mv addons/ upload/addons/
+          mkdir -p upload_base/addons
+          mv addons/${{env.LIBRARY_NAME}} upload_base/addons/${{env.LIBRARY_NAME}}
 
-      - name: Upload GDExtension
+      - name: Move LipSync addon to the new root folders
+        if: needs.collect-gdextension.outputs.is_lipsync_compiled == 'true'
+        run: |
+          pushd addons/${{env.LIBRARY_NAME}}_lipsync/OVRLipSyncNative
+          find -type f \( -name '*.a' -o -name '*.lib' -o -wholename '*/Include/*' -o -wholename '*/Sample/*' \) -delete
+          find -type d -empty -delete
+          touch .gdignore
+          popd
+
+          mkdir -p upload_lipsync/addons
+          mv addons/${{env.LIBRARY_NAME}}_lipsync upload_lipsync/addons/${{env.LIBRARY_NAME}}_lipsync
+
+      - name: Upload GDExtension Base
+        if: needs.collect-gdextension.outputs.is_base_compiled == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ".${{env.PROJECT_NAME}}"
           retention-days: 7
-          path: upload/*
+          path: upload_base/*
+
+      - name: Upload GDExtension LipSync
+        if: needs.collect-gdextension.outputs.is_lipsync_compiled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ".${{env.PROJECT_NAME}}_With_LipSync"
+          retention-days: 7
+          path: upload_lipsync/*
