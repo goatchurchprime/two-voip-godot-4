@@ -174,9 +174,10 @@ func starttalking():
 	$MQTTnetwork.transportaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
 	talkingstarttime = Time.get_ticks_msec()
 	
-	var leadtimems = $HBoxBigButtons/VBoxVox/Leadtime.value*1000 - frametimems
-	while leadtimems > 0 and audioopuschunkedeffect.undrop_chunk():
-		leadtimems -= frametimems
+	if audioopuschunkedeffect != null:
+		var leadtimems = $HBoxBigButtons/VBoxVox/Leadtime.value*1000 - frametimems
+		while leadtimems > 0 and audioopuschunkedeffect.undrop_chunk():
+			leadtimems -= frametimems
 
 
 func _on_mic_working_toggled(toggled_on):
