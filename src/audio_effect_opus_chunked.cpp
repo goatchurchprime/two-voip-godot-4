@@ -187,27 +187,20 @@ void AudioEffectOpusChunkedInstance::_process(const void *src_buffer, AudioFrame
 void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count) {
     if (chunknumber == -1) 
         createencoder();
-
-    int chunkstart = (chunknumber % ringbufferchunks)*audiosamplesize;
     for (int i = 0; i < p_frame_count; i++) {
         p_dst_frames[i] = p_src_frames[i];
-        audiosamplebuffer.set(bufferend, Vector2(p_src_frames[i].left, p_src_frames[i].right));
+        audiosamplebuffer.set(bufferend % audiosamplebuffer.size(), Vector2(p_src_frames[i].left, p_src_frames[i].right));
         bufferend += 1; 
-        if (bufferend == chunkstart) {
+        if (bufferend == (chunknumber + ringbufferchunks)*audiosamplesize) {
             drop_chunk(); 
-            chunkstart = (chunknumber % ringbufferchunks)*audiosamplesize;
             discardedchunks += 1; 
-            printf("Discarding chunk %d\n", discardedchunks); 
+            printf("Discarding chunk %d %d %d \n", discardedchunks, bufferend, (chunknumber + 1)*audiosamplesize); 
         }
-        if (bufferend == audiosamplebuffer.size())
-            bufferend = 0;
     }
 }
 
 bool AudioEffectOpusChunked::chunk_available() {
-    int lchunknumber = (chunknumber % ringbufferchunks);
-    return ((chunknumber != -1) && 
-        ((bufferend < lchunknumber*audiosamplesize) || (bufferend >= (lchunknumber + 1)*audiosamplesize))); 
+    return ((chunknumber != -1) && (bufferend >= (chunknumber + 1)*audiosamplesize)); 
 }
 
 float AudioEffectOpusChunked::chunk_max() {
@@ -266,12 +259,11 @@ void AudioEffectOpusChunked::drop_chunk() {
 }
 
 bool AudioEffectOpusChunked::undrop_chunk() {
-    if (chunknumber == -1) 
+    if ((chunknumber == -1) || (chunknumber == 0)) 
         return false;
-    int lchunknumber = (chunknumber == 0 ? ringbufferchunks : chunknumber) - 1;
-    if (!((bufferend < lchunknumber*audiosamplesize) || (bufferend >= (lchunknumber + 1)*audiosamplesize)))
+    if (bufferend >= (chunknumber - 1 + ringbufferchunks)*audiosamplesize)
         return false;
-    chunknumber = lchunknumber;
+    chunknumber -= 1;
     return true;
 }
 
@@ -279,8 +271,7 @@ PackedVector2Array AudioEffectOpusChunked::read_chunk() {
     if (!chunk_available()) 
         return PackedVector2Array();
     int begin = (chunknumber % ringbufferchunks)*audiosamplesize; 
-    int end = begin + audiosamplesize; 
-    return audiosamplebuffer.slice(begin, end); 
+    return audiosamplebuffer.slice(begin, begin + audiosamplesize); 
 }
 
 float* AudioEffectOpusChunked::chunk_resample_if_necessary(float* laudiosamplebufferptr, int bufferchunknumber) {

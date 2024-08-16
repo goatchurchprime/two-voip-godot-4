@@ -92,9 +92,9 @@ class AudioEffectOpusChunked : public AudioEffect {
     int audiosamplesize = 881;
     int ringbufferchunks = 50;
 
-    PackedVector2Array audiosamplebuffer;  // size audiosamplesize*audiosamplechunks
+    PackedVector2Array audiosamplebuffer;  // size audiosamplesize*ringbufferchunks
     int chunknumber = -1;
-    int bufferend = 0;
+    int bufferend = 0;    // apply %(audiosamplesize*ringbufferchunks) for actual position
     int discardedchunks = 0;
 
     int opussamplerate = 48000;
@@ -102,13 +102,13 @@ class AudioEffectOpusChunked : public AudioEffect {
     int opusbitrate = 24000;
 
     SpeexResamplerState* speexresampler = NULL;
-    PackedVector2Array audioresampledbuffer;  // size opusframesize*audiosamplechunks
+    PackedVector2Array audioresampledbuffer;  // size opusframesize*ringbufferchunks
     int audioresampledbuffer_chunknumber = -1;
     int audioresampledbuffer_bufferend = 0;
     
     DenoiseState *st = NULL;
     int rnnoiseframesize = 0;
-    PackedVector2Array audiodenoisedbuffer;  // size opusframesize*audiosamplechunks
+    PackedVector2Array audiodenoisedbuffer;  // size opusframesize*ringbufferchunks
     PackedFloat32Array rnnoise_in;
     PackedFloat32Array rnnoise_out;
 
