@@ -103,8 +103,8 @@ class AudioEffectOpusChunked : public AudioEffect {
 
     SpeexResamplerState* speexresampler = NULL;
     PackedVector2Array audioresampledbuffer;  // size opusframesize*ringbufferchunks
-    int audioresampledbuffer_chunknumber = -1;
-    int audioresampledbuffer_bufferend = 0;
+    int lastresampledchunk = -1;
+    PackedVector2Array singleresamplebuffer;  // size opusframesize, for use by chunk_to_opus_packet()
     
     DenoiseState *st = NULL;
     int rnnoiseframesize = 0;
@@ -125,8 +125,9 @@ class AudioEffectOpusChunked : public AudioEffect {
 protected:
     static void _bind_methods();
 
-    float* chunk_resample_if_necessary(float* laudiosamplebufferptr, int bufferchunknumber);
+    float* resampled_current_chunk();
     PackedByteArray opus_frame_to_opus_packet(const PackedByteArray& prefixbytes, float* paudiosamples);
+    void resample_single_chunk(float* paudiosamples, float* paudioresamples);
 
 public:
     virtual Ref<AudioEffectInstance> _instantiate() override;
@@ -140,9 +141,9 @@ public:
     int chunk_to_lipsync(); 
     float denoise_resampled_chunk();
     PackedFloat32Array read_visemes(); 
-    PackedByteArray pop_opus_packet(const PackedByteArray& prefixbytes);  // this converts and drops chunk all in one
+    PackedByteArray read_opus_packet(const PackedByteArray& prefixbytes); 
     PackedVector2Array read_chunk();
-    PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& laudiosamplebuffer, int bufferchunknumber);
+    PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& laudiosamplebuffer);
     void drop_chunk();
     bool undrop_chunk();
 

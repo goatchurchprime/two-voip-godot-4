@@ -127,7 +127,7 @@ func updatesamplerates():
 	if opusframesize != 0:
 		recordedopuspackets = [ ]
 		for s in recordedsamples:
-			var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, s, 0)
+			var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, s)
 			recordedopuspackets.append(opuspacket)
 			recordedopuspacketsMemSize += opuspacket.size() 
 		$HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
@@ -242,7 +242,8 @@ func _process(_delta):
 			if currentlytalking:
 				recordedsamples.append(audiosamples)
 				if audioopuschunkedeffect.opusframesize != 0:
-					var opuspacket = audioopuschunkedeffect.pop_opus_packet(prefixbytes)
+					var opuspacket = audioopuschunkedeffect.read_opus_packet(prefixbytes)
+					audioopuschunkedeffect.drop_chunk()
 					recordedopuspackets.append(opuspacket)
 					$MQTTnetwork.transportaudiopacket(opuspacket)
 					$HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
@@ -274,7 +275,7 @@ func _process(_delta):
 				recordedsamples.append(audiosamples)
 				var framecount = len(recordedsamples)
 				if opusframesize != 0:
-					var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, audiosamples, 0);
+					var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, audiosamples);
 					recordedopuspackets.append(opuspacket)
 					framecount = len(recordedopuspackets)
 					$MQTTnetwork.transportaudiopacket(opuspacket)
