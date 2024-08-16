@@ -28,9 +28,13 @@ if env["platform"] == "windows":
     env.Append(CPPDEFINES={"OVR_LIP_SYNC": None})
 
 else:
-    env.Append(CPPPATH=["opus/include"], LIBS=["opus"], LIBPATH="opus/build")
+    env.Append(CPPPATH="opus/include", LIBS=["opus"], LIBPATH=["opus/build"])
+    env.Append(CPPPATH="rnnoise/include", LIBS=["rnnoise"], LIBPATH=["rnnoise/.libs"])
 
-# Couldn't get OVR_LIP_SYNC from Android
+
+
+
+# Couldn't get OVR_LIP_SYNC from Android  (the trick is to put [Dependencies] into the .gdextension file) 
 # Tried nix develop;genericBuilder, then look at linking function.  The ldd-ar not able to unpack libOVRLipSyncShim.a
 # Since the GDExtension can only carry one .so file, a fake addon pointing to OverLipSync.so inserted it into the apk file under Lib
 # (use apktool decode to check the structure), but it didn't work.  This is still a potential way to inject executables into Android
@@ -83,7 +87,7 @@ if env["platform"] == "macos":
     )
 else:
     library = env.SharedLibrary(
-        "addons/twovoip/libtwovoip{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
+        "example/addons/twovoip/libtwovoip{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
         source=sources,
     )
 

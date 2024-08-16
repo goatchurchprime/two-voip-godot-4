@@ -79,6 +79,8 @@ On Mac:
 
 See the instructions on the one-voip here: https://github.com/RevoluPowered/one-voip-godot-4/?tab=readme-ov-file#mac
 
+
+
 ### Using scons
 
 Build a library for the current platform:
@@ -114,3 +116,16 @@ On Windows you may need to copy the `OVRLipSyncNative/Lib/Win64/OVRLipSync.dll` 
 as your `GodotEngine.exe` so that it finds and links it.
 
 For the addon to work correctly, `twovoip_lipsync` and `twovoip` cannot be used in the same project.
+
+## Adding rnnoise
+
+This is a noise supppression library, also from xiph, so it's the best there is.
+
+```bash
+git clone git@github.com:xiph/rnnoise.git
+cd rnnoise
+nix-shell -p autoreconfHook
+./autogen.sh    # this will download 47Mb trained model data
+./configure
+make
+```

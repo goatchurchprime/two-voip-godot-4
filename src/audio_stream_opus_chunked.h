@@ -48,7 +48,6 @@ namespace godot {
 
 class AudioStreamOpusChunked;
 
-
 // This should use AudioStreamPlaybackResampled, so we get the mix_rate done automatically
 class AudioStreamPlaybackOpusChunked : public AudioStreamPlaybackResampled {
     GDCLASS(AudioStreamPlaybackOpusChunked, AudioStreamPlaybackResampled)

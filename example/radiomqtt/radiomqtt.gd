@@ -217,6 +217,10 @@ func _process(_delta):
 	if audioeffectcapture == null:
 		assert (audioopuschunkedeffect != null)
 		while audioopuschunkedeffect.chunk_available():
+			if $HBoxBigButtons/Denoise.button_pressed:
+				var speechnoiseprobability = audioopuschunkedeffect.denoise_resampled_chunk()
+				if speechnoiseprobability > 0.5:
+					print("speechnoiseprobability ", speechnoiseprobability)
 			var audiosamples = audioopuschunkedeffect.read_chunk()
 			audiosamplestoshader(audiosamples)
 			var chunkv1 = audioopuschunkedeffect.chunk_max()
