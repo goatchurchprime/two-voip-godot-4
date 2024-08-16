@@ -76,6 +76,8 @@ typedef enum {
 
 
 // This AudioEffect copies samples from the microphone input into the ringbuffer audiosamplebuffer of size audiosamplesize*audiosamplechunks
+// These chunks are resampled into audioresampledbuffer of size opusframesize*audiosamplechunks
+
 // The chunking is for the purpose of the opus encoder.  GDScript code consumes these chunks as they become available.
 // There is no reason to leave unprocessed data available in the buffer other than a processing delay.
 // Use chunk_max() or chunk_rms() to determin whether to trigger a Vox signal (Voice Operated theshold) so 
@@ -88,9 +90,9 @@ class AudioEffectOpusChunked : public AudioEffect {
 
     int audiosamplerate = 44100;
     int audiosamplesize = 881;
-    int audiosamplechunks = 50;
+    int ringbufferchunks = 50;
 
-    PackedVector2Array audiosamplebuffer;
+    PackedVector2Array audiosamplebuffer;  // size audiosamplesize*audiosamplechunks
     int chunknumber = -1;
     int bufferend = 0;
     int discardedchunks = 0;
@@ -100,9 +102,16 @@ class AudioEffectOpusChunked : public AudioEffect {
     int opusbitrate = 24000;
 
     SpeexResamplerState* speexresampler = NULL;
-    PackedVector2Array audioresampledbuffer;
+    PackedVector2Array audioresampledbuffer;  // size opusframesize*audiosamplechunks
     int audioresampledbuffer_chunknumber = -1;
+    int audioresampledbuffer_bufferend = 0;
     
+    DenoiseState *st = NULL;
+    int rnnoiseframesize = 0;
+    PackedVector2Array audiodenoisedbuffer;  // size opusframesize*audiosamplechunks
+    PackedFloat32Array rnnoise_in;
+    PackedFloat32Array rnnoise_out;
+
     OpusEncoder* opusencoder = NULL;
     PackedByteArray opusbytebuffer;
 
@@ -110,11 +119,6 @@ class AudioEffectOpusChunked : public AudioEffect {
     PackedFloat32Array visemes; 
     ovrLipSyncFrame ovrlipsyncframe;
     ovrLipSyncContext ovrlipsyncctx = 0;
-
-    DenoiseState *st = NULL;
-    int rnnoiseframesize = 0;
-    PackedFloat32Array rnnoise_in;
-    PackedFloat32Array rnnoise_out;
 
     void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
 
@@ -152,8 +156,8 @@ public:
     int get_audiosamplerate() { return audiosamplerate; };
     void set_audiosamplesize(int laudiosamplesize) { chunknumber = -1; audiosamplesize = laudiosamplesize; };
     int get_audiosamplesize() { return audiosamplesize; };
-    void set_audiosamplechunks(int laudiosamplechunks) { chunknumber = -1; audiosamplechunks = laudiosamplechunks; };
-    int get_audiosamplechunks() { return audiosamplechunks; };
+    void set_audiosamplechunks(int laudiosamplechunks) { chunknumber = -1; ringbufferchunks = laudiosamplechunks; };
+    int get_audiosamplechunks() { return ringbufferchunks; };
 
     AudioEffectOpusChunked();
     ~AudioEffectOpusChunked();
