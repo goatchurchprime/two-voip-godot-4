@@ -58,6 +58,7 @@ void AudioEffectOpusChunked::_bind_methods() {
 
     ClassDB::bind_method(D_METHOD("chunk_available"), &AudioEffectOpusChunked::chunk_available);
     ClassDB::bind_method(D_METHOD("resampled_current_chunk"), &AudioEffectOpusChunked::resampled_current_chunk);
+    ClassDB::bind_method(D_METHOD("denoiser_available"), &AudioEffectOpusChunked::denoiser_available);
     ClassDB::bind_method(D_METHOD("denoise_resampled_chunk"), &AudioEffectOpusChunked::denoise_resampled_chunk);
     ClassDB::bind_method(D_METHOD("chunk_max", "rms"), &AudioEffectOpusChunked::chunk_max);
 
@@ -168,6 +169,7 @@ void AudioEffectOpusChunked::createencoder() {
         printf("Encoder timeframeopus equating %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
     }
 
+    printf("DEBOISE %d  \n", rnnoise_get_size());
     st = rnnoise_create(NULL);
     rnnoiseframesize = rnnoise_get_frame_size();
     rnnoise_in.resize(rnnoiseframesize);
@@ -236,6 +238,10 @@ void AudioEffectOpusChunked::resampled_current_chunk() {
         resample_single_chunk(paudioresamples, paudiosamples);
         lastresampledchunk = chunknumber;
     }
+}
+
+bool AudioEffectOpusChunked::denoiser_available() {
+    return (rnnoise_get_size() != 0);
 }
 
 float AudioEffectOpusChunked::denoise_resampled_chunk() {
@@ -321,6 +327,7 @@ void AudioEffectOpusChunked::flush_opus_encoder() {
         opus_frame_to_opus_packet(PackedByteArray(), paudioresamples);
 
     if (st != NULL) {
+        // we could use rnnoise_init (if it doesn't involve a heavy reload of the model)
         float* rin = (float*)rnnoise_in.ptr();
         for (int j = 0; j < rnnoiseframesize; j++)
             rin[j] = 0.0F;
@@ -372,8 +379,6 @@ PackedByteArray AudioEffectOpusChunked::chunk_to_opus_packet(const PackedByteArr
         denoise_single_chunk((float*)singleresamplebuffer.ptrw(), (float*)singleresamplebuffer.ptrw());
     return opus_frame_to_opus_packet(prefixbytes, (float*)singleresamplebuffer.ptrw());
 }
-
-
 
 void AudioEffectOpusChunked::resample_single_chunk(float* paudioresamples, const float* paudiosamples) {
     if (opusframesize != audiosamplesize) {

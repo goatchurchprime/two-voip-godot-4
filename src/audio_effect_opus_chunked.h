@@ -42,7 +42,6 @@
 
 #include "opus.h"
 #include "speex_resampler/speex_resampler.h"
-#include "rnnoise.h"
 
 #ifdef OVR_LIP_SYNC
     #include "OVRLipSync.h"
@@ -50,6 +49,11 @@
     #include "OVRLipSync_Stub.h"
 #endif
 
+#ifdef RNNOISE
+    #include "rnnoise.h"
+#else
+    #include "rnnoise_stub.h"
+#endif
 
 namespace godot {
 
@@ -91,13 +95,10 @@ typedef enum {
 // fix any crashes  
 // plot the float value of the noise detector in the screen as a threshold
 // plot the resampled denoised view in the same texture too. (aligned)
-// make scons so it links in the librnnoise.a file statically
-// make a git submodule for it
 // hack the main scons module so it builds on the actions
 // make a stub so it can run without the rnnoise library if necessary
 // get help with this compiling
 
-// sign up to the ferryman collective VRChat group and try it out
 // finish folding and delivering GP leaflets
 
 
@@ -161,6 +162,7 @@ public:
 
     void resampled_current_chunk();
     float denoise_resampled_chunk();
+    bool denoiser_available();
     PackedVector2Array read_chunk(bool resampled);
     float chunk_max(bool rms);
 

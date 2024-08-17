@@ -100,6 +100,7 @@ func updatesamplerates():
 		audioopuschunkedeffect.opusbitrate = opusbitrate
 		opusframesize = int(opussamplerate*frametimems/1000.0)
 		audioopuschunkedeffect.opusframesize = opusframesize
+		$HBoxBigButtons/VBoxPTT/Denoise.disabled = not audioopuschunkedeffect.denoiser_available()
 	else:
 		opusframesize = int(opussamplerate*frametimems/1000.0)
 	
