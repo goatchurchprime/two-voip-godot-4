@@ -242,10 +242,9 @@ func _process(_delta):
 			audioopuschunkedeffect.resampled_current_chunk()
 			var chunkv1 = audioopuschunkedeffect.chunk_max(false)
 			var chunkv2 = audioopuschunkedeffect.chunk_max(true)
+			var speechnoiseprobability = -1.0
 			if $HBoxBigButtons/VBoxPTT/Denoise.button_pressed:
-				var speechnoiseprobability = audioopuschunkedeffect.denoise_resampled_chunk()
-				if speechnoiseprobability > 0.5:
-					print("speechnoiseprobability ", speechnoiseprobability)
+				speechnoiseprobability = audioopuschunkedeffect.denoise_resampled_chunk()
 				audiosamplestoshader(audioopuschunkedeffect.read_chunk(true), true)
 				$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", true)
 			else:
@@ -264,7 +263,7 @@ func _process(_delta):
 			else:
 				$HBoxVisemes.visible = false
 				
-			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2, frametimems)
+			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2, frametimems, speechnoiseprobability)
 			if currentlytalking:
 				recordedsamples.append(audiosamples)
 				if opusframesize != 0:
@@ -293,7 +292,7 @@ func _process(_delta):
 					chunkv1 = vm
 				schunkv2 = v.x*v.x + v.y*v.y
 			var chunkv2 = sqrt(schunkv2/(len(audiosamples)*2))
-			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2, frametimems)
+			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2, frametimems, -1.0)
 			if currentlytalking:
 				recordedsamples.append(audiosamples)
 				var framecount = len(recordedsamples)
@@ -345,4 +344,5 @@ func _on_option_button_item_selected(_index):
 	updatesamplerates()
 
 func _on_denoise_toggled(toggled_on):
+	$HBoxMicTalk/HSliderVox.value = ($HBoxMicTalk.voiceprobthreshold if toggled_on else $HBoxMicTalk.voxthreshold)*$HBoxMicTalk/HSliderVox.max_value
 	updatesamplerates()

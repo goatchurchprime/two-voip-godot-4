@@ -254,6 +254,14 @@ offset_bottom = 32.0
 mouse_filter = 1
 color = Color(0.689579, 0.760623, 0.0826142, 1)
 
+[node name="ColorRectDenoiseVoiceProb" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
+layout_mode = 0
+offset_left = 193.0
+offset_top = 60.0
+offset_right = 223.0
+offset_bottom = 62.0
+color = Color(1, 1, 0.00392157, 1)
+
 [node name="HSeparator" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
