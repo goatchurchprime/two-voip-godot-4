@@ -29,8 +29,7 @@ if env["platform"] == "windows":
 
 else:
     env.Append(CPPPATH="opus/include", LIBS=["opus"], LIBPATH=["opus/build"])
-    env.Append(CPPPATH="rnnoise/include", LIBS=["rnnoise"], LIBPATH=["rnnoise/.libs"])
-
+    env.Append(CPPPATH="rnnoise/include", LIBS=[File("rnnoise/.libs/librnnoise.a")], LIBPATH=["rnnoise/.libs"])
 
 
 
