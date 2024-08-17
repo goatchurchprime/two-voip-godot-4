@@ -21,9 +21,11 @@ var recordedopuspackets = [ ]
 var recordedopuspacketsMemSize = 0
 var recordedheader = { }
 
-
 var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
+var audioresampledframetextureimage : Image
+var audioresampledframetexture : ImageTexture
+
 var prevviseme = 0
 var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa", "E", "ih", "oh", "ou", "LA" ]
 
@@ -146,20 +148,31 @@ func setupaudioshader():
 	audiosampleframedata_blank.resize(audiosamplesize)
 	for j in range(audiosamplesize):
 		audiosampleframedata_blank.set(j, Vector2(-0.5,0.9) if (j%10)<5 else Vector2(0.6,0.1))
-
+	var audioresampledframedata_blank = PackedVector2Array()
+	audioresampledframedata_blank.resize(opusframesize)
 	audiosampleframetextureimage = Image.create_from_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata_blank.to_byte_array())
 	audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
 	assert (audiosampleframetexture != null)
 	$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
-	
-func audiosamplestoshader(audiosamples):
-	if (len(audiosamples) == 0):
-		print("This should'nt be ", audioopuschunkedeffect.chunk_available())
-	assert (len(audiosamples)== audiosamplesize)
-	audiosampleframetextureimage.set_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
-	audiosampleframetexture.update(audiosampleframetextureimage)
+	if opusframesize != 0:
+		audioresampledframetextureimage = Image.create_from_data(opusframesize, 1, false, Image.FORMAT_RGF, audioresampledframedata_blank.to_byte_array())
+		audioresampledframetexture = ImageTexture.create_from_image(audioresampledframetextureimage)
+		assert (audioresampledframetexture != null)
+		$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice_resampled", audioresampledframetexture)
+		$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", true)
+	else:
+		$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", false)
 
-	#$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
+	
+func audiosamplestoshader(audiosamples, resampled):
+	if resampled:
+		assert (len(audiosamples)== opusframesize)
+		audioresampledframetextureimage.set_data(opusframesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
+		audioresampledframetexture.update(audioresampledframetextureimage)
+	else:
+		assert (len(audiosamples)== audiosamplesize)
+		audiosampleframetextureimage.set_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
+		audiosampleframetexture.update(audiosampleframetextureimage)
 
 var currentlytalking = false
 var talkingstarttime = 0
@@ -225,7 +238,7 @@ func _process(_delta):
 		assert (audioopuschunkedeffect != null)
 		while audioopuschunkedeffect.chunk_available():
 			var audiosamples = audioopuschunkedeffect.read_chunk(false)
-			audiosamplestoshader(audiosamples)
+			audiosamplestoshader(audiosamples, false)
 			audioopuschunkedeffect.resampled_current_chunk()
 			var chunkv1 = audioopuschunkedeffect.chunk_max(false)
 			var chunkv2 = audioopuschunkedeffect.chunk_max(true)
@@ -233,6 +246,11 @@ func _process(_delta):
 				var speechnoiseprobability = audioopuschunkedeffect.denoise_resampled_chunk()
 				if speechnoiseprobability > 0.5:
 					print("speechnoiseprobability ", speechnoiseprobability)
+				audiosamplestoshader(audioopuschunkedeffect.read_chunk(true), true)
+				$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", true)
+			else:
+				$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", false)
+
 			var viseme = audioopuschunkedeffect.chunk_to_lipsync(false)
 			if viseme != prevviseme:
 				print(" viseme ", visemes[viseme], " ", chunkv2)
@@ -265,7 +283,7 @@ func _process(_delta):
 	else:
 		while audioeffectcapture.get_frames_available() > audiosamplesize:
 			var audiosamples = audioeffectcapture.get_buffer(audiosamplesize)
-			audiosamplestoshader(audiosamples)
+			audiosamplestoshader(audiosamples, false)
 			var chunkv1 = 0.0
 			var schunkv2 = 0.0
 			for i in range(len(audiosamples)):

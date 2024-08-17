@@ -37,20 +37,29 @@ code = "// NOTE: Shader automatically converted from Godot Engine 4.3.beta's Can
 shader_type canvas_item;
 render_mode blend_mix;
 
-uniform float blue = 1.0; // you can assign a default value to uniforms
 uniform sampler2D voice : repeat_enable;
+uniform bool drawresampled = false;
+uniform sampler2D voice_resampled : repeat_enable;
 
 void fragment() {
-  COLOR = vec4(UV, 0.5, 1.0);
-  vec4 v = texture(voice, UV);
-  float d = UV.y*2.0 - v.r*4.0 - 1.0;
-  COLOR = (abs(d) < 0.1 ? vec4(0.8,0.8,0.9,1.0) : vec4(0.1,0.1,0.1,1.0));
+  //COLOR = vec4(UV, 0.5, 1.0);
+  float rr = texture(voice, UV).r;
+  float dr = abs(UV.y*2.0 - rr*4.0 - 1.0);
+  float rs = (drawresampled ? texture(voice_resampled, UV).r : 0.0F);
+  float ds = abs(UV.y*2.0 - rs*4.0 - 1.0);
+  if (drawresampled && (ds < 0.1))
+    COLOR = (ds < 0.05 ? vec4(1.0,1.0,0.0,1.0) : vec4(0.5,0.5,0.0,1.0));
+  else if (dr < 0.1)
+    COLOR = vec4(0.8,0.8,0.9,1.0);
+  else
+    COLOR = vec4(0.1,0.1,0.1,1.0);
 }"
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_cklni"]
 shader = SubResource("Shader_r847e")
-shader_parameter/blue = 1.0
+shader_parameter/drawresampled = false
 shader_parameter/voice = ExtResource("3_eh2h5")
+shader_parameter/voice_resampled = ExtResource("3_eh2h5")
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_67wxx"]
 bg_color = Color(0.290196, 0.505882, 0.490196, 1)
