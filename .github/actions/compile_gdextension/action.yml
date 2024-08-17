@@ -93,6 +93,7 @@ runs:
         
         scons apply_patches
         scons build_opus $scons_params
+        scons build_rnnoise $scons_params
         scons $scons_params
         echo "::endgroup::"
 

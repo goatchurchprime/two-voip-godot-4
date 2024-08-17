@@ -28,6 +28,7 @@ patches_to_apply = [
 print("If you add new source files (e.g. .cpp, .c), do not forget to specify them in 'src/default_sources.json'.\n\tOr add them to 'setup_defines_and_flags' inside 'lib_utils.py '.")
 print("To apply git patches, use 'scons apply_patches'.")
 print("To build the opus library, use 'scons build_opus'.")
+print("To build the rnnoise library, use 'scons build_rnnoise'.")
 
 # Additional console arguments
 def setup_options(env: SConsEnvironment, arguments):
@@ -40,6 +41,7 @@ def setup_options(env: SConsEnvironment, arguments):
 
     opts.Add(BoolVariable("lipsync", "Enable lipsync support", False))
     opts.Add(BoolVariable("lto", "Link-time optimization", False))
+    opts.Add(BoolVariable("rnnoise", "Enable rnnoise support", True))
 
     opts.Update(env)
     env.Help(opts.GenerateHelpText(env))
@@ -76,7 +78,7 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
                 print("Lipsync is supported only on arm32 and arm64.")
                 env.Exit(1)
         else:
-            print(f"Lipsync is not supported by the {env["platform"]}:{env["arch"]} platform.")
+            print(f'Lipsync is not supported by the {env["platform"]}:{env["arch"]} platform.')
             env.Exit(1)
 
         dbg_suffix = "d" if env["dev_build"] else ""
@@ -84,6 +86,12 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
                     LIBS=["OVRLipSyncShim" + dbg_suffix],
                     LIBPATH=[lipsync_lib_path],
                     CPPDEFINES=["OVR_LIP_SYNC"])
+
+    if env["rnnoise"]:
+        env.Append(CPPPATH="rnnoise/include", 
+                    LIBS=[File("rnnoise/.libs/librnnoise.a")], 
+                    LIBPATH=["rnnoise/.libs"], 
+                    CPPDEFINES=["RNNOISE"])
 
     if env.get("is_msvc", False):
         env.Append(LINKFLAGS=["/WX:NO"])
@@ -119,6 +127,18 @@ def build_opus(target, source, env: SConsEnvironment):
 
     return lib_utils_external.cmake_build_project(env, "opus", extra_flags)
 
+def build_rnnoise(target, source, env: SConsEnvironment):
+    extra_flags = []
+    if env["platform"] == "web":
+        extra_flags += ["-DOPUS_STACK_PROTECTOR=0"]
+    if env["platform"] in ["linux", "web"]:
+        extra_flags += ["-DCMAKE_POSITION_INDEPENDENT_CODE=ON"]
+    if env["platform"] in ["macos", "ios"]:
+        extra_flags += ["-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64", "-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15"]
+
+    return lib_utils_external.autogen_build_project(env, "rnnoise", extra_flags)
+
+
 env: SConsEnvironment = SConscript("godot-cpp/SConstruct")
 env = env.Clone()
 
@@ -137,3 +157,4 @@ lib_utils.get_library_object(env, project_name, lib_name, output_path, src_folde
 # Register console commands
 env.Command("apply_patches", [], apply_patches)
 env.Command("build_opus", [], build_opus)
+env.Command("build_rnnoise", [], build_rnnoise)

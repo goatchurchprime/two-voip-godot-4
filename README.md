@@ -86,6 +86,7 @@ See the instructions on the one-voip here: https://github.com/RevoluPowered/one-
 Build a library for the current platform:
 
 ```bash
+nix-shell -p scons cmake ninja autoreconfHook # if you are on nix
 scons apply_patches # optional
 scons build_opus # build opus using cmake
 scons # build this library
