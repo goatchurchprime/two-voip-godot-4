@@ -87,6 +87,20 @@ typedef enum {
 
 // chunk_to_opus_packet() is for encoding a series of chunks not in the ring buffer.
 
+// TODO
+// fix any crashes  
+// plot the float value of the noise detector in the screen as a threshold
+// plot the resampled denoised view in the same texture too. (aligned)
+// make scons so it links in the librnnoise.a file statically
+// make a git submodule for it
+// hack the main scons module so it builds on the actions
+// make a stub so it can run without the rnnoise library if necessary
+// get help with this compiling
+
+// sign up to the ferryman collective VRChat group and try it out
+// finish folding and delivering GP leaflets
+
+
 class AudioEffectOpusChunked : public AudioEffect {
     GDCLASS(AudioEffectOpusChunked, AudioEffect)
     friend class AudioEffectOpusChunkedInstance;
@@ -119,6 +133,7 @@ class AudioEffectOpusChunked : public AudioEffect {
 
     OpusEncoder* opusencoder = NULL;
     PackedByteArray opusbytebuffer;
+    int lastopuschunk = -1;
 
     GovrLipSyncStatus govrlipsyncstatus = GovrLipSyncUninitialized;
     PackedFloat32Array visemes; 
@@ -146,21 +161,15 @@ public:
 
     void resampled_current_chunk();
     float denoise_resampled_chunk();
-    PackedVector2Array read_chunk(bool unresampled);
+    PackedVector2Array read_chunk(bool resampled);
     float chunk_max(bool rms);
 
     PackedByteArray read_opus_packet(const PackedByteArray& prefixbytes); 
-    int chunk_to_lipsync(); 
+    void flush_opus_encoder();
+    int chunk_to_lipsync(bool resampled); 
     PackedFloat32Array read_visemes() { return visemes; };
 
     PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamples, bool denoise);
-
-
-// crashes playing back uncompressed one.  
-// keep working on the conversions
-// plot the float value of the noise detector in the screen
-// plot the resampled view in the same texture too. (aligned)
-
 
     void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };

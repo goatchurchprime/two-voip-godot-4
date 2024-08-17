@@ -178,9 +178,13 @@ func starttalking():
 	
 	if audioopuschunkedeffect != null:
 		var leadtimems = $HBoxBigButtons/VBoxVox/Leadtime.value*1000 - frametimems
+		var Dundroppedchunks = 0
 		while leadtimems > 0 and audioopuschunkedeffect.undrop_chunk():
 			leadtimems -= frametimems
-
+			Dundroppedchunks += 1
+		print("Undropped ", Dundroppedchunks, " chunks")
+		#if opusframesize != 0:
+		audioopuschunkedeffect.flush_opus_encoder()
 
 func _on_mic_working_toggled(toggled_on):
 	print("_on_mic_working_toggled ", $AudioStreamMicrophone.playing, " to ", toggled_on)
@@ -219,7 +223,7 @@ func _process(_delta):
 	if audioeffectcapture == null:
 		assert (audioopuschunkedeffect != null)
 		while audioopuschunkedeffect.chunk_available():
-			var audiosamples = audioopuschunkedeffect.read_chunk(true)
+			var audiosamples = audioopuschunkedeffect.read_chunk(false)
 			audiosamplestoshader(audiosamples)
 			audioopuschunkedeffect.resampled_current_chunk()
 			var chunkv1 = audioopuschunkedeffect.chunk_max(false)
@@ -228,7 +232,7 @@ func _process(_delta):
 				var speechnoiseprobability = audioopuschunkedeffect.denoise_resampled_chunk()
 				if speechnoiseprobability > 0.5:
 					print("speechnoiseprobability ", speechnoiseprobability)
-			var viseme = audioopuschunkedeffect.chunk_to_lipsync()
+			var viseme = audioopuschunkedeffect.chunk_to_lipsync(false)
 			if viseme != prevviseme:
 				print(" viseme ", visemes[viseme], " ", chunkv2)
 				prevviseme = viseme
