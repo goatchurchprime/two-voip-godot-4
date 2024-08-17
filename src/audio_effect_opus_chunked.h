@@ -74,15 +74,18 @@ typedef enum {
     GovrLipSyncUnavailable,
 } GovrLipSyncStatus;
 
+// This AudioEffect records 44.1kHz samples from the microphone into a ring buffer.
+// If there are enough samples to make up a chunk (usually 20ms), chunk_available() returns true.
+// An available chunk can be resampled up to 48kHz in a second ringbuffer by resampled_current_chunk()
+// A resampled 48kHz chunk can be denoised into a third ringbuffer by denoise_resampled_chunk()
+// read_chunk() will return a chunk from either of these three buffers depending on progress through the above two functions.
 
-// This AudioEffect copies samples from the microphone input into the ringbuffer audiosamplebuffer of size audiosamplesize*audiosamplechunks
-// These chunks are resampled into audioresampledbuffer of size opusframesize*audiosamplechunks
+// chunk_to_lipsync() and read_opus() will apply to the same chunk as read_chunk(), so keep it consistent, 
+//   This design is so we can defer calling either of these functions until we are sure it's a speaking episode
+// drop_chunk() advances to next chunk, undrop_chunk() rolls back the buffer it so we can run the deferred functions
+// and avoid pre-clipping of the spoken episode.
 
-// The chunking is for the purpose of the opus encoder.  GDScript code consumes these chunks as they become available.
-// There is no reason to leave unprocessed data available in the buffer other than a processing delay.
-// Use chunk_max() or chunk_rms() to determin whether to trigger a Vox signal (Voice Operated theshold) so 
-// that the opus coding does not need to be applied to all the unspoken silence.
-// Use undrop_chunks() to roll-back the buffer to back-date when the Vox should come on and stop pre-clipping
+// chunk_to_opus_packet() is for encoding a series of chunks not in the ring buffer.
 
 class AudioEffectOpusChunked : public AudioEffect {
     GDCLASS(AudioEffectOpusChunked, AudioEffect)
@@ -103,12 +106,14 @@ class AudioEffectOpusChunked : public AudioEffect {
 
     SpeexResamplerState* speexresampler = NULL;
     PackedVector2Array audioresampledbuffer;  // size opusframesize*ringbufferchunks
-    int lastresampledchunk = -1;
     PackedVector2Array singleresamplebuffer;  // size opusframesize, for use by chunk_to_opus_packet()
-    
+    int lastresampledchunk = -1;
+
     DenoiseState *st = NULL;
     int rnnoiseframesize = 0;
     PackedVector2Array audiodenoisedbuffer;  // size opusframesize*ringbufferchunks
+    PackedFloat32Array audiodenoisedvalues;  // size ringbufferchunks
+    int lastdenoisedchunk = -1;
     PackedFloat32Array rnnoise_in;
     PackedFloat32Array rnnoise_out;
 
@@ -125,10 +130,10 @@ class AudioEffectOpusChunked : public AudioEffect {
 protected:
     static void _bind_methods();
 
-    float* resampled_current_chunk();
+    void resample_single_chunk(float* paudioresamples, const float* paudiosamples);
+    float denoise_single_chunk(float* pdenoisedaudioresamples, const float* paudiosamples);
     PackedByteArray opus_frame_to_opus_packet(const PackedByteArray& prefixbytes, float* paudiosamples);
-    void resample_single_chunk(float* paudiosamples, float* paudioresamples);
-
+    
 public:
     virtual Ref<AudioEffectInstance> _instantiate() override;
 
@@ -136,16 +141,26 @@ public:
     void resetencoder(int Dreason=3);
 
     bool chunk_available();
-    float chunk_max();
-    float chunk_rms();
-    int chunk_to_lipsync(); 
-    float denoise_resampled_chunk();
-    PackedFloat32Array read_visemes(); 
-    PackedByteArray read_opus_packet(const PackedByteArray& prefixbytes); 
-    PackedVector2Array read_chunk();
-    PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& laudiosamplebuffer);
     void drop_chunk();
     bool undrop_chunk();
+
+    void resampled_current_chunk();
+    float denoise_resampled_chunk();
+    PackedVector2Array read_chunk(bool unresampled);
+    float chunk_max(bool rms);
+
+    PackedByteArray read_opus_packet(const PackedByteArray& prefixbytes); 
+    int chunk_to_lipsync(); 
+    PackedFloat32Array read_visemes() { return visemes; };
+
+    PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamples, bool denoise);
+
+
+// crashes playing back uncompressed one.  
+// keep working on the conversions
+// plot the float value of the noise detector in the screen
+// plot the resampled view in the same texture too. (aligned)
+
 
     void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };

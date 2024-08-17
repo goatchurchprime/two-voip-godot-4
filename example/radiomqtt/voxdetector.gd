@@ -6,7 +6,7 @@ var samplescountdown = 1
 var voxthreshold = 1.0
 var visthreshold = 1.0
 
-@onready var PTT = get_node("../HBoxBigButtons/PTT")
+@onready var PTT = get_node("../HBoxBigButtons/VBoxPTT/PTT")
 @onready var Vox = get_node("../HBoxBigButtons/VBoxVox/Vox")
 @onready var Sil = get_node("../HBoxBigButtons/VBoxVox/Silence")
 @onready var Hangtime = get_node("../HBoxBigButtons/VBoxVox/Hangtime")

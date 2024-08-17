@@ -57,16 +57,18 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("Dcreateencoder"), &AudioEffectOpusChunked::createencoder);
 
     ClassDB::bind_method(D_METHOD("chunk_available"), &AudioEffectOpusChunked::chunk_available);
-    ClassDB::bind_method(D_METHOD("chunk_max"), &AudioEffectOpusChunked::chunk_max);
-    ClassDB::bind_method(D_METHOD("chunk_rms"), &AudioEffectOpusChunked::chunk_rms);
+    ClassDB::bind_method(D_METHOD("resampled_current_chunk"), &AudioEffectOpusChunked::resampled_current_chunk);
     ClassDB::bind_method(D_METHOD("denoise_resampled_chunk"), &AudioEffectOpusChunked::denoise_resampled_chunk);
+    ClassDB::bind_method(D_METHOD("chunk_max", "rms"), &AudioEffectOpusChunked::chunk_max);
+
     ClassDB::bind_method(D_METHOD("chunk_to_lipsync"), &AudioEffectOpusChunked::chunk_to_lipsync);
     ClassDB::bind_method(D_METHOD("read_visemes"), &AudioEffectOpusChunked::read_visemes);
-    ClassDB::bind_method(D_METHOD("read_chunk"), &AudioEffectOpusChunked::read_chunk);
+    
+    ClassDB::bind_method(D_METHOD("read_chunk", "unresampled"), &AudioEffectOpusChunked::read_chunk);
     ClassDB::bind_method(D_METHOD("drop_chunk"), &AudioEffectOpusChunked::drop_chunk);
     ClassDB::bind_method(D_METHOD("undrop_chunk"), &AudioEffectOpusChunked::undrop_chunk);
     ClassDB::bind_method(D_METHOD("read_opus_packet", "prefixbytes"), &AudioEffectOpusChunked::read_opus_packet);
-    ClassDB::bind_method(D_METHOD("chunk_to_opus_packet", "prefixbytes", "audiosamplebuffer"), &AudioEffectOpusChunked::chunk_to_opus_packet);
+    ClassDB::bind_method(D_METHOD("chunk_to_opus_packet", "prefixbytes", "audiosamples", "denoise"), &AudioEffectOpusChunked::chunk_to_opus_packet);
 }
 
 const int MAXPREFIXBYTES = 100;
@@ -137,7 +139,7 @@ void AudioEffectOpusChunked::createencoder() {
         }
     } else {
         if (rc == ovrLipSyncError_MissingDLL)
-            std::cerr << "Failed to initialize ovrLipSync engine: Cannot find OVRLipSync.DLL." << std::endl;
+            std::cerr << "Failed to initialize ovrLipSynchunk_to_lipsyncc engine: Cannot find OVRLipSync.DLL." << std::endl;
         else
             std::cerr << "Failed to initialize ovrLipSync engine: " << rc << std::endl;
         govrlipsyncstatus = GovrLipSyncUnavailable;
@@ -165,6 +167,14 @@ void AudioEffectOpusChunked::createencoder() {
         printf("Encoder timeframeopus equating %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
     }
 
+    st = rnnoise_create(NULL);
+    rnnoiseframesize = rnnoise_get_frame_size();
+    rnnoise_in.resize(rnnoiseframesize);
+    rnnoise_out.resize(rnnoiseframesize);
+    audiodenoisedbuffer.resize(opusframesize*ringbufferchunks);
+    audiodenoisedvalues.resize(ringbufferchunks);
+    lastdenoisedchunk = -1;
+
     // opussamplerate is one of 8000,12000,16000,24000,48000
     // opussamplesize is 480 for 10ms at 48000
     int opusapplication = OPUS_APPLICATION_VOIP; // this option includes in-band forward error correction
@@ -174,11 +184,6 @@ void AudioEffectOpusChunked::createencoder() {
     opusbytebuffer.resize(sizeof(float)*channels*opusframesize + MAXPREFIXBYTES);
     if (opuserror != 0) 
         printf("We have an opus error*** %d\n", opuserror); 
-    
-    st = rnnoise_create(NULL);
-    rnnoiseframesize = rnnoise_get_frame_size();
-    rnnoise_in.resize(rnnoiseframesize);
-    rnnoise_out.resize(rnnoiseframesize);
 }
 
 void AudioEffectOpusChunkedInstance::_process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) {
@@ -204,55 +209,6 @@ bool AudioEffectOpusChunked::chunk_available() {
     return ((chunknumber != -1) && (bufferend >= (chunknumber + 1)*audiosamplesize)); 
 }
 
-float AudioEffectOpusChunked::chunk_max() {
-    if (!chunk_available()) 
-        return -1.0;
-    float r = 0.0F;
-    float* p = (float*)audiosamplebuffer.ptr() + 2*(chunknumber % ringbufferchunks)*audiosamplesize;
-    for (int i = 0; i < audiosamplesize*2; i++) {
-        float s = fabs(p[i]);
-        if (s > r)
-            r = s;
-    }
-    return r;
-}
-
-float AudioEffectOpusChunked::chunk_rms() {
-    if (!chunk_available()) 
-        return -1.0;
-    float s = 0.0F;
-    float* p = (float*)audiosamplebuffer.ptr() + 2*(chunknumber % ringbufferchunks)*audiosamplesize;
-    for (int i = 0; i < audiosamplesize*2; i++) {
-        s += p[i]*p[i];
-    }
-    return sqrt(s/(audiosamplesize*2));
-}
-
-int AudioEffectOpusChunked::chunk_to_lipsync() {
-    if (!chunk_available()) 
-        return -1;
-    if (govrlipsyncstatus != GovrLipSyncValid)
-        return -1;
-    auto rc = ovrLipSync_ProcessFrameEx(ovrlipsyncctx, 
-        (float*)audiosamplebuffer.ptr() + 2*(chunknumber % ringbufferchunks)*audiosamplesize, audiosamplesize,
-        ovrLipSyncAudioDataType_F32_Stereo, &ovrlipsyncframe);
-    visemes[ovrLipSyncViseme_Count] = ovrlipsyncframe.laughterScore;
-    visemes[ovrLipSyncViseme_Count+1] = ovrlipsyncframe.frameDelay;
-    visemes[ovrLipSyncViseme_Count+2] = ovrlipsyncframe.frameNumber;
-    float* array = (float*)visemes.ptrw();
-    int res = 0;
-    for (int i = 1; i < ovrLipSyncViseme_Count; i++) {
-        if (array[i] > array[res])
-            res = i;
-    }
-    return res;
-}
-
-PackedFloat32Array AudioEffectOpusChunked::read_visemes() {
-    return visemes;
-}
-
-
 void AudioEffectOpusChunked::drop_chunk() {
     if (!chunk_available()) 
         return;
@@ -268,24 +224,129 @@ bool AudioEffectOpusChunked::undrop_chunk() {
     return true;
 }
 
-PackedVector2Array AudioEffectOpusChunked::read_chunk() {
-    if (!chunk_available()) 
-        return PackedVector2Array();
-    int begin = (chunknumber % ringbufferchunks)*audiosamplesize; 
-    return audiosamplebuffer.slice(begin, begin + audiosamplesize); 
-}
 
-float* AudioEffectOpusChunked::resampled_current_chunk() {
-    float* paudioresamples = (float*)audioresampledbuffer.ptrw() + (chunknumber % ringbufferchunks)*opusframesize*2; 
+void AudioEffectOpusChunked::resampled_current_chunk() {
+    if (!chunk_available() || (opusframesize == 0)) 
+        return;
     if (lastresampledchunk < chunknumber) {
         float* paudiosamples = (float*)audiosamplebuffer.ptrw() + (chunknumber % ringbufferchunks)*audiosamplesize*2; 
-        resample_single_chunk(paudiosamples, paudioresamples);
+        float* paudioresamples = (float*)audioresampledbuffer.ptrw() + (chunknumber % ringbufferchunks)*opusframesize*2; 
+        resample_single_chunk(paudioresamples, paudiosamples);
         lastresampledchunk = chunknumber;
     }
-    return paudioresamples;
 }
 
-void AudioEffectOpusChunked::resample_single_chunk(float* paudiosamples, float* paudioresamples) {
+float AudioEffectOpusChunked::denoise_resampled_chunk() {
+    if (!chunk_available() || (opusframesize == 0)) 
+        return -1.0;
+    resampled_current_chunk();
+    int rchunknumber = (chunknumber % ringbufferchunks);
+    if (lastdenoisedchunk < chunknumber) {
+        float* paudioresamples = (float*)audioresampledbuffer.ptrw() + rchunknumber*opusframesize*2; 
+        float* pdenoisedaudioresamples = (float*)audiodenoisedbuffer.ptrw() + rchunknumber*opusframesize*2;
+        audiodenoisedvalues[rchunknumber] = denoise_single_chunk(pdenoisedaudioresamples, paudioresamples);
+        lastdenoisedchunk = chunknumber; 
+    }
+    return audiodenoisedvalues[rchunknumber];
+}
+
+
+float AudioEffectOpusChunked::chunk_max(bool rms) {
+    if (!chunk_available()) 
+        return -1.0;
+    float* p;
+    int n;
+    if ((opusframesize == 0) || (chunknumber > lastresampledchunk)) {
+        p = (float*)audiosamplebuffer.ptr() + (chunknumber % ringbufferchunks)*audiosamplesize*2; 
+        n = audiosamplesize*2; 
+    } else {
+        p = (chunknumber > lastdenoisedchunk ? (float*)audioresampledbuffer.ptr() : (float*)audiodenoisedvalues.ptr());
+        p += (chunknumber % ringbufferchunks)*opusframesize*2; 
+        n = opusframesize*2;
+    } 
+
+    if (rms) {
+        float s = 0.0F;
+        for (int i = 0; i < n; i++) {
+            s += p[i]*p[i];
+        }
+        return sqrt(s/n);
+    } else {
+        float r = 0.0F;
+        for (int i = 0; i < n; i++) {
+            float s = fabs(p[i]);
+            if (s > r)
+                r = s;
+        }
+        return r;
+    }
+}
+
+PackedVector2Array AudioEffectOpusChunked::read_chunk(bool unresampled) {
+    if (!chunk_available()) 
+        return PackedVector2Array();
+    if (unresampled || (opusframesize == 0) || (chunknumber > lastresampledchunk)) {
+        int begin = (chunknumber % ringbufferchunks)*audiosamplesize; 
+        return audiosamplebuffer.slice(begin, begin + audiosamplesize); 
+    }
+    int begin = (chunknumber % ringbufferchunks)*opusframesize; 
+    if (chunknumber > lastdenoisedchunk)
+        return audioresampledbuffer.slice(begin, begin + opusframesize); 
+    return audiodenoisedbuffer.slice(begin, begin + opusframesize); 
+}
+
+PackedByteArray AudioEffectOpusChunked::read_opus_packet(const PackedByteArray& prefixbytes) {
+    if (!chunk_available() || (opusframesize == 0))
+        return PackedByteArray();
+    resampled_current_chunk();
+    float* paudioresamples = (chunknumber > lastdenoisedchunk ? (float*)audioresampledbuffer.ptr() : (float*)audiodenoisedbuffer.ptr()) \
+                             + (chunknumber % ringbufferchunks)*opusframesize*2; 
+    return opus_frame_to_opus_packet(prefixbytes, paudioresamples);
+}
+
+int AudioEffectOpusChunked::chunk_to_lipsync() {
+    if (!chunk_available()) 
+        return -1;
+    if (govrlipsyncstatus != GovrLipSyncValid)
+        return -1;
+
+    const void* audioBuffer;
+    int sampleCount;
+    if (chunknumber > lastresampledchunk) {
+        audioBuffer = (float*)audiosamplebuffer.ptr() + (chunknumber % ringbufferchunks)*audiosamplesize*2; 
+        sampleCount = audiosamplesize*2; 
+    } else {
+        audioBuffer = (chunknumber > lastdenoisedchunk ? (float*)audioresampledbuffer.ptr() : (float*)audiodenoisedbuffer.ptr()) \
+                      + (chunknumber % ringbufferchunks)*opusframesize*2; 
+        sampleCount = opusframesize*2;
+    } 
+
+    auto rc = ovrLipSync_ProcessFrameEx(ovrlipsyncctx, audioBuffer, sampleCount,
+                                        ovrLipSyncAudioDataType_F32_Stereo, &ovrlipsyncframe);
+    visemes[ovrLipSyncViseme_Count] = ovrlipsyncframe.laughterScore;
+    visemes[ovrLipSyncViseme_Count+1] = ovrlipsyncframe.frameDelay;
+    visemes[ovrLipSyncViseme_Count+2] = ovrlipsyncframe.frameNumber;
+    float* array = (float*)visemes.ptrw();
+    int res = 0;
+    for (int i = 1; i < ovrLipSyncViseme_Count; i++) {
+        if (array[i] > array[res])
+            res = i;
+    }
+    return res;
+}
+
+PackedByteArray AudioEffectOpusChunked::chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamples, bool denoise) {
+    if (chunknumber == -1) 
+        createencoder();
+    resample_single_chunk((float*)singleresamplebuffer.ptrw(), (float*)audiosamples.ptr());
+    if (denoise)
+        denoise_single_chunk((float*)singleresamplebuffer.ptrw(), (float*)singleresamplebuffer.ptrw());
+    return opus_frame_to_opus_packet(prefixbytes, (float*)singleresamplebuffer.ptrw());
+}
+
+
+
+void AudioEffectOpusChunked::resample_single_chunk(float* paudioresamples, const float* paudiosamples) {
     if (opusframesize != audiosamplesize) {
         unsigned int Uaudiosamplesize = audiosamplesize;
         unsigned int Uopusframesize = opusframesize;
@@ -298,12 +359,36 @@ void AudioEffectOpusChunked::resample_single_chunk(float* paudiosamples, float* 
     }
 }
 
-PackedByteArray AudioEffectOpusChunked::chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& laudiosamplebuffer) {
-    if (chunknumber == -1) 
-        createencoder();
-    resample_single_chunk((float*)laudiosamplebuffer.ptr(), (float*)singleresamplebuffer.ptrw());
-    return opus_frame_to_opus_packet(prefixbytes, (float*)singleresamplebuffer.ptrw());
+float AudioEffectOpusChunked::denoise_single_chunk(float* pdenoisedaudioresamples, const float* paudiosamples) {
+    int nnoisechunks = (int)(opusframesize/rnnoiseframesize);
+    float res = -1.0F;
+    if (nnoisechunks*rnnoiseframesize == opusframesize) {
+        float* rin = (float*)rnnoise_in.ptr();
+        float* rout = (float*)rnnoise_out.ptr();
+        for (int j = 0; j < nnoisechunks; j++) {
+            const float* p = paudiosamples + 2*j*rnnoiseframesize;
+            for (int i = 0; i < rnnoiseframesize; i++) {
+                rin[i] = (p[i*2] + p[i*2+1])*0.5F*32768.0F;
+            }
+            float r = rnnoise_process_frame(st, rout, rin);
+            if (r > res)
+                res = r;
+            float* q = pdenoisedaudioresamples + 2*j*rnnoiseframesize;
+            for (int i = 0; i < rnnoiseframesize; i++) {
+                q[i*2] = rout[i]/32768.0F;
+                q[i*2+1] = rout[i]/32768.0F;
+            }
+        }
+    } else {
+        printf("Warning: noise framesize %d does not divide opusframesize %d\n", rnnoiseframesize, opusframesize);
+        for (int i = 0; i < opusframesize; i++) {
+            pdenoisedaudioresamples[i*2] = paudiosamples[i*2];
+            pdenoisedaudioresamples[i*2 + 1] = paudiosamples[i*2 + 1];
+        }
+    }
+    return res;
 }
+
 
 PackedByteArray AudioEffectOpusChunked::opus_frame_to_opus_packet(const PackedByteArray& prefixbytes, float* paudiosamples) {
     unsigned char* popusbytes = opusbytebuffer.ptrw(); 
@@ -320,38 +405,6 @@ PackedByteArray AudioEffectOpusChunked::opus_frame_to_opus_packet(const PackedBy
     return opusbytebuffer.slice(0, nprefbytes + bytepacketsize);
 }
 
-float AudioEffectOpusChunked::denoise_resampled_chunk() {
-    float* paudioresamples = resampled_current_chunk();
-    int nnoisechunks = (int)(opusframesize/rnnoiseframesize);
-    float res = -1.0F;
-    if (nnoisechunks*rnnoiseframesize == opusframesize) {
-        float* rin = (float*)rnnoise_in.ptr();
-        float* rout = (float*)rnnoise_out.ptr();
-        for (int j = 0; j < nnoisechunks; j++) {
-            float* p = paudioresamples + 2*j*rnnoiseframesize;
-            for (int i = 0; i < rnnoiseframesize; i++) {
-                rin[i] = (p[i*2] + p[i*2+1])*0.5F*32768.0F;
-            }
-            float r = rnnoise_process_frame(st, rin, rin);
-            if (r > res)
-                res = r;
-            for (int i = 0; i < rnnoiseframesize; i++) {
-                p[i*2] = rin[i]/32768.0F;
-                p[i*2+1] = rin[i]/32768.0F;
-            }
-        }
-    } else {
-         printf("Warning: noise framesize %d does not divide audiosamplesize %d\n", rnnoiseframesize, audiosamplesize);
-    }
-    return res;
-}
-
-PackedByteArray AudioEffectOpusChunked::read_opus_packet(const PackedByteArray& prefixbytes) {
-    if (!chunk_available() || (opusframesize == 0))
-        return PackedByteArray();
-    float* paudioresamples = resampled_current_chunk();
-    return opus_frame_to_opus_packet(prefixbytes, paudioresamples);
-}
 
 
 

@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=22 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
@@ -21,6 +21,9 @@ corner_radius_top_left = 20
 corner_radius_top_right = 20
 corner_radius_bottom_right = 20
 corner_radius_bottom_left = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ak08f"]
+bg_color = Color(0.814464, 0.272608, 0.419173, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_k6a7f"]
 bg_color = Color(0.6, 0.6, 0.0470588, 1)
@@ -118,15 +121,28 @@ layout_mode = 2
 layout_mode = 2
 size_flags_horizontal = 4
 
-[node name="PTT" type="Button" parent="HBoxBigButtons"]
+[node name="VBoxPTT" type="VBoxContainer" parent="HBoxBigButtons"]
+layout_mode = 2
+
+[node name="PTT" type="Button" parent="HBoxBigButtons/VBoxPTT"]
 custom_minimum_size = Vector2(250, 100)
 layout_mode = 2
+size_flags_vertical = 3
 tooltip_text = "Hold down to talk"
 theme_override_font_sizes/font_size = 50
 theme_override_styles/pressed = SubResource("StyleBoxFlat_30le3")
 theme_override_styles/normal = SubResource("StyleBoxFlat_ljq7l")
 text = "PTT
 "
+
+[node name="HSeparator" type="HSeparator" parent="HBoxBigButtons/VBoxPTT"]
+layout_mode = 2
+
+[node name="Denoise" type="Button" parent="HBoxBigButtons/VBoxPTT"]
+layout_mode = 2
+theme_override_styles/pressed = SubResource("StyleBoxFlat_ak08f")
+toggle_mode = true
+text = "De-Noise"
 
 [node name="VSeparator" type="VSeparator" parent="HBoxBigButtons"]
 custom_minimum_size = Vector2(20, 0)
@@ -169,16 +185,6 @@ custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 tooltip_text = "Hold this down to set the Vox silence threshold"
 text = "Sil"
-
-[node name="Denoise" type="Button" parent="HBoxBigButtons"]
-layout_mode = 2
-toggle_mode = true
-text = "D
-E
-N
-O
-I
-S"
 
 [node name="HSeparator2" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
@@ -571,6 +577,7 @@ offset_bottom = 23.0
 text = "sil"
 
 [connection signal="finished" from="AudioStreamMicrophone" to="." method="_on_audio_stream_microphone_finished"]
+[connection signal="toggled" from="HBoxBigButtons/VBoxPTT/Denoise" to="." method="_on_denoise_toggled"]
 [connection signal="toggled" from="HBoxBigButtons/VBoxVox/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
 [connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="toggled" from="HBoxMicTalk/MicWorking" to="." method="_on_mic_working_toggled"]

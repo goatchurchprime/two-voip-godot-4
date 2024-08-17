@@ -127,7 +127,7 @@ func updatesamplerates():
 	if opusframesize != 0:
 		recordedopuspackets = [ ]
 		for s in recordedsamples:
-			var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, s)
+			var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, s, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed)
 			recordedopuspackets.append(opuspacket)
 			recordedopuspacketsMemSize += opuspacket.size() 
 		$HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
@@ -152,6 +152,8 @@ func setupaudioshader():
 	$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
 	
 func audiosamplestoshader(audiosamples):
+	if (len(audiosamples) == 0):
+		print("This should'nt be ", audioopuschunkedeffect.chunk_available())
 	assert (len(audiosamples)== audiosamplesize)
 	audiosampleframetextureimage.set_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
 	audiosampleframetexture.update(audiosampleframetextureimage)
@@ -202,7 +204,7 @@ func _input(event):
 			print($AudioStreamMicrophone.volume_db)
 
 func _process(_delta):
-	var talking = $HBoxBigButtons/PTT.button_pressed
+	var talking = $HBoxBigButtons/VBoxPTT/PTT.button_pressed
 	if talking:
 		$HBoxPlaycount/GridContainer/TimeSecs.text = "%.1f" % ((Time.get_ticks_msec() - talkingstarttime)*0.001)
 	if talking and not currentlytalking:
@@ -217,14 +219,15 @@ func _process(_delta):
 	if audioeffectcapture == null:
 		assert (audioopuschunkedeffect != null)
 		while audioopuschunkedeffect.chunk_available():
-			if $HBoxBigButtons/Denoise.button_pressed:
+			var audiosamples = audioopuschunkedeffect.read_chunk(true)
+			audiosamplestoshader(audiosamples)
+			audioopuschunkedeffect.resampled_current_chunk()
+			var chunkv1 = audioopuschunkedeffect.chunk_max(false)
+			var chunkv2 = audioopuschunkedeffect.chunk_max(true)
+			if $HBoxBigButtons/VBoxPTT/Denoise.button_pressed:
 				var speechnoiseprobability = audioopuschunkedeffect.denoise_resampled_chunk()
 				if speechnoiseprobability > 0.5:
 					print("speechnoiseprobability ", speechnoiseprobability)
-			var audiosamples = audioopuschunkedeffect.read_chunk()
-			audiosamplestoshader(audiosamples)
-			var chunkv1 = audioopuschunkedeffect.chunk_max()
-			var chunkv2 = audioopuschunkedeffect.chunk_rms()
 			var viseme = audioopuschunkedeffect.chunk_to_lipsync()
 			if viseme != prevviseme:
 				print(" viseme ", visemes[viseme], " ", chunkv2)
@@ -241,9 +244,8 @@ func _process(_delta):
 			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2, frametimems)
 			if currentlytalking:
 				recordedsamples.append(audiosamples)
-				if audioopuschunkedeffect.opusframesize != 0:
+				if opusframesize != 0:
 					var opuspacket = audioopuschunkedeffect.read_opus_packet(prefixbytes)
-					audioopuschunkedeffect.drop_chunk()
 					recordedopuspackets.append(opuspacket)
 					$MQTTnetwork.transportaudiopacket(opuspacket)
 					$HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
@@ -252,10 +254,8 @@ func _process(_delta):
 					var tm = len(recordedopuspackets)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
 					$HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
 				else:
-					audioopuschunkedeffect.drop_chunk()
 					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples))
-			else:
-				audioopuschunkedeffect.drop_chunk()
+			audioopuschunkedeffect.drop_chunk()
 
 	else:
 		while audioeffectcapture.get_frames_available() > audiosamplesize:
@@ -275,7 +275,7 @@ func _process(_delta):
 				recordedsamples.append(audiosamples)
 				var framecount = len(recordedsamples)
 				if opusframesize != 0:
-					var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, audiosamples);
+					var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, audiosamples, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed);
 					recordedopuspackets.append(opuspacket)
 					framecount = len(recordedopuspackets)
 					$MQTTnetwork.transportaudiopacket(opuspacket)
@@ -319,4 +319,7 @@ func _on_audio_stream_microphone_finished():
 	print("_on_audio_stream_microphone_finished")
 
 func _on_option_button_item_selected(_index):
+	updatesamplerates()
+
+func _on_denoise_toggled(toggled_on):
 	updatesamplerates()
