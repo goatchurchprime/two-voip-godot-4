@@ -63,8 +63,8 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
 
     if env["rnnoise"]:
         env.Append(CPPPATH="noise-suppression-for-voice/external/rnnoise/include",
-                   LIBS=["rnnoise"],
-                   LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "noise-suppression-for-voice/external/rnnoise")],
+                   LIBS=["RnNoise"],
+                   LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "RnNoise")],
                    CPPDEFINES=["RNNOISE"])
 
     if env["lipsync"]:
