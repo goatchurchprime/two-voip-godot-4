@@ -38,7 +38,7 @@ def print_subprocess_result(result, prefix: str):
         print(f"{prefix} errors: {result.stderr}")
 
 
-def apply_git_patches(env: SConsEnvironment, patches_to_apply: list):
+def apply_git_patches(env: SConsEnvironment, patches_to_apply: list, root_path: str):
     for patch in patches_to_apply:
         print()
         try:
@@ -46,7 +46,7 @@ def apply_git_patches(env: SConsEnvironment, patches_to_apply: list):
                 [
                     "git",
                     "apply",
-                    "--directory=godot-cpp",
+                    "--directory=" + root_path,
                     "--ignore-space-change",
                     "--ignore-whitespace",
                     "--reverse",
@@ -65,7 +65,7 @@ def apply_git_patches(env: SConsEnvironment, patches_to_apply: list):
 
         try:
             result = subprocess.run(
-                ["git", "apply", "--directory=godot-cpp", "--ignore-space-change", "--ignore-whitespace", patch],
+                ["git", "apply", "--directory=" + root_path, "--ignore-space-change", "--ignore-whitespace", patch],
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -79,7 +79,6 @@ def apply_git_patches(env: SConsEnvironment, patches_to_apply: list):
             return 1
     print()
     return 0
-
 
 def cmake_build_project(env: SConsEnvironment, lib_path: str, extra_args: list, extra_c_compiler_flags: dict = {}):
     print()
