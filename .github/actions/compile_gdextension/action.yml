@@ -89,8 +89,9 @@ runs:
       shell: bash
       run: |
         echo "::group::🛠️ GDExtension Compilation 🛠️"
+        echo "- platform=${{inputs.platform}} arch=${{inputs.arch}} target=${{inputs.target}} addon_output_dir=${{inputs.output_libs_path}} ${{inputs.additional}}"
         scons_params="platform=${{inputs.platform}} arch=${{inputs.arch}} target=${{inputs.target}} addon_output_dir=${{inputs.output_libs_path}} ${{inputs.additional}}"
-        
+
         scons apply_patches
         scons build_opus $scons_params
         scons $scons_params
