@@ -41,7 +41,7 @@ def setup_options(env: SConsEnvironment, arguments):
 
     opts.Add(BoolVariable("lipsync", "Enable lipsync support", False))
     opts.Add(BoolVariable("lto", "Link-time optimization", False))
-    opts.Add(BoolVariable("rnnoise", "Enable rnnoise support", True))
+    opts.Add(BoolVariable("rnnoise", "Enable rnnoise support", False))
 
     opts.Update(env)
     env.Help(opts.GenerateHelpText(env))
