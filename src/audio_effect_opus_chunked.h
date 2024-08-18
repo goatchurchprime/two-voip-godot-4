@@ -49,6 +49,11 @@
     #include "OVRLipSync_Stub.h"
 #endif
 
+#ifdef RNNOISE
+    #include "rnnoise.h"
+#else
+    #include "rnnoise_stub.h"
+#endif
 
 namespace godot {
 
@@ -73,13 +78,29 @@ typedef enum {
     GovrLipSyncUnavailable,
 } GovrLipSyncStatus;
 
+// This AudioEffect records 44.1kHz samples from the microphone into a ring buffer.
+// If there are enough samples to make up a chunk (usually 20ms), chunk_available() returns true.
+// An available chunk can be resampled up to 48kHz in a second ringbuffer by resampled_current_chunk()
+// A resampled 48kHz chunk can be denoised into a third ringbuffer by denoise_resampled_chunk()
+// read_chunk() will return a chunk from either of these three buffers depending on progress through the above two functions.
 
-// This AudioEffect copies samples from the microphone input into the ringbuffer audiosamplebuffer of size audiosamplesize*audiosamplechunks
-// The chunking is for the purpose of the opus encoder.  GDScript code consumes these chunks as they become available.
-// There is no reason to leave unprocessed data available in the buffer other than a processing delay.
-// Use chunk_max() or chunk_rms() to determin whether to trigger a Vox signal (Voice Operated theshold) so 
-// that the opus coding does not need to be applied to all the unspoken silence.
-// Use undrop_chunks() to roll-back the buffer to back-date when the Vox should come on and stop pre-clipping
+// chunk_to_lipsync() and read_opus() will apply to the same chunk as read_chunk(), so keep it consistent, 
+//   This design is so we can defer calling either of these functions until we are sure it's a speaking episode
+// drop_chunk() advances to next chunk, undrop_chunk() rolls back the buffer it so we can run the deferred functions
+// and avoid pre-clipping of the spoken episode.
+
+// chunk_to_opus_packet() is for encoding a series of chunks not in the ring buffer.
+
+// TODO
+// fix any crashes  
+// plot the float value of the noise detector in the screen as a threshold
+// plot the resampled denoised view in the same texture too. (aligned)
+// hack the main scons module so it builds on the actions
+// make a stub so it can run without the rnnoise library if necessary
+// get help with this compiling
+
+// finish folding and delivering GP leaflets
+
 
 class AudioEffectOpusChunked : public AudioEffect {
     GDCLASS(AudioEffectOpusChunked, AudioEffect)
@@ -87,11 +108,11 @@ class AudioEffectOpusChunked : public AudioEffect {
 
     int audiosamplerate = 44100;
     int audiosamplesize = 881;
-    int audiosamplechunks = 50;
+    int ringbufferchunks = 50;
 
-    PackedVector2Array audiosamplebuffer;
+    PackedVector2Array audiosamplebuffer;  // size audiosamplesize*ringbufferchunks
     int chunknumber = -1;
-    int bufferend = 0;
+    int bufferend = 0;    // apply %(audiosamplesize*ringbufferchunks) for actual position
     int discardedchunks = 0;
 
     int opussamplerate = 48000;
@@ -99,9 +120,21 @@ class AudioEffectOpusChunked : public AudioEffect {
     int opusbitrate = 24000;
 
     SpeexResamplerState* speexresampler = NULL;
-    PackedVector2Array audioresampledbuffer;
+    PackedVector2Array audioresampledbuffer;  // size opusframesize*ringbufferchunks
+    PackedVector2Array singleresamplebuffer;  // size opusframesize, for use by chunk_to_opus_packet()
+    int lastresampledchunk = -1;
+
+    DenoiseState *st = NULL;
+    int rnnoiseframesize = 0;
+    PackedVector2Array audiodenoisedbuffer;  // size opusframesize*ringbufferchunks
+    PackedFloat32Array audiodenoisedvalues;  // size ringbufferchunks
+    int lastdenoisedchunk = -1;
+    PackedFloat32Array rnnoise_in;
+    PackedFloat32Array rnnoise_out;
+
     OpusEncoder* opusencoder = NULL;
     PackedByteArray opusbytebuffer;
+    int lastopuschunk = -1;
 
     GovrLipSyncStatus govrlipsyncstatus = GovrLipSyncUninitialized;
     PackedFloat32Array visemes; 
@@ -113,6 +146,10 @@ class AudioEffectOpusChunked : public AudioEffect {
 protected:
     static void _bind_methods();
 
+    void resample_single_chunk(float* paudioresamples, const float* paudiosamples);
+    float denoise_single_chunk(float* pdenoisedaudioresamples, const float* paudiosamples);
+    PackedByteArray opus_frame_to_opus_packet(const PackedByteArray& prefixbytes, float* paudiosamples);
+    
 public:
     virtual Ref<AudioEffectInstance> _instantiate() override;
 
@@ -120,15 +157,21 @@ public:
     void resetencoder(int Dreason=3);
 
     bool chunk_available();
-    float chunk_max();
-    float chunk_rms();
-    int chunk_to_lipsync(); 
-    PackedFloat32Array read_visemes(); 
-    PackedByteArray pop_opus_packet(const PackedByteArray& prefixbytes);  // this converts and drops chunk all in one
-    PackedVector2Array read_chunk();
-    PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamplebuffer, int begin);
     void drop_chunk();
     bool undrop_chunk();
+
+    void resampled_current_chunk();
+    float denoise_resampled_chunk();
+    bool denoiser_available();
+    PackedVector2Array read_chunk(bool resampled);
+    float chunk_max(bool rms);
+
+    PackedByteArray read_opus_packet(const PackedByteArray& prefixbytes); 
+    void flush_opus_encoder();
+    int chunk_to_lipsync(bool resampled); 
+    PackedFloat32Array read_visemes() { return visemes; };
+
+    PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamples, bool denoise);
 
     void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
@@ -140,8 +183,8 @@ public:
     int get_audiosamplerate() { return audiosamplerate; };
     void set_audiosamplesize(int laudiosamplesize) { chunknumber = -1; audiosamplesize = laudiosamplesize; };
     int get_audiosamplesize() { return audiosamplesize; };
-    void set_audiosamplechunks(int laudiosamplechunks) { chunknumber = -1; audiosamplechunks = laudiosamplechunks; };
-    int get_audiosamplechunks() { return audiosamplechunks; };
+    void set_audiosamplechunks(int laudiosamplechunks) { chunknumber = -1; ringbufferchunks = laudiosamplechunks; };
+    int get_audiosamplechunks() { return ringbufferchunks; };
 
     AudioEffectOpusChunked();
     ~AudioEffectOpusChunked();
