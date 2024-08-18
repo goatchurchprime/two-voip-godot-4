@@ -158,4 +158,4 @@ lib_utils.get_library_object(env, project_name, lib_name, output_path, src_folde
 # Register console commands
 env.Command("apply_patches", [], apply_patches)
 env.Command("build_opus", [], build_opus)
-env.Command("build_rnnoise", [], build_rnnoise)
+#env.Command("build_rnnoise", [], build_rnnoise)
