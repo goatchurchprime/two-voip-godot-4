@@ -63,8 +63,6 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
     env.Append(CPPPATH="opus/include", LIBS=["opus"], LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "opus")])
 
     if env["rnnoise"]:
-        print('***  ', [lib_utils_external.get_cmake_output_lib_dir(env, "noise-suppression-for-voice/external/rnnoise")])
-
         env.Append(CPPPATH="noise-suppression-for-voice/external/rnnoise/include",
                    LIBS=["RnNoise"],
                    LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "noise-suppression-for-voice/external/rnnoise")],
