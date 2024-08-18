@@ -88,10 +88,15 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
                     CPPDEFINES=["OVR_LIP_SYNC"])
 
     if env["rnnoise"]:
-        env.Append(CPPPATH="rnnoise/include", 
-                    LIBS=[File("rnnoise/.libs/librnnoise.a")], 
-                    LIBPATH=["rnnoise/.libs"], 
-                    CPPDEFINES=["RNNOISE"])
+#        env.Append(CPPPATH="noise-suppression-for-voice/external/rnnoise/include", 
+#                    LIBS=[File("noise-suppression-for-voice/external/rnnoise/linux_x86_64/Release/libRnNoise.a")], 
+#                    LIBPATH=["noise-suppression-for-voice/external/rnnoise/linux_x86_64/Release"], 
+#                    CPPDEFINES=["RNNOISE"])
+        env.Append(CPPPATH="noise-suppression-for-voice/external/rnnoise/include", 
+                   LIBS=["RnNoise"], 
+                   LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "noise-suppression-for-voice/external/rnnoise")],
+                   CPPDEFINES=["RNNOISE"])
+
 
     if env.get("is_msvc", False):
         env.Append(LINKFLAGS=["/WX:NO"])
@@ -136,7 +141,7 @@ def build_rnnoise(target, source, env: SConsEnvironment):
     if env["platform"] in ["macos", "ios"]:
         extra_flags += ["-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64", "-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15"]
 
-    return lib_utils_external.autogen_build_project(env, "rnnoise", extra_flags)
+    return lib_utils_external.cmake_build_project(env, "noise-suppression-for-voice/external/rnnoise", extra_flags)
 
 
 env: SConsEnvironment = SConscript("godot-cpp/SConstruct")

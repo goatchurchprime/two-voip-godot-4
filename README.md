@@ -122,6 +122,9 @@ For the addon to work correctly, `twovoip_lipsync` and `twovoip` cannot be used 
 
 This is a noise supppression library, also from xiph, so it's the best there is.
 
+> nix-shell -p autoreconfHook cmake scons ninja
+
+
 ```bash
 git clone git@github.com:xiph/rnnoise.git
 cd rnnoise
