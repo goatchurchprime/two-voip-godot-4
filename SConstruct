@@ -40,7 +40,7 @@ def setup_options(env: SConsEnvironment, arguments):
 
     opts.Add(BoolVariable("lipsync", "Enable lipsync support", False))
     opts.Add(BoolVariable("lto", "Link-time optimization", False))
-    opts.Add(BoolVariable("rnnoise", "Enable rnnoise support", False))
+    opts.Add(BoolVariable("rnnoise", "Enable rnnoise support", True))
 
     opts.Update(env)
     env.Help(opts.GenerateHelpText(env))
@@ -63,7 +63,7 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
 
     if env["rnnoise"]:
         env.Append(CPPPATH="noise-suppression-for-voice/external/rnnoise/include",
-                   LIBS=["RnNoise"],
+                   LIBS=["rnnoise"],
                    LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "noise-suppression-for-voice/external/rnnoise")],
                    CPPDEFINES=["RNNOISE"])
 
