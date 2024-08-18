@@ -61,6 +61,13 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
                              LINKFLAGS=["-flto"],)
 
     env.Append(CPPPATH="opus/include", LIBS=["opus"], LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "opus")])
+
+#    if env["rnnoise"]:
+#        env.Append(CPPPATH="noise-suppression-for-voice/external/rnnoise/include", 
+#                   LIBS=["RnNoise"], 
+#                   LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "noise-suppression-for-voice/external/rnnoise")],
+#                   CPPDEFINES=["RNNOISE"])
+
     if env["lipsync"]:
         lipsync_lib_path = ""
         ovrlipsync_dir = env["ovrlipsync_dir"]
@@ -86,17 +93,6 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
                     LIBS=["OVRLipSyncShim" + dbg_suffix],
                     LIBPATH=[lipsync_lib_path],
                     CPPDEFINES=["OVR_LIP_SYNC"])
-
-    if env["rnnoise"]:
-#        env.Append(CPPPATH="noise-suppression-for-voice/external/rnnoise/include", 
-#                    LIBS=[File("noise-suppression-for-voice/external/rnnoise/linux_x86_64/Release/libRnNoise.a")], 
-#                    LIBPATH=["noise-suppression-for-voice/external/rnnoise/linux_x86_64/Release"], 
-#                    CPPDEFINES=["RNNOISE"])
-        env.Append(CPPPATH="noise-suppression-for-voice/external/rnnoise/include", 
-                   LIBS=["RnNoise"], 
-                   LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "noise-suppression-for-voice/external/rnnoise")],
-                   CPPDEFINES=["RNNOISE"])
-
 
     if env.get("is_msvc", False):
         env.Append(LINKFLAGS=["/WX:NO"])
