@@ -88,7 +88,7 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
                 print("Lipsync is supported only on arm32 and arm64.")
                 env.Exit(1)
         else:
-            print(f"Lipsync is not supported by the {env["platform"]}:{env["arch"]} platform.")
+            print(f'Lipsync is not supported by the {env["platform"]}:{env["arch"]} platform.')
             env.Exit(1)
 
         dbg_suffix = "d" if env["dev_build"] else ""

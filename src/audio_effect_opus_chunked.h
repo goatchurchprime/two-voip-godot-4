@@ -123,6 +123,7 @@ class AudioEffectOpusChunked : public AudioEffect {
     PackedVector2Array audioresampledbuffer;  // size opusframesize*ringbufferchunks
     PackedVector2Array singleresamplebuffer;  // size opusframesize, for use by chunk_to_opus_packet()
     int lastresampledchunk = -1;
+    SpeexResamplerState* speexbackresampler = NULL;
 
     DenoiseState *st = NULL;
     int rnnoiseframesize = 0;
@@ -163,15 +164,16 @@ public:
     void resampled_current_chunk();
     float denoise_resampled_chunk();
     bool denoiser_available();
-    PackedVector2Array read_chunk(bool resampled);
-    float chunk_max(bool rms);
+    PackedVector2Array read_chunk(bool resampled=false);
+    float chunk_max(bool rms=false, bool resampled=false);
 
     PackedByteArray read_opus_packet(const PackedByteArray& prefixbytes); 
     void flush_opus_encoder();
-    int chunk_to_lipsync(bool resampled); 
+    int chunk_to_lipsync(bool resampled=false); 
     PackedFloat32Array read_visemes() { return visemes; };
 
-    PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamples, bool denoise);
+    PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamples, bool denoise=false);
+    PackedVector2Array chunk_resample_denoise(const PackedVector2Array& audiosamples, bool backresample);
 
     void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };

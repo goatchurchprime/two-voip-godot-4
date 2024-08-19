@@ -114,7 +114,7 @@ func updatesamplerates():
 		audiosamplesize = int(audiosamplerate*frametimems/1000)
 		opusframesize = 0
 		if audioopuschunkedeffect != null:
-			audioopuschunkedeffect.opusframesize = 0
+			audioopuschunkedeffect.opusframesize = int(opussamplerate*frametimems/1000.0)
 	elif i == 1: # Speexresample
 		audiosamplesize = int(audiosamplerate*frametimems/1000)
 	else:  # 441.1k as 48k fakery
@@ -154,14 +154,14 @@ func setupaudioshader():
 	audiosampleframedata_blank.resize(audiosamplesize)
 	for j in range(audiosamplesize):
 		audiosampleframedata_blank.set(j, Vector2(-0.5,0.9) if (j%10)<5 else Vector2(0.6,0.1))
-	var audioresampledframedata_blank = PackedVector2Array()
-	audioresampledframedata_blank.resize(opusframesize)
 	audiosampleframetextureimage = Image.create_from_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata_blank.to_byte_array())
 	audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
 	assert (audiosampleframetexture != null)
 	$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
-	if opusframesize != 0:
-		audioresampledframetextureimage = Image.create_from_data(opusframesize, 1, false, Image.FORMAT_RGF, audioresampledframedata_blank.to_byte_array())
+	if audioopuschunkedeffect.opusframesize != 0:
+		var audioresampledframedata_blank = PackedVector2Array()
+		audioresampledframedata_blank.resize(audioopuschunkedeffect.opusframesize)
+		audioresampledframetextureimage = Image.create_from_data(audioopuschunkedeffect.opusframesize, 1, false, Image.FORMAT_RGF, audioresampledframedata_blank.to_byte_array())
 		audioresampledframetexture = ImageTexture.create_from_image(audioresampledframetextureimage)
 		assert (audioresampledframetexture != null)
 		$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice_resampled", audioresampledframetexture)
@@ -172,8 +172,8 @@ func setupaudioshader():
 	
 func audiosamplestoshader(audiosamples, resampled):
 	if resampled:
-		assert (len(audiosamples)== opusframesize)
-		audioresampledframetextureimage.set_data(opusframesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
+		assert (len(audiosamples)== audioopuschunkedeffect.opusframesize)
+		audioresampledframetextureimage.set_data(audioopuschunkedeffect.opusframesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
 		audioresampledframetexture.update(audioresampledframetextureimage)
 	else:
 		assert (len(audiosamples)== audiosamplesize)
@@ -246,13 +246,14 @@ func _process(_delta):
 			var audiosamples = audioopuschunkedeffect.read_chunk(false)
 			audiosamplestoshader(audiosamples, false)
 			audioopuschunkedeffect.resampled_current_chunk()
-			var chunkv1 = audioopuschunkedeffect.chunk_max(false)
-			var chunkv2 = audioopuschunkedeffect.chunk_max(true)
+			var chunkv1 = audioopuschunkedeffect.chunk_max(false, false)
+			var chunkv2 = audioopuschunkedeffect.chunk_max(true, false)
 			var speechnoiseprobability = -1.0
 			if $HBoxBigButtons/VBoxPTT/Denoise.button_pressed:
-				speechnoiseprobability = audioopuschunkedeffect.denoise_resampled_chunk()
-				audiosamplestoshader(audioopuschunkedeffect.read_chunk(true), true)
-				$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", true)
+				if opusframesize != 0 or audioopuschunkedeffect.opusframesize != 0:
+					speechnoiseprobability = audioopuschunkedeffect.denoise_resampled_chunk()
+					audiosamplestoshader(audioopuschunkedeffect.read_chunk(true), true)
+					$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", true)
 			else:
 				$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", false)
 
@@ -284,7 +285,7 @@ func _process(_delta):
 					var tm = len(recordedopuspackets)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
 					$HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
 				else:
-					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples))
+					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples), mqttpacketencodebase64)
 			audioopuschunkedeffect.drop_chunk()
 
 	else:
@@ -335,12 +336,9 @@ func _on_play_pressed():
 		SelfMember.opuspacketsbuffer = recordedopuspackets.duplicate()
 	else:
 		var lrecordedsamples = [ ]
-		if $HBoxBigButtons/VBoxPTT/Denoise.button_pressed:
-			audioopuschunkedeffect.opusframesize = int(opussamplerate*frametimems/1000.0)
+		if $HBoxBigButtons/VBoxPTT/Denoise.button_pressed and audioopuschunkedeffect.opusframesize != 0:
 			for s in recordedsamples:
-				#lrecordedsamples.append(audioopuschunkedeffect.resample_denoise_resample_chunk(s))
-				lrecordedsamples.append(s)
-			audioopuschunkedeffect.opusframesize = opusframesize
+				lrecordedsamples.append(audioopuschunkedeffect.chunk_resample_denoise(s, true))
 		else:
 			lrecordedsamples = recordedsamples.duplicate()
 		SelfMember.processheaderpacket(recordedheader.duplicate())
