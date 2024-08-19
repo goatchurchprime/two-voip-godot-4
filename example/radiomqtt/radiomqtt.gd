@@ -306,7 +306,7 @@ func _process(_delta):
 				recordedsamples.append(audiosamples)
 				var framecount = len(recordedsamples)
 				if opusframesize != 0:
-					var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, audiosamples, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed);
+					var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, audiosamples, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed)
 					recordedopuspackets.append(opuspacket)
 					framecount = len(recordedopuspackets)
 					$MQTTnetwork.transportaudiopacket(opuspacket, mqttpacketencodebase64)

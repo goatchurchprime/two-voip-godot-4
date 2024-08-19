@@ -410,7 +410,7 @@ item_count = 3
 popup/item_0/text = "Uncompressed"
 popup/item_1/text = "Speex Resample"
 popup/item_1/id = 1
-popup/item_2/text = "44.1k as 48k"
+popup/item_2/text = "44.1kHz as 48kHz"
 popup/item_2/id = 2
 
 [node name="LabFrameLength" type="Label" parent="VBoxFrameLength/HBoxAudioFrame"]
