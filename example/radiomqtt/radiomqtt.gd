@@ -204,7 +204,7 @@ func starttalking():
 			Dundroppedchunks += 1
 		print("Undropped ", Dundroppedchunks, " chunks")
 		#if opusframesize != 0:
-		audioopuschunkedeffect.flush_opus_encoder()
+		audioopuschunkedeffect.flush_opus_encoder(false)
 
 func _on_mic_working_toggled(toggled_on):
 	print("_on_mic_working_toggled ", $AudioStreamMicrophone.playing, " to ", toggled_on)

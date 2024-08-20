@@ -69,7 +69,7 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("drop_chunk"), &AudioEffectOpusChunked::drop_chunk);
     ClassDB::bind_method(D_METHOD("undrop_chunk"), &AudioEffectOpusChunked::undrop_chunk);
     ClassDB::bind_method(D_METHOD("read_opus_packet", "prefixbytes"), &AudioEffectOpusChunked::read_opus_packet);
-    ClassDB::bind_method(D_METHOD("flush_opus_encoder"), &AudioEffectOpusChunked::flush_opus_encoder);
+    ClassDB::bind_method(D_METHOD("flush_opus_encoder", "denoise"), &AudioEffectOpusChunked::flush_opus_encoder);
     ClassDB::bind_method(D_METHOD("chunk_to_opus_packet", "prefixbytes", "audiosamples", "denoise"), &AudioEffectOpusChunked::chunk_to_opus_packet);
     ClassDB::bind_method(D_METHOD("chunk_resample_denoise", "audiosamples", "backresample"), &AudioEffectOpusChunked::chunk_resample_denoise);
 }
@@ -322,7 +322,7 @@ PackedByteArray AudioEffectOpusChunked::read_opus_packet(const PackedByteArray& 
     return opus_frame_to_opus_packet(prefixbytes, paudioresamples);
 }
 
-void AudioEffectOpusChunked::flush_opus_encoder() {
+void AudioEffectOpusChunked::flush_opus_encoder(bool denoise) {
     if (opusframesize == 0)
         return;
     // this just sends 5 empty chunks into the encoder.  doesn't necessarily work
@@ -332,7 +332,7 @@ void AudioEffectOpusChunked::flush_opus_encoder() {
     for (int i = 0; i < 5; i++)
         opus_frame_to_opus_packet(PackedByteArray(), paudioresamples);
 
-    if (st != NULL) {
+    if ((st != NULL) && denoise) {
         // we could use rnnoise_init (if it doesn't involve a heavy reload of the model)
         float* rin = (float*)rnnoise_in.ptr();
         for (int j = 0; j < rnnoiseframesize; j++)
