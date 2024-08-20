@@ -168,7 +168,7 @@ public:
     float chunk_max(bool rms=false, bool resampled=false);
 
     PackedByteArray read_opus_packet(const PackedByteArray& prefixbytes); 
-    void flush_opus_encoder();
+    void flush_opus_encoder(bool denoise);
     int chunk_to_lipsync(bool resampled=false); 
     PackedFloat32Array read_visemes() { return visemes; };
 
