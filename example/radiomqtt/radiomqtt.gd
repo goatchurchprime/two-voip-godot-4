@@ -193,7 +193,7 @@ func starttalking():
 	$HBoxPlaycount/GridContainer/Bytespersec.text = str(0)
 	
 	print("start talking")
-	$MQTTnetwork.transportaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer(), false)
+	$MQTTnetwork.transportaudiopacketjson(recordedheader)
 	talkingstarttime = Time.get_ticks_msec()
 	
 	if audioopuschunkedeffect != null:
@@ -327,7 +327,7 @@ func _process(_delta):
 func endtalking():
 	currentlytalking = false
 	print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
-	$MQTTnetwork.transportaudiopacket(JSON.stringify({"framecount":len(recordedsamples)}).to_ascii_buffer(), false)
+	$MQTTnetwork.transportaudiopacketjson({"framecount":len(recordedsamples)})
 	print("Talked for ", (Time.get_ticks_msec() - talkingstarttime)*0.001, " seconds")
 
 func _on_play_pressed():

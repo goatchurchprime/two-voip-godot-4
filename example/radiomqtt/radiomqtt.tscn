@@ -519,6 +519,7 @@ text = "Shell $> "
 layout_mode = 2
 tooltip_text = "transmit mqtt packets in ascii"
 toggle_mode = true
+button_pressed = true
 text = "base64"
 
 [node name="Cmd" type="LineEdit" parent="HBoxMosquitto"]

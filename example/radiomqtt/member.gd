@@ -96,20 +96,21 @@ func audiosamplestoshader(audiosamples):
 	audiosampleframetextureimage.set_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
 	audiosampleframetexture.update(audiosampleframetextureimage)
 
-func receivemqttmessage(msg):
-	if msg[0] == "{".to_ascii_buffer()[0]:
-		var h = JSON.parse_string(msg.get_string_from_ascii())
-		if h != null:
-			print("audio json packet ", h)
-			if h.has("opusframesize"):
-				processheaderpacket(h)
+func receivemqttaudiometa(msg):
+	assert (msg[0] == "{".to_ascii_buffer()[0])
+	var h = JSON.parse_string(msg.get_string_from_ascii())
+	if h != null:
+		print("audio json packet ", h)
+		if h.has("opusframesize"):
+			processheaderpacket(h)
+			
+func receivemqttaudio(msg):
+	if mqttpacketencodebase64:
+		msg = Marshalls.base64_to_raw(msg.get_string_from_ascii())
+	if opusframesize != 0:
+		opuspacketsbuffer.push_back(msg)
 	else:
-		if mqttpacketencodebase64:
-			msg = Marshalls.base64_to_raw(msg.get_string_from_ascii())
-		if opusframesize != 0:
-			opuspacketsbuffer.push_back(msg)
-		else:
-			audiopacketsbuffer.push_back(bytes_to_var(msg))
+		audiopacketsbuffer.push_back(bytes_to_var(msg))
 
 
 var timedelaytohide = 0.1

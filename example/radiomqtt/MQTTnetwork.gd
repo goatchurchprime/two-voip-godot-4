@@ -3,7 +3,8 @@ extends Control
 var myname = ""
 var roomtopic = ""
 var roomtopicwords = 0
-var audioouttopic = "" # "%s/%s/audio"
+var audioouttopic = "" 
+var audioouttopicmeta = "" 
 var statustopic = ""
 
 @onready var Members = get_node("../Members")
@@ -41,25 +42,37 @@ func transportaudiopacket(packet, asbase64):
 		else:
 			$MQTT.publish(audioouttopic, packet)
 
+func transportaudiopacketjson(jheader):
+	if audioouttopicmeta:
+		var packet = JSON.stringify(jheader).to_ascii_buffer()
+		$MQTT.publish(audioouttopicmeta, packet)
+
 func received_mqtt(topic, msg):
-	var stopic = topic.split("/")
+	var stopic = topic.split("/", true, roomtopicwords+1)
 	if len(stopic) == roomtopicwords + 2:
 		var membername = stopic[roomtopicwords]
-		if stopic[roomtopicwords+1] == "status" and membername != myname:
-			if msg == Mstatusconnected:
-				var member = load("res://radiomqtt/member.tscn").instantiate()
-				member.setname(membername)
-				Members.add_child(member)
-				$MQTT.subscribe("%s/%s/audio" % [roomtopic, membername])
-			elif msg == Mstatusdisconnected or msg == MstatusdisconnectedLW:
-				var member = Members.get_node_or_null(membername)
-				if member:
-					Members.remove_child(member)
-					$MQTT.unsubscribe("%s/%s/audio" % [roomtopic, membername])
-				else:
-					$MQTT.publish("%s/%s/status" % [roomtopic, membername], "".to_ascii_buffer(), true)
-		if stopic[roomtopicwords+1] == "audio":
-			Members.get_node(membername).receivemqttmessage(msg)
+		if stopic[roomtopicwords+1] == "status":
+			if membername != myname:
+				if msg == Mstatusconnected:
+					var member = load("res://radiomqtt/member.tscn").instantiate()
+					member.setname(membername)
+					Members.add_child(member)
+					$MQTT.subscribe("%s/%s/audio/meta" % [roomtopic, membername])
+					$MQTT.subscribe("%s/%s/audio" % [roomtopic, membername])
+				elif msg == Mstatusdisconnected or msg == MstatusdisconnectedLW:
+					var member = Members.get_node_or_null(membername)
+					if member:
+						Members.remove_child(member)
+						$MQTT.unsubscribe("%s/%s/audio/meta" % [roomtopic, membername])
+						$MQTT.unsubscribe("%s/%s/audio" % [roomtopic, membername])
+					else:
+						$MQTT.publish("%s/%s/status" % [roomtopic, membername], "".to_ascii_buffer(), true)
+		elif stopic[roomtopicwords+1] == "audio/meta":
+			Members.get_node(membername).receivemqttaudiometa(msg)
+		elif stopic[roomtopicwords+1] == "audio":
+			Members.get_node(membername).receivemqttaudio(msg)
+		else:
+			print("Unrecognized topic ", stopic)
 			
 func on_broker_connect():
 	$MQTT.subscribe("%s/+/status" % roomtopic)
@@ -86,6 +99,7 @@ func _on_connect_toggled(toggled_on):
 		roomtopic = $GridContainer/topic.text
 		roomtopicwords = len(roomtopic.split("/"))
 		audioouttopic = "%s/%s/audio" % [roomtopic, myname]
+		audioouttopicmeta = "%s/%s/audio/meta" % [roomtopic, myname]
 		statustopic = "%s/%s/status" % [roomtopic, myname]
 		$MQTT.set_last_will(statustopic, MstatusdisconnectedLW, true)
 		var userpass = ""
@@ -114,4 +128,5 @@ func _on_connect_toggled(toggled_on):
 		myname = ""
 		SelfMember.setname("Self")
 		audioouttopic = ""
+		audioouttopicmeta = ""
 		statustopic = ""
