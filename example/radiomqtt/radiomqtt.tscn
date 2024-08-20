@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=22 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
@@ -12,6 +12,9 @@
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kcsl6"]
 bg_color = Color(0.0705882, 0.0235294, 0.564706, 1)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_30le3"]
+bg_color = Color(0.909804, 0.392157, 0.435294, 1)
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ljq7l"]
 bg_color = Color(0.101961, 0.101961, 0.101961, 1)
 corner_radius_top_left = 20
@@ -19,8 +22,8 @@ corner_radius_top_right = 20
 corner_radius_bottom_right = 20
 corner_radius_bottom_left = 20
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_30le3"]
-bg_color = Color(0.909804, 0.392157, 0.435294, 1)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ak08f"]
+bg_color = Color(0.814464, 0.272608, 0.419173, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_k6a7f"]
 bg_color = Color(0.6, 0.6, 0.0470588, 1)
@@ -34,20 +37,29 @@ code = "// NOTE: Shader automatically converted from Godot Engine 4.3.beta's Can
 shader_type canvas_item;
 render_mode blend_mix;
 
-uniform float blue = 1.0; // you can assign a default value to uniforms
 uniform sampler2D voice : repeat_enable;
+uniform bool drawresampled = false;
+uniform sampler2D voice_resampled : repeat_enable;
 
 void fragment() {
-  COLOR = vec4(UV, 0.5, 1.0);
-  vec4 v = texture(voice, UV);
-  float d = UV.y*2.0 - v.r*4.0 - 1.0;
-  COLOR = (abs(d) < 0.1 ? vec4(0.8,0.8,0.9,1.0) : vec4(0.1,0.1,0.1,1.0));
+  //COLOR = vec4(UV, 0.5, 1.0);
+  float rr = texture(voice, UV).r;
+  float dr = abs(UV.y*2.0 - rr*4.0 - 1.0);
+  float rs = (drawresampled ? texture(voice_resampled, UV).r : 0.0F);
+  float ds = abs(UV.y*2.0 - rs*4.0 - 1.0);
+  if (drawresampled && (ds < 0.1))
+    COLOR = (ds < 0.05 ? vec4(1.0,1.0,0.0,1.0) : vec4(0.5,0.5,0.0,1.0));
+  else if (dr < 0.1)
+    COLOR = vec4(0.8,0.8,0.9,1.0);
+  else
+    COLOR = vec4(0.1+max(rr,0.0)*0.7,0.1,0.1+max(-rr,0.0)*0.7,1.0);
 }"
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_cklni"]
 shader = SubResource("Shader_r847e")
-shader_parameter/blue = 1.0
+shader_parameter/drawresampled = false
 shader_parameter/voice = ExtResource("3_eh2h5")
+shader_parameter/voice_resampled = ExtResource("3_eh2h5")
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_67wxx"]
 bg_color = Color(0.290196, 0.505882, 0.490196, 1)
@@ -118,15 +130,28 @@ layout_mode = 2
 layout_mode = 2
 size_flags_horizontal = 4
 
-[node name="PTT" type="Button" parent="HBoxBigButtons"]
+[node name="VBoxPTT" type="VBoxContainer" parent="HBoxBigButtons"]
+layout_mode = 2
+
+[node name="PTT" type="Button" parent="HBoxBigButtons/VBoxPTT"]
 custom_minimum_size = Vector2(250, 100)
 layout_mode = 2
+size_flags_vertical = 3
 tooltip_text = "Hold down to talk"
 theme_override_font_sizes/font_size = 50
-theme_override_styles/normal = SubResource("StyleBoxFlat_ljq7l")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_30le3")
+theme_override_styles/normal = SubResource("StyleBoxFlat_ljq7l")
 text = "PTT
 "
+
+[node name="HSeparator" type="HSeparator" parent="HBoxBigButtons/VBoxPTT"]
+layout_mode = 2
+
+[node name="Denoise" type="Button" parent="HBoxBigButtons/VBoxPTT"]
+layout_mode = 2
+theme_override_styles/pressed = SubResource("StyleBoxFlat_ak08f")
+toggle_mode = true
+text = "De-Noise"
 
 [node name="VSeparator" type="VSeparator" parent="HBoxBigButtons"]
 custom_minimum_size = Vector2(20, 0)
@@ -229,6 +254,14 @@ offset_bottom = 32.0
 mouse_filter = 1
 color = Color(0.689579, 0.760623, 0.0826142, 1)
 
+[node name="ColorRectDenoiseVoiceProb" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
+layout_mode = 0
+offset_left = 193.0
+offset_top = 60.0
+offset_right = 223.0
+offset_bottom = 62.0
+color = Color(1, 1, 0.00392157, 1)
+
 [node name="HSeparator" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
@@ -327,7 +360,6 @@ text = "Opus Bit Rate"
 layout_mode = 2
 item_count = 5
 popup/item_0/text = "24000"
-popup/item_0/id = 0
 popup/item_1/text = "12000"
 popup/item_1/id = 1
 popup/item_2/text = "10000"
@@ -349,7 +381,6 @@ text = "Frame duration"
 layout_mode = 2
 item_count = 6
 popup/item_0/text = "2.5ms"
-popup/item_0/id = 0
 popup/item_1/text = "5ms"
 popup/item_1/id = 1
 popup/item_2/text = "10ms"
@@ -377,10 +408,9 @@ text = "Audio sampler"
 layout_mode = 2
 item_count = 3
 popup/item_0/text = "Uncompressed"
-popup/item_0/id = 0
 popup/item_1/text = "Speex Resample"
 popup/item_1/id = 1
-popup/item_2/text = "44.1k as 48k"
+popup/item_2/text = "44.1kHz as 48kHz"
 popup/item_2/id = 2
 
 [node name="LabFrameLength" type="Label" parent="VBoxFrameLength/HBoxAudioFrame"]
@@ -463,7 +493,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 item_count = 4
 popup/item_0/text = "doesliverpool"
-popup/item_0/id = 0
 popup/item_1/text = "hivemq"
 popup/item_1/id = 1
 popup/item_2/text = "m.org"
@@ -486,10 +515,19 @@ theme_override_styles/normal = SubResource("StyleBoxFlat_m5fk6")
 layout_mode = 2
 text = "Shell $> "
 
+[node name="base64" type="Button" parent="HBoxMosquitto"]
+layout_mode = 2
+tooltip_text = "transmit mqtt packets in ascii"
+toggle_mode = true
+button_pressed = true
+text = "base64"
+
 [node name="Cmd" type="LineEdit" parent="HBoxMosquitto"]
 layout_mode = 2
 size_flags_horizontal = 3
-tooltip_text = "Use this shell command to externally monitor messages through the broker"
+tooltip_text = "run this to monitor messages 
+passing through the MQTT broker.  
+[base64] recommended."
 text = "mosquitto_sub ..."
 editable = false
 
@@ -565,6 +603,7 @@ offset_bottom = 23.0
 text = "sil"
 
 [connection signal="finished" from="AudioStreamMicrophone" to="." method="_on_audio_stream_microphone_finished"]
+[connection signal="toggled" from="HBoxBigButtons/VBoxPTT/Denoise" to="." method="_on_denoise_toggled"]
 [connection signal="toggled" from="HBoxBigButtons/VBoxVox/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
 [connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="toggled" from="HBoxMicTalk/MicWorking" to="." method="_on_mic_working_toggled"]
@@ -575,4 +614,5 @@ text = "sil"
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
 [connection signal="toggled" from="MQTTnetwork/Connect" to="MQTTnetwork" method="_on_connect_toggled"]
 [connection signal="item_selected" from="MQTTnetwork/GridContainer/presets" to="MQTTnetwork" method="_on_mqtt_broker_item_selected"]
+[connection signal="toggled" from="HBoxMosquitto/base64" to="." method="_on_base_64_toggled"]
 [connection signal="toggled" from="VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]

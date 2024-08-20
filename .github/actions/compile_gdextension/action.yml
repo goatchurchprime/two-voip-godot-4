@@ -92,6 +92,7 @@ runs:
         scons_params="platform=${{inputs.platform}} arch=${{inputs.arch}} target=${{inputs.target}} addon_output_dir=${{inputs.output_libs_path}} ${{inputs.additional}}"
         
         scons apply_patches
+        scons build_rnnoise $scons_params
         scons build_opus $scons_params
         scons $scons_params
         echo "::endgroup::"

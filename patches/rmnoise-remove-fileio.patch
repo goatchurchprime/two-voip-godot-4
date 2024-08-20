@@ -1,0 +1,53 @@
+diff -ur noise-suppression-for-voice.org/external/rnnoise/include/rnnoise.h noise-suppression-for-voice/external/rnnoise/include/rnnoise.h
+--- noise-suppression-for-voice.org/external/rnnoise/include/rnnoise.h	2024-08-18 14:19:35.586959928 +0100
++++ noise-suppression-for-voice/external/rnnoise/include/rnnoise.h	2024-08-18 16:31:43.741188889 +0100
+@@ -101,6 +101,7 @@
+  */
+ RNNOISE_EXPORT RNNModel *rnnoise_model_from_buffer(const void *ptr, int len);
+ 
++#if 0
+ 
+ /**
+  * Load a model from a file
+@@ -117,6 +118,8 @@
+  */
+ RNNOISE_EXPORT RNNModel *rnnoise_model_from_filename(const char *filename);
+ 
++#endif
++
+ /**
+  * Free a custom model
+  *
+diff -ur noise-suppression-for-voice.org/external/rnnoise/src/denoise.c noise-suppression-for-voice/external/rnnoise/src/denoise.c
+--- noise-suppression-for-voice.org/external/rnnoise/src/denoise.c	2024-08-18 14:19:35.586959928 +0100
++++ noise-suppression-for-voice/external/rnnoise/src/denoise.c	2024-08-18 16:29:47.014027163 +0100
+@@ -229,7 +229,7 @@
+   const void *const_blob;
+   void *blob;
+   int blob_len;
+-  FILE *file;
++//  FILE *file;
+ };
+ 
+ RNNModel *rnnoise_model_from_buffer(const void *ptr, int len) {
+@@ -241,6 +241,8 @@
+   return model;
+ }
+ 
++#if 0
++
+ RNNModel *rnnoise_model_from_filename(const char *filename) {
+   RNNModel *model;
+   FILE *f = fopen(filename, "rb");
+@@ -268,8 +270,10 @@
+   return model;
+ }
+ 
++#endif
++
+ void rnnoise_model_free(RNNModel *model) {
+-  if (model->file != NULL) fclose(model->file);
++//  if (model->file != NULL) fclose(model->file);
+   if (model->blob != NULL) free(model->blob);
+   free(model);
+ }

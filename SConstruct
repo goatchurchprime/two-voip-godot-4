@@ -19,11 +19,15 @@ default_output_lipsync_dir = os.path.join("addons", "twovoip_lipsync", "libs")
 src_folder = "src"
 
 # If necessary, add patches from the code
-patches_to_apply = [
+patches_to_apply_rmnoise = [
+    "patches/rmnoise-remove-fileio.patch", # Remove fileio from rmnoise library as we get a Windows link error TODO: Work out how to link against the right MSVCRT library
+]
+
+patches_to_apply_godot = [
     "patches/godot_cpp_exclude_unused_classes.patch", # Removes unused godot-cpp classes from the build process
     "patches/unity_build.patch", # Speeds up the build by merging the source files. It can increase the size of assemblies.
     "patches/web_threads.patch", # Adds the build flag that appeared in Godot 4.3. Required for a web build compatible with Godot 4.3.
-    ]
+]
 
 print("If you add new source files (e.g. .cpp, .c), do not forget to specify them in 'src/default_sources.json'.\n\tOr add them to 'setup_defines_and_flags' inside 'lib_utils.py '.")
 print("To apply git patches, use 'scons apply_patches'.")
@@ -40,6 +44,7 @@ def setup_options(env: SConsEnvironment, arguments):
 
     opts.Add(BoolVariable("lipsync", "Enable lipsync support", False))
     opts.Add(BoolVariable("lto", "Link-time optimization", False))
+    opts.Add(BoolVariable("rnnoise", "Enable rnnoise support", True))
 
     opts.Update(env)
     env.Help(opts.GenerateHelpText(env))
@@ -59,6 +64,13 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
                              LINKFLAGS=["-flto"],)
 
     env.Append(CPPPATH="opus/include", LIBS=["opus"], LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "opus")])
+
+    if env["rnnoise"]:
+        env.Append(CPPPATH="noise-suppression-for-voice/external/rnnoise/include",
+                   LIBS=["RnNoise"],
+                   LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "noise-suppression-for-voice/external/rnnoise")],
+                   CPPDEFINES=["RNNOISE"])
+
     if env["lipsync"]:
         lipsync_lib_path = ""
         ovrlipsync_dir = env["ovrlipsync_dir"]
@@ -76,7 +88,7 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
                 print("Lipsync is supported only on arm32 and arm64.")
                 env.Exit(1)
         else:
-            print(f"Lipsync is not supported by the {env["platform"]}:{env["arch"]} platform.")
+            print(f'Lipsync is not supported by the {env["platform"]}:{env["arch"]} platform.')
             env.Exit(1)
 
         dbg_suffix = "d" if env["dev_build"] else ""
@@ -103,10 +115,11 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
         )
     print()
 
-
 def apply_patches(target, source, env: SConsEnvironment):
-    return lib_utils_external.apply_git_patches(env, patches_to_apply)
-
+    rc = lib_utils_external.apply_git_patches(env, patches_to_apply_rmnoise, "noise-suppression-for-voice")
+    if rc:
+      return rc
+    return lib_utils_external.apply_git_patches(env, patches_to_apply_godot, "godot-cpp")
 
 def build_opus(target, source, env: SConsEnvironment):
     extra_flags = []
@@ -118,6 +131,15 @@ def build_opus(target, source, env: SConsEnvironment):
         extra_flags += ["-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64", "-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15"]
 
     return lib_utils_external.cmake_build_project(env, "opus", extra_flags)
+
+def build_rnnoise(target, source, env: SConsEnvironment):
+    extra_flags = []
+    if env["platform"] in ["linux", "web"]:
+        extra_flags += ["-DCMAKE_POSITION_INDEPENDENT_CODE=ON"]
+    if env["platform"] in ["macos", "ios"]:
+        extra_flags += ["-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64", "-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15"]
+
+    return lib_utils_external.cmake_build_project(env, "noise-suppression-for-voice/external/rnnoise", extra_flags)
 
 env: SConsEnvironment = SConscript("godot-cpp/SConstruct")
 env = env.Clone()
@@ -137,3 +159,4 @@ lib_utils.get_library_object(env, project_name, lib_name, output_path, src_folde
 # Register console commands
 env.Command("apply_patches", [], apply_patches)
 env.Command("build_opus", [], build_opus)
+env.Command("build_rnnoise", [], build_rnnoise)
