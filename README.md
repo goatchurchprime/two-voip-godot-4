@@ -13,9 +13,9 @@ for indefatiguable work on the github actions that are successfully building thi
 
 ## Demo example
 
-The purpose of this demo is to test out all the features 
-and so you can hear what the opus compression sounds like with 
-different settings before you choose one.
+The purpose of this demo is to test all the features 
+so you can hear what the opus compression and noise cancelling settings do to the  
+sound of a voice.
 
 1. Clone/Download this repository and open the example project in Godot 4.3.
 2. Go to assetlib, search for twovoip, and install it.
@@ -138,16 +138,56 @@ of the current chunk.  Use `flush_opus_encoder()` if you anticipate a gap from t
 The `undrop_chunk()` function can roll back the chunk buffer and by some milliseconds 
 so you can avoid clipping at the start of a speech sequence.
 
-## Building on github actions
+## Build structure
 
-Thanks to @ajlennon and @DmitriySalnikov without whom this would not be possible.
-Notes about the non-portability of rnnoise, but for a secondary project
-Notes about compiling locally using scons
+There are three submodules in this repository.  
 
+**godot-cpp** is contains the header files and class definitions required to build a compiled 
+[GDExtension](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/what_is_gdextension.html) object that can 
+dynamically link to the GodotEngine at runtime.
 
-## Build instructions:
+**opus** is the opus voice compression and decompression library from [xiph.org](https://xiph.org/) that 
+generally takes an array of 960 pairs of floats representing 20ms of stereo audio samples at 48kHz and 
+returns 20 to 30 bytes of compressed data for that chunk.
 
-Only do this locally if you are developing the C++ code.
+**noise-suppression-for-voice** contains a copy of the [xiph/rnnoise](https://github.com/xiph/rnnoise) 
+code in its external/rnnoise directory with the all important `CMakeLists.txt` file that makes it possible 
+to compile it on all the diffeerent platforms
+
+The sequence of commands to build the system locally
+```bash
+nix-shell -p scons cmake ninja autoreconfHook # if you are on nix
+scons apply_patches  # optional
+scons build_opus     # build opus using cmake
+scons build_rnnoise  # build opus using cmake
+scons                # build this library
+```
+
+To compile for another platform like web, the commands are
+```bash
+scons apply_patches
+scons platform=web target=template_release build_opus
+scons platform=web target=template_release build_rnnoise
+scons platform=web target=template_release
+```
+
+## With OVRLipSync
+
+This is a highly speculative component that takes advantage of the chunking feature in the OpusChunked effect,
+but which is currently closed source and distributed as a library only for Windows, Android and Mac.
+There is [no Linux version](https://github.com/godotengine/godot-proposals/discussions/9718).
+The github actions compiles a version for the available platforms 
+with `scons lipsync=yes` and creates an `addons/twovoip_lipsync` that can be copied into a project
+
+Download the OVRLipSync libraries from https://developer.oculus.com/documentation/native/audio-ovrlipsync-native/
+and unzip into top level as OVRLipSyncNative directory in this project.  There is a stub include file
+for Linux that allows this GDExtension to compile without this library.
+
+On Windows you may need to copy the `OVRLipSyncNative/Lib/Win64/OVRLipSync.dll` file to the same directory
+as your `GodotEngine.exe` so that it finds and links it.
+
+For the addon to work correctly, `twovoip_lipsync` and `twovoip` cannot be used in the same project.
+
 
 ### Nixos automated
 
@@ -167,33 +207,6 @@ nix build .#android
 cp result/addons/twovoip/*so addons/twovoip
 ```
 
-### Otherwise by hand when developing
-
-Since we've not got submodules here we need to
-first clone Opus and godot-cpp modules before building them
-
-```
-git clone --recurse-submodules git@github.com:goatchurchprime/two-voip-godot-4.git
-cd two-voip-godot-4
-```
-
-On Linux:
-
-```
-cd godot-cpp
-cmake -Bbuild -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-cd build
-make
-cd ../..
-scons
-```
-
-**You may need to copy the much simplified `SConstruct_jgtdev` onto `SConstruct` to make it work.  
-Also, the project has been moved down into the example directory, so it's a good idea to go 
-into the example/addons directory and set up the following symlink:
-> ln -s ../../addons/twovoip twovoip
-
-
 On Windows:
 
 Use Visual Studio 2022 Community Edition with CMake option to open opus
@@ -202,62 +215,4 @@ directory and convert cmake script to sln and then compile.
 ```
 cd ../..
 python -m SCons
-```
-On Mac:
-
-See the instructions on the one-voip here: https://github.com/RevoluPowered/one-voip-godot-4/?tab=readme-ov-file#mac
-
-
-
-### Using scons
-
-Build a library for the current platform:
-
-```bash
-nix-shell -p scons cmake ninja autoreconfHook # if you are on nix
-scons apply_patches # optional
-scons build_opus # build opus using cmake
-scons # build this library
-```
-
-Build a library for another platform:
-
-```bash
-scons apply_patches # optional
-# The scons arguments for build_opus and the build of the library itself must match!
-scons platform=web target=template_release build_opus # build opus using cmake
-scons platform=web target=template_release # build this library
-```
-
-To build with lipsync support, you need to add the `lipsync=yes` flag and download the libraries from the section below.
-
-## With OVRLipSync
-
-This is a highly speculative component that takes advantage of the chunking feature in the OpusChunked effect,
-but which is currently closed source.  There is no Linux version.
-See https://github.com/godotengine/godot-proposals/discussions/9718
-
-Download the OVRLipSync libraries from https://developer.oculus.com/documentation/native/audio-ovrlipsync-native/
-and unzip into top level as OVRLipSyncNative directory in this project.  There is a stub include file
-for Linux that allows this GDExtension to compile and work without this library.
-
-On Windows you may need to copy the `OVRLipSyncNative/Lib/Win64/OVRLipSync.dll` file to the same directory
-as your `GodotEngine.exe` so that it finds and links it.
-
-For the addon to work correctly, `twovoip_lipsync` and `twovoip` cannot be used in the same project.
-
-## Adding rnnoise
-
-This is a noise supppression library, also from xiph, so it's the best there is.
-
-> nix-shell -p autoreconfHook cmake scons ninja
-
-
-```bash
-git clone git@github.com:xiph/rnnoise.git
-cd rnnoise
-nix-shell -p autoreconfHook
-./autogen.sh    # this will download 47Mb trained model data
-./configure
-make
 ```
