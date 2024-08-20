@@ -8,14 +8,14 @@ to an audio stream of speech from the microphone.
 The starting point for this project was [one-voip-godot-4](https://github.com/RevoluPowered/one-voip-godot-4/).
 
 Thanks to [@ajlennon](https://github.com/ajlennon) and [@DmitriySalnikov](https://github.com/DmitriySalnikov) 
-for indefatiguable work on the github actions that are successfully building this plugin across  
-[all six GodotEngine supported platforms](https://docs.godotengine.org/en/stable/about/list_of_features.html#platforms).
+for indefatiguable work on the github actions that are successfully building this plugin across 
+[all six](https://docs.godotengine.org/en/stable/about/list_of_features.html#platforms) GodotEngine supported platforms.
 
-## Demo example instructions
+## Demo example
 
 The purpose of this demo is to test out all the features 
 and so you can hear what the opus compression sounds like with 
-different settings before you pick fixed values in your code.
+different settings before you choose one.
 
 1. Clone/Download this repository and open the example project in Godot 4.3.
 2. Go to assetlib, search for twovoip, and install it.
@@ -28,7 +28,7 @@ If there is no response on MacOS, it could be [this issue](https://github.com/qu
 Go to Project Settings (with Advanced Settings selected) -> Audio -> Driver -> Mix rate and set to 48000
 
 The top section of the user interface has the PTT (Press to Talk) button and Vox button (Voice Activity Detection) where the 
-activation threshold is given in the slider below it (on top of the waveform).  
+activation threshold is given in the slider below it (on top of the waveform). 
 Click on \[De-noise\] to hear how recordings 
 sound with and without this feature.
 
@@ -106,7 +106,7 @@ func _process(delta):
 
 Opus packets don't have any context, so if you want to number them so they can be shuffled 
 if they get out of order in the particular network data channel you are using, you can use the `prepend` 
-array to splice in an index values.
+array to splice an index value into a header.
 Then `prefixbyteslength` needs to be the same length as this header so it can be split off 
 on its way to the decoder.
 The forward error correction flag, `fec`, can be set to 1 if the previous packet is missing.
@@ -126,11 +126,17 @@ while audiostreamgeneratorplayback.get_frames_available() > audiostreamopuschunk
     audiostreamgeneratorplayback.push_buffer(audiopacketsbuffer.pop_front())
 ```
 
-Document chunk max, rnnoise and undrop chunk
-When a chunk is available you can call the helper functions 
-The RNNdenoise is works by calling:
-speechnoiseprobability = audioopuschunkedeffect.denoise_resampled_chunk()
+The `chunk_max()` function is for implementing a Vox (Voice Activity Detection) feature 
+so that you can save processor cycles by dropping chunks before you opus encoding them. 
+Or you can use `denoise_resampled_chunk()` (which requires resampling to 48kHz) to read a 
+speech probability, or optionally measure `chunk_max()` post de-noising.
 
+The opus compression and denoiser features need the chunks to be sent to them in order 
+because they use the state recorded from earlier audio samples to provide context and improve the performance 
+of the current chunk.  Use `flush_opus_encoder()` if you anticipate a gap from the previous chunk 
+(eg the PTT was off for a period and there was no processing).
+The `undrop_chunk()` function can roll back the chunk buffer and by some milliseconds 
+so you can avoid clipping at the start of a speech sequence.
 
 ## Building on github actions
 
