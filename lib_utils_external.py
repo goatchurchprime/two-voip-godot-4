@@ -117,7 +117,7 @@ def cmake_build_project(env: SConsEnvironment, lib_path: str, extra_args: list, 
     build_args += ["--config", "Debug" if env["dev_build"] else "Release"]
 
     if len(compiler_flags):
-        platform_args += [f'-DCMAKE_C_FLAGS={";".join(compiler_flags)}", f"-DCMAKE_CXX_FLAGS={";".join(compiler_flags)}']
+        platform_args += [f'-DCMAKE_C_FLAGS={";".join(compiler_flags)}', f'-DCMAKE_CXX_FLAGS={";".join(compiler_flags)}']
     if len(linker_flags):
         platform_args += [f'-DCMAKE_EXE_LINKER_FLAGS={";".join(linker_flags)}']
 
