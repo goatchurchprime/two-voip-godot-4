@@ -108,10 +108,15 @@ func _on_connect_toggled(toggled_on):
 			userpass = " -u %s -P %s" % [$GridContainer/mqttuser.text, $GridContainer/mqttpassword.text]
 		else:
 			$MQTT.set_user_pass(null, null)
-		if not $MQTT.connect_to_broker($GridContainer/broker.text):
-			$MQTTnetwork/Connect.button_pressed = false
+		var brokerurl = $GridContainer/broker.text
+		if brokerurl.find("://") == -1 and OS.has_feature("web"):
+			brokerurl = "wss://"+brokerurl
+		if not $MQTT.connect_to_broker(brokerurl):
+			$Connect.button_pressed = false
 		#get_node("../HBoxMosquitto/Cmd").text = "mosquitto_sub -h %s%s -v -t %s/# -T %s/+/audio" % [$GridContainer/broker.text, userpass, $GridContainer/topic.text, $GridContainer/topic.text] 
 		get_node("../HBoxMosquitto/Cmd").text = "mosquitto_sub -h %s%s -v -t %s/#" % [$GridContainer/broker.text, userpass, $GridContainer/topic.text] 
+		if OS.has_feature("web"):
+			get_node("../HBoxMosquitto/Cmd").enabled = true
 
 	else:
 		print("Disconnecting MQTT")
@@ -130,3 +135,7 @@ func _on_connect_toggled(toggled_on):
 		audioouttopic = ""
 		audioouttopicmeta = ""
 		statustopic = ""
+
+
+func _on_mqtt_broker_connection_failed():
+	$Connect.button_pressed = false

@@ -612,6 +612,7 @@ text = "sil"
 [connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
+[connection signal="broker_connection_failed" from="MQTTnetwork/MQTT" to="MQTTnetwork" method="_on_mqtt_broker_connection_failed"]
 [connection signal="toggled" from="MQTTnetwork/Connect" to="MQTTnetwork" method="_on_connect_toggled"]
 [connection signal="item_selected" from="MQTTnetwork/GridContainer/presets" to="MQTTnetwork" method="_on_mqtt_broker_item_selected"]
 [connection signal="toggled" from="HBoxMosquitto/base64" to="." method="_on_base_64_toggled"]
