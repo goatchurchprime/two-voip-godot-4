@@ -355,12 +355,12 @@ int AudioEffectOpusChunked::chunk_to_lipsync(bool resampled) {
     int sampleCount;
     if (!resampled) {
         audioBuffer = (float*)audiosamplebuffer.ptr() + (chunknumber % ringbufferchunks)*audiosamplesize*2; 
-        sampleCount = audiosamplesize*2; 
+        sampleCount = audiosamplesize; 
     } else {
         resampled_current_chunk();
         audioBuffer = (chunknumber > lastdenoisedchunk ? (float*)audioresampledbuffer.ptr() : (float*)audiodenoisedbuffer.ptr()) \
                       + (chunknumber % ringbufferchunks)*opusframesize*2; 
-        sampleCount = opusframesize*2;
+        sampleCount = opusframesize;
     } 
 
     auto rc = ovrLipSync_ProcessFrameEx(ovrlipsyncctx, audioBuffer, sampleCount,
