@@ -80,6 +80,8 @@ AudioEffectOpusChunked::AudioEffectOpusChunked() {
     visemes.resize(ovrLipSyncViseme_Count + 3);  // we append laughterscore, framedelay and framenumber to this list
     ovrlipsyncframe.visemes = visemes.ptrw();
     ovrlipsyncframe.visemesLength = ovrLipSyncViseme_Count;
+    ovrlipsyncframe.laughterCategories = NULL;
+    ovrlipsyncframe.laughterCategoriesLength = 0;
 }
 
 AudioEffectOpusChunked::~AudioEffectOpusChunked() 
