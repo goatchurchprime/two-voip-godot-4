@@ -19,3 +19,4 @@ addons/twovoip_lipsync/libs/*
 addons/twovoip_lipsync/OVRLipSyncNative/*
 example/addons/twovoip*
 example/android/*
+cmake_build_out/*
