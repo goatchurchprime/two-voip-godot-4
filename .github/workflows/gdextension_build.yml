@@ -407,7 +407,7 @@ jobs:
           touch .gdignore
           popd
 
-          mkdir -p upload_lipsync/project/twovoip_lipsync/addons
+          mkdir -p upload_lipsync/project/addons
           mv addons/${{env.LIBRARY_NAME}}_lipsync upload_lipsync/project/addons/${{env.LIBRARY_NAME}}_lipsync
 
       - name: Upload GDExtension Base
