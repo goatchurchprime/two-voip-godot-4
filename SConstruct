@@ -54,9 +54,6 @@ def setup_options(env: SConsEnvironment, arguments):
 def setup_defines_and_flags(env: SConsEnvironment, src_out):
     # Add more sources to `src_out` if needed
 
-    # disregard lipsync on linux
-    if env["lipsync"] and env["platform"] == "linux":  
-        env["lipsync"] = False
 
     if env["lto"]:
         if env.get("is_msvc", False):
@@ -91,15 +88,18 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
             else:
                 print("Lipsync is supported only on arm32 and arm64.")
                 env.Exit(1)
+        elif env["platform"] == "linux":
+            pass # disregard library on linux, but pretend it is there to make android deployment possible
         else:
             print(f'Lipsync is not supported by the {env["platform"]}:{env["arch"]} platform.')
             env.Exit(1)
 
-        dbg_suffix = "d" if env["dev_build"] else ""
-        env.Append(CPPPATH=os.path.join(ovrlipsync_dir, "Include"),
-                    LIBS=["OVRLipSyncShim" + dbg_suffix],
-                    LIBPATH=[lipsync_lib_path],
-                    CPPDEFINES=["OVR_LIP_SYNC"])
+        if env["platform"] != "linux":
+            dbg_suffix = "d" if env["dev_build"] else ""
+            env.Append(CPPPATH=os.path.join(ovrlipsync_dir, "Include"),
+                        LIBS=["OVRLipSyncShim" + dbg_suffix],
+                        LIBPATH=[lipsync_lib_path],
+                        CPPDEFINES=["OVR_LIP_SYNC"])
 
     if env.get("is_msvc", False):
         env.Append(LINKFLAGS=["/WX:NO"])
