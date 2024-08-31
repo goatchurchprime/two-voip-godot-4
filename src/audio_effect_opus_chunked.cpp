@@ -133,27 +133,7 @@ void AudioEffectOpusChunked::createencoder() {
     bufferend = 0;
 
 #ifdef OVR_LIP_SYNC
-    ovrLipSyncResult rc = ovrLipSync_Initialize(audiosamplerate, audiosamplesize);
-    if (rc == ovrLipSyncSuccess) {
-        ovrLipSyncContextProvider provider = ovrLipSyncContextProvider_EnhancedWithLaughter;
-        //ovrLipSyncContextProvider provider = ovrLipSyncContextProvider_Enhanced;
-        rc = ovrLipSync_CreateContextEx(&ovrlipsyncctx, provider, audiosamplerate, true);
-        if (rc == ovrLipSyncSuccess) {
-            govrlipsyncstatus = GovrLipSyncValid;
-            printf("lipsync context successfully created: %d\n", ovrlipsyncctx); 
-        } else {
-            std::cerr << "Failed to create ovrLipSync context: " << rc << std::endl;
-            rc = ovrLipSync_Shutdown();
-            std::cerr << "lipsync shutdown due to lack of context: " << rc << std::endl;
-            govrlipsyncstatus = GovrLipSyncUnavailable;
-        }
-    } else {
-        if (rc == ovrLipSyncError_MissingDLL)
-            std::cerr << "Failed to initialize ovrLipSynchunk_to_lipsyncc engine: Cannot find OVRLipSync.DLL." << std::endl;
-        else
-            std::cerr << "Failed to initialize ovrLipSync engine: " << rc << std::endl;
-        govrlipsyncstatus = GovrLipSyncUnavailable;
-    }
+    govrlipsyncstatus = GovrLipSyncUninitialized;
 #else
     govrlipsyncstatus = GovrLipSyncUnavailable;
 #endif
@@ -348,10 +328,41 @@ void AudioEffectOpusChunked::flush_opus_encoder(bool denoise) {
 }
 
 int AudioEffectOpusChunked::chunk_to_lipsync(bool resampled) {
+#ifdef OVR_LIP_SYNC
     if (!chunk_available() || (resampled && (opusframesize == 0))) 
         return -1;
+        
+    if (govrlipsyncstatus == GovrLipSyncUninitialized) {
+        resampledlipsync = resampled;
+        ovrLipSyncResult rc = ovrLipSync_Initialize(resampledlipsync ? opussamplerate : audiosamplerate, 
+                                                    resampledlipsync ? opusframesize : audiosamplesize);
+        if (rc == ovrLipSyncSuccess) {
+            ovrLipSyncContextProvider provider = ovrLipSyncContextProvider_EnhancedWithLaughter;
+            rc = ovrLipSync_CreateContextEx(&ovrlipsyncctx, provider, audiosamplerate, true);
+            if (rc == ovrLipSyncSuccess) {
+                govrlipsyncstatus = GovrLipSyncValid;
+                printf("lipsync context successfully created: %d\n", ovrlipsyncctx); 
+            } else {
+                std::cerr << "Failed to create ovrLipSync context: " << rc << std::endl;
+                rc = ovrLipSync_Shutdown();
+                std::cerr << "lipsync shutdown due to lack of context: " << rc << std::endl;
+                govrlipsyncstatus = GovrLipSyncUnavailable;
+            }
+        } else {
+            if (rc == ovrLipSyncError_MissingDLL)
+                std::cerr << "Failed to initialize ovrLipSynchunk_to_lipsyncc engine: Cannot find OVRLipSync.DLL." << std::endl;
+            else
+                std::cerr << "Failed to initialize ovrLipSync engine: " << rc << std::endl;
+            govrlipsyncstatus = GovrLipSyncUnavailable;
+        }
+    }
+
     if (govrlipsyncstatus != GovrLipSyncValid)
         return -1;
+    if (resampledlipsync != resampled) {
+        std::cerr << "Cannot mix lipsync sample rates" << std::endl;
+        return -1;
+    }
 
     const void* audioBuffer;
     int sampleCount;
@@ -377,6 +388,9 @@ int AudioEffectOpusChunked::chunk_to_lipsync(bool resampled) {
             res = i;
     }
     return res;
+#else
+    return -1;
+#endif
 }
 
 PackedByteArray AudioEffectOpusChunked::chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamples, bool denoise) {

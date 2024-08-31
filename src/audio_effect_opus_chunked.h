@@ -138,6 +138,7 @@ class AudioEffectOpusChunked : public AudioEffect {
     int lastopuschunk = -1;
 
     GovrLipSyncStatus govrlipsyncstatus = GovrLipSyncUninitialized;
+    bool resampledlipsync;
     PackedFloat32Array visemes; 
     ovrLipSyncFrame ovrlipsyncframe;
     ovrLipSyncContext ovrlipsyncctx = 0;

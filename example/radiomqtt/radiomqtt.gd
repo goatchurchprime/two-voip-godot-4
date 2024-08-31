@@ -2,8 +2,11 @@ extends Control
 
 
 @onready var microphoneidx = AudioServer.get_bus_index("MicrophoneBus")
+@onready var speechbusidx = AudioServer.get_bus_index("SpeechBus")
 @onready var SelfMember = $Members/Self
 
+var audioeffectpitchshift : AudioEffectPitchShift = null
+var audioeffectpitchshiftidx = 0
 var audioeffectcapture : AudioEffectCapture = null
 var audioopuschunkedeffect # : AudioEffectOpusChunked
 
@@ -68,6 +71,14 @@ func _ready():
 		audioeffectcapture = audioeffectonmic
 		if ClassDB.can_instantiate("AudioEffectOpusChunked"):
 			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
+
+	for effect_idx in range(AudioServer.get_bus_effect_count(speechbusidx)):
+		var laudioeffectonspeechbus : AudioEffect = AudioServer.get_bus_effect(speechbusidx, effect_idx)
+		if laudioeffectonspeechbus.is_class("AudioEffectPitchShift"):
+			audioeffectpitchshift = laudioeffectonspeechbus
+			audioeffectpitchshiftidx = effect_idx
+			break
+
 
 	updatesamplerates()
 	for i in range(1, len(visemes)):
@@ -331,6 +342,13 @@ func endtalking():
 	print("Talked for ", (Time.get_ticks_msec() - talkingstarttime)*0.001, " seconds")
 
 func _on_play_pressed():
+	if audioeffectpitchshift != null:
+		var speedup = $HBoxPlaycount/StreamSpeedup.value
+		AudioServer.set_bus_effect_enabled(speechbusidx, audioeffectpitchshiftidx, (speedup != 1.0))
+		SelfMember.get_node("AudioStreamPlayer").pitch_scale = speedup
+		audioeffectpitchshift.pitch_scale = 1.0/speedup
+
+
 	if recordedopuspackets:
 		SelfMember.processheaderpacket(recordedheader.duplicate())
 		SelfMember.opuspacketsbuffer = recordedopuspackets.duplicate()
@@ -343,6 +361,9 @@ func _on_play_pressed():
 			lrecordedsamples = recordedsamples.duplicate()
 		SelfMember.processheaderpacket(recordedheader.duplicate())
 		SelfMember.audiopacketsbuffer = lrecordedsamples
+
+
+
 
 func _on_frame_duration_item_selected(_index):
 	updatesamplerates()

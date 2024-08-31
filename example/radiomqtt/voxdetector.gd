@@ -44,6 +44,7 @@ func loudnessvalues(chunkv1, chunkv2, frametimems, speechprobability):
 		$HSliderVox/ColorRectDenoiseVoiceProb.visible = true
 	else:
 		$HSliderVox/ColorRectDenoiseVoiceProb.visible = false
+	$MicZero.visible = (chunkv1 == 0.0)
 
 	if Sil.button_pressed:
 		if Vox.pressed:

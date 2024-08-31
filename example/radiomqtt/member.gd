@@ -138,7 +138,9 @@ func _process(delta):
 			timedelaytohide = 0.1
 			
 		var bufferlengthtime = audioserveroutputlatency + audiostreamopuschunked.queue_length_frames()*1.0/audiosamplerate
-		if bufferlengthtime < audiobufferregulationtime:
+		if audiobufferregulationtime == 3600:
+			pass
+		elif bufferlengthtime < audiobufferregulationtime:
 			$AudioStreamPlayer.pitch_scale = 1.0
 		else:
 			var w = inverse_lerp(audiobufferregulationtime, audioserveroutputlatency + audiobuffersize/audiosamplerate, bufferlengthtime)
