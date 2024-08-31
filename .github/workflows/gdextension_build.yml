@@ -92,6 +92,7 @@ jobs:
       matrix:
         arch: [x86_64]
         target: [template_debug, template_release]
+        lipsync: [yes, no]   # does not actually have lipsync, but having the stub version running is required to android from linux
 
     steps:
       - name: Checkout
@@ -394,8 +395,8 @@ jobs:
       - name: Move base addon to the new root folders
         if: needs.collect-gdextension.outputs.is_base_compiled == 'true'
         run: |
-          mkdir -p upload_base/addons
-          mv addons/${{env.LIBRARY_NAME}} upload_base/addons/${{env.LIBRARY_NAME}}
+          mkdir -p upload_base/project/addons
+          mv addons/${{env.LIBRARY_NAME}} upload_base/project/addons/${{env.LIBRARY_NAME}}
 
       - name: Move LipSync addon to the new root folders
         if: needs.collect-gdextension.outputs.is_lipsync_compiled == 'true'
@@ -406,8 +407,8 @@ jobs:
           touch .gdignore
           popd
 
-          mkdir -p upload_lipsync/addons
-          mv addons/${{env.LIBRARY_NAME}}_lipsync upload_lipsync/addons/${{env.LIBRARY_NAME}}_lipsync
+          mkdir -p upload_lipsync/twovoip_lipsync/addons
+          mv addons/${{env.LIBRARY_NAME}}_lipsync upload_lipsync/project/addons/${{env.LIBRARY_NAME}}_lipsync
 
       - name: Upload GDExtension Base
         if: needs.collect-gdextension.outputs.is_base_compiled == 'true'

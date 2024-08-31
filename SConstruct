@@ -54,6 +54,10 @@ def setup_options(env: SConsEnvironment, arguments):
 def setup_defines_and_flags(env: SConsEnvironment, src_out):
     # Add more sources to `src_out` if needed
 
+    # disregard lipsync on linux
+    if env["lipsync"] and env["platform"] == "linux":  
+        env["lipsync"] = False
+
     if env["lto"]:
         if env.get("is_msvc", False):
             env.AppendUnique(CCFLAGS=["/GL"],
