@@ -106,7 +106,7 @@ jobs:
           platform: linux
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
-          artifact: linux.${{matrix.target}}.${{matrix.arch}}-base
+          artifact: linux.${{matrix.target}}.${{matrix.arch}}.${{contains(matrix.lipsync, 'yes') && '-lipsync' || '-base'}}
           additional: lto=yes
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
