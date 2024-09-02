@@ -19,8 +19,8 @@ The purpose of this demo is to test all the features
 so you can hear what the opus compression and noise cancelling settings do to the  
 sound of a voice.
 
-1. Clone/Download this repository and open the example project in Godot 4.3.
-2. Go to assetlib, search for twovoip, and install it.
+1. Clone/Download this repository and open the project in the `example/` directory in Godot 4.3.
+2. Go to assetlib, search for twovoip, and install it.  (Now on version 3.1)
 3. Run the app. 
 4. If the microphone is working, then you should see a waveform in the app like this:
 
