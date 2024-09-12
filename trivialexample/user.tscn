@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://e8q0gjrr45rq"]
+
+[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_mrrtk"]
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer"]
+stream = SubResource("AudioStreamOpusChunked_mrrtk")
+autoplay = true
