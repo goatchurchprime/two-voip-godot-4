@@ -19,6 +19,7 @@ func _ready():
 	multiplayer.connection_failed.connect(_connection_failed)
 	multiplayer.server_disconnected.connect(_server_disconnected)
 	
+	assert ($AudioStreamPlayer.bus == "Mic")
 	var mic_bus = AudioServer.get_bus_index("Mic")
 	mic_capture = AudioServer.get_bus_effect(mic_bus, 0)
 	
