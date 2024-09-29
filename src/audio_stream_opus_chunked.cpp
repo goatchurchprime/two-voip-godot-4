@@ -29,6 +29,7 @@
 /**************************************************************************/
 
 #include "audio_stream_opus_chunked.h"
+#include <godot_cpp/variant/utility_functions.hpp>
 
 using namespace godot;
 
@@ -48,7 +49,7 @@ void AudioStreamOpusChunked::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opussamplerate", PROPERTY_HINT_RANGE, "8000,48000,4000"), "set_opussamplerate", "get_opussamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opusframesize", PROPERTY_HINT_RANGE, "20,2880,2"), "set_opusframesize", "get_opusframesize");
 
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplerate", PROPERTY_HINT_RANGE, "44100,44100,1"), "set_audiosamplerate", "get_audiosamplerate");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplerate", PROPERTY_HINT_RANGE, "8000,96000,100"), "set_audiosamplerate", "get_audiosamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplesize", PROPERTY_HINT_RANGE, "10,4000,1"), "set_audiosamplesize", "get_audiosamplesize");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplechunks", PROPERTY_HINT_RANGE, "1,200,1"), "set_audiosamplechunks", "get_audiosamplechunks");
 
@@ -68,7 +69,7 @@ Ref<AudioStreamPlayback> AudioStreamOpusChunked::_instantiate_playback() const {
     Ref<AudioStreamPlaybackOpusChunked> playback;
     playback.instantiate();
     playback->base = Ref<AudioStreamOpusChunked>(this);
-    printf(" instantiate_playback\n");
+    godot::UtilityFunctions::prints("instantiate_playback");
     return playback;
 }
 
@@ -89,9 +90,12 @@ void AudioStreamOpusChunked::createdecoder() {
     int opuserror = 0;
     int channels = 2;
     opusdecoder = opus_decoder_create(opussamplerate, channels, &opuserror);
-    if (opuserror != 0) 
-        printf("We have an opus error*** %d\n", opuserror); 
-
+    if (opuserror != 0) {
+        godot::UtilityFunctions::printerr("opus_decoder_create error ", opuserror); 
+        chunknumber = -2;
+        return;
+    }
+    
     float Dtimeframeopus = opusframesize*1.0F/opussamplerate;
     float Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
     if (audiosamplesize != opusframesize) {
@@ -99,9 +103,9 @@ void AudioStreamOpusChunked::createdecoder() {
         int resamplingquality = 10;
         speexresampler = speex_resampler_init(channels, opussamplerate, audiosamplerate, resamplingquality, &speexerror);
         audiopreresampledbuffer.resize(opusframesize);
-        printf("Decoder timeframeopus preresampler %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
+        godot::UtilityFunctions::prints("Decoder timeframeopus preresampler", Dtimeframeopus, "timeframeaudio", Dtimeframeaudio); 
     } else {
-        printf("Decoder timeframeopus equating %f timeframeaudio %f\n", Dtimeframeopus, Dtimeframeaudio); 
+        godot::UtilityFunctions::prints("Decoder timeframeopus equating", Dtimeframeopus, "timeframeaudio", Dtimeframeaudio); 
     }
     Daudioresampledbuffer.resize(audiosamplesize);
 
@@ -116,8 +120,12 @@ void AudioStreamOpusChunked::createdecoder() {
 }
 
 bool AudioStreamOpusChunked::chunk_space_available() {
-    if (chunknumber == -1) 
-        createdecoder();
+    if (chunknumber < 0) {
+        if (chunknumber == -1) 
+            createdecoder();
+        else
+            return false;
+    }
     //buffertail = chunknumber*audiosamplesize; 
     if (chunknumber == -1)
         return false;
@@ -141,10 +149,14 @@ int AudioStreamOpusChunked::queue_length_frames() {
 
 
 void AudioStreamOpusChunked::push_audio_chunk(const PackedVector2Array& audiochunk) {
-    if (chunknumber == -1) 
-        createdecoder();
+    if (chunknumber < 0) {
+        if (chunknumber == -1) 
+            createdecoder();
+        else
+            return;
+    }
     if (audiochunk.size() != audiosamplesize)
-        printf("Error mismatch audiochunk size");
+        godot::UtilityFunctions::prints("Error mismatch audiochunk size");
     for (int i = 0; i < audiosamplesize; i++) 
         audiosamplebuffer.set(buffertail + i, audiochunk[i]);
     chunknumber += 1;
@@ -190,8 +202,12 @@ PackedVector2Array AudioStreamOpusChunked::read_last_chunk() {
 
 
 PackedVector2Array* AudioStreamOpusChunked::Popus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec) {
-    if (chunknumber == -1) 
-        createdecoder();
+    if (chunknumber < 0) {
+        if (chunknumber == -1) 
+            createdecoder();
+        else
+            return &audiopreresampledbuffer;
+    }
     int decodedsamples = opus_decode_float(opusdecoder, opusbytepacket.ptr() + begin, opusbytepacket.size() - begin, 
                                            (float*)audiopreresampledbuffer.ptrw(), opusframesize, decode_fec);
     if (audiosamplesize == opusframesize) {

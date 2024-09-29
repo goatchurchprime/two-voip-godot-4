@@ -111,7 +111,7 @@ class AudioEffectOpusChunked : public AudioEffect {
     int ringbufferchunks = 50;
 
     PackedVector2Array audiosamplebuffer;  // size audiosamplesize*ringbufferchunks
-    int chunknumber = -1;
+    int chunknumber = -1; // -1 is uninitialized, -2 is error state
     int bufferend = 0;    // apply %(audiosamplesize*ringbufferchunks) for actual position
     int discardedchunks = 0;
 

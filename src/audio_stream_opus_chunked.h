@@ -91,7 +91,7 @@ class AudioStreamOpusChunked : public AudioStream {
 
     PackedVector2Array audiosamplebuffer;
     int audiosamplechunks = 50;
-    int chunknumber = -1;
+    int chunknumber = -1;  // -1 is uninitialized, -2 is error state
     int bufferbegin = 0;
     int buffertail = 0;
     int missingsamples = 0;
