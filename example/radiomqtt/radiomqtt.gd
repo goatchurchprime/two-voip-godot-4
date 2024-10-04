@@ -157,7 +157,9 @@ func updatesamplerates():
 			recordedopuspackets.append(opuspacket)
 			recordedopuspacketsMemSize += opuspacket.size() 
 		$HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
+
 	if resamplestate == 3:
+		print("Uncomp resampled only applies to resampling of recorded message, not applied to transmitted message")
 		recordedresampledpackets = [ ]
 		if len(recordedsamples):
 			for s in recordedsamples:
@@ -214,6 +216,7 @@ func starttalking():
 	currentlytalking = true
 	recordedsamples = [ ]
 	recordedopuspackets = [ ]
+	recordedresampledpackets = null
 	$HBoxPlaycount/GridContainer/FrameCount.text = str(0)
 	$HBoxPlaycount/GridContainer/TimeSecs.text = str(0)
 	recordedopuspacketsMemSize = 0

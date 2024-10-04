@@ -167,6 +167,12 @@ void AudioEffectOpusChunked::createencoder() {
     audiodenoisedvalues.resize(ringbufferchunks);
     lastdenoisedchunk = -1;
 
+    if ((opussamplerate > 0) && (opussamplerate < 8000)) {
+        godot::UtilityFunctions::print("non-opus-samplerate for resample testing");
+        opusencoder = NULL;
+        return;
+    }
+
     // opussamplerate is one of 8000,12000,16000,24000,48000
     // opussamplesize is 480 for 10ms at 48000
     int opusapplication = OPUS_APPLICATION_VOIP; // this option includes in-band forward error correction
