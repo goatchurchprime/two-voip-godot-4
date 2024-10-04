@@ -115,7 +115,8 @@ public:
     void push_audio_chunk(const PackedVector2Array& audiochunk);
     void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
     PackedVector2Array opus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
-
+    PackedVector2Array resample_chunk(const PackedVector2Array& resampledaudio);
+    
     float last_chunk_max();
     float last_chunk_rms();
     PackedVector2Array read_last_chunk();

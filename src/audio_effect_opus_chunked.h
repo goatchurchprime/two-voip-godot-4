@@ -174,7 +174,7 @@ public:
     PackedFloat32Array read_visemes() { return visemes; };
 
     PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamples, bool denoise=false);
-    PackedVector2Array chunk_resample_denoise(const PackedVector2Array& audiosamples, bool backresample);
+    PackedVector2Array chunk_resample(const PackedVector2Array& audiosamples, bool denoise=false, bool backresample=false);
 
     void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };

@@ -22,6 +22,7 @@ var mqttpacketencodebase64 : bool = false
 
 var recordedsamples = [ ]
 var recordedopuspackets = [ ]
+var recordedresampledpackets = null
 const maxrecordedsamples = 10*50
 var recordedopuspacketsMemSize = 0
 var recordedheader = { }
@@ -37,8 +38,11 @@ var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa
 var possibleusernames = ["Alice", "Beth", "Cath", "Dan", "Earl", "Fred", "George", "Harry", "Ivan", "John", "Kevin", "Larry", "Martin", "Oliver", "Peter", "Quentin", "Robert", "Samuel", "Thomas", "Ulrik", "Victor", "Wayne", "Xavier", "Youngs", "Zephir"]
 
 func _ready():
+	$VBoxFrameLength/HBoxAudioFrame/SampleRate.value = AudioServer.get_mix_rate()
 	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
 		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
+	if $VBoxFrameLength/HBoxOpusFrame/SampleRate.selected == -1:
+		$VBoxFrameLength/HBoxOpusFrame/SampleRate.select(4)
 	if $VBoxFrameLength/HBoxAudioFrame/ResampleState.selected == -1:
 		$VBoxFrameLength/HBoxAudioFrame/ResampleState.select(1)
 	if $VBoxFrameLength/HBoxBitRate/BitRate.selected == -1:
@@ -79,7 +83,6 @@ func _ready():
 			audioeffectpitchshiftidx = effect_idx
 			break
 
-
 	updatesamplerates()
 	for i in range(1, len(visemes)):
 		var d = $HBoxVisemes/ColorRect.duplicate()
@@ -109,33 +112,35 @@ func resamplerecordedsamples(orgsamples, newsamplesize):
 func updatesamplerates():
 	frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
 	opusbitrate = int($VBoxFrameLength/HBoxBitRate/BitRate.text)
+	opussamplerate = int($VBoxFrameLength/HBoxOpusFrame/SampleRate.text)*1000
+	audiosamplerate = $VBoxFrameLength/HBoxAudioFrame/SampleRate.value
 	if audioopuschunkedeffect != null:
-		audiosamplerate = audioopuschunkedeffect.audiosamplerate
-		opussamplerate = audioopuschunkedeffect.opussamplerate
+		audioopuschunkedeffect.audiosamplerate = audiosamplerate
+		audioopuschunkedeffect.opussamplerate = opussamplerate
 		audioopuschunkedeffect.opusbitrate = opusbitrate
 		opusframesize = int(opussamplerate*frametimems/1000.0)
 		audioopuschunkedeffect.opusframesize = opusframesize
-		$HBoxBigButtons/VBoxPTT/Denoise.disabled = not audioopuschunkedeffect.denoiser_available()
-	else:
-		opusframesize = int(opussamplerate*frametimems/1000.0)
-	
-	var i = $VBoxFrameLength/HBoxAudioFrame/ResampleState.get_selected_id()
-	if i == 0:  # uncompressed
-		recordedopuspackets = [ ]
-		audiosamplesize = int(audiosamplerate*frametimems/1000)
+		$HBoxBigButtons/VBoxPTT/Denoise.disabled = not (audioopuschunkedeffect.denoiser_available() and opussamplerate == 48000)
+		$VBoxFrameLength/HBoxAudioFrame/ResampleState.set_item_disabled(2, not (audiosamplerate == 44100 and opussamplerate == 48000))
+	opusframesize = int(opussamplerate*frametimems/1000.0)
+	if audioopuschunkedeffect != null:
+		audioopuschunkedeffect.opusframesize = opusframesize
+	var resamplestate = $VBoxFrameLength/HBoxAudioFrame/ResampleState.get_selected_id()
+	audiosamplesize = int(audiosamplerate*frametimems/1000)
+	if resamplestate == 0:  # uncompressed
 		opusframesize = 0
-		if audioopuschunkedeffect != null:
-			audioopuschunkedeffect.opusframesize = int(opussamplerate*frametimems/1000.0)
-	elif i == 1: # Speexresample
-		audiosamplesize = int(audiosamplerate*frametimems/1000)
-	else:  # 441.1k as 48k fakery
+	elif resamplestate == 1: # Speexresample
+		pass 
+	elif resamplestate == 2:  # 441.1k as 48k fakery
 		audiosamplesize = opusframesize
+	elif resamplestate == 3:  # uncompressed resampled
+		opusframesize = 0
 	if audioopuschunkedeffect != null:
 		audioopuschunkedeffect.audiosamplesize = audiosamplesize
 
 	mqttpacketencodebase64 = $HBoxMosquitto/base64.button_pressed
-	$VBoxFrameLength/HBoxOpusFrame/LabFrameLength.text = "%d samples at 48KHz" % opusframesize
-	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples at 44.1KHz" % audiosamplesize
+	$VBoxFrameLength/HBoxOpusFrame/LabFrameLength.text = "%d opus samples at" % opusframesize
+	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples at" % audiosamplesize
 	recordedheader = { "opusframesize":opusframesize, "audiosamplesize":audiosamplesize, 
 					   "opussamplerate":opussamplerate, "audiosamplerate":audiosamplerate, 
 					   "prefixbyteslength":prefixbyteslength, 
@@ -144,17 +149,29 @@ func updatesamplerates():
 		recordedsamples = resamplerecordedsamples(recordedsamples, audiosamplesize)
 	var prefixbytes = PackedByteArray()
 	recordedopuspacketsMemSize = 0
+	recordedopuspackets = [ ]
+	recordedresampledpackets = null
 	if opusframesize != 0:
-		recordedopuspackets = [ ]
 		for s in recordedsamples:
 			var opuspacket = audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, s, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed)
 			recordedopuspackets.append(opuspacket)
 			recordedopuspacketsMemSize += opuspacket.size() 
 		$HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
+	if resamplestate == 3:
+		recordedresampledpackets = [ ]
+		if len(recordedsamples):
+			for s in recordedsamples:
+				var resampledchunk = audioopuschunkedeffect.chunk_resample(s, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed and (opussamplerate == 48000), false)
+				recordedresampledpackets.append(resampledchunk)
+			recordedopuspacketsMemSize = len(recordedresampledpackets)*len(recordedresampledpackets[0])*4
+		$HBoxPlaycount/GridContainer/FrameCount.text = "1"
+		recordedheader["uncompressedresampledaudiorate"] = opussamplerate
+		recordedheader["uncompressedresampledframesize"] = int(opussamplerate*frametimems/1000.0)
 	else:
 		if len(recordedsamples):
 			recordedopuspacketsMemSize = len(recordedsamples)*len(recordedsamples[0])*4
 		$HBoxPlaycount/GridContainer/FrameCount.text = "1"
+
 	$HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
 	var tm = len(recordedsamples)*frametimems*0.001
 	$HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm if tm else 0))
@@ -346,11 +363,15 @@ func _on_play_pressed():
 		var speedup = $HBoxPlaycount/StreamSpeedup.value
 		AudioServer.set_bus_effect_enabled(speechbusidx, audioeffectpitchshiftidx, (speedup != 1.0))
 		SelfMember.get_node("AudioStreamPlayer").pitch_scale = speedup
-		audioeffectpitchshift.pitch_scale = 1.0/speedup
+		#audioeffectpitchshift.pitch_scale = 1.0/speedup
 
-
-	if recordedopuspackets:
+	if recordedresampledpackets != null:
 		SelfMember.processheaderpacket(recordedheader.duplicate())
+		assert (SelfMember.resampledpacketsbuffer != null)
+		SelfMember.resampledpacketsbuffer = recordedresampledpackets.duplicate()
+	elif recordedopuspackets:
+		SelfMember.processheaderpacket(recordedheader.duplicate())
+		assert (SelfMember.resampledpacketsbuffer == null)
 		SelfMember.opuspacketsbuffer = recordedopuspackets.duplicate()
 	else:
 		var lrecordedsamples = [ ]
@@ -360,19 +381,21 @@ func _on_play_pressed():
 		else:
 			lrecordedsamples = recordedsamples.duplicate()
 		SelfMember.processheaderpacket(recordedheader.duplicate())
+		assert (SelfMember.resampledpacketsbuffer == null)
 		SelfMember.audiopacketsbuffer = lrecordedsamples
 
 
-
-
 func _on_frame_duration_item_selected(_index):
+	updatesamplerates()
+
+func _on_sample_rate_item_selected(index):
 	updatesamplerates()
 
 func _on_resample_state_item_selected(_index):
 	updatesamplerates()
 
 func _on_audio_stream_microphone_finished():
-	print("_on_audio_stream_microphone_finished")
+	printerr("_on_audio_stream_microphone_finished")
 
 func _on_option_button_item_selected(_index):
 	updatesamplerates()

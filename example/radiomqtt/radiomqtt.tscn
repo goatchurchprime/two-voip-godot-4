@@ -366,26 +366,6 @@ text = "LibOpus compression and resampling"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="HBoxBitRate" type="HBoxContainer" parent="VBoxFrameLength"]
-layout_mode = 2
-
-[node name="LabBitRate" type="Label" parent="VBoxFrameLength/HBoxBitRate"]
-layout_mode = 2
-text = "Opus Bit Rate"
-
-[node name="BitRate" type="OptionButton" parent="VBoxFrameLength/HBoxBitRate"]
-layout_mode = 2
-item_count = 5
-popup/item_0/text = "24000"
-popup/item_1/text = "12000"
-popup/item_1/id = 1
-popup/item_2/text = "10000"
-popup/item_2/id = 2
-popup/item_3/text = "6000"
-popup/item_3/id = 3
-popup/item_4/text = "3000"
-popup/item_4/id = 4
-
 [node name="HBoxOpusFrame" type="HBoxContainer" parent="VBoxFrameLength"]
 layout_mode = 2
 size_flags_horizontal = 0
@@ -411,11 +391,23 @@ popup/item_5/id = 5
 
 [node name="LabFrameLength" type="Label" parent="VBoxFrameLength/HBoxOpusFrame"]
 layout_mode = 2
-text = "---"
+text = "0 samples at"
+
+[node name="SampleRate" type="OptionButton" parent="VBoxFrameLength/HBoxOpusFrame"]
+layout_mode = 2
+item_count = 5
+popup/item_0/text = "8KHz"
+popup/item_1/text = "12KHz"
+popup/item_1/id = 1
+popup/item_2/text = "16KHz"
+popup/item_2/id = 2
+popup/item_3/text = "24KHz"
+popup/item_3/id = 3
+popup/item_4/text = "48KHz"
+popup/item_4/id = 4
 
 [node name="HBoxAudioFrame" type="HBoxContainer" parent="VBoxFrameLength"]
 layout_mode = 2
-size_flags_horizontal = 0
 
 [node name="LabAudioSampler" type="Label" parent="VBoxFrameLength/HBoxAudioFrame"]
 layout_mode = 2
@@ -423,16 +415,48 @@ text = "Audio sampler"
 
 [node name="ResampleState" type="OptionButton" parent="VBoxFrameLength/HBoxAudioFrame"]
 layout_mode = 2
-item_count = 3
+item_count = 4
 popup/item_0/text = "Uncompressed"
 popup/item_1/text = "Speex Resample"
 popup/item_1/id = 1
 popup/item_2/text = "44.1kHz as 48kHz"
 popup/item_2/id = 2
+popup/item_3/text = "Uncomp resampled"
+popup/item_3/id = 3
 
 [node name="LabFrameLength" type="Label" parent="VBoxFrameLength/HBoxAudioFrame"]
 layout_mode = 2
 text = "---"
+
+[node name="SampleRate" type="SpinBox" parent="VBoxFrameLength/HBoxAudioFrame"]
+custom_minimum_size = Vector2(95, 0)
+layout_mode = 2
+min_value = 8000.0
+max_value = 96000.0
+step = 100.0
+value = 44100.0
+editable = false
+suffix = "Hz"
+
+[node name="HBoxBitRate" type="HBoxContainer" parent="VBoxFrameLength"]
+layout_mode = 2
+
+[node name="LabBitRate" type="Label" parent="VBoxFrameLength/HBoxBitRate"]
+layout_mode = 2
+text = "Opus Bit Rate"
+
+[node name="BitRate" type="OptionButton" parent="VBoxFrameLength/HBoxBitRate"]
+layout_mode = 2
+item_count = 5
+popup/item_0/text = "24000"
+popup/item_1/text = "12000"
+popup/item_1/id = 1
+popup/item_2/text = "10000"
+popup/item_2/id = 2
+popup/item_3/text = "6000"
+popup/item_3/id = 3
+popup/item_4/text = "3000"
+popup/item_4/id = 4
 
 [node name="HSeparator5" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
@@ -626,9 +650,10 @@ text = "sil"
 [connection signal="toggled" from="HBoxMicTalk/MicWorking" to="." method="_on_mic_working_toggled"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="pressed" from="HBoxPlaycount/Play" to="." method="_on_play_pressed"]
-[connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
+[connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/SampleRate" to="." method="_on_sample_rate_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
+[connection signal="item_selected" from="VBoxFrameLength/HBoxBitRate/BitRate" to="." method="_on_option_button_item_selected"]
 [connection signal="broker_connection_failed" from="MQTTnetwork/MQTT" to="MQTTnetwork" method="_on_mqtt_broker_connection_failed"]
 [connection signal="toggled" from="MQTTnetwork/Connect" to="MQTTnetwork" method="_on_connect_toggled"]
 [connection signal="item_selected" from="MQTTnetwork/GridContainer/presets" to="MQTTnetwork" method="_on_mqtt_broker_item_selected"]
