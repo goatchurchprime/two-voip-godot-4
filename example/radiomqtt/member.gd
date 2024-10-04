@@ -4,6 +4,7 @@ extends Control
 var audiostreamopuschunked # : AudioStreamOpusChunked
 var audiostreamgeneratorplayback : AudioStreamGeneratorPlayback
 var opuspacketsbuffer = [ ]
+var resampledpacketsbuffer = null
 var audiopacketsbuffer = [ ]
 
 var opusframesize : int = 0 # 960
@@ -59,22 +60,26 @@ func processheaderpacket(h):
 	prefixbyteslength = h["prefixbyteslength"]
 	mqttpacketencodebase64 = (h.get("mqttpacketencoding") == "base64")
 	chunkcount = 0
-	if opusframesize != h["opusframesize"] or audiosamplesize != h["audiosamplesize"]:
+	if opusframesize != h["opusframesize"] or audiosamplesize != h["audiosamplesize"] or (h.has("uncompressedresampledaudiorate") != (resampledpacketsbuffer != null)):
 		opusframesize = h["opusframesize"]
 		audiosamplesize = h["audiosamplesize"]
 		opussamplerate = h["opussamplerate"]
 		audiosamplerate = h["audiosamplerate"]
-
+		
+		if h.has("uncompressedresampledaudiorate"):
+			resampledpacketsbuffer = [ ]
+			opusframesize = h["uncompressedresampledframesize"]
+		else:
+			resampledpacketsbuffer = null
 		if audiostreamopuschunked != null:
 			audiostreamopuschunked.opusframesize = opusframesize
 			audiostreamopuschunked.audiosamplesize = audiosamplesize
 			audiostreamopuschunked.opussamplerate = opussamplerate
 			audiostreamopuschunked.audiosamplerate = audiosamplerate
 			audiobuffersize = audiostreamopuschunked.audiosamplesize*audiostreamopuschunked.audiosamplechunks
-			
-			if opusframesize != 0:
-				print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
+			print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
 			#$AudioStreamPlayer.play()
+
 		setupaudioshader()
 
 	if opusframesize != 0 and audiostreamopuschunked == null:
@@ -120,7 +125,11 @@ func _process(delta):
 		assert (audiostreamopuschunked != null)
 		var chunkv1 = 0.0
 		while audiostreamopuschunked.chunk_space_available():
-			if len(audiopacketsbuffer) != 0:
+			if resampledpacketsbuffer != null and len(resampledpacketsbuffer) != 0:
+				#audiostreamopuschunked.push_audio_chunk(resampledpacketsbuffer.pop_front())
+				var audiochunk = audiostreamopuschunked.resample_chunk(resampledpacketsbuffer.pop_front())
+				audiostreamopuschunked.push_audio_chunk(audiochunk)
+			elif len(audiopacketsbuffer) != 0:
 				audiostreamopuschunked.push_audio_chunk(audiopacketsbuffer.pop_front())
 			elif len(opuspacketsbuffer) != 0:
 				const fec = 0

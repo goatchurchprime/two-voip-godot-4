@@ -111,7 +111,7 @@ class AudioEffectOpusChunked : public AudioEffect {
     int ringbufferchunks = 50;
 
     PackedVector2Array audiosamplebuffer;  // size audiosamplesize*ringbufferchunks
-    int chunknumber = -1;
+    int chunknumber = -1; // -1 is uninitialized, -2 is error state
     int bufferend = 0;    // apply %(audiosamplesize*ringbufferchunks) for actual position
     int discardedchunks = 0;
 
@@ -174,7 +174,7 @@ public:
     PackedFloat32Array read_visemes() { return visemes; };
 
     PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamples, bool denoise=false);
-    PackedVector2Array chunk_resample_denoise(const PackedVector2Array& audiosamples, bool backresample);
+    PackedVector2Array chunk_resample(const PackedVector2Array& audiosamples, bool denoise=false, bool backresample=false);
 
     void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };

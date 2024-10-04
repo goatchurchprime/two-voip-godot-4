@@ -32,6 +32,7 @@ func _ready():
 	else:
 		print("Created server ", ("Error %d" % err if err else ""))
 		set_process(false)
+		AudioServer.set_bus_effect_enabled(mic_bus, 0, false)
 	multiplayer.multiplayer_peer = peer
 
 func _peer_connected(id):
