@@ -363,7 +363,7 @@ func endtalking():
 
 func _on_play_pressed():
 	if audioeffectpitchshift != null:
-		var speedup = $HBoxPlaycount/StreamSpeedup.value
+		var speedup = $HBoxPlaycount/VBoxExpt/StreamSpeedup.value
 		AudioServer.set_bus_effect_enabled(speechbusidx, audioeffectpitchshiftidx, (speedup != 1.0))
 		SelfMember.get_node("AudioStreamPlayer").pitch_scale = speedup
 		#audioeffectpitchshift.pitch_scale = 1.0/speedup
@@ -386,6 +386,26 @@ func _on_play_pressed():
 		SelfMember.processheaderpacket(recordedheader.duplicate())
 		assert (SelfMember.resampledpacketsbuffer == null)
 		SelfMember.audiopacketsbuffer = lrecordedsamples
+
+var saveplaybackfile = "user://savedplayback.dat"
+func _on_sav_options_item_selected(index):
+	pass # Replace with function body.
+	if index == 1:
+		var f = FileAccess.open(saveplaybackfile, FileAccess.WRITE)
+		print("Saving to file", f.get_path_absolute())
+		f.store_var({"audiosamplerate":audiosamplerate,
+					"recordedsamples":recordedsamples})
+		f.close()
+	elif index == 2:
+		var f = FileAccess.open(saveplaybackfile, FileAccess.READ)
+		print("Loading from file", f.get_path_absolute())
+		var dat = f.get_var()
+		if audiosamplerate != dat["audiosamplerate"]:
+			prints(" sample rates disagree!!", dat["audiosamplerate"], audiosamplerate)
+		recordedsamples = dat["recordedsamples"]
+		f.close()
+	$HBoxPlaycount/VBoxExpt/SavOptions.select(0)
+
 
 
 func _on_frame_duration_item_selected(_index):

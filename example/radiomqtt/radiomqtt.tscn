@@ -299,15 +299,32 @@ theme_override_styles/normal = SubResource("StyleBoxFlat_icid5")
 text = "Play
 "
 
-[node name="StreamSpeedup" type="SpinBox" parent="HBoxPlaycount"]
-custom_minimum_size = Vector2(30, 60)
+[node name="VBoxExpt" type="VBoxContainer" parent="HBoxPlaycount"]
 layout_mode = 2
-tooltip_text = "Playback speed"
+size_flags_horizontal = 0
+size_flags_vertical = 0
+
+[node name="StreamSpeedup" type="SpinBox" parent="HBoxPlaycount/VBoxExpt"]
+layout_mode = 2
+size_flags_horizontal = 0
+tooltip_text = "Playback speed
+(experimental)"
 min_value = 0.1
 max_value = 3.0
 step = 0.1
 value = 1.0
-alignment = 1
+
+[node name="SavOptions" type="OptionButton" parent="HBoxPlaycount/VBoxExpt"]
+layout_mode = 2
+selected = 0
+item_count = 4
+popup/item_0/text = "(actions)"
+popup/item_1/text = "Save"
+popup/item_1/id = 1
+popup/item_2/text = "Load"
+popup/item_2/id = 2
+popup/item_3/text = "Transmit"
+popup/item_3/id = 3
 
 [node name="VSeparator" type="VSeparator" parent="HBoxPlaycount"]
 custom_minimum_size = Vector2(20, 0)
@@ -654,6 +671,7 @@ text = "sil"
 [connection signal="toggled" from="HBoxMicTalk/MicWorking" to="." method="_on_mic_working_toggled"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="pressed" from="HBoxPlaycount/Play" to="." method="_on_play_pressed"]
+[connection signal="item_selected" from="HBoxPlaycount/VBoxExpt/SavOptions" to="." method="_on_sav_options_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/SampleRate" to="." method="_on_sample_rate_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxAudioFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
