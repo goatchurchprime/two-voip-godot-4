@@ -1,7 +1,10 @@
-[gd_scene load_steps=5 format=3 uid="uid://c1ibcb1toyerh"]
+[gd_scene load_steps=6 format=3 uid="uid://c1ibcb1toyerh"]
 
 [ext_resource type="Script" path="res://radiomqtt/member.gd" id="1_o3hks"]
 [ext_resource type="Texture2D" uid="uid://cvyjsyigutxbh" path="res://icon.png" id="2_atirx"]
+
+[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_t5boe"]
+resource_local_to_scene = true
 
 [sub_resource type="Shader" id="Shader_022wp"]
 code = "// NOTE: Shader automatically converted from Godot Engine 4.3.beta's CanvasItemMaterial.
@@ -35,6 +38,7 @@ color = Color(0.423529, 0, 0.423529, 1)
 script = ExtResource("1_o3hks")
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
+stream = SubResource("AudioStreamGenerator_t5boe")
 bus = &"SpeechBus"
 
 [node name="Label" type="Label" parent="."]

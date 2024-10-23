@@ -35,7 +35,7 @@ func _ready():
 			audiostream = AudioStreamGenerator.new()
 		$AudioStreamPlayer.stream = audiostream
 	else:
-		assert (audiostream.resource_local_to_scene)
+		assert (audiostream.resource_local_to_scene, "AudioStreamGenerator must be local_to_scene")
 
 	$AudioStreamPlayer.play()
 	if audiostream.is_class("AudioStreamOpusChunked"):
@@ -44,7 +44,7 @@ func _ready():
 		#audiostreamopyschunkedplayback.begin_resample()
 	elif audiostream.is_class("AudioStreamGenerator"):
 		if ClassDB.can_instantiate("AudioStreamOpusChunked"):
-			audiostreamopuschunked = ClassDB.instantiate("AudioStreamOpusChunked").new()
+			audiostreamopuschunked = ClassDB.instantiate("AudioStreamOpusChunked")
 		audiostreamgeneratorplayback = $AudioStreamPlayer.get_stream_playback()
 	else:
 		printerr("Incorrect AudioStream type ", audiostream)

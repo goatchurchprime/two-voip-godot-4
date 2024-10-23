@@ -392,20 +392,19 @@ func _on_sav_options_item_selected(index):
 	pass # Replace with function body.
 	if index == 1:
 		var f = FileAccess.open(saveplaybackfile, FileAccess.WRITE)
-		print("Saving to file", f.get_path_absolute())
+		prints("Saving to file:", f.get_path_absolute())
 		f.store_var({"audiosamplerate":audiosamplerate,
 					"recordedsamples":recordedsamples})
 		f.close()
 	elif index == 2:
 		var f = FileAccess.open(saveplaybackfile, FileAccess.READ)
-		print("Loading from file", f.get_path_absolute())
+		prints("Loading from file:", f.get_path_absolute())
 		var dat = f.get_var()
 		if audiosamplerate != dat["audiosamplerate"]:
 			prints(" sample rates disagree!!", dat["audiosamplerate"], audiosamplerate)
 		recordedsamples = dat["recordedsamples"]
 		f.close()
 	$HBoxPlaycount/VBoxExpt/SavOptions.select(0)
-
 
 
 func _on_frame_duration_item_selected(_index):
