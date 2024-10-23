@@ -63,7 +63,7 @@ protected:
 
 public:
     virtual int32_t _mix_resampled(AudioFrame *dst_buffer, int32_t frame_count) override;
-    virtual double _get_stream_sampling_rate() const override { return 44100.0F; };
+    virtual double _get_stream_sampling_rate() const override;
 
     virtual void _start(double p_from_pos = 0.0) override;
     virtual void _stop() override;
@@ -88,6 +88,8 @@ class AudioStreamOpusChunked : public AudioStream {
     int audiosamplerate = 44100;
     int audiosamplesize = 881;
     PackedVector2Array Daudioresampledbuffer;
+    
+    float mix_rate = 44100.0;
 
     PackedVector2Array audiosamplebuffer;
     int audiosamplechunks = 50;
@@ -131,6 +133,8 @@ public:
     int get_audiosamplesize() { return audiosamplesize; };
     void set_audiosamplechunks(int laudiosamplechunks) { resetdecoder(); audiosamplechunks = laudiosamplechunks; };
     int get_audiosamplechunks() { return audiosamplechunks; };
+    void set_mix_rate(int lmix_rate) { resetdecoder(); mix_rate = lmix_rate; };
+    int get_mix_rate() { return mix_rate; };
 
     AudioStreamOpusChunked() {;};
     ~AudioStreamOpusChunked() { resetdecoder(); };

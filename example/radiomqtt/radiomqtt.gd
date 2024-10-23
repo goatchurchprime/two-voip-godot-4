@@ -38,6 +38,8 @@ var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa
 var possibleusernames = ["Alice", "Beth", "Cath", "Dan", "Earl", "Fred", "George", "Harry", "Ivan", "John", "Kevin", "Larry", "Martin", "Oliver", "Peter", "Quentin", "Robert", "Samuel", "Thomas", "Ulrik", "Victor", "Wayne", "Xavier", "Youngs", "Zephir"]
 
 func _ready():
+	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
+	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 	$VBoxFrameLength/HBoxAudioFrame/SampleRate.value = AudioServer.get_mix_rate()
 	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
 		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)

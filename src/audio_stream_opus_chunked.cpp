@@ -46,12 +46,17 @@ void AudioStreamOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_audiosamplesize"), &AudioStreamOpusChunked::get_audiosamplesize);
     ClassDB::bind_method(D_METHOD("set_audiosamplechunks", "audiosamplechunks"), &AudioStreamOpusChunked::set_audiosamplechunks);
     ClassDB::bind_method(D_METHOD("get_audiosamplechunks"), &AudioStreamOpusChunked::get_audiosamplechunks);
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "opussamplerate", PROPERTY_HINT_RANGE, "8000,48000,4000"), "set_opussamplerate", "get_opussamplerate");
+    ClassDB::bind_method(D_METHOD("set_mix_rate", "mix_rate"), &AudioStreamOpusChunked::set_mix_rate);
+    ClassDB::bind_method(D_METHOD("get_mix_rate"), &AudioStreamOpusChunked::get_mix_rate);
+
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "opussamplerate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_opussamplerate", "get_opussamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opusframesize", PROPERTY_HINT_RANGE, "20,2880,2"), "set_opusframesize", "get_opusframesize");
 
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplerate", PROPERTY_HINT_RANGE, "8000,96000,100"), "set_audiosamplerate", "get_audiosamplerate");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplerate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_audiosamplerate", "get_audiosamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplesize", PROPERTY_HINT_RANGE, "10,4000,1"), "set_audiosamplesize", "get_audiosamplesize");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplechunks", PROPERTY_HINT_RANGE, "1,200,1"), "set_audiosamplechunks", "get_audiosamplechunks");
+
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "mix_rate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_mix_rate", "get_mix_rate");
 
     ClassDB::bind_method(D_METHOD("chunk_space_available"), &AudioStreamOpusChunked::chunk_space_available);
     ClassDB::bind_method(D_METHOD("queue_length_frames"), &AudioStreamOpusChunked::queue_length_frames);
@@ -275,6 +280,11 @@ int32_t AudioStreamPlaybackOpusChunked::_mix_resampled(AudioFrame *buffer, int32
     mixed += frames/_get_stream_sampling_rate();
     return frames;
 }
+
+double AudioStreamPlaybackOpusChunked::_get_stream_sampling_rate() const { 
+    return base->mix_rate; 
+};
+
 
 void AudioStreamPlaybackOpusChunked::_start(double p_from_pos) {
     if (mixed == 0.0) {
