@@ -166,8 +166,10 @@ void AudioStreamOpusChunked::push_audio_chunk(const PackedVector2Array& audiochu
         else
             return;
     }
-    if (audiochunk.size() != audiosamplesize)
-        godot::UtilityFunctions::print("Warning mismatch expected audiochunk size");
+    if (audiochunk.size() != audiosamplesize) {
+        godot::UtilityFunctions::printerr("Error mismatch expected audiochunk size");
+        return;
+    }
     for (int i = 0; i < audiochunk.size(); i++) 
         audiosamplebuffer.set(buffertail + i, audiochunk[i]);
     chunknumber += 1;
@@ -237,8 +239,10 @@ PackedVector2Array AudioStreamOpusChunked::resample_chunk(const PackedVector2Arr
         else
             return audiopreresampledbuffer;
     }
-    if (resampledaudio.size() != opusframesize)
+    if (resampledaudio.size() != opusframesize) {
         godot::UtilityFunctions::printerr("Error mismatch resampledaudio size");
+        return PackedVector2Array();
+    }
     if (audiosamplesize == opusframesize) {
         return resampledaudio; 
     }
