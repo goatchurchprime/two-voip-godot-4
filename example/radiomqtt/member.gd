@@ -11,6 +11,7 @@ var opusframesize : int = 0 # 960
 var audiosamplesize : int = 0 # 882
 var opussamplerate : int = 48000
 var audiosamplerate : int = 44100
+var mix_rate : int = 44100
 var prefixbyteslength : int = 0
 var mqttpacketencodebase64 : bool = false
 
@@ -23,6 +24,8 @@ var audiosampleframetexture : ImageTexture
 var audioserveroutputlatency = 0.015
 var audiobufferregulationtime = 0.7
 var audiobufferregulationpitch = 1.4
+
+var playbackstarttime = -1.0
 
 func _ready():
 	var audiostream = $AudioStreamPlayer.stream
@@ -54,18 +57,17 @@ func setname(lname):
 	$Label.text = name
 
 func processheaderpacket(h):
-	print(h["audiosamplesize"],  "  ss  ", h["opusframesize"])
-	#h["audiosamplesize"] = 400; h["audiosamplerate"] = 40000
-	#print("setting audiosamplesize wrong on receive ", h)
+	var radiomqtt = get_node("../..")
+	audiosamplerate = radiomqtt.get_node("VBoxPlayback/HBoxStream/SampleRate").value
+	mix_rate = radiomqtt.get_node("VBoxPlayback/HBoxStream/MixRate").value
 	prefixbyteslength = h["prefixbyteslength"]
 	mqttpacketencodebase64 = (h.get("mqttpacketencoding") == "base64")
 	chunkcount = 0
-	if opusframesize != h["opusframesize"] or audiosamplesize != h["audiosamplesize"] or (h.has("uncompressedresampledaudiorate") != (resampledpacketsbuffer != null)):
+	if opusframesize != h["opusframesize"] or opussamplerate != h["opussamplerate"] or (h.has("uncompressedresampledaudiorate") != (resampledpacketsbuffer != null)):
 		opusframesize = h["opusframesize"]
-		audiosamplesize = h["audiosamplesize"]
 		opussamplerate = h["opussamplerate"]
-		audiosamplerate = h["audiosamplerate"]
-		
+		var frametimems = opusframesize*1000.0/opussamplerate
+		audiosamplesize = int(audiosamplerate*frametimems/1000.0)
 		if h.has("uncompressedresampledaudiorate"):
 			resampledpacketsbuffer = [ ]
 			opusframesize = h["uncompressedresampledframesize"]
@@ -73,15 +75,18 @@ func processheaderpacket(h):
 			resampledpacketsbuffer = null
 		if audiostreamopuschunked != null:
 			audiostreamopuschunked.opusframesize = opusframesize
-			audiostreamopuschunked.audiosamplesize = audiosamplesize
 			audiostreamopuschunked.opussamplerate = opussamplerate
-			audiostreamopuschunked.audiosamplerate = audiosamplerate
-			audiostreamopuschunked.mix_rate = AudioServer.get_mix_rate()
-			audiobuffersize = audiostreamopuschunked.audiosamplesize*audiostreamopuschunked.audiosamplechunks
-			print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
-			#$AudioStreamPlayer.play()
 
+	if audiostreamopuschunked != null and (audiostreamopuschunked.audiosamplesize != audiosamplesize or audiostreamopuschunked.audiosamplerate != audiosamplerate or audiostreamopuschunked.mix_rate != mix_rate):
+		audiostreamopuschunked.audiosamplesize = audiosamplesize
+		audiostreamopuschunked.audiosamplerate = audiosamplerate
+		audiostreamopuschunked.mix_rate = mix_rate
+		audiobuffersize = audiostreamopuschunked.audiosamplesize*audiostreamopuschunked.audiosamplechunks
+		print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
+		#$AudioStreamPlayer.play()
 		setupaudioshader()
+
+
 
 	if opusframesize != 0 and audiostreamopuschunked == null:
 		print("Compressed opus stream received that we cannot decompress")
@@ -147,6 +152,11 @@ func _process(delta):
 			$Node/ColorRectBackground.visible = true
 			timedelaytohide = 0.1
 			
+		if playbackstarttime != -1.0 and audiostreamopuschunked.queue_length_frames() == 0:
+			var playbackduration = Time.get_ticks_msec() - playbackstarttime + audioserveroutputlatency
+			playbackstarttime = -1.0
+			print("--- Playback time: ", playbackduration/1000.0)
+
 		var bufferlengthtime = audioserveroutputlatency + audiostreamopuschunked.queue_length_frames()*1.0/audiosamplerate
 		if audiobufferregulationtime == 3600:
 			pass
