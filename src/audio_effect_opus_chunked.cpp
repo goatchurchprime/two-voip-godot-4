@@ -48,11 +48,12 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_audiosamplesize"), &AudioEffectOpusChunked::get_audiosamplesize);
     ClassDB::bind_method(D_METHOD("set_audiosamplechunks", "audiosamplechunks"), &AudioEffectOpusChunked::set_audiosamplechunks);
     ClassDB::bind_method(D_METHOD("get_audiosamplechunks"), &AudioEffectOpusChunked::get_audiosamplechunks);
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "opussamplerate", PROPERTY_HINT_RANGE, "8000,48000,4000"), "set_opussamplerate", "get_opussamplerate");
+
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "opussamplerate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_opussamplerate", "get_opussamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opusframesize", PROPERTY_HINT_RANGE, "20,2880,2"), "set_opusframesize", "get_opusframesize");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opusbitrate", PROPERTY_HINT_RANGE, "3000,24000,1000"), "set_opusbitrate", "get_opusbitrate");
 
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplerate", PROPERTY_HINT_RANGE, "8000,96000,100"), "set_audiosamplerate", "get_audiosamplerate");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplerate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_audiosamplerate", "get_audiosamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplesize", PROPERTY_HINT_RANGE, "10,4000,1"), "set_audiosamplesize", "get_audiosamplesize");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplechunks", PROPERTY_HINT_RANGE, "1,200,1"), "set_audiosamplechunks", "get_audiosamplechunks");
 
@@ -214,7 +215,7 @@ void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame 
             drop_chunk(); 
             discardedchunks += 1; 
             if (!Engine::get_singleton()->is_editor_hint())
-                if ((discardedchunks < 50) || ((discardedchunks % 1000) == 0))
+                if ((discardedchunks < 5) || ((discardedchunks % 1000) == 0))
                     godot::UtilityFunctions::prints("Discarding chunk", discardedchunks, bufferend, (chunknumber + 1)*audiosamplesize); 
         }
     }
@@ -494,7 +495,7 @@ float AudioEffectOpusChunked::denoise_single_chunk(float* pdenoisedaudioresample
             }
         }
     } else {
-        godot::UtilityFunctions::prints("Warning: noise framesize", rnnoiseframesize, "does not divide opusframesize", opusframesize);
+        godot::UtilityFunctions::printerr("Warning: noise framesize", rnnoiseframesize, "does not divide opusframesize", opusframesize);
         for (int i = 0; i < opusframesize; i++) {
             pdenoisedaudioresamples[i*2] = paudiosamples[i*2];
             pdenoisedaudioresamples[i*2 + 1] = paudiosamples[i*2 + 1];
@@ -508,11 +509,16 @@ PackedByteArray AudioEffectOpusChunked::opus_frame_to_opus_packet(const PackedBy
     unsigned char* popusbytes = opusbytebuffer.ptrw(); 
     int nprefbytes = prefixbytes.size();
     if (nprefbytes > MAXPREFIXBYTES) {
-        godot::UtilityFunctions::prints("Warning: prefixbytes too long");
+        godot::UtilityFunctions::printerr("Error: prefixbytes longer than ", MAXPREFIXBYTES);
         nprefbytes = 0;
+        return PackedByteArray();
     }
     if (nprefbytes != 0) {
         memcpy(popusbytes, prefixbytes.ptr(), nprefbytes); 
+    }
+    if (opusencoder == NULL) {
+        godot::UtilityFunctions::printerr("Error: opusencoder is null");
+        return PackedByteArray();
     }
     int bytepacketsize = opus_encode_float(opusencoder, paudiosamples, opusframesize, 
                                            popusbytes + nprefbytes, opusbytebuffer.size() - nprefbytes);

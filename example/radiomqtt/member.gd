@@ -11,6 +11,7 @@ var opusframesize : int = 0 # 960
 var audiosamplesize : int = 0 # 882
 var opussamplerate : int = 48000
 var audiosamplerate : int = 44100
+var mix_rate : int = 44100
 var prefixbyteslength : int = 0
 var mqttpacketencodebase64 : bool = false
 
@@ -24,6 +25,8 @@ var audioserveroutputlatency = 0.015
 var audiobufferregulationtime = 0.7
 var audiobufferregulationpitch = 1.4
 
+var playbackstarttime = -1.0
+
 func _ready():
 	var audiostream = $AudioStreamPlayer.stream
 	if audiostream == null:
@@ -35,7 +38,7 @@ func _ready():
 			audiostream = AudioStreamGenerator.new()
 		$AudioStreamPlayer.stream = audiostream
 	else:
-		assert (audiostream.resource_local_to_scene)
+		assert (audiostream.resource_local_to_scene, "AudioStreamGenerator must be local_to_scene")
 
 	$AudioStreamPlayer.play()
 	if audiostream.is_class("AudioStreamOpusChunked"):
@@ -44,7 +47,7 @@ func _ready():
 		#audiostreamopyschunkedplayback.begin_resample()
 	elif audiostream.is_class("AudioStreamGenerator"):
 		if ClassDB.can_instantiate("AudioStreamOpusChunked"):
-			audiostreamopuschunked = ClassDB.instantiate("AudioStreamOpusChunked").new()
+			audiostreamopuschunked = ClassDB.instantiate("AudioStreamOpusChunked")
 		audiostreamgeneratorplayback = $AudioStreamPlayer.get_stream_playback()
 	else:
 		printerr("Incorrect AudioStream type ", audiostream)
@@ -54,32 +57,29 @@ func setname(lname):
 	$Label.text = name
 
 func processheaderpacket(h):
-	print(h["audiosamplesize"],  "  ss  ", h["opusframesize"])
-	#h["audiosamplesize"] = 400; h["audiosamplerate"] = 40000
-	#print("setting audiosamplesize wrong on receive ", h)
+	var radiomqtt = get_node("../..")
+	audiosamplerate = radiomqtt.get_node("VBoxPlayback/HBoxStream/SampleRate").value
+	mix_rate = radiomqtt.get_node("VBoxPlayback/HBoxStream/MixRate").value
 	prefixbyteslength = h["prefixbyteslength"]
 	mqttpacketencodebase64 = (h.get("mqttpacketencoding") == "base64")
 	chunkcount = 0
-	if opusframesize != h["opusframesize"] or audiosamplesize != h["audiosamplesize"] or (h.has("uncompressedresampledaudiorate") != (resampledpacketsbuffer != null)):
+	if opusframesize != h["opusframesize"] or opussamplerate != h["opussamplerate"] or \
+			((audiostreamopuschunked != null) and (audiostreamopuschunked.audiosamplesize != audiosamplesize or audiostreamopuschunked.audiosamplerate != audiosamplerate or \
+			audiostreamopuschunked.mix_rate != mix_rate)):
 		opusframesize = h["opusframesize"]
-		audiosamplesize = h["audiosamplesize"]
 		opussamplerate = h["opussamplerate"]
-		audiosamplerate = h["audiosamplerate"]
-		
-		if h.has("uncompressedresampledaudiorate"):
-			resampledpacketsbuffer = [ ]
-			opusframesize = h["uncompressedresampledframesize"]
-		else:
-			resampledpacketsbuffer = null
+		var frametimems = opusframesize*1000.0/opussamplerate
+		audiosamplesize = int(audiosamplerate*frametimems/1000.0)
+		resampledpacketsbuffer = null
 		if audiostreamopuschunked != null:
 			audiostreamopuschunked.opusframesize = opusframesize
-			audiostreamopuschunked.audiosamplesize = audiosamplesize
 			audiostreamopuschunked.opussamplerate = opussamplerate
+			audiostreamopuschunked.audiosamplesize = audiosamplesize
 			audiostreamopuschunked.audiosamplerate = audiosamplerate
+			audiostreamopuschunked.mix_rate = mix_rate
 			audiobuffersize = audiostreamopuschunked.audiosamplesize*audiostreamopuschunked.audiosamplechunks
-			print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
-			#$AudioStreamPlayer.play()
-
+		print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
+		#$AudioStreamPlayer.play()
 		setupaudioshader()
 
 	if opusframesize != 0 and audiostreamopuschunked == null:
@@ -90,6 +90,7 @@ func processheaderpacket(h):
 func setupaudioshader():
 	var audiosampleframedata : PackedVector2Array
 	audiosampleframedata.resize(audiosamplesize)
+	assert (audiosamplesize != 0)
 	audiosampleframetextureimage = Image.create_from_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata.to_byte_array())
 	audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
 	assert (audiosampleframetexture != null)
@@ -146,6 +147,11 @@ func _process(delta):
 			$Node/ColorRectBackground.visible = true
 			timedelaytohide = 0.1
 			
+		if playbackstarttime != -1.0 and audiostreamopuschunked.queue_length_frames() == 0:
+			var playbackduration = Time.get_ticks_msec() - playbackstarttime + audioserveroutputlatency
+			playbackstarttime = -1.0
+			print("--- Playback time: ", playbackduration/1000.0)
+
 		var bufferlengthtime = audioserveroutputlatency + audiostreamopuschunked.queue_length_frames()*1.0/audiosamplerate
 		if audiobufferregulationtime == 3600:
 			pass
