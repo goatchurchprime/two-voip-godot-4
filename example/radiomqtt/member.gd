@@ -63,30 +63,24 @@ func processheaderpacket(h):
 	prefixbyteslength = h["prefixbyteslength"]
 	mqttpacketencodebase64 = (h.get("mqttpacketencoding") == "base64")
 	chunkcount = 0
-	if opusframesize != h["opusframesize"] or opussamplerate != h["opussamplerate"] or (h.has("uncompressedresampledaudiorate") != (resampledpacketsbuffer != null)):
+	if opusframesize != h["opusframesize"] or opussamplerate != h["opussamplerate"] or \
+			((audiostreamopuschunked != null) and (audiostreamopuschunked.audiosamplesize != audiosamplesize or audiostreamopuschunked.audiosamplerate != audiosamplerate or \
+			audiostreamopuschunked.mix_rate != mix_rate)):
 		opusframesize = h["opusframesize"]
 		opussamplerate = h["opussamplerate"]
 		var frametimems = opusframesize*1000.0/opussamplerate
 		audiosamplesize = int(audiosamplerate*frametimems/1000.0)
-		if h.has("uncompressedresampledaudiorate"):
-			resampledpacketsbuffer = [ ]
-			opusframesize = h["uncompressedresampledframesize"]
-		else:
-			resampledpacketsbuffer = null
+		resampledpacketsbuffer = null
 		if audiostreamopuschunked != null:
 			audiostreamopuschunked.opusframesize = opusframesize
 			audiostreamopuschunked.opussamplerate = opussamplerate
-
-	if audiostreamopuschunked != null and (audiostreamopuschunked.audiosamplesize != audiosamplesize or audiostreamopuschunked.audiosamplerate != audiosamplerate or audiostreamopuschunked.mix_rate != mix_rate):
-		audiostreamopuschunked.audiosamplesize = audiosamplesize
-		audiostreamopuschunked.audiosamplerate = audiosamplerate
-		audiostreamopuschunked.mix_rate = mix_rate
-		audiobuffersize = audiostreamopuschunked.audiosamplesize*audiostreamopuschunked.audiosamplechunks
+			audiostreamopuschunked.audiosamplesize = audiosamplesize
+			audiostreamopuschunked.audiosamplerate = audiosamplerate
+			audiostreamopuschunked.mix_rate = mix_rate
+			audiobuffersize = audiostreamopuschunked.audiosamplesize*audiostreamopuschunked.audiosamplechunks
 		print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
 		#$AudioStreamPlayer.play()
 		setupaudioshader()
-
-
 
 	if opusframesize != 0 and audiostreamopuschunked == null:
 		print("Compressed opus stream received that we cannot decompress")
@@ -96,6 +90,7 @@ func processheaderpacket(h):
 func setupaudioshader():
 	var audiosampleframedata : PackedVector2Array
 	audiosampleframedata.resize(audiosamplesize)
+	assert (audiosamplesize != 0)
 	audiosampleframetextureimage = Image.create_from_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata.to_byte_array())
 	audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
 	assert (audiosampleframetexture != null)

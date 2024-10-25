@@ -495,7 +495,7 @@ float AudioEffectOpusChunked::denoise_single_chunk(float* pdenoisedaudioresample
             }
         }
     } else {
-        godot::UtilityFunctions::prints("Warning: noise framesize", rnnoiseframesize, "does not divide opusframesize", opusframesize);
+        godot::UtilityFunctions::printerr("Warning: noise framesize", rnnoiseframesize, "does not divide opusframesize", opusframesize);
         for (int i = 0; i < opusframesize; i++) {
             pdenoisedaudioresamples[i*2] = paudiosamples[i*2];
             pdenoisedaudioresamples[i*2 + 1] = paudiosamples[i*2 + 1];
@@ -509,11 +509,16 @@ PackedByteArray AudioEffectOpusChunked::opus_frame_to_opus_packet(const PackedBy
     unsigned char* popusbytes = opusbytebuffer.ptrw(); 
     int nprefbytes = prefixbytes.size();
     if (nprefbytes > MAXPREFIXBYTES) {
-        godot::UtilityFunctions::prints("Warning: prefixbytes too long");
+        godot::UtilityFunctions::printerr("Error: prefixbytes longer than ", MAXPREFIXBYTES);
         nprefbytes = 0;
+        return PackedByteArray();
     }
     if (nprefbytes != 0) {
         memcpy(popusbytes, prefixbytes.ptr(), nprefbytes); 
+    }
+    if (opusencoder == NULL) {
+        godot::UtilityFunctions::printerr("Error: opusencoder is null");
+        return PackedByteArray();
     }
     int bytepacketsize = opus_encode_float(opusencoder, paudiosamples, opusframesize, 
                                            popusbytes + nprefbytes, opusbytebuffer.size() - nprefbytes);

@@ -306,38 +306,41 @@ popup/item_4/id = 4
 popup/item_5/text = "60ms"
 popup/item_5/id = 5
 
-[node name="ResampleState" type="OptionButton" parent="VBoxFrameLength/HBoxOpusFrame"]
-layout_mode = 2
-item_count = 4
-popup/item_0/text = "Uncompressed"
-popup/item_1/text = "Speex Resample"
-popup/item_1/id = 1
-popup/item_2/text = "44.1kHz as 48kHz"
-popup/item_2/id = 2
-popup/item_3/text = "Uncomp resampled"
-popup/item_3/id = 3
-
 [node name="HBoxAudioFrame" type="HBoxContainer" parent="VBoxFrameLength"]
 layout_mode = 2
 
-[node name="LabAudioSampler" type="Label" parent="VBoxFrameLength/HBoxAudioFrame"]
-layout_mode = 2
-text = "Mic Audio Frame:"
-
 [node name="LabSampleRate" type="Label" parent="VBoxFrameLength/HBoxAudioFrame"]
 layout_mode = 2
-text = "Sample Rate"
+text = "Mic sampled"
 
 [node name="SampleRate" type="SpinBox" parent="VBoxFrameLength/HBoxAudioFrame"]
 custom_minimum_size = Vector2(95, 0)
 layout_mode = 2
-min_value = 8000.0
+min_value = 20.0
 max_value = 96000.0
-step = 100.0
 value = 44100.0
 suffix = "Hz"
 
 [node name="LabFrameLength" type="Label" parent="VBoxFrameLength/HBoxAudioFrame"]
+layout_mode = 2
+text = "0 samples"
+
+[node name="VSeparator" type="VSeparator" parent="VBoxFrameLength/HBoxAudioFrame"]
+layout_mode = 2
+
+[node name="LabResampleRate" type="Label" parent="VBoxFrameLength/HBoxAudioFrame"]
+layout_mode = 2
+text = "Resampled:"
+
+[node name="ResampleRate" type="SpinBox" parent="VBoxFrameLength/HBoxAudioFrame"]
+custom_minimum_size = Vector2(95, 0)
+layout_mode = 2
+min_value = 20.0
+max_value = 96000.0
+value = 48000.0
+suffix = "Hz"
+
+[node name="LabResampleFrameLength" type="Label" parent="VBoxFrameLength/HBoxAudioFrame"]
 layout_mode = 2
 text = "0 samples"
 
@@ -354,7 +357,8 @@ text = "Sample Rate"
 
 [node name="SampleRate" type="OptionButton" parent="VBoxFrameLength/HBoxOpusBitRate"]
 layout_mode = 2
-item_count = 7
+allow_reselect = true
+item_count = 5
 popup/item_0/text = "8KHz"
 popup/item_1/text = "12KHz"
 popup/item_1/id = 1
@@ -364,10 +368,6 @@ popup/item_3/text = "24KHz"
 popup/item_3/id = 3
 popup/item_4/text = "48KHz"
 popup/item_4/id = 4
-popup/item_5/text = "4KHz"
-popup/item_5/id = 5
-popup/item_6/text = "2KHz"
-popup/item_6/id = 6
 
 [node name="LabBitRate" type="Label" parent="VBoxFrameLength/HBoxOpusBitRate"]
 layout_mode = 2
@@ -386,9 +386,10 @@ popup/item_3/id = 3
 popup/item_4/text = "3000"
 popup/item_4/id = 4
 
-[node name="LabFrameLength" type="Label" parent="VBoxFrameLength/HBoxOpusBitRate"]
+[node name="Compressed" type="CheckButton" parent="VBoxFrameLength/HBoxOpusBitRate"]
 layout_mode = 2
-text = "0 samples"
+button_pressed = true
+text = "Compressed"
 
 [node name="HSeparator4" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
@@ -419,7 +420,7 @@ size_flags_stretch_ratio = 0.14
 tooltip_text = "Speedup"
 
 [node name="Play" type="Button" parent="VBoxPlayback/HBoxPlaycount"]
-custom_minimum_size = Vector2(60, 0)
+custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 theme_override_styles/normal = SubResource("StyleBoxFlat_icid5")
 text = "Play
@@ -489,7 +490,7 @@ layout_mode = 2
 
 [node name="LabelStream" type="Label" parent="VBoxPlayback/HBoxStream"]
 layout_mode = 2
-text = "Out: "
+text = "Play"
 
 [node name="LabelSamplerate" type="Label" parent="VBoxPlayback/HBoxStream"]
 layout_mode = 2
@@ -723,9 +724,11 @@ text = "sil"
 [connection signal="toggled" from="HBoxMicTalk/MicWorking" to="." method="_on_mic_working_toggled"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
-[connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/ResampleState" to="." method="_on_resample_state_item_selected"]
+[connection signal="value_changed" from="VBoxFrameLength/HBoxAudioFrame/SampleRate" to="." method="_on_sample_rate_value_changed"]
+[connection signal="value_changed" from="VBoxFrameLength/HBoxAudioFrame/ResampleRate" to="." method="_on_resample_rate_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusBitRate/SampleRate" to="." method="_on_sample_rate_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusBitRate/BitRate" to="." method="_on_option_button_item_selected"]
+[connection signal="toggled" from="VBoxFrameLength/HBoxOpusBitRate/Compressed" to="." method="_on_compressed_toggled"]
 [connection signal="pressed" from="VBoxPlayback/HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 [connection signal="item_selected" from="VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions" to="." method="_on_sav_options_item_selected"]
 [connection signal="broker_connection_failed" from="MQTTnetwork/MQTT" to="MQTTnetwork" method="_on_mqtt_broker_connection_failed"]
