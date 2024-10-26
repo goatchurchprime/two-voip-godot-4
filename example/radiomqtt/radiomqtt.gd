@@ -442,3 +442,7 @@ func _on_resample_rate_value_changed(value):
 
 func _on_sample_rate_value_changed(value):
 	updatesamplerates()
+
+
+func _on_spin_box_value_changed(value):
+	$AudioStreamMicrophone.pitch_scale = value

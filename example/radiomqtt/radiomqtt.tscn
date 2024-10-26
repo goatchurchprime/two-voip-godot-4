@@ -306,6 +306,17 @@ popup/item_4/id = 4
 popup/item_5/text = "60ms"
 popup/item_5/id = 5
 
+[node name="Label" type="Label" parent="VBoxFrameLength/HBoxOpusFrame"]
+layout_mode = 2
+text = "Mic Pitch rate:"
+
+[node name="SpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame"]
+layout_mode = 2
+min_value = 0.2
+max_value = 5.0
+step = 0.0
+value = 1.0
+
 [node name="HBoxAudioFrame" type="HBoxContainer" parent="VBoxFrameLength"]
 layout_mode = 2
 
@@ -724,6 +735,7 @@ text = "sil"
 [connection signal="toggled" from="HBoxMicTalk/MicWorking" to="." method="_on_mic_working_toggled"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
+[connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/SpinBox" to="." method="_on_spin_box_value_changed"]
 [connection signal="value_changed" from="VBoxFrameLength/HBoxAudioFrame/SampleRate" to="." method="_on_sample_rate_value_changed"]
 [connection signal="value_changed" from="VBoxFrameLength/HBoxAudioFrame/ResampleRate" to="." method="_on_resample_rate_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusBitRate/SampleRate" to="." method="_on_sample_rate_item_selected"]
