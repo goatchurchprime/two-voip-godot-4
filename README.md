@@ -15,12 +15,10 @@ for indefatiguable work on the github actions that are successfully building thi
 
 An HTML5 demo is hosted at https://goatchurch.itch.io/twovoip-mqtt
 
-The purpose of this demo is to test all the features 
-so you can hear what the opus compression and noise cancelling settings do to the  
-sound of a voice.
+The purpose of this demo is to test all the features so you can hear what the opus compression and noise cancelling settings do to a voice recording, as well as debug sample rate issues.
 
 1. Clone/Download this repository and open the project in the `example/` directory in Godot 4.3.
-2. Go to assetlib, search for twovoip, and install it.  (Now on version 3.1)
+2. Go to assetlib, search for twovoip, and install it.  (Now on version 3.3)
 3. Run the app. 
 4. If the microphone is working, then you should see a waveform in the app like this:
 
@@ -34,41 +32,37 @@ activation threshold is given in the slider below it (on top of the waveform).
 Click on \[De-noise\] to hear how recordings 
 sound with and without this feature.
 
-![image](https://github.com/user-attachments/assets/aef018f3-1f91-4898-9a48-4871bf74cd02)
+#### A Note about the sample rates
+There are two different `mix_rates` values in the GodotEngine that vary according to platform:  
+* [audio/driver/mix_rate](https://docs.godotengine.org/en/stable/classes/class_projectsettings.html#class-projectsettings-property-audio-driver-mix-rate) is available in the ProjectSettings and can be overridden for different platforms
+* [AudioServer.mix_rate](https://docs.godotengine.org/en/stable/classes/class_audioserver.html#class-audioserver-method-get-mix-rate) is set by the platform
+
+Additionally, an `AudioStream` can have its own `mix_rate`, and the resampling ratio that is applied internally on the data in the stream will be `target_mix_rate/(AudioStream.mix_rate*AudioStreamPlayer.pitch_scale)`.
+
+All combinations are exposed in the `TwoVoip` plugin and the example project to help you work out what settings are correct.  If you record and playback on the same system then wrong settings can cancel out and make it appear that a bad signal between different systems is due to the transmission.  The common problems are playing a 48KHz stream at 44.1KHz which will sound slow and off-key, or playing a decoded 44.1KHz stream from a network at 48KHz which will result in small gaps between the packets that are being consumed too fast and can sound like analog radio static distortion (which is impossible).
+
+Because the Opus Compression and RNNoise libraries only work at certain sample rates (none of which are 44.1KHz) the `AudioEffectOpusChunked` class has an internal resampler, though this could have been implemented by setting the `pitch_scale` to 0.91875=44100/48000.  Similarly on the output the `AudioStreamOpusChunked` class also has a resampler that could be made redundant by tinkering with the `pitch_scale` and `mix_rate`.  The properties of these classes are controlled by the frame size and sample rate instead of sample time to make it clear that these all relate to known fixed width arrays of floating point values.  In fact the entire library can operate independently of the audio system and just on these Packed Arrays.
+
+![image](https://github.com/user-attachments/assets/4928a06c-15c2-4e9e-a71c-d2de26d03856)
+
+This section controls all the settings for the Opus compression in terms of frame duration, sample rate and bit rate.  The purpose of the resampler definition on the middle line is match the sample rate told to the Opus compression library.  
+
+![image](https://github.com/user-attachments/assets/f67438c5-75f9-44ef-9b0a-69f0ac8cfaeb)
 
 Use the \[Play\] button in the Recording Playback section to hear up to 10 seconds of the last recording you made 
 by holding down the PTT (either manually or automatically by the Vox).  The Bytes per second for the audio 
-compression is shown here.
-
-![image](https://github.com/user-attachments/assets/07898215-5b53-483d-a221-ac629ba3a800)
-
-The LibOpus compression and resampling section has options for altering the frame size and compression rate 
-on the recorded sample before you play it back so you can experiment with how it sounds with different settings.
-Since the internal Godot audio sample rate of 44.1kHz doesn't match the 48kHz that the Opus and RNNoise libraries 
-are designed for, a function copied from the Speex codebase resamples it to the higher sample rate.
-If you are curious about what how much difference this 8% change in the sample rate makes, 
-you can experiment with the "44.1kHz as 48kH" option.  
-
-![image](https://github.com/user-attachments/assets/6ca53408-8757-4299-a30e-225949256fcf)
-
-Finally, there is an MQTT transmission section for you to publish audio packets over the network via a 
-a broker on a topic.  Click the \[Connect\] button to go online while a friend does the same on another computer and you 
-should be able to talk to one another over the internet (don't forget to use the PTT button).
-Several presets are given for convenience, and it will automatically use websockets if you are operating from HTML5.
+compression is shown here and is recalculated from the uncompressed recording whenever you change the Opus settings. 
 
 ![image](https://github.com/user-attachments/assets/f5d4db27-edb2-466f-b056-24423bad08c8)
 
-MQTT is a lightweight protocol 
-implemented in another GodotEngine GDExtension [https://godotengine.org/asset-library/asset/1993](godot-mqtt)
-and described [here](https://github.com/goatchurchprime/godot-mqtt/?tab=readme-ov-file#mqtt).
-Its publish and subscribe, and retained and last will messages system provides a simple basis for 
-each player track who is joining or leaving the network.  There is a line of text beginning with `mosquitto_sub` command that you can copy into your . 
+Finally, there is an MQTT transmission section to push audio packets over the network via a broker on a topic.  Click the \[Connect\] button to go online while a friend does the same on another computer and you should be able to talk to one another over the internet (don't forget to use the PTT button).  Several presets are given for convenience, and it will automatically use websockets if you are operating from HTML5.
+
+MQTT is a lightweight protocol implemented in another GodotEngine GDExtension [https://godotengine.org/asset-library/asset/1993](godot-mqtt) and described [here](https://github.com/goatchurchprime/godot-mqtt/?tab=readme-ov-file#mqtt). Its publish and subscribe, and retained and last will messages system provides a simple basis for each player track who is joining or leaving the network.  There is a line of text beginning with `mosquitto_sub` command that you can copy into your terminal window to watch the data fly by. 
 
 
 ## Minimal Use Case
 
-If you are familiar with the [Godot Audio system](https://docs.godotengine.org/en/stable/tutorials/audio/index.html), the following minimal 
-use case of this plugin should make sense:
+If you are familiar with the [Godot Audio system](https://docs.godotengine.org/en/stable/tutorials/audio/index.html), the following minimal use case of this plugin should make sense:
 
 As outlined in the [docs](https://docs.godotengine.org/en/stable/tutorials/audio/recording_with_microphone.html), 
 create an `AudioStreamPlayer` with `stream=AudioStreamMicrophone`, set it to Autoplay, and 
