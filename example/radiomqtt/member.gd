@@ -58,7 +58,7 @@ func setname(lname):
 
 func processheaderpacket(h):
 	var radiomqtt = get_node("../..")
-	audiosamplerate = radiomqtt.get_node("VBoxPlayback/HBoxStream/SampleRate").value
+	audiosamplerate = radiomqtt.get_node("VBoxPlayback/HBoxStream/OutSampleRate").value
 	mix_rate = radiomqtt.get_node("VBoxPlayback/HBoxStream/MixRate").value
 	prefixbyteslength = h["prefixbyteslength"]
 	mqttpacketencodebase64 = (h.get("mqttpacketencoding") == "base64")

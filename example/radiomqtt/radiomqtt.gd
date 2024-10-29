@@ -43,12 +43,14 @@ func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 	$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
-	if ProjectSettings.get_setting_with_override("audio/driver/mix_rate") != 0:
-		$VBoxFrameLength/HBoxAudioFrame/SampleRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
-		$VBoxPlayback/HBoxStream/SampleRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
+
+			# works better if we don't use ProjectSettings("audio/driver/mix_rate") anywhere, so what is it for?
+	if false and ProjectSettings.get_setting_with_override("audio/driver/mix_rate") != 0:
+		$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
+		$VBoxPlayback/HBoxStream/OutSampleRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
 	else:
-		$VBoxFrameLength/HBoxAudioFrame/SampleRate.value = AudioServer.get_mix_rate()
-		$VBoxPlayback/HBoxStream/SampleRate.value = AudioServer.get_mix_rate()
+		$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_mix_rate()
+		$VBoxPlayback/HBoxStream/OutSampleRate.value = AudioServer.get_mix_rate()
 
 	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
 		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
@@ -59,7 +61,7 @@ func _ready():
 		$VBoxFrameLength/HBoxOpusBitRate/BitRate.select(2)
 	if not ClassDB.can_instantiate("AudioEffectOpusChunked"):
 		$TwovoipWarning.visible = true
-		$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = $VBoxFrameLength/HBoxAudioFrame/SampleRate.value
+		$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = $VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value
 		$VBoxFrameLength/HBoxOpusBitRate/SampleRate.disabled = true
 		
 	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
@@ -119,7 +121,7 @@ func resamplerecordedsamples(orgsamples, newsamplesize):
 			
 func updatesamplerates():
 	frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
-	audiosamplerate = $VBoxFrameLength/HBoxAudioFrame/SampleRate.value
+	audiosamplerate = $VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value
 	audiosamplesize = int(audiosamplerate*frametimems/1000.0)
 	audioresamplerate = $VBoxFrameLength/HBoxAudioFrame/ResampleRate.value
 	audioresamplesize = int(audioresamplerate*frametimems/1000.0)

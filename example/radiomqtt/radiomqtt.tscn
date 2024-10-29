@@ -324,7 +324,7 @@ layout_mode = 2
 layout_mode = 2
 text = "Mic sampled"
 
-[node name="SampleRate" type="SpinBox" parent="VBoxFrameLength/HBoxAudioFrame"]
+[node name="MicSampleRate" type="SpinBox" parent="VBoxFrameLength/HBoxAudioFrame"]
 custom_minimum_size = Vector2(95, 0)
 layout_mode = 2
 min_value = 20.0
@@ -507,7 +507,7 @@ text = "Play"
 layout_mode = 2
 text = "sample rate"
 
-[node name="SampleRate" type="SpinBox" parent="VBoxPlayback/HBoxStream"]
+[node name="OutSampleRate" type="SpinBox" parent="VBoxPlayback/HBoxStream"]
 custom_minimum_size = Vector2(95, 0)
 layout_mode = 2
 min_value = 8000.0
@@ -736,7 +736,7 @@ text = "sil"
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/SpinBox" to="." method="_on_spin_box_value_changed"]
-[connection signal="value_changed" from="VBoxFrameLength/HBoxAudioFrame/SampleRate" to="." method="_on_sample_rate_value_changed"]
+[connection signal="value_changed" from="VBoxFrameLength/HBoxAudioFrame/MicSampleRate" to="." method="_on_sample_rate_value_changed"]
 [connection signal="value_changed" from="VBoxFrameLength/HBoxAudioFrame/ResampleRate" to="." method="_on_resample_rate_value_changed"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusBitRate/SampleRate" to="." method="_on_sample_rate_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusBitRate/BitRate" to="." method="_on_option_button_item_selected"]
