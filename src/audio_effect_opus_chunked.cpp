@@ -42,6 +42,10 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_opusframesize"), &AudioEffectOpusChunked::get_opusframesize);
     ClassDB::bind_method(D_METHOD("set_opusbitrate", "opusbitrate"), &AudioEffectOpusChunked::set_opusbitrate);
     ClassDB::bind_method(D_METHOD("get_opusbitrate"), &AudioEffectOpusChunked::get_opusbitrate);
+    ClassDB::bind_method(D_METHOD("set_opuscomplexity", "opuscomplexity"), &AudioEffectOpusChunked::set_opuscomplexity);
+    ClassDB::bind_method(D_METHOD("get_opuscomplexity"), &AudioEffectOpusChunked::get_opuscomplexity);
+    ClassDB::bind_method(D_METHOD("set_opusoptimizeforvoice", "opusoptimizeforvoice"), &AudioEffectOpusChunked::set_opusoptimizeforvoice);
+    ClassDB::bind_method(D_METHOD("get_opusoptimizeforvoice"), &AudioEffectOpusChunked::get_opusoptimizeforvoice);
     ClassDB::bind_method(D_METHOD("set_audiosamplerate", "audiosamplerate"), &AudioEffectOpusChunked::set_audiosamplerate);
     ClassDB::bind_method(D_METHOD("get_audiosamplerate"), &AudioEffectOpusChunked::get_audiosamplerate);
     ClassDB::bind_method(D_METHOD("set_audiosamplesize", "audiosamplesize"), &AudioEffectOpusChunked::set_audiosamplesize);
@@ -50,14 +54,13 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_audiosamplechunks"), &AudioEffectOpusChunked::get_audiosamplechunks);
 
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opussamplerate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_opussamplerate", "get_opussamplerate");
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "opusframesize", PROPERTY_HINT_RANGE, "20,2880,2"), "set_opusframesize", "get_opusframesize");
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "opusbitrate", PROPERTY_HINT_RANGE, "3000,24000,1000"), "set_opusbitrate", "get_opusbitrate");
-
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "opusframesize", PROPERTY_HINT_RANGE, "20,2880,1"), "set_opusframesize", "get_opusframesize");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "opusbitrate", PROPERTY_HINT_RANGE, "500,200000,1"), "set_opusbitrate", "get_opusbitrate");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "opuscomplexity", PROPERTY_HINT_RANGE, "0,10,1"), "set_opuscomplexity", "get_opuscomplexity");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "opusoptimizeforvoice"), "set_opusoptimizeforvoice", "get_opusoptimizeforvoice");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplerate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_audiosamplerate", "get_audiosamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplesize", PROPERTY_HINT_RANGE, "10,4000,1"), "set_audiosamplesize", "get_audiosamplesize");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplechunks", PROPERTY_HINT_RANGE, "1,200,1"), "set_audiosamplechunks", "get_audiosamplechunks");
-
-//    ClassDB::bind_method(D_METHOD("Dcreateencoder"), &AudioEffectOpusChunked::createencoder);
 
     ClassDB::bind_method(D_METHOD("chunk_available"), &AudioEffectOpusChunked::chunk_available);
     ClassDB::bind_method(D_METHOD("resampled_current_chunk"), &AudioEffectOpusChunked::resampled_current_chunk);
@@ -188,7 +191,19 @@ void AudioEffectOpusChunked::createencoder() {
     }
     int opuserror2 = opus_encoder_ctl(opusencoder, OPUS_SET_BITRATE(opusbitrate));
     if (opuserror2 != 0) {
-        godot::UtilityFunctions::printerr("opus_encoder_ctl error error ", opuserror2);
+        godot::UtilityFunctions::printerr("opus_encoder_ctl bitrate error error ", opuserror2);
+        chunknumber = -2;
+        return;
+    }
+    int opuserror3 = opus_encoder_ctl(opusencoder, OPUS_SET_COMPLEXITY(complexity));
+    if (opuserror3 != 0) {
+        godot::UtilityFunctions::printerr("opus_encoder_ctl complexity error error ", opuserror3);
+        chunknumber = -2;
+        return;
+    }
+    int opuserror4 = opus_encoder_ctl(opusencoder, OPUS_SET_SIGNAL(signal_type));
+    if (opuserror4 != 0) {
+        godot::UtilityFunctions::printerr("opus_encoder_ctl signal_type error error ", opuserror4);
         chunknumber = -2;
         return;
     }
@@ -329,7 +344,7 @@ PackedByteArray AudioEffectOpusChunked::read_opus_packet(const PackedByteArray& 
 }
 
 void AudioEffectOpusChunked::flush_opus_encoder(bool denoise) {
-    if (opusframesize == 0)
+    if ((opusframesize == 0) || (chunknumber == -1)) 
         return;
     // this just sends 5 empty chunks into the encoder.  doesn't necessarily work
     float* paudioresamples = (float*)singleresamplebuffer.ptrw();

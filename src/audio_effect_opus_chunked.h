@@ -55,6 +55,7 @@
     #include "rnnoise_stub.h"
 #endif
 
+
 namespace godot {
 
 class AudioEffectOpusChunked;
@@ -117,7 +118,9 @@ class AudioEffectOpusChunked : public AudioEffect {
 
     int opussamplerate = 48000;
     int opusframesize = 960;
-    int opusbitrate = 24000;
+    int opusbitrate = 12000;
+    int complexity = 5;
+    int signal_type = OPUS_SIGNAL_VOICE;
 
     SpeexResamplerState* speexresampler = NULL;
     PackedVector2Array audioresampledbuffer;  // size opusframesize*ringbufferchunks
@@ -188,6 +191,10 @@ public:
     int get_audiosamplesize() { return audiosamplesize; };
     void set_audiosamplechunks(int laudiosamplechunks) { chunknumber = -1; ringbufferchunks = laudiosamplechunks; };
     int get_audiosamplechunks() { return ringbufferchunks; };
+    void set_opuscomplexity(int lcomplexity) { chunknumber = -1; complexity = lcomplexity; };
+    int get_opuscomplexity() { return complexity; };
+    void set_opusoptimizeforvoice(bool loptimizeforvoice) { chunknumber = -1; signal_type = (loptimizeforvoice ? OPUS_SIGNAL_VOICE : OPUS_SIGNAL_MUSIC); };
+    bool get_opusoptimizeforvoice() { return (signal_type == OPUS_SIGNAL_VOICE); };
 
     AudioEffectOpusChunked();
     ~AudioEffectOpusChunked();

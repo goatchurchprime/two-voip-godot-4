@@ -19,7 +19,7 @@ var audioresamplerate : int = 48000
 var audioresamplesize : int = 960
 var opussamplerate : int = 48000
 var opusframesize : int = 960
-var prefixbyteslength : int = 0
+var prefixbytes = PackedByteArray([0,0,0,0,1])
 var mqttpacketencodebase64 : bool = false
 
 var recordedsamples = [ ]
@@ -156,11 +156,10 @@ func updatesamplerates():
 	$VBoxFrameLength/HBoxAudioFrame/LabResampleFrameLength.text = "%d samples" % audioresamplesize
 	recordedheader = { "opusframesize":audioresamplesize, 
 					   "opussamplerate":audioresamplerate, 
-					   "prefixbyteslength":prefixbyteslength, 
+					   "prefixbyteslength":len(prefixbytes), 
 					   "mqttpacketencoding":"base64" if mqttpacketencodebase64 else "binary" }
 	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audiosamplesize:
 		recordedsamples = resamplerecordedsamples(recordedsamples, audiosamplesize)
-	var prefixbytes = PackedByteArray()
 	recordedopuspacketsMemSize = 0
 	recordedopuspackets = null
 	recordedresampledpackets = null
@@ -279,7 +278,6 @@ func _process(_delta):
 		endtalking()
 	$HBoxMicTalk/MicWorking.button_pressed = $AudioStreamMicrophone.playing
 
-	var prefixbytes = PackedByteArray()
 	if audioeffectcapture == null:
 		assert (audioopuschunkedeffect != null)
 		while audioopuschunkedeffect.chunk_available():
