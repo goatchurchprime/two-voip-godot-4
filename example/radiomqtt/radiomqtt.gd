@@ -19,7 +19,10 @@ var audioresamplerate : int = 48000
 var audioresamplesize : int = 960
 var opussamplerate : int = 48000
 var opusframesize : int = 960
-var prefixbyteslength : int = 0
+var opuscomplexity : int = 5
+var opusoptimizeforvoice : bool = true
+
+var prefixbytes = PackedByteArray([0,0,0,0,1])
 var mqttpacketencodebase64 : bool = false
 
 var recordedsamples = [ ]
@@ -44,6 +47,11 @@ func _ready():
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 	$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
 
+	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
+		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
+	if $VBoxFrameLength/HBoxOpusBitRate/SampleRate.selected == -1:
+		$VBoxFrameLength/HBoxOpusBitRate/SampleRate.select(4)
+
 			# works better if we don't use ProjectSettings("audio/driver/mix_rate") anywhere, so what is it for?
 	if false and ProjectSettings.get_setting_with_override("audio/driver/mix_rate") != 0:
 		$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
@@ -52,13 +60,6 @@ func _ready():
 		$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_mix_rate()
 		$VBoxPlayback/HBoxStream/OutSampleRate.value = AudioServer.get_mix_rate()
 
-	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
-		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
-	if $VBoxFrameLength/HBoxOpusBitRate/SampleRate.selected == -1:
-		$VBoxFrameLength/HBoxOpusBitRate/SampleRate.select(4)
-
-	if $VBoxFrameLength/HBoxOpusBitRate/BitRate.selected == -1:
-		$VBoxFrameLength/HBoxOpusBitRate/BitRate.select(2)
 	if not ClassDB.can_instantiate("AudioEffectOpusChunked"):
 		$TwovoipWarning.visible = true
 		$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = $VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value
@@ -127,28 +128,33 @@ func updatesamplerates():
 	audioresamplesize = int(audioresamplerate*frametimems/1000.0)
 	opussamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
 	opusframesize = int(opussamplerate*frametimems/1000.0)
+	opuscomplexity = int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value)
+	opusoptimizeforvoice = $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed
 
 	print("aaa audiosamplesize ", audiosamplesize, "  audiosamplerate ", audiosamplerate)
 
 	var noopuscompression = false
 	if opussamplerate == audioresamplerate:
-		$VBoxFrameLength/HBoxOpusBitRate/Compressed.disabled = false
-		if not $VBoxFrameLength/HBoxOpusBitRate/Compressed.button_pressed:
+		$VBoxFrameLength/HBoxOpusExtra/Compressed.disabled = false
+		if not $VBoxFrameLength/HBoxOpusExtra/Compressed.button_pressed:
 			noopuscompression = true
 	else:
-		$VBoxFrameLength/HBoxOpusBitRate/Compressed.disabled = true
+		$VBoxFrameLength/HBoxOpusExtra/Compressed.disabled = true
 		noopuscompression = true
-	opusbitrate = int($VBoxFrameLength/HBoxOpusBitRate/BitRate.text)
+	opusbitrate = int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value)
 	
 	if audioopuschunkedeffect != null:
 		audioopuschunkedeffect.audiosamplerate = audiosamplerate
 		audioopuschunkedeffect.audiosamplesize = audiosamplesize
 		audioopuschunkedeffect.opussamplerate = audioresamplerate
 		audioopuschunkedeffect.opusframesize = audioresamplesize
+		audioopuschunkedeffect.opuscomplexity = opuscomplexity
+		audioopuschunkedeffect.opusoptimizeforvoice = opusoptimizeforvoice
+		
 		$HBoxBigButtons/VBoxPTT/Denoise.disabled = not (audioopuschunkedeffect.denoiser_available() and audioresamplerate == 48000)
 		audioopuschunkedeffect.opusbitrate = opusbitrate
 	else:
-		$VBoxFrameLength/HBoxOpusBitRate/Compressed.disabled = true
+		$VBoxFrameLength/HBoxOpusExtra/Compressed.disabled = true
 		$HBoxBigButtons/VBoxPTT/Denoise.disabled = true
 
 	mqttpacketencodebase64 = $HBoxMosquitto/base64.button_pressed
@@ -156,11 +162,10 @@ func updatesamplerates():
 	$VBoxFrameLength/HBoxAudioFrame/LabResampleFrameLength.text = "%d samples" % audioresamplesize
 	recordedheader = { "opusframesize":audioresamplesize, 
 					   "opussamplerate":audioresamplerate, 
-					   "prefixbyteslength":prefixbyteslength, 
+					   "prefixbyteslength":len(prefixbytes), 
 					   "mqttpacketencoding":"base64" if mqttpacketencodebase64 else "binary" }
 	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audiosamplesize:
 		recordedsamples = resamplerecordedsamples(recordedsamples, audiosamplesize)
-	var prefixbytes = PackedByteArray()
 	recordedopuspacketsMemSize = 0
 	recordedopuspackets = null
 	recordedresampledpackets = null
@@ -279,7 +284,6 @@ func _process(_delta):
 		endtalking()
 	$HBoxMicTalk/MicWorking.button_pressed = $AudioStreamMicrophone.playing
 
-	var prefixbytes = PackedByteArray()
 	if audioeffectcapture == null:
 		assert (audioopuschunkedeffect != null)
 		while audioopuschunkedeffect.chunk_available():
@@ -417,7 +421,7 @@ func _on_frame_duration_item_selected(_index):
 
 func _on_sample_rate_item_selected(index):
 	$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
-	$VBoxFrameLength/HBoxOpusBitRate/Compressed.button_pressed = true
+	$VBoxFrameLength/HBoxOpusExtra/Compressed.button_pressed = true
 	updatesamplerates()
 
 func _on_resample_state_item_selected(_index):
@@ -448,3 +452,16 @@ func _on_sample_rate_value_changed(value):
 
 func _on_spin_box_value_changed(value):
 	$AudioStreamMicrophone.pitch_scale = value
+
+func _on_volume_db_spin_box_value_changed(value):
+	$AudioStreamMicrophone.volume_db = value
+
+func _on_complexity_spin_box_value_changed(value):
+	updatesamplerates()
+
+func _on_audio_optimized_check_button_toggled(toggled_on):
+	updatesamplerates()
+
+
+func _on_bit_rate_value_changed(value):
+	updatesamplerates()

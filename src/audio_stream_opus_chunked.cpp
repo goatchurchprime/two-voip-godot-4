@@ -107,17 +107,18 @@ void AudioStreamOpusChunked::createdecoder() {
             return;
         }
     }
+ 
     float Dtimeframeopus = opusframesize*1.0F/opussamplerate;
     float Dtimeframeaudio = audiosamplesize*1.0F/audiosamplerate;
     if (audiosamplesize != opusframesize) {
         int speexerror = 0; 
         int resamplingquality = 10;
         speexresampler = speex_resampler_init(channels, opussamplerate, audiosamplerate, resamplingquality, &speexerror);
-        audiopreresampledbuffer.resize(opusframesize);
         godot::UtilityFunctions::prints("Decoder timeframeopus preresampler", Dtimeframeopus, "timeframeaudio", Dtimeframeaudio); 
     } else {
         godot::UtilityFunctions::prints("Decoder timeframeopus no-resampling needed", Dtimeframeopus, "timeframeaudio", Dtimeframeaudio); 
     }
+    audiopreresampledbuffer.resize(opusframesize);
     Daudioresampledbuffer.resize(audiosamplesize);
 
     audiosamplebuffer.resize(audiosamplesize*audiosamplechunks); 
@@ -215,6 +216,10 @@ PackedVector2Array* AudioStreamOpusChunked::Popus_packet_to_chunk(const PackedBy
             createdecoder();
         else
             return &audiopreresampledbuffer;
+    }
+    if (audiopreresampledbuffer.size() != opusframesize) {
+        godot::UtilityFunctions::printerr("Errorrrr mismatch resampledaudio size");
+        return &audiopreresampledbuffer; 
     }
     int decodedsamples = opus_decode_float(opusdecoder, opusbytepacket.ptr() + begin, opusbytepacket.size() - begin, 
                                            (float*)audiopreresampledbuffer.ptrw(), opusframesize, decode_fec);
