@@ -14,6 +14,10 @@ var statustopic = ""
 @onready var Mstatusdisconnected = "disconnected".to_ascii_buffer()
 @onready var MstatusdisconnectedLW = "disconnected-LW".to_ascii_buffer()
 
+const logfile = "user://mqttlogging.dat"
+var flogfile : FileAccess = null
+var logfilepackcount = 0
+
 func _ready():
 	if $GridContainer/presets.selected == -1:
 		$GridContainer/presets.select(0)
@@ -48,6 +52,10 @@ func transportaudiopacketjson(jheader):
 		$MQTT.publish(audioouttopicmeta, packet)
 
 func received_mqtt(topic, msg):
+	if flogfile != null:
+		flogfile.store_line("%d %s %s" % [Time.get_ticks_msec(), topic, msg.get_string_from_ascii()]) 
+		logfilepackcount += 1
+		get_node("../HBoxLogging/PacketCount").text = str(logfilepackcount)
 	var stopic = topic.split("/", true, roomtopicwords+1)
 	if len(stopic) == roomtopicwords + 2:
 		var membername = stopic[roomtopicwords]
@@ -82,7 +90,13 @@ func on_broker_disconnect():
 	print("MQTT broker disconnected")
 
 func _on_connect_toggled(toggled_on):
+	var LogButton = get_node("../HBoxLogging/LogButton")
+	LogButton.disabled = toggled_on
 	if toggled_on:
+		if LogButton.button_pressed:
+			flogfile = FileAccess.open("user://mqttlogging.dat", FileAccess.WRITE)
+			print("Opening mqtt logfile ", flogfile.get_path_absolute())
+			logfilepackcount = 0
 		$MQTT.received_message.connect(received_mqtt)
 		$MQTT.broker_connected.connect(on_broker_connect)
 		$MQTT.broker_disconnected.connect(on_broker_disconnect)
@@ -91,6 +105,8 @@ func _on_connect_toggled(toggled_on):
 		myname = "%s_%x" % [FriendlyName.text, (randi() % 0x10000)]
 		$MQTT.client_id = "c%d" % (2 + (randi()%0x7fffff8))
 		SelfMember.setname(myname)
+		if flogfile != null:
+			flogfile.store_line("%d %s" % [Time.get_ticks_msec(), myname]) 
 		SelfMember.color = FriendlyName.get("theme_override_styles/normal").bg_color
 		$GridContainer/topic.editable = false
 		$GridContainer/broker.editable = false
@@ -116,9 +132,13 @@ func _on_connect_toggled(toggled_on):
 		#get_node("../HBoxMosquitto/Cmd").text = "mosquitto_sub -h %s%s -v -t %s/# -T %s/+/audio" % [$GridContainer/broker.text, userpass, $GridContainer/topic.text, $GridContainer/topic.text] 
 		get_node("../HBoxMosquitto/Cmd").text = "mosquitto_sub -h %s%s -v -t %s/#" % [$GridContainer/broker.text, userpass, $GridContainer/topic.text] 
 		if OS.has_feature("web"):
-			get_node("../HBoxMosquitto/Cmd").enabled = true
+			get_node("../HBoxMosquitto/Cmd").enabroomtopicwordsled = true
 
 	else:
+		if flogfile != null:
+			print("Closing mqtt logfile ", flogfile.get_path_absolute())
+			flogfile.close()
+			flogfile = null
 		print("Disconnecting MQTT")
 		$MQTT.received_message.disconnect(received_mqtt)
 		$MQTT.broker_connected.disconnect(on_broker_connect)
@@ -136,6 +156,43 @@ func _on_connect_toggled(toggled_on):
 		audioouttopicmeta = ""
 		statustopic = ""
 
-
 func _on_mqtt_broker_connection_failed():
 	$Connect.button_pressed = false
+
+func _on_replay_button_toggled(toggled_on):
+	if not toggled_on:
+		return
+	print("*** Begin replay")
+	var ReplayButton = get_node("../HBoxLogging/ReplayButton")
+	var flogfileR : FileAccess = FileAccess.open("user://mqttlogging.dat", FileAccess.READ)
+	var sl0 = flogfileR.get_line().split(" ")
+	var timediff0 = int(sl0[0]) - Time.get_ticks_msec()
+	myname = sl0[1]
+	SelfMember.setname(myname)
+	roomtopic = $GridContainer/topic.text
+	roomtopicwords = len(roomtopic.split("/"))
+	audioouttopic = "%s/%s/audio" % [roomtopic, myname]
+	audioouttopicmeta = "%s/%s/audio/meta" % [roomtopic, myname]
+	statustopic = "%s/%s/status" % [roomtopic, myname]
+
+	var l = flogfileR.get_line()
+	while ReplayButton.button_pressed and l:
+		var sl = l.split(" ")
+		var timediff = int(sl[0]) - Time.get_ticks_msec()
+		var dtms = timediff - timediff0
+		if dtms > 1000:
+			await get_tree().create_timer(0.9).timeout
+			continue
+		elif dtms > 0:
+			await get_tree().create_timer(dtms/1000.0).timeout
+		elif dtms < -1000:
+			print("Long delay %f seconds, catching up " % (-dtms/1000.0))
+			timediff0 = timediff
+		print(l)
+		if flogfile == null:
+			received_mqtt(sl[1], sl[2].to_ascii_buffer())
+		l = flogfileR.get_line()
+	ReplayButton.button_pressed = false
+	flogfileR.close()
+	print("*** End replay")
+	

@@ -677,39 +677,24 @@ passing through the MQTT broker.
 text = "mosquitto_sub ..."
 editable = false
 
-[node name="VBoxMQTT" type="VBoxContainer" parent="."]
-visible = false
+[node name="HBoxLogging" type="HBoxContainer" parent="."]
 layout_mode = 2
 
-[node name="HBoxConnect" type="HBoxContainer" parent="VBoxMQTT"]
+[node name="LogButton" type="CheckButton" parent="HBoxLogging"]
+layout_mode = 2
+text = "LogAll Rec"
+
+[node name="Label" type="Label" parent="HBoxLogging"]
+layout_mode = 2
+text = "Packets: "
+
+[node name="PacketCount" type="LineEdit" parent="HBoxLogging"]
 layout_mode = 2
 
-[node name="ConnectMQTT" type="Button" parent="VBoxMQTT/HBoxConnect"]
+[node name="ReplayButton" type="Button" parent="HBoxLogging"]
 layout_mode = 2
 toggle_mode = true
-text = "Connect MQTT"
-
-[node name="Myname" type="LineEdit" parent="VBoxMQTT/HBoxConnect"]
-layout_mode = 2
-size_flags_horizontal = 3
-editable = false
-
-[node name="HBoxBroker" type="HBoxContainer" parent="VBoxMQTT"]
-layout_mode = 2
-
-[node name="LabelMQTT" type="Label" parent="VBoxMQTT/HBoxBroker"]
-layout_mode = 2
-text = "MQTTBroker
-"
-
-[node name="HBoxRoom" type="HBoxContainer" parent="VBoxMQTT"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="Labelroom" type="Label" parent="VBoxMQTT/HBoxRoom"]
-layout_mode = 2
-text = "roomname
-"
+text = "Replay"
 
 [node name="HSeparator6" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
@@ -770,4 +755,4 @@ text = "sil"
 [connection signal="toggled" from="MQTTnetwork/Connect" to="MQTTnetwork" method="_on_connect_toggled"]
 [connection signal="item_selected" from="MQTTnetwork/GridContainer/presets" to="MQTTnetwork" method="_on_mqtt_broker_item_selected"]
 [connection signal="toggled" from="HBoxMosquitto/base64" to="." method="_on_base_64_toggled"]
-[connection signal="toggled" from="VBoxMQTT/HBoxConnect/ConnectMQTT" to="MQTTnetwork" method="_on_connect_mqtt_toggled"]
+[connection signal="toggled" from="HBoxLogging/ReplayButton" to="MQTTnetwork" method="_on_replay_button_toggled"]
