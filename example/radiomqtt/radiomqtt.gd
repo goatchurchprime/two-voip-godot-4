@@ -47,6 +47,11 @@ func _ready():
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 	$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
 
+	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
+		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
+	if $VBoxFrameLength/HBoxOpusBitRate/SampleRate.selected == -1:
+		$VBoxFrameLength/HBoxOpusBitRate/SampleRate.select(4)
+
 			# works better if we don't use ProjectSettings("audio/driver/mix_rate") anywhere, so what is it for?
 	if false and ProjectSettings.get_setting_with_override("audio/driver/mix_rate") != 0:
 		$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
@@ -54,11 +59,6 @@ func _ready():
 	else:
 		$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_mix_rate()
 		$VBoxPlayback/HBoxStream/OutSampleRate.value = AudioServer.get_mix_rate()
-
-	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
-		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
-	if $VBoxFrameLength/HBoxOpusBitRate/SampleRate.selected == -1:
-		$VBoxFrameLength/HBoxOpusBitRate/SampleRate.select(4)
 
 	if not ClassDB.can_instantiate("AudioEffectOpusChunked"):
 		$TwovoipWarning.visible = true
