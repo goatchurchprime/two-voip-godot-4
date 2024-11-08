@@ -591,6 +591,15 @@ theme_override_styles/pressed = SubResource("StyleBoxFlat_q145v")
 toggle_mode = true
 text = "Connect"
 
+[node name="ColorRectConnecting" type="ColorRect" parent="MQTTnetwork/Connect"]
+visible = false
+layout_mode = 0
+offset_left = 54.0
+offset_top = 43.0
+offset_right = 72.0
+offset_bottom = 66.0
+color = Color(1, 1, 0.0196078, 0.25098)
+
 [node name="VSeparator" type="VSeparator" parent="MQTTnetwork"]
 layout_mode = 2
 

@@ -85,6 +85,7 @@ func received_mqtt(topic, msg):
 func on_broker_connect():
 	$MQTT.subscribe("%s/+/status" % roomtopic)
 	$MQTT.publish(statustopic, Mstatusconnected, true)
+	$Connect/ColorRectConnecting.visible = false
 
 func on_broker_disconnect():
 	print("MQTT broker disconnected")
@@ -129,6 +130,8 @@ func _on_connect_toggled(toggled_on):
 			brokerurl = "wss://"+brokerurl
 		if not $MQTT.connect_to_broker(brokerurl):
 			$Connect.button_pressed = false
+
+		$Connect/ColorRectConnecting.visible = true
 		#get_node("../HBoxMosquitto/Cmd").text = "mosquitto_sub -h %s%s -v -t %s/# -T %s/+/audio" % [$GridContainer/broker.text, userpass, $GridContainer/topic.text, $GridContainer/topic.text] 
 		get_node("../HBoxMosquitto/Cmd").text = "mosquitto_sub -h %s%s -v -t %s/#" % [$GridContainer/broker.text, userpass, $GridContainer/topic.text] 
 		if OS.has_feature("web"):
@@ -140,6 +143,7 @@ func _on_connect_toggled(toggled_on):
 			flogfile.close()
 			flogfile = null
 		print("Disconnecting MQTT")
+		$Connect/ColorRectConnecting.visible = false
 		$MQTT.received_message.disconnect(received_mqtt)
 		$MQTT.broker_connected.disconnect(on_broker_connect)
 		$MQTT.broker_disconnected.disconnect(on_broker_disconnect)

@@ -320,14 +320,14 @@ func _process(_delta):
 					recordedsamples.append(audiosamples)
 				if opusframesize != 0:
 					var opuspacket = audioopuschunkedeffect.read_opus_packet(prefixbytes)
+					$MQTTnetwork.transportaudiopacket(opuspacket, mqttpacketencodebase64)
 					if len(recordedopuspackets) < maxrecordedsamples:
 						recordedopuspackets.append(opuspacket)
-					$MQTTnetwork.transportaudiopacket(opuspacket, mqttpacketencodebase64)
-					$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
-					recordedopuspacketsMemSize += opuspacket.size()
-					$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
-					var tm = len(recordedopuspackets)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
-					$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
+						$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
+						recordedopuspacketsMemSize += opuspacket.size()
+						$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
+						var tm = len(recordedopuspackets)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
+						$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
 				else:
 					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples), mqttpacketencodebase64)
 			audioopuschunkedeffect.drop_chunk()

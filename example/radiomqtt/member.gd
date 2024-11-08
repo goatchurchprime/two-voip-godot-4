@@ -116,7 +116,10 @@ func receivemqttaudio(msg):
 	if opusframesize != 0:
 		opuspacketsbuffer.push_back(msg)
 	else:
-		audiopacketsbuffer.push_back(bytes_to_var(msg))
+		var a = bytes_to_var(msg)
+		assert (a != null)
+		if a != null:
+			audiopacketsbuffer.push_back(a)
 
 
 var timedelaytohide = 0.1
@@ -160,7 +163,8 @@ func _process(delta):
 		else:
 			var w = inverse_lerp(audiobufferregulationtime, audioserveroutputlatency + audiobuffersize/audiosamplerate, bufferlengthtime)
 			$AudioStreamPlayer.pitch_scale = lerp(1.0, audiobufferregulationpitch, w)
-	
+#show some view of the speedup rate on here
+
 	else:
 		while audiostreamgeneratorplayback.get_frames_available() > audiosamplesize:
 			if len(audiopacketsbuffer) != 0:
