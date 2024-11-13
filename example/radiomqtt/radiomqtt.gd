@@ -272,6 +272,9 @@ func _input(event):
 			$AudioStreamMicrophone.volume_db += (1 if event.keycode == KEY_I else -1)
 			print($AudioStreamMicrophone.volume_db)
 
+
+
+
 func _process(_delta):
 	var talking = $HBoxBigButtons/VBoxPTT/PTT.button_pressed
 	if talking:

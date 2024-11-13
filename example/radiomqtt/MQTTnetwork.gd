@@ -11,7 +11,7 @@ var statustopic = ""
 @onready var SelfMember = get_node("../Members/Self")
 
 @onready var Mstatusconnected = "connected".to_ascii_buffer()
-@onready var Mstatusdisconnected = "disconnected".to_ascii_buffer()
+@onready var Mstatusdisconnected = "disconnnected".to_ascii_buffer()
 @onready var MstatusdisconnectedLW = "disconnected-LW".to_ascii_buffer()
 
 const logfile = "user://mqttlogging.dat"
@@ -89,6 +89,29 @@ func on_broker_connect():
 
 func on_broker_disconnect():
 	print("MQTT broker disconnected")
+
+func DDconn():
+	print("eeeek CONNECTED ")
+	
+func _input(event):
+	if event is InputEventKey and event.is_pressed() and event.keycode == KEY_9:
+		$MQTT.broker_connected.connect(DDconn)
+#		if not $MQTT.connect_to_broker("tcp://mosquitto.doesliverpool.xyz:1883"):
+#			print("BAD")
+#		return
+		
+		# this works
+		#$MQTT.set_last_will("room1/Larry_21ee/status", "discon".to_ascii_buffer(), true)
+
+		#this doesn't work
+		$MQTT.set_last_will("godot/twovoip/room1/Larry_21ee/status", "disconnected-LW".to_ascii_buffer(), true)
+
+		var u = "rpoDYSwsYRfBAVxbtTuCc0ZLKw6rgC5yyFAVrYmeHVRHZaz5f2y3EUfR0klbTuhy"
+		$MQTT.set_user_pass(u, "")
+		var b = "wss://mqtt.flespi.io:443"
+		if not $MQTT.connect_to_broker(b):
+			print("BAD")
+
 
 func _on_connect_toggled(toggled_on):
 	var LogButton = get_node("../HBoxLogging/LogButton")
