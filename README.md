@@ -82,7 +82,7 @@ Now you can consume and transmit the byte chunks with the following code:
 func _process(delta):
     var prepend = PackedByteArray()
     while opuschunked.chunk_available():
-        var opusdata : PackedByteArray = opuschunked.opus_chunk(prepend)
+        var opusdata : PackedByteArray = opuschunked.read_opus_packet(prepend)
         opuschunked.drop_chunk()
         transmit(opusdata)
 ```
@@ -93,11 +93,9 @@ stream is set to an `AudioStreamOpusChunked`.
 ```GDScript
 var audiostreamopuschunked : AudioStreamOpusChunked = $AudioStreamPlayer.stream
 var opuspacketsbuffer = [ ]   # append incoming packets to this list
-var prefixbyteslength = 0
 func _process(delta):
     while audiostreamopuschunked.chunk_space_available():
-        var fec = 0
-        audiostreamopuschunked.push_opus_packet(opuspacketsbuffer.pop_front(), prefixbyteslength, fec)
+        audiostreamopuschunked.push_opus_packet(opuspacketsbuffer.pop_front(), 0, 0)
 ```
 
 Opus packets don't have any context, so if you want to number them so they can be shuffled 

@@ -1,8 +1,11 @@
-[gd_resource type="AudioBusLayout" load_steps=2 format=3 uid="uid://orx4iw038t0c"]
+[gd_resource type="AudioBusLayout" load_steps=3 format=3 uid="uid://orx4iw038t0c"]
 
 [sub_resource type="AudioEffectPitchShift" id="AudioEffectPitchShift_jq6ag"]
 resource_name = "PitchShift"
 fft_size = 1
+
+[sub_resource type="AudioEffectOpusChunked" id="AudioEffectOpusChunked_v1e16"]
+resource_name = "OpusChunked"
 
 [resource]
 bus/1/name = &"SpeechBus"
@@ -19,3 +22,5 @@ bus/2/mute = true
 bus/2/bypass_fx = false
 bus/2/volume_db = 0.0
 bus/2/send = &"Master"
+bus/2/effect/0/effect = SubResource("AudioEffectOpusChunked_v1e16")
+bus/2/effect/0/enabled = true
