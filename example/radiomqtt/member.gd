@@ -161,7 +161,7 @@ func _process(delta):
 		elif bufferlengthtime < audiobufferregulationtime:
 			$AudioStreamPlayer.pitch_scale = 1.0
 		else:
-			var w = inverse_lerp(audiobufferregulationtime, audioserveroutputlatency + audiobuffersize/audiosamplerate, bufferlengthtime)
+			var w = inverse_lerp(audiobufferregulationtime, audioserveroutputlatency + audiobuffersize*1.0/audiosamplerate, bufferlengthtime)
 			$AudioStreamPlayer.pitch_scale = lerp(1.0, audiobufferregulationpitch, w)
 #show some view of the speedup rate on here
 

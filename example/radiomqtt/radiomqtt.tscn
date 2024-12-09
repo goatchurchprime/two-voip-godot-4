@@ -356,6 +356,7 @@ text = "Resampled:"
 [node name="ResampleRate" type="SpinBox" parent="VBoxFrameLength/HBoxAudioFrame"]
 custom_minimum_size = Vector2(95, 0)
 layout_mode = 2
+tooltip_text = "Needs to match the Opus sample rate to be compressed"
 min_value = 20.0
 max_value = 96000.0
 value = 48000.0

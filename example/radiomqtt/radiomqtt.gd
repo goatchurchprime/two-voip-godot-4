@@ -24,6 +24,7 @@ var opusoptimizeforvoice : bool = true
 
 var prefixbytes = PackedByteArray([0,0,0,0,1])
 var mqttpacketencodebase64 : bool = false
+var noopuscompression = false
 
 var recordedsamples = [ ]
 var recordedopuspackets = [ ]
@@ -104,7 +105,7 @@ func _ready():
 
 	SelfMember.audiobufferregulationtime = 3600.0
 
-func resamplerecordedsamples(orgsamples, newsamplesize):
+func rechunkrecordedchunks(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
 	var res = [ ]
 	var currentsample = PackedVector2Array()
@@ -133,12 +134,13 @@ func updatesamplerates():
 
 	print("aaa audiosamplesize ", audiosamplesize, "  audiosamplerate ", audiosamplerate)
 
-	var noopuscompression = false
+	noopuscompression = false
 	if opussamplerate == audioresamplerate:
 		$VBoxFrameLength/HBoxOpusExtra/Compressed.disabled = false
 		if not $VBoxFrameLength/HBoxOpusExtra/Compressed.button_pressed:
 			noopuscompression = true
 	else:
+		$VBoxFrameLength/HBoxOpusExtra/Compressed.button_pressed = false
 		$VBoxFrameLength/HBoxOpusExtra/Compressed.disabled = true
 		noopuscompression = true
 	opusbitrate = int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value)
@@ -163,9 +165,10 @@ func updatesamplerates():
 	recordedheader = { "opusframesize":audioresamplesize, 
 					   "opussamplerate":audioresamplerate, 
 					   "prefixbyteslength":len(prefixbytes), 
+					   "noopuscompression":noopuscompression,
 					   "mqttpacketencoding":"base64" if mqttpacketencodebase64 else "binary" }
 	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audiosamplesize:
-		recordedsamples = resamplerecordedsamples(recordedsamples, audiosamplesize)
+		recordedsamples = rechunkrecordedchunks(recordedsamples, audiosamplesize)
 	recordedopuspacketsMemSize = 0
 	recordedopuspackets = null
 	recordedresampledpackets = null
@@ -229,8 +232,13 @@ var talkingstarttime = 0
 func starttalking():
 	currentlytalking = true
 	recordedsamples = [ ]
-	recordedopuspackets = [ ]
-	recordedresampledpackets = null
+	if not noopuscompression:
+		recordedopuspackets = [ ]
+		recordedresampledpackets = null
+	else:
+		recordedopuspackets = null
+		recordedresampledpackets = [ ]
+
 	$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(0)
 	$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = str(0)
 	recordedopuspacketsMemSize = 0
@@ -248,7 +256,7 @@ func starttalking():
 			leadtimems -= frametimems
 			Dundroppedchunks += 1
 		print("Undropped ", Dundroppedchunks, " chunks")
-		if opusframesize != 0:
+		if opusframesize != 0 and $VBoxFrameLength/HBoxOpusExtra/Compressed.button_pressed:
 			audioopuschunkedeffect.flush_opus_encoder(false)
 
 func _on_mic_working_toggled(toggled_on):
@@ -321,7 +329,9 @@ func _process(_delta):
 			if currentlytalking:
 				if len(recordedsamples) < maxrecordedsamples:
 					recordedsamples.append(audiosamples)
-				if opusframesize != 0:
+				if noopuscompression:
+					recordedresampledpackets.append(audioopuschunkedeffect.read_chunk(true))
+				elif opusframesize != 0:
 					var opuspacket = audioopuschunkedeffect.read_opus_packet(prefixbytes)
 					$MQTTnetwork.transportaudiopacket(opuspacket, mqttpacketencodebase64)
 					if len(recordedopuspackets) < maxrecordedsamples:

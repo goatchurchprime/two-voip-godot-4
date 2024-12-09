@@ -43,6 +43,7 @@
 #include "opus.h"
 #include "speex_resampler/speex_resampler.h"
 
+
 #ifdef OVR_LIP_SYNC
     #include "OVRLipSync.h"
 #else
@@ -92,15 +93,6 @@ typedef enum {
 
 // chunk_to_opus_packet() is for encoding a series of chunks not in the ring buffer.
 
-// TODO
-// fix any crashes  
-// plot the float value of the noise detector in the screen as a threshold
-// plot the resampled denoised view in the same texture too. (aligned)
-// hack the main scons module so it builds on the actions
-// make a stub so it can run without the rnnoise library if necessary
-// get help with this compiling
-
-// finish folding and delivering GP leaflets
 
 
 class AudioEffectOpusChunked : public AudioEffect {
