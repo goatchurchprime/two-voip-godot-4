@@ -155,6 +155,7 @@ scons apply_patches  # optional
 scons build_opus     # build opus using cmake
 scons build_rnnoise  # build opus using cmake
 scons                # build this library
+cp addons/twovoip/libs/*.so example/addons/twovoip/libs/
 ```
 
 To compile for another platform like web, the commands are
@@ -183,7 +184,7 @@ as your `GodotEngine.exe` so that it finds and links it.
 For the addon to work correctly, `twovoip_lipsync` and `twovoip` cannot be used in the same project.
 
 
-### Nixos automated
+### Nixos automated (not working)
 
 The build system is defined by the flake.nix file
 
