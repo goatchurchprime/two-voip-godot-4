@@ -179,7 +179,7 @@ func updatesamplerates():
 			recordedopuspackets.append(opuspacket)
 			recordedopuspacketsMemSize += opuspacket.size() 
 		$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
-	else:
+	elif audioopuschunkedeffect != null:
 		recordedresampledpackets = [ ]
 		var denoise = not $HBoxBigButtons/VBoxPTT/Denoise.disabled and $HBoxBigButtons/VBoxPTT/Denoise.button_pressed
 		for s in recordedsamples:
@@ -190,6 +190,9 @@ func updatesamplerates():
 		$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = "1"
 		if len(recordedresampledpackets):
 			recordedopuspacketsMemSize = len(recordedresampledpackets)*len(recordedresampledpackets[0])*4
+	else:
+		recordedresampledpackets = null
+
 
 	$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
 	var tm = len(recordedsamples)*frametimems*0.001
@@ -237,7 +240,10 @@ func starttalking():
 		recordedresampledpackets = null
 	else:
 		recordedopuspackets = null
-		recordedresampledpackets = [ ]
+		if audioopuschunkedeffect != null:
+			recordedresampledpackets = [ ]
+		else:
+			recordedresampledpackets = null
 
 	$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(0)
 	$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = str(0)

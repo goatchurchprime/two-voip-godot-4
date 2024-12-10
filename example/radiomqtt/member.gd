@@ -82,7 +82,7 @@ func processheaderpacket(h):
 		#$AudioStreamPlayer.play()
 		setupaudioshader()
 
-	if opusframesize != 0 and audiostreamopuschunked == null:
+	if opusframesize != 0 and audiostreamopuschunked == null and not h["noopuscompression"]:
 		print("Compressed opus stream received that we cannot decompress")
 	audioserveroutputlatency = AudioServer.get_output_latency()
 	print("audioserveroutputlatency ", audioserveroutputlatency)
