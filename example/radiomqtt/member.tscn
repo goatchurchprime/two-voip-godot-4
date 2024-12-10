@@ -35,6 +35,7 @@ color = Color(0.423529, 0, 0.423529, 1)
 script = ExtResource("1_o3hks")
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
+bus = &"SpeechBus"
 
 [node name="Label" type="Label" parent="."]
 layout_mode = 2
