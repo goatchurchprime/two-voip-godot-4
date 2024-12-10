@@ -84,6 +84,8 @@ func processheaderpacket(h):
 
 	if opusframesize != 0 and audiostreamopuschunked == null and not h["noopuscompression"]:
 		print("Compressed opus stream received that we cannot decompress")
+	if audiostreamopuschunked != null:
+		audiostreamopuschunked.resetdecoder()
 	audioserveroutputlatency = AudioServer.get_output_latency()
 	print("audioserveroutputlatency ", audioserveroutputlatency)
 
@@ -130,8 +132,8 @@ func _process(delta):
 		var chunkv1 = 0.0
 		while audiostreamopuschunked.chunk_space_available():
 			if resampledpacketsbuffer != null and len(resampledpacketsbuffer) != 0:
-				#audiostreamopuschunked.push_audio_chunk(resampledpacketsbuffer.pop_front())
-				var audiochunk = audiostreamopuschunked.resample_chunk(resampledpacketsbuffer.pop_front())
+				var resampledaudiochunk = resampledpacketsbuffer.pop_front()
+				var audiochunk = audiostreamopuschunked.resample_chunk(resampledaudiochunk)
 				audiostreamopuschunked.push_audio_chunk(audiochunk)
 			elif len(audiopacketsbuffer) != 0:
 				audiostreamopuschunked.push_audio_chunk(audiopacketsbuffer.pop_front())

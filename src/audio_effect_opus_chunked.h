@@ -151,7 +151,8 @@ public:
     virtual Ref<AudioEffectInstance> _instantiate() override;
 
     void createencoder();
-    void resetencoder(int Dreason=3);
+    void deleteencoder();
+    void resetencoder();
 
     bool chunk_available();
     void drop_chunk();

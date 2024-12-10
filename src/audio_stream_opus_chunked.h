@@ -111,7 +111,9 @@ public:
     virtual int32_t _get_beat_count() const override { return 0; }
 
     void createdecoder();
+    void deletedecoder();
     void resetdecoder();
+    
     bool chunk_space_available();
     int queue_length_frames();
     void push_audio_chunk(const PackedVector2Array& audiochunk);
@@ -123,21 +125,21 @@ public:
     float last_chunk_rms();
     PackedVector2Array read_last_chunk();
 
-    void set_opussamplerate(int lopussamplerate) { resetdecoder(); opussamplerate = lopussamplerate; };
+    void set_opussamplerate(int lopussamplerate) { deletedecoder(); opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
-    void set_opusframesize(int lopusframesize) { resetdecoder(); opusframesize = lopusframesize; };
+    void set_opusframesize(int lopusframesize) { deletedecoder(); opusframesize = lopusframesize; };
     int get_opusframesize() { return opusframesize; };
-    void set_audiosamplerate(int laudiosamplerate) { resetdecoder(); audiosamplerate = laudiosamplerate; };
+    void set_audiosamplerate(int laudiosamplerate) { deletedecoder(); audiosamplerate = laudiosamplerate; };
     int get_audiosamplerate() { return audiosamplerate; };
-    void set_audiosamplesize(int laudiosamplesize) { resetdecoder(); audiosamplesize = laudiosamplesize; };
+    void set_audiosamplesize(int laudiosamplesize) { deletedecoder(); audiosamplesize = laudiosamplesize; };
     int get_audiosamplesize() { return audiosamplesize; };
-    void set_audiosamplechunks(int laudiosamplechunks) { resetdecoder(); audiosamplechunks = laudiosamplechunks; };
+    void set_audiosamplechunks(int laudiosamplechunks) { deletedecoder(); audiosamplechunks = laudiosamplechunks; };
     int get_audiosamplechunks() { return audiosamplechunks; };
-    void set_mix_rate(int lmix_rate) { resetdecoder(); mix_rate = lmix_rate; };
+    void set_mix_rate(int lmix_rate) { deletedecoder(); mix_rate = lmix_rate; };
     int get_mix_rate() { return mix_rate; };
 
     AudioStreamOpusChunked() {;};
-    ~AudioStreamOpusChunked() { resetdecoder(); };
+    ~AudioStreamOpusChunked() { deletedecoder(); };
 };
 
 }

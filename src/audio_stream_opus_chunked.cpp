@@ -64,6 +64,7 @@ void AudioStreamOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("push_opus_packet", "opusbytepacket", "begin", "decode_fec"), &AudioStreamOpusChunked::push_opus_packet);
     ClassDB::bind_method(D_METHOD("opus_packet_to_chunk", "opusbytepacket", "begin", "decode_fec"), &AudioStreamOpusChunked::opus_packet_to_chunk);
     ClassDB::bind_method(D_METHOD("resample_chunk", "resampledaudio"), &AudioStreamOpusChunked::resample_chunk);
+    ClassDB::bind_method(D_METHOD("resetdecoder"), &AudioStreamOpusChunked::resetdecoder);
 
     ClassDB::bind_method(D_METHOD("last_chunk_max"), &AudioStreamOpusChunked::last_chunk_max);
     ClassDB::bind_method(D_METHOD("last_chunk_rms"), &AudioStreamOpusChunked::last_chunk_rms);
@@ -79,7 +80,7 @@ Ref<AudioStreamPlayback> AudioStreamOpusChunked::_instantiate_playback() const {
     return playback;
 }
 
-void AudioStreamOpusChunked::resetdecoder() {
+void AudioStreamOpusChunked::deletedecoder() {
     chunknumber = -1;
     if (speexresampler != NULL) {
         speex_resampler_destroy(speexresampler);
@@ -90,6 +91,15 @@ void AudioStreamOpusChunked::resetdecoder() {
         opusdecoder = NULL;
     }
 }
+
+void AudioStreamOpusChunked::resetdecoder() {
+    if (speexresampler != NULL) 
+        speex_resampler_reset_mem(speexresampler);
+    if (opusdecoder != NULL) 
+        opus_decoder_ctl(opusdecoder, OPUS_RESET_STATE);
+    chunknumber = -1;
+}
+
 
 void AudioStreamOpusChunked::createdecoder() {
     resetdecoder();  // In case called from GDScript
@@ -172,8 +182,9 @@ void AudioStreamOpusChunked::push_audio_chunk(const PackedVector2Array& audiochu
     chunknumber += 1;
     if (chunknumber == audiosamplechunks)
         chunknumber = 0;
-    buffertail = chunknumber*audiochunk.size(); 
+    buffertail = chunknumber*audiosamplesize; 
 }
+
 
 
 float AudioStreamOpusChunked::last_chunk_max() {

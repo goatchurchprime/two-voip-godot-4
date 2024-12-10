@@ -22,7 +22,7 @@ var opusframesize : int = 960
 var opuscomplexity : int = 5
 var opusoptimizeforvoice : bool = true
 
-var prefixbytes = PackedByteArray([0,0,0,0,1])
+var prefixbytes = PackedByteArray([23])
 var mqttpacketencodebase64 : bool = false
 var noopuscompression = false
 
@@ -88,12 +88,13 @@ func _ready():
 		if ClassDB.can_instantiate("AudioEffectOpusChunked"):
 			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
 
-	for effect_idx in range(AudioServer.get_bus_effect_count(speechbusidx)):
-		var laudioeffectonspeechbus : AudioEffect = AudioServer.get_bus_effect(speechbusidx, effect_idx)
-		if laudioeffectonspeechbus.is_class("AudioEffectPitchShift"):
-			audioeffectpitchshift = laudioeffectonspeechbus
-			audioeffectpitchshiftidx = effect_idx
-			break
+	if speechbusidx != -1:
+		for effect_idx in range(AudioServer.get_bus_effect_count(speechbusidx)):
+			var laudioeffectonspeechbus : AudioEffect = AudioServer.get_bus_effect(speechbusidx, effect_idx)
+			if laudioeffectonspeechbus.is_class("AudioEffectPitchShift"):
+				audioeffectpitchshift = laudioeffectonspeechbus
+				audioeffectpitchshiftidx = effect_idx
+				break
 
 	updatesamplerates()
 	for i in range(1, len(visemes)):
@@ -263,7 +264,7 @@ func starttalking():
 			Dundroppedchunks += 1
 		print("Undropped ", Dundroppedchunks, " chunks")
 		if opusframesize != 0 and $VBoxFrameLength/HBoxOpusExtra/Compressed.button_pressed:
-			audioopuschunkedeffect.flush_opus_encoder(false)
+			audioopuschunkedeffect.resetencoder()
 
 func _on_mic_working_toggled(toggled_on):
 	print("_on_mic_working_toggled ", $AudioStreamMicrophone.playing, " to ", toggled_on)
@@ -408,6 +409,11 @@ func _on_play_pressed():
 	elif recordedresampledpackets != null:
 		SelfMember.processheaderpacket(h)
 		SelfMember.resampledpacketsbuffer = recordedresampledpackets.duplicate()
+		var resampledaudiochunk_blank = PackedVector2Array()
+		resampledaudiochunk_blank.resize(h["opusframesize"])
+		for i in range(5):
+			SelfMember.audiostreamopuschunked.resample_chunk(resampledaudiochunk_blank)
+
 	elif recordedsamples and SelfMember.audiostreamgeneratorplayback != null:
 		SelfMember.audiosamplesize = audiosamplesize
 		SelfMember.audiopacketsbuffer = recordedsamples.duplicate()

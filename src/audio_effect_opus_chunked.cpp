@@ -75,7 +75,7 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("drop_chunk"), &AudioEffectOpusChunked::drop_chunk);
     ClassDB::bind_method(D_METHOD("undrop_chunk"), &AudioEffectOpusChunked::undrop_chunk);
     ClassDB::bind_method(D_METHOD("read_opus_packet", "prefixbytes"), &AudioEffectOpusChunked::read_opus_packet);
-    ClassDB::bind_method(D_METHOD("flush_opus_encoder", "denoise"), &AudioEffectOpusChunked::flush_opus_encoder);
+    ClassDB::bind_method(D_METHOD("resetencoder"), &AudioEffectOpusChunked::resetencoder);
     ClassDB::bind_method(D_METHOD("chunk_to_opus_packet", "prefixbytes", "audiosamples", "denoise"), &AudioEffectOpusChunked::chunk_to_opus_packet);
     ClassDB::bind_method(D_METHOD("chunk_resample", "audiosamples", "denoise", "backresample"), &AudioEffectOpusChunked::chunk_resample);
 }
@@ -92,7 +92,7 @@ AudioEffectOpusChunked::AudioEffectOpusChunked() {
 
 AudioEffectOpusChunked::~AudioEffectOpusChunked() 
 {
-    resetencoder(17);
+    deleteencoder();
 };
 
 Ref<AudioEffectInstance> AudioEffectOpusChunked::_instantiate() {
@@ -102,8 +102,22 @@ Ref<AudioEffectInstance> AudioEffectOpusChunked::_instantiate() {
     return ins;
 }
 
-void AudioEffectOpusChunked::resetencoder(int Dreason) {
-    godot::UtilityFunctions::prints("resetting AudioEffectOpusChunked", Dreason);
+void AudioEffectOpusChunked::resetencoder() {
+    if ((opusframesize == 0) || (chunknumber == -1)) 
+        return;
+    if (speexresampler != NULL)
+        speex_resampler_reset_mem(speexresampler);
+    if (speexbackresampler != NULL) 
+        speex_resampler_reset_mem(speexbackresampler);
+    if (st != NULL) 
+        rnnoise_init(st, NULL);        
+    if (opusencoder != NULL) 
+        opus_encoder_ctl(opusencoder, OPUS_RESET_STATE);
+    lastopuschunk = chunknumber - 1;
+}
+
+
+void AudioEffectOpusChunked::deleteencoder() {
     if (speexresampler != NULL) {
         speex_resampler_destroy(speexresampler);
         speexresampler = NULL;
@@ -133,7 +147,7 @@ void AudioEffectOpusChunked::resetencoder(int Dreason) {
 }
 
 void AudioEffectOpusChunked::createencoder() {
-    resetencoder(4);  // In case called from GDScript
+    deleteencoder();  
     audiosamplebuffer.resize(audiosamplesize*ringbufferchunks); 
     chunknumber = 0;
     bufferend = 0;
@@ -191,22 +205,25 @@ void AudioEffectOpusChunked::createencoder() {
     }
     int opuserror2 = opus_encoder_ctl(opusencoder, OPUS_SET_BITRATE(opusbitrate));
     if (opuserror2 != 0) {
-        godot::UtilityFunctions::printerr("opus_encoder_ctl bitrate error error ", opuserror2);
+        godot::UtilityFunctions::printerr("opus_encoder_ctl bitrate error ", opuserror2);
         chunknumber = -2;
         return;
     }
     int opuserror3 = opus_encoder_ctl(opusencoder, OPUS_SET_COMPLEXITY(complexity));
     if (opuserror3 != 0) {
-        godot::UtilityFunctions::printerr("opus_encoder_ctl complexity error error ", opuserror3);
+        godot::UtilityFunctions::printerr("opus_encoder_ctl complexity error ", opuserror3);
         chunknumber = -2;
         return;
     }
     int opuserror4 = opus_encoder_ctl(opusencoder, OPUS_SET_SIGNAL(signal_type));
     if (opuserror4 != 0) {
-        godot::UtilityFunctions::printerr("opus_encoder_ctl signal_type error error ", opuserror4);
+        godot::UtilityFunctions::printerr("opus_encoder_ctl signal_type error ", opuserror4);
         chunknumber = -2;
         return;
     }
+    // we don't set DTX because it's for letting opus decide internally when it is quiet https://github.com/xiph/opus/issues/381
+    //int opuserror5 = opus_encoder_ctl(opusencoder, OPUS_SET_DTX(1));
+
     opusbytebuffer.resize(sizeof(float)*channels*opusframesize + MAXPREFIXBYTES);
     lastopuschunk = -1;
 }
@@ -343,28 +360,6 @@ PackedByteArray AudioEffectOpusChunked::read_opus_packet(const PackedByteArray& 
     return opus_frame_to_opus_packet(prefixbytes, paudioresamples);
 }
 
-void AudioEffectOpusChunked::flush_opus_encoder(bool denoise) {
-    if ((opusframesize == 0) || (chunknumber == -1)) 
-        return;
-    // this just sends 5 empty chunks into the encoder.  doesn't necessarily work
-    float* paudioresamples = (float*)singleresamplebuffer.ptrw();
-    for (int j = 0; j < opusframesize*2; j++)
-        paudioresamples[j] = 0.0F;
-    for (int i = 0; i < 5; i++)
-        opus_frame_to_opus_packet(PackedByteArray(), paudioresamples);
-
-    if ((st != NULL) && denoise) {
-        // we could use rnnoise_init (if it doesn't involve a heavy reload of the model)
-        float* rin = (float*)rnnoise_in.ptr();
-        for (int j = 0; j < rnnoiseframesize; j++)
-            rin[j] = 0.0F;
-        float* rout = (float*)rnnoise_out.ptr();
-        for (int i = 0; i < 5; i++)
-            rnnoise_process_frame(st, rout, rin);
-    }
-    
-    lastopuschunk = chunknumber - 1;
-}
 
 int AudioEffectOpusChunked::chunk_to_lipsync(bool resampled) {
 #ifdef OVR_LIP_SYNC
