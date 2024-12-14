@@ -106,6 +106,8 @@ func _ready():
 
 	SelfMember.audiobufferregulationtime = 3600.0
 
+
+
 func rechunkrecordedchunks(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
 	var res = [ ]
@@ -291,6 +293,8 @@ func _input(event):
 
 
 func _process(_delta):
+	#Dmicrophonestreamplayback.mix()
+	
 	var talking = $HBoxBigButtons/VBoxPTT/PTT.button_pressed
 	if talking:
 		$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = "%.1f" % ((Time.get_ticks_msec() - talkingstarttime)*0.001)
@@ -394,6 +398,33 @@ func endtalking():
 	$MQTTnetwork.transportaudiopacketjson({"framecount":len(recordedsamples)})
 	print("Talked for ", (Time.get_ticks_msec() - talkingstarttime)*0.001, " seconds")
 
+
+
+func duplicatewithslippage(audiopackets, lframeslip):
+	var frameslip = abs(lframeslip)
+	var bleftside = (lframeslip >= 0)
+	var slippedaudiopackets = [ ]
+	for i in range(1, len(audiopackets)):
+		var prevpacket = audiopackets[i-1]
+		var packet = audiopackets[i]
+		var dpacket = packet.duplicate()
+		var n = len(packet)
+		if bleftside:
+			for j in range(n):
+				if j < frameslip:
+					dpacket[j].x = prevpacket[n - frameslip + j].x
+				else:
+					dpacket[j].x = packet[j - frameslip].x
+		else:
+			for j in range(n):
+				if j < frameslip:
+					dpacket[j].y = prevpacket[n - frameslip + j].y
+				else:
+					dpacket[j].y = packet[j - frameslip].y
+		slippedaudiopackets.push_back(dpacket)
+	return slippedaudiopackets
+		
+
 func _on_play_pressed():
 	if audioeffectpitchshift != null:
 		var speedup = $VBoxPlayback/HBoxStream/StreamSpeedup.value
@@ -408,11 +439,11 @@ func _on_play_pressed():
 		SelfMember.opuspacketsbuffer = recordedopuspackets.duplicate()
 	elif recordedresampledpackets != null:
 		SelfMember.processheaderpacket(h)
-		SelfMember.resampledpacketsbuffer = recordedresampledpackets.duplicate()
-		var resampledaudiochunk_blank = PackedVector2Array()
-		resampledaudiochunk_blank.resize(h["opusframesize"])
-		for i in range(5):
-			SelfMember.audiostreamopuschunked.resample_chunk(resampledaudiochunk_blank)
+		var stereoframeslip = $VBoxPlayback/HBoxStream/StereoFrameSlip.value
+		if stereoframeslip == 0:
+			SelfMember.resampledpacketsbuffer = recordedresampledpackets.duplicate()
+		else:
+			SelfMember.resampledpacketsbuffer = duplicatewithslippage(recordedresampledpackets, stereoframeslip)
 
 	elif recordedsamples and SelfMember.audiostreamgeneratorplayback != null:
 		SelfMember.audiosamplesize = audiosamplesize

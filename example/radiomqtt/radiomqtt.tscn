@@ -526,7 +526,7 @@ text = "Play"
 
 [node name="LabelSamplerate" type="Label" parent="VBoxPlayback/HBoxStream"]
 layout_mode = 2
-text = "sample rate"
+text = "sample"
 
 [node name="OutSampleRate" type="SpinBox" parent="VBoxPlayback/HBoxStream"]
 custom_minimum_size = Vector2(95, 0)
@@ -539,7 +539,7 @@ suffix = "Hz"
 
 [node name="LabelMixrate" type="Label" parent="VBoxPlayback/HBoxStream"]
 layout_mode = 2
-text = "mix rate"
+text = "mix"
 
 [node name="MixRate" type="SpinBox" parent="VBoxPlayback/HBoxStream"]
 custom_minimum_size = Vector2(95, 0)
@@ -563,6 +563,12 @@ min_value = 0.1
 max_value = 3.0
 step = 0.1
 value = 1.0
+
+[node name="StereoFrameSlip" type="SpinBox" parent="VBoxPlayback/HBoxStream"]
+layout_mode = 2
+tooltip_text = "stereo frame slip"
+min_value = -900.0
+max_value = 900.0
 
 [node name="HSeparator5" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
