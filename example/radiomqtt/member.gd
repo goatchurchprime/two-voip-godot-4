@@ -169,7 +169,11 @@ func _process(delta):
 
 	else:
 		while audiostreamgeneratorplayback.get_frames_available() > audiosamplesize:
-			if len(audiopacketsbuffer) != 0:
+			if resampledpacketsbuffer != null and len(resampledpacketsbuffer) != 0:
+				var resampledaudiochunk = resampledpacketsbuffer.pop_front()
+				var audiochunk = audiostreamopuschunked.resample_chunk(resampledaudiochunk)
+				audiostreamgeneratorplayback.push_buffer(audiochunk)
+			elif len(audiopacketsbuffer) != 0:
 				audiostreamgeneratorplayback.push_buffer(audiopacketsbuffer.pop_front())
 			elif len(opuspacketsbuffer) != 0:
 				const fec = 0
