@@ -9,6 +9,7 @@ var audioeffectpitchshift : AudioEffectPitchShift = null
 var audioeffectpitchshiftidx = 0
 var audioeffectcapture : AudioEffectCapture = null
 var audioopuschunkedeffect # : AudioEffectOpusChunked
+@onready var audiostreamplaybackmicrophone : AudioStreamPlaybackMicrophone = AudioStreamPlaybackMicrophone.new()
 
 # values to use when AudioEffectOpusChunked cannot be instantiated
 var frametimems : float = 20 
@@ -44,6 +45,8 @@ var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa
 var possibleusernames = ["Alice", "Beth", "Cath", "Dan", "Earl", "Fred", "George", "Harry", "Ivan", "John", "Kevin", "Larry", "Martin", "Oliver", "Peter", "Quentin", "Robert", "Samuel", "Thomas", "Ulrik", "Victor", "Wayne", "Xavier", "Youngs", "Zephir"]
 
 func _ready():
+	if audiostreamplaybackmicrophone != null:
+		audiostreamplaybackmicrophone.start_microphone()
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 	$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
@@ -289,7 +292,8 @@ func _input(event):
 			$AudioStreamMicrophone.volume_db += (1 if event.keycode == KEY_I else -1)
 			print($AudioStreamMicrophone.volume_db)
 
-
+		if event.keycode == KEY_D:
+			audioopuschunkedeffect.Drunmicthing()
 
 
 func _process(_delta):
@@ -299,14 +303,14 @@ func _process(_delta):
 	if talking:
 		$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = "%.1f" % ((Time.get_ticks_msec() - talkingstarttime)*0.001)
 	if talking and not currentlytalking:
-		if not $AudioStreamMicrophone.playing:
+		if not $AudioStreamMicrophone.playing and audiostreamplaybackmicrophone == null:
 			$AudioStreamMicrophone.play()
 		starttalking()
 	elif not talking and currentlytalking:
 		endtalking()
 	$HBoxMicTalk/MicWorking.button_pressed = $AudioStreamMicrophone.playing
 
-	if audioeffectcapture == null:
+	if audioeffectcapture == null and audiostreamplaybackmicrophone == null:
 		assert (audioopuschunkedeffect != null)
 		while audioopuschunkedeffect.chunk_available():
 			var audiosamples = audioopuschunkedeffect.read_chunk(false)
@@ -357,8 +361,19 @@ func _process(_delta):
 			audioopuschunkedeffect.drop_chunk()
 
 	else:
-		while audioeffectcapture.get_frames_available() > audiosamplesize:
-			var audiosamples = audioeffectcapture.get_buffer(audiosamplesize)
+		while true:
+			var audiosamples = null
+			if audiostreamplaybackmicrophone.is_microphone_playing() and audiostreamplaybackmicrophone != null:
+				audiosamples = audiostreamplaybackmicrophone.get_microphone_buffer(audiosamplesize)
+				if len(audiosamples) != audiosamplesize:
+					assert (len(audiosamples) == 0)
+					break
+			else:
+				if audioeffectcapture.get_frames_available() > audiosamplesize:
+					audiosamples = audioeffectcapture.get_buffer(audiosamplesize)
+				else:
+					break
+						
 			audiosamplestoshader(audiosamples, false)
 			var chunkv1 = 0.0
 			var schunkv2 = 0.0

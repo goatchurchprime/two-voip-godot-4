@@ -39,6 +39,11 @@
 #include <godot_cpp/classes/mutex.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/audio_stream_microphone.hpp>
+#include <godot_cpp/classes/audio_stream_playback.hpp>
+#include <godot_cpp/classes/audio_frame.hpp>
+#include <godot_cpp/classes/audio_stream_playback_resampled.hpp>
+//#include <godot_cpp/classes/audio_stream_playback_microphone.hpp>
 
 #include "opus.h"
 #include "speex_resampler/speex_resampler.h"
@@ -58,6 +63,9 @@
 
 
 namespace godot {
+    
+    
+
 
 class AudioEffectOpusChunked;
 
@@ -140,6 +148,12 @@ class AudioEffectOpusChunked : public AudioEffect {
 
     void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
 
+
+    bool DBrunmicthing = false;
+    AudioStreamMicrophone Daudiostreammicrophone;
+    Ref<AudioStreamPlaybackResampled> Daudiostreammicrophoneplayback;
+
+
 protected:
     static void _bind_methods();
 
@@ -153,6 +167,8 @@ public:
     void createencoder();
     void deleteencoder();
     void resetencoder();
+
+    void Drunmicthing();
 
     bool chunk_available();
     void drop_chunk();
