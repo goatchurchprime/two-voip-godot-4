@@ -71,13 +71,14 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("chunk_to_lipsync", "resampled"), &AudioEffectOpusChunked::chunk_to_lipsync);
     ClassDB::bind_method(D_METHOD("read_visemes"), &AudioEffectOpusChunked::read_visemes);
     
-    ClassDB::bind_method(D_METHOD("read_chunk", "resampled"), &AudioEffectOpusChunked::read_chunk);
+    ClassDB::bind_method(D_METHOD("push_chunk", "audiosamples"), &AudioEffectOpusChunked::push_chunk);
     ClassDB::bind_method(D_METHOD("drop_chunk"), &AudioEffectOpusChunked::drop_chunk);
     ClassDB::bind_method(D_METHOD("undrop_chunk"), &AudioEffectOpusChunked::undrop_chunk);
+
+    ClassDB::bind_method(D_METHOD("read_chunk", "resampled"), &AudioEffectOpusChunked::read_chunk);
+
     ClassDB::bind_method(D_METHOD("read_opus_packet", "prefixbytes"), &AudioEffectOpusChunked::read_opus_packet);
-    ClassDB::bind_method(D_METHOD("resetencoder"), &AudioEffectOpusChunked::resetencoder);
-    ClassDB::bind_method(D_METHOD("chunk_to_opus_packet", "prefixbytes", "audiosamples", "denoise"), &AudioEffectOpusChunked::chunk_to_opus_packet);
-    ClassDB::bind_method(D_METHOD("chunk_resample", "audiosamples", "denoise", "backresample"), &AudioEffectOpusChunked::chunk_resample);
+    ClassDB::bind_method(D_METHOD("resetencoder", "clearbuffers"), &AudioEffectOpusChunked::resetencoder);
 }
 
 const int MAXPREFIXBYTES = 100;
@@ -96,14 +97,17 @@ AudioEffectOpusChunked::~AudioEffectOpusChunked()
 };
 
 Ref<AudioEffectInstance> AudioEffectOpusChunked::_instantiate() {
+    instanceinstantiations += 1;
+    if (instanceinstantiations > 1)
+        godot::UtilityFunctions::printerr("Warning: more than one AudioEffectOpusChunkedInstance instantiation");
     Ref<AudioEffectOpusChunkedInstance> ins;
     ins.instantiate();
     ins->base = Ref<AudioEffectOpusChunked>(this);
     return ins;
 }
 
-void AudioEffectOpusChunked::resetencoder() {
-    if ((opusframesize == 0) || (chunknumber == -1)) 
+void AudioEffectOpusChunked::resetencoder(bool clearbuffers) {
+    if ((opusframesize == 0) || (chunknumber < 0)) 
         return;
     if (speexresampler != NULL)
         speex_resampler_reset_mem(speexresampler);
@@ -113,9 +117,16 @@ void AudioEffectOpusChunked::resetencoder() {
         rnnoise_init(st, NULL);        
     if (opusencoder != NULL) 
         opus_encoder_ctl(opusencoder, OPUS_RESET_STATE);
+
+    if (clearbuffers) {
+        DEV_ASSERT(audiosamplebuffer.size() == audiosamplesize*ringbufferchunks); 
+        chunknumber = 0;
+        bufferend = 0;
+    }
+    lastresampledchunk = chunknumber - 1;
+    lastdenoisedchunk = chunknumber - 1;
     lastopuschunk = chunknumber - 1;
 }
-
 
 void AudioEffectOpusChunked::deleteencoder() {
     if (speexresampler != NULL) {
@@ -232,6 +243,19 @@ void AudioEffectOpusChunkedInstance::_process(const void *src_buffer, AudioFrame
     base->process((const AudioFrame *)src_buffer, p_dst_frames, p_frame_count); 
 }
 
+
+void AudioEffectOpusChunked::push_sample(const Vector2 &sample) {
+    audiosamplebuffer.set(bufferend % audiosamplebuffer.size(), sample);
+    bufferend += 1; 
+    if (bufferend == (chunknumber + ringbufferchunks)*audiosamplesize) {
+        drop_chunk(); 
+        discardedchunks += 1; 
+        if (!Engine::get_singleton()->is_editor_hint())
+            if ((discardedchunks < 5) || ((discardedchunks % 1000) == 0))
+                godot::UtilityFunctions::prints("Discarding chunk", discardedchunks, bufferend, (chunknumber + 1)*audiosamplesize); 
+    }
+}
+
 void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count) {
     if (chunknumber < 0) { 
         if (chunknumber == -1) 
@@ -239,18 +263,24 @@ void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame 
         else
             return;
     }
+    DEV_ASSERT(instanceinstantiations == 1);
     for (int i = 0; i < p_frame_count; i++) {
         p_dst_frames[i] = p_src_frames[i];
-        audiosamplebuffer.set(bufferend % audiosamplebuffer.size(), Vector2(p_src_frames[i].left, p_src_frames[i].right));
-        bufferend += 1; 
-        if (bufferend == (chunknumber + ringbufferchunks)*audiosamplesize) {
-            drop_chunk(); 
-            discardedchunks += 1; 
-            if (!Engine::get_singleton()->is_editor_hint())
-                if ((discardedchunks < 5) || ((discardedchunks % 1000) == 0))
-                    godot::UtilityFunctions::prints("Discarding chunk", discardedchunks, bufferend, (chunknumber + 1)*audiosamplesize); 
-        }
+        push_sample(Vector2(p_src_frames[i].left, p_src_frames[i].right));
     }
+}
+
+void AudioEffectOpusChunked::push_chunk(const PackedVector2Array& audiosamples) {
+    if (chunknumber < 0) { 
+        if (chunknumber == -1) 
+            createencoder();
+        else
+            return;
+    }
+    if (instanceinstantiations != 0)
+        godot::UtilityFunctions::printerr("Warning: push_chunk on an AudioEffectOpusChunked that is instantiated on an Audio Bus");
+    for (int i = 0; i < audiosamples.size(); i++)
+        push_sample(audiosamples[i]);
 }
 
 bool AudioEffectOpusChunked::chunk_available() {
@@ -426,50 +456,6 @@ int AudioEffectOpusChunked::chunk_to_lipsync(bool resampled) {
     return -1;
 #endif
 }
-
-PackedByteArray AudioEffectOpusChunked::chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamples, bool denoise) {
-    if (chunknumber < 0) {
-        if (chunknumber == -1) 
-            createencoder();
-        else
-            return PackedByteArray();
-    }
-    resample_single_chunk((float*)singleresamplebuffer.ptrw(), (float*)audiosamples.ptr());
-    if (denoise)
-        denoise_single_chunk((float*)singleresamplebuffer.ptrw(), (float*)singleresamplebuffer.ptrw());
-    return opus_frame_to_opus_packet(prefixbytes, (float*)singleresamplebuffer.ptrw());
-}
-
-PackedVector2Array AudioEffectOpusChunked::chunk_resample(const PackedVector2Array& audiosamples, bool denoise, bool backresample) {
-    if (chunknumber < 0) {
-        if (chunknumber == -1) 
-            createencoder();
-        else
-            return PackedVector2Array();
-    }
-    resample_single_chunk((float*)singleresamplebuffer.ptrw(), (float*)audiosamples.ptr());
-    if (denoise)
-        denoise_single_chunk((float*)singleresamplebuffer.ptrw(), (float*)singleresamplebuffer.ptrw());
-    if ((audiosamplesize != opusframesize) && backresample) {
-        if (speexbackresampler == NULL) {
-            int channels = 2;
-            int speexerror = 0; 
-            int resamplingquality = 10;
-            speexbackresampler = speex_resampler_init(channels, opussamplerate, audiosamplerate, resamplingquality, &speexerror);
-        }
-        PackedVector2Array singlereresamplebuffer;
-        singlereresamplebuffer.resize(audiosamplesize);
-        unsigned int Uaudiosamplesize = audiosamplesize;
-        unsigned int Uopusframesize = opusframesize;
-        int sxerr = speex_resampler_process_interleaved_float(speexbackresampler, 
-                                                              (float*)singleresamplebuffer.ptrw(), &Uopusframesize,
-                                                              (float*)singlereresamplebuffer.ptrw(), &Uaudiosamplesize);
-        return singlereresamplebuffer;
-    } else {
-        return singleresamplebuffer;
-    }
-}
-
 
 void AudioEffectOpusChunked::resample_single_chunk(float* paudioresamples, const float* paudiosamples) {
     if (audiosamplesize != opusframesize) {

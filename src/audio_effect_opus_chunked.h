@@ -39,6 +39,11 @@
 #include <godot_cpp/classes/mutex.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/audio_stream_microphone.hpp>
+#include <godot_cpp/classes/audio_stream_playback.hpp>
+#include <godot_cpp/classes/audio_frame.hpp>
+#include <godot_cpp/classes/audio_stream_playback_resampled.hpp>
+//#include <godot_cpp/classes/audio_stream_playback_microphone.hpp>
 
 #include "opus.h"
 #include "speex_resampler/speex_resampler.h"
@@ -58,6 +63,9 @@
 
 
 namespace godot {
+    
+    
+
 
 class AudioEffectOpusChunked;
 
@@ -91,9 +99,8 @@ typedef enum {
 // drop_chunk() advances to next chunk, undrop_chunk() rolls back the buffer it so we can run the deferred functions
 // and avoid pre-clipping of the spoken episode.
 
-// chunk_to_opus_packet() is for encoding a series of chunks not in the ring buffer.
-
-
+// we are putting all the state into the AudioEffect instead of the AudioEffectInstance 
+// because it simplifies the coding here.
 
 class AudioEffectOpusChunked : public AudioEffect {
     GDCLASS(AudioEffectOpusChunked, AudioEffect)
@@ -138,11 +145,13 @@ class AudioEffectOpusChunked : public AudioEffect {
     ovrLipSyncFrame ovrlipsyncframe;
     ovrLipSyncContext ovrlipsyncctx = 0;
 
+    int instanceinstantiations = 0;
     void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
 
 protected:
     static void _bind_methods();
 
+    void push_sample(const Vector2 &sample);
     void resample_single_chunk(float* paudioresamples, const float* paudiosamples);
     float denoise_single_chunk(float* pdenoisedaudioresamples, const float* paudiosamples);
     PackedByteArray opus_frame_to_opus_packet(const PackedByteArray& prefixbytes, float* paudiosamples);
@@ -152,11 +161,12 @@ public:
 
     void createencoder();
     void deleteencoder();
-    void resetencoder();
+    void resetencoder(bool clearbuffers);
 
     bool chunk_available();
     void drop_chunk();
     bool undrop_chunk();
+    void push_chunk(const PackedVector2Array& audiosamples); 
 
     void resampled_current_chunk();
     float denoise_resampled_chunk();
@@ -165,12 +175,8 @@ public:
     float chunk_max(bool rms=false, bool resampled=false);
 
     PackedByteArray read_opus_packet(const PackedByteArray& prefixbytes); 
-    void flush_opus_encoder(bool denoise);
     int chunk_to_lipsync(bool resampled=false); 
     PackedFloat32Array read_visemes() { return visemes; };
-
-    PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamples, bool denoise=false);
-    PackedVector2Array chunk_resample(const PackedVector2Array& audiosamples, bool denoise=false, bool backresample=false);
 
     void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
