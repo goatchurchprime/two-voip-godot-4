@@ -51,6 +51,9 @@ func _ready():
 		audiostreamplaybackmicrophone.start_microphone()
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
+	var caninstantiate_audioeffectopuschunked = ClassDB.can_instantiate("AudioEffectOpusChunked")
+	caninstantiate_audioeffectopuschunked = false  # to disable it
+
 	$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
 
 	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
@@ -66,7 +69,7 @@ func _ready():
 		$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_mix_rate()
 		$VBoxPlayback/HBoxStream/OutSampleRate.value = AudioServer.get_mix_rate()
 
-	if not ClassDB.can_instantiate("AudioEffectOpusChunked"):
+	if not caninstantiate_audioeffectopuschunked:
 		$TwovoipWarning.visible = true
 		$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = $VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value
 		$VBoxFrameLength/HBoxOpusBitRate/SampleRate.disabled = true
@@ -80,7 +83,7 @@ func _ready():
 			break
 
 	if audioeffectonmic == null:
-		if ClassDB.can_instantiate("AudioEffectOpusChunked"):
+		if caninstantiate_audioeffectopuschunked:
 			audioeffectonmic = ClassDB.instantiate("AudioEffectOpusChunked")
 			print("Adding AudioEffectOpusChunked to bus: ", $AudioStreamMicrophone.bus)
 		else:
@@ -90,11 +93,12 @@ func _ready():
 
 	if audioeffectonmic.is_class("AudioEffectOpusChunked"):
 		audioopuschunkedeffect = audioeffectonmic
+		assert (caninstantiate_audioeffectopuschunked)
 	elif audioeffectonmic.is_class("AudioEffectCapture"):
 		audioeffectcapture = audioeffectonmic
-		if ClassDB.can_instantiate("AudioEffectOpusChunked"):
+		if caninstantiate_audioeffectopuschunked:
 			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
-	if ClassDB.can_instantiate("AudioEffectOpusChunked"):
+	if caninstantiate_audioeffectopuschunked:
 		audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
 
 	if speechbusidx != -1:
@@ -249,7 +253,6 @@ func setupaudioshader():
 	else:
 		$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", false)
 
-	
 func audiosamplestoshader(audiosamples, resampled):
 	if resampled:
 		assert (len(audiosamples) == audioopuschunkedeffect.opusframesize)

@@ -106,16 +106,15 @@ void AudioStreamOpusChunked::createdecoder() {
     int opuserror = 0;
     int channels = 2;
     
-    if ((opussamplerate > 0) && (opussamplerate < 8000)) {
-        godot::UtilityFunctions::print("non-opus sample rate for resample testing "); 
-        opusdecoder = NULL;
-    } else {
-        opusdecoder = opus_decoder_create(opussamplerate, channels, &opuserror);
-        if (opuserror != 0) {
+    opusdecoder = opus_decoder_create(opussamplerate, channels, &opuserror);
+    if (opuserror != 0) {
+        if ((opussamplerate == 8000) || (opussamplerate == 12000) || (opussamplerate == 16000) || (opussamplerate == 24000) || (opussamplerate == 48000)) {
             godot::UtilityFunctions::printerr("opus_decoder_create error ", opuserror); 
             chunknumber = -2;
             return;
         }
+        godot::UtilityFunctions::print("non-opus sample rate for resample testing "); 
+        opusdecoder = NULL;
     }
  
     float Dtimeframeopus = opusframesize*1.0F/opussamplerate;
