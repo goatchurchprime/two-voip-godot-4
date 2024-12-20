@@ -71,66 +71,17 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("chunk_to_lipsync", "resampled"), &AudioEffectOpusChunked::chunk_to_lipsync);
     ClassDB::bind_method(D_METHOD("read_visemes"), &AudioEffectOpusChunked::read_visemes);
     
-    ClassDB::bind_method(D_METHOD("read_chunk", "resampled"), &AudioEffectOpusChunked::read_chunk);
+    ClassDB::bind_method(D_METHOD("push_chunk", "audiosamples"), &AudioEffectOpusChunked::push_chunk);
     ClassDB::bind_method(D_METHOD("drop_chunk"), &AudioEffectOpusChunked::drop_chunk);
     ClassDB::bind_method(D_METHOD("undrop_chunk"), &AudioEffectOpusChunked::undrop_chunk);
+
+    ClassDB::bind_method(D_METHOD("read_chunk", "resampled"), &AudioEffectOpusChunked::read_chunk);
+
     ClassDB::bind_method(D_METHOD("read_opus_packet", "prefixbytes"), &AudioEffectOpusChunked::read_opus_packet);
     ClassDB::bind_method(D_METHOD("resetencoder"), &AudioEffectOpusChunked::resetencoder);
     ClassDB::bind_method(D_METHOD("chunk_to_opus_packet", "prefixbytes", "audiosamples", "denoise"), &AudioEffectOpusChunked::chunk_to_opus_packet);
     ClassDB::bind_method(D_METHOD("chunk_resample", "audiosamples", "denoise", "backresample"), &AudioEffectOpusChunked::chunk_resample);
-
-    ClassDB::bind_method(D_METHOD("Drunmicthing"), &AudioEffectOpusChunked::Drunmicthing);
 }
-
-// What have I done:
-// in v4.3.stable
-// change the ngodot/flake.nix
-//                substituteInPlace servers/register_server_types.cpp \
-//                    --replace-fail 'GDREGISTER_CLASS(AudioStreamMicrophone);' 'GDREGISTER_CLASS(AudioStreamMicrophone);GDREGISTER_CLASS(AudioStreamPlaybackMicrophone);'
-//
-// godot4 --dump-extension-api
-// cp extension_api.json ../two-voip-godot-4-DEV/godot-cpp/gdextension/
-// in twovoip run scons
-// cp addons/twovoip/libs/libtwovoip.linux.template_debug.x86_64.so example/addons/twovoip_lipsync/libs/
-//
-// To compile godot from repositories/godot source code
-// nix develop nixpkgs#godot_4
-// scons -j16 dbus=true debug_symbols=false fontconfig=true platform=linuxbsd precision=single production=true pulseaudio=true speechd=true target=editor touch=true udev=true wayland=true x11=true prefix=/home/julian/repositories/godot/outputs/out
-// runPhase installPhase
-// runphase fixupPhase
-// outputs/out/bin/godot4
-
-
-
-void AudioEffectOpusChunked::Drunmicthing() {
-    if (!DBrunmicthing) {
-        Daudiostreammicrophoneplayback = Daudiostreammicrophone.instantiate_playback();
-        godot::UtilityFunctions::prints("Bingo!");
-        godot::UtilityFunctions::prints(Daudiostreammicrophoneplayback);
-        Daudiostreammicrophoneplayback->begin_resample();
-        //Daudiostreammicrophoneplayback->Dingo();
-        godot::UtilityFunctions::prints("Bongo!");
-        DBrunmicthing = true;
-    }
-    
-    godot::UtilityFunctions::prints(Daudiostreammicrophoneplayback->_is_playing());
-    std::vector<AudioFrame> buff;
-    buff.resize(882);
-    int mixed = Daudiostreammicrophoneplayback->_mix_resampled(&buff.front(), 882);
-    godot::UtilityFunctions::prints(mixed);
-    
-
-/*	virtual void _start(double p_from_pos);
-	virtual void _stop();
-	virtual bool _is_playing() const;
-	virtual int32_t _get_loop_count() const;
-	virtual double _get_playback_position() const;
-	virtual void _seek(double p_position);
-	virtual int32_t _mix(AudioFrame *p_buffer, double p_rate_scale, int32_t p_frames);
-	virtual void _tag_used_streams();
-*/
-}
-
 
 const int MAXPREFIXBYTES = 100;
 
@@ -284,6 +235,19 @@ void AudioEffectOpusChunkedInstance::_process(const void *src_buffer, AudioFrame
     base->process((const AudioFrame *)src_buffer, p_dst_frames, p_frame_count); 
 }
 
+
+void AudioEffectOpusChunked::push_sample(const Vector2 &sample) {
+    audiosamplebuffer.set(bufferend % audiosamplebuffer.size(), sample);
+    bufferend += 1; 
+    if (bufferend == (chunknumber + ringbufferchunks)*audiosamplesize) {
+        drop_chunk(); 
+        discardedchunks += 1; 
+        if (!Engine::get_singleton()->is_editor_hint())
+            if ((discardedchunks < 5) || ((discardedchunks % 1000) == 0))
+                godot::UtilityFunctions::prints("Discarding chunk", discardedchunks, bufferend, (chunknumber + 1)*audiosamplesize); 
+    }
+}
+
 void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count) {
     if (chunknumber < 0) { 
         if (chunknumber == -1) 
@@ -293,16 +257,19 @@ void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame 
     }
     for (int i = 0; i < p_frame_count; i++) {
         p_dst_frames[i] = p_src_frames[i];
-        audiosamplebuffer.set(bufferend % audiosamplebuffer.size(), Vector2(p_src_frames[i].left, p_src_frames[i].right));
-        bufferend += 1; 
-        if (bufferend == (chunknumber + ringbufferchunks)*audiosamplesize) {
-            drop_chunk(); 
-            discardedchunks += 1; 
-            if (!Engine::get_singleton()->is_editor_hint())
-                if ((discardedchunks < 5) || ((discardedchunks % 1000) == 0))
-                    godot::UtilityFunctions::prints("Discarding chunk", discardedchunks, bufferend, (chunknumber + 1)*audiosamplesize); 
-        }
+        push_sample(Vector2(p_src_frames[i].left, p_src_frames[i].right));
     }
+}
+
+void AudioEffectOpusChunked::push_chunk(const PackedVector2Array& audiosamples) {
+    if (chunknumber < 0) { 
+        if (chunknumber == -1) 
+            createencoder();
+        else
+            return;
+    }
+    for (int i = 0; i < audiosamples.size(); i++)
+        push_sample(audiosamples[i]);
 }
 
 bool AudioEffectOpusChunked::chunk_available() {

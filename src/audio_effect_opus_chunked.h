@@ -148,15 +148,10 @@ class AudioEffectOpusChunked : public AudioEffect {
 
     void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
 
-
-    bool DBrunmicthing = false;
-    AudioStreamMicrophone Daudiostreammicrophone;
-    Ref<AudioStreamPlaybackResampled> Daudiostreammicrophoneplayback;
-
-
 protected:
     static void _bind_methods();
 
+    void push_sample(const Vector2 &sample);
     void resample_single_chunk(float* paudioresamples, const float* paudiosamples);
     float denoise_single_chunk(float* pdenoisedaudioresamples, const float* paudiosamples);
     PackedByteArray opus_frame_to_opus_packet(const PackedByteArray& prefixbytes, float* paudiosamples);
@@ -168,11 +163,10 @@ public:
     void deleteencoder();
     void resetencoder();
 
-    void Drunmicthing();
-
     bool chunk_available();
     void drop_chunk();
     bool undrop_chunk();
+    void push_chunk(const PackedVector2Array& audiosamples); 
 
     void resampled_current_chunk();
     float denoise_resampled_chunk();
@@ -181,7 +175,6 @@ public:
     float chunk_max(bool rms=false, bool resampled=false);
 
     PackedByteArray read_opus_packet(const PackedByteArray& prefixbytes); 
-    void flush_opus_encoder(bool denoise);
     int chunk_to_lipsync(bool resampled=false); 
     PackedFloat32Array read_visemes() { return visemes; };
 
