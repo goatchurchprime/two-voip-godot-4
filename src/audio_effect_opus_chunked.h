@@ -102,6 +102,8 @@ typedef enum {
 // chunk_to_opus_packet() is for encoding a series of chunks not in the ring buffer.
 
 
+// we are putting all the state into the AudioEffect instead of the AudioEffectInstance 
+// because it simplifies the coding here.
 
 class AudioEffectOpusChunked : public AudioEffect {
     GDCLASS(AudioEffectOpusChunked, AudioEffect)
@@ -146,6 +148,7 @@ class AudioEffectOpusChunked : public AudioEffect {
     ovrLipSyncFrame ovrlipsyncframe;
     ovrLipSyncContext ovrlipsyncctx = 0;
 
+    int instanceinstantiations = 0;
     void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
 
 protected:
@@ -161,7 +164,7 @@ public:
 
     void createencoder();
     void deleteencoder();
-    void resetencoder();
+    void resetencoder(bool clearbuffers);
 
     bool chunk_available();
     void drop_chunk();

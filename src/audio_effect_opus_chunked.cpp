@@ -78,7 +78,10 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("read_chunk", "resampled"), &AudioEffectOpusChunked::read_chunk);
 
     ClassDB::bind_method(D_METHOD("read_opus_packet", "prefixbytes"), &AudioEffectOpusChunked::read_opus_packet);
-    ClassDB::bind_method(D_METHOD("resetencoder"), &AudioEffectOpusChunked::resetencoder);
+    ClassDB::bind_method(D_METHOD("resetencoder", "clearbuffers"), &AudioEffectOpusChunked::resetencoder);
+
+
+
     ClassDB::bind_method(D_METHOD("chunk_to_opus_packet", "prefixbytes", "audiosamples", "denoise"), &AudioEffectOpusChunked::chunk_to_opus_packet);
     ClassDB::bind_method(D_METHOD("chunk_resample", "audiosamples", "denoise", "backresample"), &AudioEffectOpusChunked::chunk_resample);
 }
@@ -99,14 +102,17 @@ AudioEffectOpusChunked::~AudioEffectOpusChunked()
 };
 
 Ref<AudioEffectInstance> AudioEffectOpusChunked::_instantiate() {
+    instanceinstantiations += 1;
+    if (instanceinstantiations > 1)
+        godot::UtilityFunctions::printerr("Warning: more than one AudioEffectOpusChunkedInstance instantiation");
     Ref<AudioEffectOpusChunkedInstance> ins;
     ins.instantiate();
     ins->base = Ref<AudioEffectOpusChunked>(this);
     return ins;
 }
 
-void AudioEffectOpusChunked::resetencoder() {
-    if ((opusframesize == 0) || (chunknumber == -1)) 
+void AudioEffectOpusChunked::resetencoder(bool clearbuffers) {
+    if ((opusframesize == 0) || (chunknumber < 0)) 
         return;
     if (speexresampler != NULL)
         speex_resampler_reset_mem(speexresampler);
@@ -116,9 +122,16 @@ void AudioEffectOpusChunked::resetencoder() {
         rnnoise_init(st, NULL);        
     if (opusencoder != NULL) 
         opus_encoder_ctl(opusencoder, OPUS_RESET_STATE);
+
+    if (clearbuffers) {
+        DEV_ASSERT(audiosamplebuffer.size() == audiosamplesize*ringbufferchunks); 
+        chunknumber = 0;
+        bufferend = 0;
+    }
+    lastresampledchunk = chunknumber - 1;
+    lastdenoisedchunk = chunknumber - 1;
     lastopuschunk = chunknumber - 1;
 }
-
 
 void AudioEffectOpusChunked::deleteencoder() {
     if (speexresampler != NULL) {
@@ -255,6 +268,7 @@ void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame 
         else
             return;
     }
+    DEV_ASSERT(instanceinstantiations == 1);
     for (int i = 0; i < p_frame_count; i++) {
         p_dst_frames[i] = p_src_frames[i];
         push_sample(Vector2(p_src_frames[i].left, p_src_frames[i].right));
@@ -268,6 +282,8 @@ void AudioEffectOpusChunked::push_chunk(const PackedVector2Array& audiosamples) 
         else
             return;
     }
+    if (instanceinstantiations != 0)
+        godot::UtilityFunctions::printerr("Warning: push_chunk on an AudioEffectOpusChunked that is instantiated on an Audio Bus");
     for (int i = 0; i < audiosamples.size(); i++)
         push_sample(audiosamples[i]);
 }
