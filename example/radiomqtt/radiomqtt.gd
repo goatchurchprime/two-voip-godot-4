@@ -52,7 +52,7 @@ func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 	var caninstantiate_audioeffectopuschunked = ClassDB.can_instantiate("AudioEffectOpusChunked")
-	caninstantiate_audioeffectopuschunked = false  # to disable it
+	#caninstantiate_audioeffectopuschunked = false  # to disable it
 
 	$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
 
@@ -168,6 +168,7 @@ func updatesamplerates():
 		audioopuschunkedeffect.opusframesize = audioresamplesize
 		audioopuschunkedeffect.opuscomplexity = opuscomplexity
 		audioopuschunkedeffect.opusoptimizeforvoice = opusoptimizeforvoice
+		audioopuschunkedeffect.opusbitrate = opusbitrate
 		
 		audioopuschunkedeffect_forreprocessing.audiosamplerate = audiosamplerate
 		audioopuschunkedeffect_forreprocessing.audiosamplesize = audiosamplesize
@@ -175,9 +176,9 @@ func updatesamplerates():
 		audioopuschunkedeffect_forreprocessing.opusframesize = audioresamplesize
 		audioopuschunkedeffect_forreprocessing.opuscomplexity = opuscomplexity
 		audioopuschunkedeffect_forreprocessing.opusoptimizeforvoice = opusoptimizeforvoice
+		audioopuschunkedeffect_forreprocessing.opusbitrate = opusbitrate
 		
 		$HBoxBigButtons/VBoxPTT/Denoise.disabled = not (audioopuschunkedeffect.denoiser_available() and audioresamplerate == 48000)
-		audioopuschunkedeffect.opusbitrate = opusbitrate
 	else:
 		$VBoxFrameLength/HBoxOpusExtra/Compressed.disabled = true
 		$HBoxBigButtons/VBoxPTT/Denoise.disabled = true

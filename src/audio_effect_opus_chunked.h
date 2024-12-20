@@ -99,9 +99,6 @@ typedef enum {
 // drop_chunk() advances to next chunk, undrop_chunk() rolls back the buffer it so we can run the deferred functions
 // and avoid pre-clipping of the spoken episode.
 
-// chunk_to_opus_packet() is for encoding a series of chunks not in the ring buffer.
-
-
 // we are putting all the state into the AudioEffect instead of the AudioEffectInstance 
 // because it simplifies the coding here.
 
@@ -180,9 +177,6 @@ public:
     PackedByteArray read_opus_packet(const PackedByteArray& prefixbytes); 
     int chunk_to_lipsync(bool resampled=false); 
     PackedFloat32Array read_visemes() { return visemes; };
-
-    PackedByteArray chunk_to_opus_packet(const PackedByteArray& prefixbytes, const PackedVector2Array& audiosamples, bool denoise=false);
-    PackedVector2Array chunk_resample(const PackedVector2Array& audiosamples, bool denoise=false, bool backresample=false);
 
     void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
