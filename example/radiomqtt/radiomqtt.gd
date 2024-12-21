@@ -47,12 +47,13 @@ var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa
 var possibleusernames = ["Alice", "Beth", "Cath", "Dan", "Earl", "Fred", "George", "Harry", "Ivan", "John", "Kevin", "Larry", "Martin", "Oliver", "Peter", "Quentin", "Robert", "Samuel", "Thomas", "Ulrik", "Victor", "Wayne", "Xavier", "Youngs", "Zephir"]
 
 func _ready():
-	if audiostreamplaybackmicrophone != null:
-		audiostreamplaybackmicrophone.start_microphone()
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 	var caninstantiate_audioeffectopuschunked = ClassDB.can_instantiate("AudioEffectOpusChunked")
 	#caninstantiate_audioeffectopuschunked = false  # to disable it
+
+	var caninstantiate_audiostreamplaybackmicrophone = ClassDB.can_instantiate("AudioStreamPlaybackMicrophone")
+	#caninstantiate_audiostreamplaybackmicrophone = false  # to disable it
 
 	$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
 
@@ -74,32 +75,43 @@ func _ready():
 		$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = $VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value
 		$VBoxFrameLength/HBoxOpusBitRate/SampleRate.disabled = true
 		
-	assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
-	var audioeffectonmic : AudioEffect = null
-	for effect_idx in range(AudioServer.get_bus_effect_count(microphoneidx)):
-		var laudioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, effect_idx)
-		if laudioeffectonmic.is_class("AudioEffectOpusChunked") or laudioeffectonmic.is_class("AudioEffectCapture"):
-			audioeffectonmic = laudioeffectonmic
-			break
-
-	if audioeffectonmic == null:
-		if caninstantiate_audioeffectopuschunked:
-			audioeffectonmic = ClassDB.instantiate("AudioEffectOpusChunked")
-			print("Adding AudioEffectOpusChunked to bus: ", $AudioStreamMicrophone.bus)
-		else:
-			audioeffectonmic = AudioEffectCapture.new()
-			print("Adding AudioEffectCapture to bus: ", $AudioStreamMicrophone.bus)
-		AudioServer.add_bus_effect(microphoneidx, audioeffectonmic)
-
-	if audioeffectonmic.is_class("AudioEffectOpusChunked"):
-		audioopuschunkedeffect = audioeffectonmic
-		assert (caninstantiate_audioeffectopuschunked)
-	elif audioeffectonmic.is_class("AudioEffectCapture"):
-		audioeffectcapture = audioeffectonmic
+	if caninstantiate_audiostreamplaybackmicrophone:
+		audiostreamplaybackmicrophone = ClassDB.instantiate("AudioStreamPlaybackMicrophone")
+		audiostreamplaybackmicrophone.start_microphone()
 		if caninstantiate_audioeffectopuschunked:
 			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
-	if caninstantiate_audioeffectopuschunked:
-		audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
+			audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
+		else:
+			audioeffectcapture = AudioEffectCapture.new()
+		$AudioStreamMicrophone.stop()
+		
+	else:
+		assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
+		var audioeffectonmic : AudioEffect = null
+		for effect_idx in range(AudioServer.get_bus_effect_count(microphoneidx)):
+			var laudioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, effect_idx)
+			if laudioeffectonmic.is_class("AudioEffectOpusChunked") or laudioeffectonmic.is_class("AudioEffectCapture"):
+				audioeffectonmic = laudioeffectonmic
+				break
+
+		if audioeffectonmic == null:
+			if caninstantiate_audioeffectopuschunked:
+				audioeffectonmic = ClassDB.instantiate("AudioEffectOpusChunked")
+				print("Adding AudioEffectOpusChunked to bus: ", $AudioStreamMicrophone.bus)
+			else:
+				audioeffectonmic = AudioEffectCapture.new()
+				print("Adding AudioEffectCapture to bus: ", $AudioStreamMicrophone.bus)
+			AudioServer.add_bus_effect(microphoneidx, audioeffectonmic)
+
+		if audioeffectonmic.is_class("AudioEffectOpusChunked"):
+			audioopuschunkedeffect = audioeffectonmic
+			assert (caninstantiate_audioeffectopuschunked)
+		elif audioeffectonmic.is_class("AudioEffectCapture"):
+			audioeffectcapture = audioeffectonmic
+			if caninstantiate_audioeffectopuschunked:
+				audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
+		if caninstantiate_audioeffectopuschunked:
+			audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
 
 	if speechbusidx != -1:
 		for effect_idx in range(AudioServer.get_bus_effect_count(speechbusidx)):
@@ -300,13 +312,21 @@ func starttalking():
 			audioopuschunkedeffect.resetencoder(false)
 
 func _on_mic_working_toggled(toggled_on):
-	print("_on_mic_working_toggled ", $AudioStreamMicrophone.playing, " to ", toggled_on)
-	if toggled_on:
-		if not $AudioStreamMicrophone.playing:
-			$AudioStreamMicrophone.play()
+	if audiostreamplaybackmicrophone != null:
+		print("_on_mic_working_toggled audiostreamplaybackmicrophone", audiostreamplaybackmicrophone.is_microphone_playing(), " to ", toggled_on)
+		if toggled_on:
+			audiostreamplaybackmicrophone.start_microphone()
+		else:
+			audiostreamplaybackmicrophone.stop_microphone()
+
 	else:
-		if $AudioStreamMicrophone.playing:
-			$AudioStreamMicrophone.stop()
+		print("_on_mic_working_toggled ", $AudioStreamMicrophone.playing, " to ", toggled_on)
+		if toggled_on:
+			if not $AudioStreamMicrophone.playing:
+				$AudioStreamMicrophone.play()
+		else:
+			if $AudioStreamMicrophone.playing:
+				$AudioStreamMicrophone.stop()
 
 func _input(event):
 	if event is InputEventKey and event.is_pressed():
@@ -336,7 +356,11 @@ func _process(_delta):
 		starttalking()
 	elif not talking and currentlytalking:
 		endtalking()
-	$HBoxMicTalk/MicWorking.button_pressed = $AudioStreamMicrophone.playing
+
+	if audiostreamplaybackmicrophone != null:
+		$HBoxMicTalk/MicWorking.button_pressed = audiostreamplaybackmicrophone.is_microphone_playing()
+	else:
+		$HBoxMicTalk/MicWorking.button_pressed = $AudioStreamMicrophone.playing
 
 	if audioopuschunkedeffect != null:
 		assert (audioopuschunkedeffect != null)
