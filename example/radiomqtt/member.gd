@@ -28,6 +28,7 @@ var audiobufferregulationpitch = 1.4
 var playbackstarttime = -1.0
 
 func _ready():
+	# we can handle the stream being AudioStreamGenerator or AudioStreamOpusChunked
 	var audiostream = $AudioStreamPlayer.stream
 	if audiostream == null:
 		if ClassDB.can_instantiate("AudioStreamOpusChunked"):
@@ -133,8 +134,7 @@ func _process(delta):
 		while audiostreamopuschunked.chunk_space_available():
 			if resampledpacketsbuffer != null and len(resampledpacketsbuffer) != 0:
 				var resampledaudiochunk = resampledpacketsbuffer.pop_front()
-				var audiochunk = audiostreamopuschunked.resample_chunk(resampledaudiochunk)
-				audiostreamopuschunked.push_audio_chunk(audiochunk)
+				audiostreamopuschunked.push_resampled_audio_chunk(resampledaudiochunk)
 			elif len(audiopacketsbuffer) != 0:
 				audiostreamopuschunked.push_audio_chunk(audiopacketsbuffer.pop_front())
 			elif len(opuspacketsbuffer) != 0:
@@ -171,13 +171,17 @@ func _process(delta):
 		while audiostreamgeneratorplayback.get_frames_available() > audiosamplesize:
 			if resampledpacketsbuffer != null and len(resampledpacketsbuffer) != 0:
 				var resampledaudiochunk = resampledpacketsbuffer.pop_front()
-				var audiochunk = audiostreamopuschunked.resample_chunk(resampledaudiochunk)
+				audiostreamopuschunked.push_resampled_audio_chunk(resampledaudiochunk)
+				var audiochunk = audiostreamopuschunked.pop_front_chunk(audiosamplesize)
+				assert (len(audiochunk) == audiosamplesize)
 				audiostreamgeneratorplayback.push_buffer(audiochunk)
 			elif len(audiopacketsbuffer) != 0:
 				audiostreamgeneratorplayback.push_buffer(audiopacketsbuffer.pop_front())
 			elif len(opuspacketsbuffer) != 0:
 				const fec = 0
-				var audiochunk = audiostreamopuschunked.opus_packet_to_chunk(opuspacketsbuffer.pop_front(), prefixbyteslength, fec)
+				audiostreamopuschunked.push_opus_packet(opuspacketsbuffer.pop_front(), prefixbyteslength, fec)
+				var audiochunk = audiostreamopuschunked.pop_front_chunk(audiosamplesize)
+				assert (len(audiochunk) == audiosamplesize)
 				audiostreamgeneratorplayback.push_buffer(audiochunk)
 			else:
 				break

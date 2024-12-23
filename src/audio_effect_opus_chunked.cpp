@@ -98,12 +98,22 @@ AudioEffectOpusChunked::~AudioEffectOpusChunked()
 
 Ref<AudioEffectInstance> AudioEffectOpusChunked::_instantiate() {
     instanceinstantiations += 1;
-    if (instanceinstantiations > 1)
-        godot::UtilityFunctions::printerr("Warning: more than one AudioEffectOpusChunkedInstance instantiation");
+    // this triggers when re-ordering effects in AudioBus
+    //if (instanceinstantiations > 1)
+    //    godot::UtilityFunctions::printerr("Warning: more than one AudioEffectOpusChunkedInstance instantiation");
     Ref<AudioEffectOpusChunkedInstance> ins;
     ins.instantiate();
     ins->base = Ref<AudioEffectOpusChunked>(this);
     return ins;
+}
+
+AudioEffectOpusChunkedInstance::~AudioEffectOpusChunkedInstance() {
+    if (!base.is_null()) {
+        base->instanceinstantiations -= 1;
+        // this triggers when re-ordering effects in AudioBus
+        //if (base->instanceinstantiations == 0)
+        //    godot::UtilityFunctions::printerr("Warning: unexpected number of AudioEffectOpusChunkedInstance instantiations after destructor");
+    }
 }
 
 void AudioEffectOpusChunked::resetencoder(bool clearbuffers) {
@@ -196,8 +206,8 @@ void AudioEffectOpusChunked::createencoder() {
     audiodenoisedvalues.resize(ringbufferchunks);
     lastdenoisedchunk = -1;
 
-    if ((opussamplerate > 0) && (opussamplerate < 8000)) {
-        godot::UtilityFunctions::print("non-opus-samplerate for resample testing");
+    if (!((opussamplerate == 8000) || (opussamplerate == 12000) || (opussamplerate == 16000) || (opussamplerate == 24000) || (opussamplerate == 48000))) {
+        godot::UtilityFunctions::print("non-opus-samplerate for resample testing, allowed: 8000,12000,16000,24000,48000");
         opusencoder = NULL;
         return;
     }
@@ -209,8 +219,6 @@ void AudioEffectOpusChunked::createencoder() {
     opusencoder = opus_encoder_create(opussamplerate, channels, opusapplication, &opuserror);
     if (opuserror != 0) {
         godot::UtilityFunctions::printerr("opus_encoder_create error ", opuserror);
-        if (!((opussamplerate == 8000) || (opussamplerate == 12000) || (opussamplerate == 16000) || (opussamplerate == 24000) || (opussamplerate == 48000)))
-            godot::UtilityFunctions::printerr("  opussamplerate must be  one of 8000,12000,16000,24000,48000");
         chunknumber = -2;
         return;
     }
@@ -244,6 +252,7 @@ void AudioEffectOpusChunkedInstance::_process(const void *src_buffer, AudioFrame
 }
 
 
+
 void AudioEffectOpusChunked::push_sample(const Vector2 &sample) {
     audiosamplebuffer.set(bufferend % audiosamplebuffer.size(), sample);
     bufferend += 1; 
@@ -263,7 +272,8 @@ void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame 
         else
             return;
     }
-    DEV_ASSERT(instanceinstantiations == 1);
+    if (instanceinstantiations != 1)
+        godot::UtilityFunctions::printerr("Warning: AudioEffectOpusChunked.process called with ", instanceinstantiations, " instanceinstatiations");
     for (int i = 0; i < p_frame_count; i++) {
         p_dst_frames[i] = p_src_frames[i];
         push_sample(Vector2(p_src_frames[i].left, p_src_frames[i].right));

@@ -48,7 +48,6 @@ namespace godot {
 
 class AudioStreamOpusChunked;
 
-// This should use AudioStreamPlaybackResampled, so we get the mix_rate done automatically
 class AudioStreamPlaybackOpusChunked : public AudioStreamPlaybackResampled {
     GDCLASS(AudioStreamPlaybackOpusChunked, AudioStreamPlaybackResampled)
     friend class AudioStreamOpusChunked;
@@ -98,6 +97,8 @@ class AudioStreamOpusChunked : public AudioStream {
     int buffertail = 0;
     int missingsamples = 0;
     PackedVector2Array* Popus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
+    int Apop_front_chunk(AudioFrame *buffer, int frames);
+    int Ppop_front_chunk(Vector2 *buffer, int frames); // same as Apop_front_chunk but different array type
 
 protected:
     static void _bind_methods();
@@ -117,13 +118,14 @@ public:
     bool chunk_space_available();
     int queue_length_frames();
     void push_audio_chunk(const PackedVector2Array& audiochunk);
+    void push_resampled_audio_chunk(const PackedVector2Array& resampledaudiochunk);
     void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
-    PackedVector2Array opus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
-    PackedVector2Array resample_chunk(const PackedVector2Array& resampledaudio);
+    
     
     float last_chunk_max();
     float last_chunk_rms();
     PackedVector2Array read_last_chunk();
+    PackedVector2Array pop_front_chunk(int frames);
 
     void set_opussamplerate(int lopussamplerate) { deletedecoder(); opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
