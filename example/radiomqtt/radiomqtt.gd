@@ -77,13 +77,12 @@ func _ready():
 		
 	if caninstantiate_audiostreamplaybackmicrophone:
 		audiostreamplaybackmicrophone = ClassDB.instantiate("AudioStreamPlaybackMicrophone")
-		audiostreamplaybackmicrophone.start_microphone()
+		$HBoxMicTalk/MicWorking.text = "*" + $HBoxMicTalk/MicWorking.text
 		if caninstantiate_audioeffectopuschunked:
 			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
 			audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
 		else:
 			audioeffectcapture = AudioEffectCapture.new()
-		$AudioStreamMicrophone.stop()
 		
 	else:
 		assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
@@ -131,6 +130,10 @@ func _ready():
 
 	SelfMember.audiobufferregulationtime = 3600.0
 
+	if audiostreamplaybackmicrophone != null:
+		audiostreamplaybackmicrophone.start_microphone()
+		if $AudioStreamMicrophone.playing:
+			$AudioStreamMicrophone.stop()
 
 
 func rechunkrecordedchunks(orgsamples, newsamplesize):
@@ -313,7 +316,7 @@ func starttalking():
 
 func _on_mic_working_toggled(toggled_on):
 	if audiostreamplaybackmicrophone != null:
-		print("_on_mic_working_toggled audiostreamplaybackmicrophone", audiostreamplaybackmicrophone.is_microphone_playing(), " to ", toggled_on)
+		print("_on_mic_working_toggled audiostreamplaybackmicrophone ", audiostreamplaybackmicrophone.is_microphone_playing(), " to ", toggled_on)
 		if toggled_on:
 			audiostreamplaybackmicrophone.start_microphone()
 		else:
@@ -344,9 +347,10 @@ func _input(event):
 			audioopuschunkedeffect.Drunmicthing()
 
 
+var timems0formicstreamestimate = 0
+var framesformicstreamestimate = 0
+const micframecheckratems = 4000
 func _process(_delta):
-	#Dmicrophonestreamplayback.mix()
-	
 	var talking = $HBoxBigButtons/VBoxPTT/PTT.button_pressed
 	if talking:
 		$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = "%.1f" % ((Time.get_ticks_msec() - talkingstarttime)*0.001)
@@ -358,16 +362,18 @@ func _process(_delta):
 		endtalking()
 
 	if audiostreamplaybackmicrophone != null:
-		$HBoxMicTalk/MicWorking.button_pressed = audiostreamplaybackmicrophone.is_microphone_playing()
+		$HBoxMicTalk/MicWorking.set_pressed_no_signal(audiostreamplaybackmicrophone.is_microphone_playing())
 	else:
-		$HBoxMicTalk/MicWorking.button_pressed = $AudioStreamMicrophone.playing
+		$HBoxMicTalk/MicWorking.set_pressed_no_signal($AudioStreamMicrophone.playing)
 
 	if audioopuschunkedeffect != null:
+		var framesinprocessformicstreamestimate = 0
 		assert (audioopuschunkedeffect != null)
 		if audiostreamplaybackmicrophone != null and audiostreamplaybackmicrophone.is_microphone_playing():
 			var microphonesamples = audiostreamplaybackmicrophone.get_microphone_buffer(audiosamplesize)
 			if len(microphonesamples) != 0:
 				audioopuschunkedeffect.push_chunk(microphonesamples)
+
 		elif audioeffectcapture != null:
 			var captureframesavailable = audioeffectcapture.get_frames_available()
 			if captureframesavailable > 0:
@@ -378,6 +384,7 @@ func _process(_delta):
 		
 		while audioopuschunkedeffect.chunk_available():
 			var audiosamples = audioopuschunkedeffect.read_chunk(false)
+			framesinprocessformicstreamestimate += len(audiosamples)
 			audiosamplestoshader(audiosamples, false)
 			audioopuschunkedeffect.resampled_current_chunk()
 			var chunkv1 = audioopuschunkedeffect.chunk_max(false, false)
@@ -423,6 +430,18 @@ func _process(_delta):
 				else:
 					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples), mqttpacketencodebase64)
 			audioopuschunkedeffect.drop_chunk()
+
+		var timemsformicstreamestimate = Time.get_ticks_msec()
+		framesformicstreamestimate += framesinprocessformicstreamestimate
+		#if framesinprocessformicstreamestimate != 0:
+		#	print("ff ", timemsformicstreamestimate, framesformicstreamestimate)
+		var dtimems = timemsformicstreamestimate - timems0formicstreamestimate
+		if dtimems > micframecheckratems or timems0formicstreamestimate == 0:
+			if timems0formicstreamestimate != 0:
+				var micfreq = framesformicstreamestimate*1000.0/micframecheckratems
+				print("micfreq ", micfreq)
+			timems0formicstreamestimate = timemsformicstreamestimate
+			framesformicstreamestimate = 0
 
 	elif audioeffectcapture != null:
 		while audioeffectcapture.get_frames_available() > audiosamplesize:
@@ -541,7 +560,7 @@ func _on_resample_state_item_selected(_index):
 	updatesamplerates()
 
 func _on_audio_stream_microphone_finished():
-	printerr("_on_audio_stream_microphone_finished")
+	print(" ** _on_audio_stream_microphone_finished")
 
 func _on_option_button_item_selected(_index):
 	updatesamplerates()

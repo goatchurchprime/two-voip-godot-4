@@ -75,11 +75,13 @@ class AudioEffectOpusChunkedInstance : public AudioEffectInstance {
     Ref<AudioEffectOpusChunked> base;
 
 protected:
-	static void _bind_methods() {;};
+    static void _bind_methods() {;};
 
 public:
-	virtual void _process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) override; 
-	virtual bool _process_silence() const override { return true; }
+    virtual void _process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) override; 
+    virtual bool _process_silence() const override { return true; }
+
+    ~AudioEffectOpusChunkedInstance();
 };
 
 typedef enum {
