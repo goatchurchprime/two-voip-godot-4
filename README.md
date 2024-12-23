@@ -11,6 +11,11 @@ Thanks to [@ajlennon](https://github.com/ajlennon) and [@DmitriySalnikov](https:
 for indefatiguable work on the github actions that are successfully building this plugin across 
 [all six](https://docs.godotengine.org/en/stable/about/list_of_features.html#platforms) GodotEngine supported platforms.
 
+**There are reliability issues with the Godot microphone implementation due to slight inconsistencies 
+between the audio output and audio input frame rates that cannot be sustained by 
+a simple buffer implemnentation on some platforms.  Fortunately this [Pull Request 100508](https://github.com/godotengine/godot/pull/100508) fixes them 
+by giving direct access to audio sample chunks via the `AudioStreamPlaybackMicrophone`.**
+
 ## Demo example
 
 An HTML5 demo is hosted at https://goatchurch.itch.io/twovoip-mqtt
