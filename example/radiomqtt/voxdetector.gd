@@ -33,6 +33,7 @@ func _ready():
 	$HSliderVox/ColorRectDenoiseVoiceProb.position = Vector2($HSliderVox.size.x/4, $HSliderVox.size.y*7/8)
 	$HSliderVox/ColorRectDenoiseVoiceProb.size = Vector2($HSliderVox.size.x*2/3, $HSliderVox.size.y/8)
 	$HSliderVox/ColorRectDenoiseVoiceProb.visible = false
+	$HSliderVox/ColorRectMicZero.position = Vector2($HSliderVox.size.x/2 - $HSliderVox/ColorRectMicZero.size.x/2, $HSliderVox.size.y*7/8) + Vector2(0, 3)
 	_on_h_slider_vox_value_changed($HSliderVox.value)
 	
 func loudnessvalues(chunkv1, chunkv2, frametimems, speechprobability):
@@ -44,7 +45,7 @@ func loudnessvalues(chunkv1, chunkv2, frametimems, speechprobability):
 		$HSliderVox/ColorRectDenoiseVoiceProb.visible = true
 	else:
 		$HSliderVox/ColorRectDenoiseVoiceProb.visible = false
-	$MicZero.visible = (chunkv1 == 0.0)
+	$HSliderVox/ColorRectMicZero.visible = (chunkv1 == 0.0)
 
 	if Sil.button_pressed:
 		if Vox.pressed:

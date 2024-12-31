@@ -1,10 +1,11 @@
-[gd_scene load_steps=22 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=23 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" uid="uid://b4vk2ccjna2l6" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
 [ext_resource type="Script" uid="uid://d0sl15xev22ac" path="res://radiomqtt/MQTTnetwork.gd" id="2_y485j"]
 [ext_resource type="Texture2D" uid="uid://cvyjsyigutxbh" path="res://icon.png" id="3_eh2h5"]
 [ext_resource type="Script" uid="uid://bv1m08th1cbg5" path="res://radiomqtt/voxdetector.gd" id="3_qvq17"]
+[ext_resource type="AudioStream" uid="uid://y2nsu1nxx0nf" path="res://radiomqtt/laser3.wav" id="4_qfww3"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 
 [sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_itmlg"]
@@ -193,10 +194,6 @@ layout_mode = 2
 tooltip_text = "Hold this down to set the Vox silence threshold"
 text = "Sil"
 
-[node name="HSeparator2" type="HSeparator" parent="."]
-custom_minimum_size = Vector2(0, 20)
-layout_mode = 2
-
 [node name="HBoxMicTalk" type="HBoxContainer" parent="."]
 custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
@@ -260,10 +257,17 @@ offset_right = 223.0
 offset_bottom = 62.0
 color = Color(1, 1, 0.00392157, 1)
 
-[node name="MicZero" type="ColorRect" parent="HBoxMicTalk"]
-custom_minimum_size = Vector2(5, 0)
+[node name="ColorRectMicZero" type="ColorRect" parent="HBoxMicTalk/HSliderVox"]
+layout_mode = 0
+offset_left = 193.0
+offset_top = 55.0
+offset_right = 223.0
+offset_bottom = 57.0
+color = Color(0.258824, 0.258824, 0.933333, 1)
+
+[node name="HSeparator2" type="HSeparator" parent="HBoxMicTalk"]
+custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
-color = Color(0.713257, 0.108138, 0.396675, 1)
 
 [node name="HSeparator" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
@@ -422,6 +426,9 @@ value = 5.0
 layout_mode = 2
 button_pressed = true
 text = "Voice optimized"
+
+[node name="AudioStreamPlayerTestNoise" type="AudioStreamPlayer" parent="VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice"]
+stream = ExtResource("4_qfww3")
 
 [node name="HSeparator4" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)

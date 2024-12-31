@@ -593,7 +593,7 @@ func _on_complexity_spin_box_value_changed(value):
 
 func _on_audio_optimized_check_button_toggled(toggled_on):
 	updatesamplerates()
-
+	$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice/AudioStreamPlayerTestNoise.play()
 
 func _on_bit_rate_value_changed(value):
 	updatesamplerates()
