@@ -62,14 +62,6 @@ func _ready():
 	if $VBoxFrameLength/HBoxOpusBitRate/SampleRate.selected == -1:
 		$VBoxFrameLength/HBoxOpusBitRate/SampleRate.select(4)
 
-			# works better if we don't use ProjectSettings("audio/driver/mix_rate") anywhere, so what is it for?
-	if false and ProjectSettings.get_setting_with_override("audio/driver/mix_rate") != 0:
-		$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
-		$VBoxPlayback/HBoxStream/OutSampleRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
-	else:
-		$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_mix_rate()
-		$VBoxPlayback/HBoxStream/OutSampleRate.value = AudioServer.get_mix_rate()
-
 	if not caninstantiate_audioeffectopuschunked:
 		$TwovoipWarning.visible = true
 		$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = $VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value
@@ -120,6 +112,8 @@ func _ready():
 				audioeffectpitchshiftidx = effect_idx
 				break
 
+	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_mix_rate()
+	$VBoxPlayback/HBoxStream/OutSampleRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
 	updatesamplerates()
 	for i in range(1, len(visemes)):
 		var d = $HBoxVisemes/ColorRect.duplicate()
