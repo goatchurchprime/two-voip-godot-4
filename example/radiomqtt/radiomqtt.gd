@@ -81,8 +81,6 @@ func _ready():
 		if caninstantiate_audioeffectopuschunked:
 			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
 			audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
-		else:
-			audioeffectcapture = AudioEffectCapture.new()
 		
 	else:
 		assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
@@ -319,6 +317,7 @@ func _on_mic_working_toggled(toggled_on):
 		print("_on_mic_working_toggled audiostreamplaybackmicrophone ", audiostreamplaybackmicrophone.is_microphone_playing(), " to ", toggled_on)
 		if toggled_on:
 			audiostreamplaybackmicrophone.start_microphone()
+			print("  is_playing=", audiostreamplaybackmicrophone.is_microphone_playing())
 		else:
 			audiostreamplaybackmicrophone.stop_microphone()
 
@@ -439,7 +438,7 @@ func _process(_delta):
 		if dtimems > micframecheckratems or timems0formicstreamestimate == 0:
 			if timems0formicstreamestimate != 0:
 				var micfreq = framesformicstreamestimate*1000.0/micframecheckratems
-				print("micfreq ", micfreq)
+				print("calculated mic frequency ", micfreq)
 			timems0formicstreamestimate = timemsformicstreamestimate
 			framesformicstreamestimate = 0
 
