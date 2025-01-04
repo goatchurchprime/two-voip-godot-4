@@ -354,18 +354,21 @@ func _process(_delta):
 	elif not talking and currentlytalking:
 		endtalking()
 
-	if audiostreamplaybackmicrophone != null:
-		$HBoxMicTalk/MicWorking.set_pressed_no_signal(audiostreamplaybackmicrophone.is_microphone_playing())
-	else:
-		$HBoxMicTalk/MicWorking.set_pressed_no_signal($AudioStreamMicrophone.playing)
+	var micworkingsignal = audiostreamplaybackmicrophone.is_microphone_playing() if audiostreamplaybackmicrophone != null else $AudioStreamMicrophone.playing
+	if $HBoxMicTalk/MicWorking.button_pressed != micworkingsignal:
+		print("changing micworking to ", micworkingsignal)
+		$HBoxMicTalk/MicWorking.set_pressed_no_signal(micworkingsignal)
 
 	if audioopuschunkedeffect != null:
 		var framesinprocessformicstreamestimate = 0
 		assert (audioopuschunkedeffect != null)
 		if audiostreamplaybackmicrophone != null and audiostreamplaybackmicrophone.is_microphone_playing():
-			var microphonesamples = audiostreamplaybackmicrophone.get_microphone_buffer(audiosamplesize)
-			if len(microphonesamples) != 0:
-				audioopuschunkedeffect.push_chunk(microphonesamples)
+			while true:
+				var microphonesamples = audiostreamplaybackmicrophone.get_microphone_buffer(audiosamplesize)
+				if len(microphonesamples) != 0:
+					audioopuschunkedeffect.push_chunk(microphonesamples)
+				else:
+					break
 
 		elif audioeffectcapture != null:
 			var captureframesavailable = audioeffectcapture.get_frames_available()
@@ -436,9 +439,17 @@ func _process(_delta):
 			timems0formicstreamestimate = timemsformicstreamestimate
 			framesformicstreamestimate = 0
 
-	elif audioeffectcapture != null:
-		while audioeffectcapture.get_frames_available() > audiosamplesize:
-			var audiosamples = audioeffectcapture.get_buffer(audiosamplesize)
+	else:
+		while true:
+			var audiosamples = null
+			if audioeffectcapture != null:
+				if audioeffectcapture.get_frames_available() > audiosamplesize:
+					audiosamples = audioeffectcapture.get_buffer(audiosamplesize)
+			elif audiostreamplaybackmicrophone != null and audiostreamplaybackmicrophone.is_microphone_playing():
+				audiosamples = audiostreamplaybackmicrophone.get_microphone_buffer(audiosamplesize)
+			if audiosamples == null or len(audiosamples) == 0:
+				break
+
 			audiosamplestoshader(audiosamples, false)
 			var chunkv1 = 0.0
 			var schunkv2 = 0.0
@@ -467,9 +478,7 @@ func endtalking():
 	$MQTTnetwork.transportaudiopacketjson({"framecount":len(recordedsamples)})
 	print("Talked for ", (Time.get_ticks_msec() - talkingstarttime)*0.001, " seconds")
 
-
-
-func duplicatewithslippage(audiopackets, lframeslip):
+func duplicatewithhaasslippage(audiopackets, lframeslip):
 	var frameslip = abs(lframeslip)
 	var bleftside = (lframeslip >= 0)
 	var slippedaudiopackets = [ ]
@@ -512,14 +521,13 @@ func _on_play_pressed():
 		if stereoframeslip == 0:
 			SelfMember.resampledpacketsbuffer = recordedresampledpackets.duplicate()
 		else:
-			SelfMember.resampledpacketsbuffer = duplicatewithslippage(recordedresampledpackets, stereoframeslip)
+			SelfMember.resampledpacketsbuffer = duplicatewithhaasslippage(recordedresampledpackets, stereoframeslip)
 
 	elif recordedsamples and SelfMember.audiostreamgeneratorplayback != null:
 		SelfMember.audiosamplesize = audiosamplesize
 		SelfMember.audiopacketsbuffer = recordedsamples.duplicate()
 
 	SelfMember.playbackstarttime = Time.get_ticks_msec()
-
 
 var saveplaybackfile = "user://savedplayback.dat"
 func _on_sav_options_item_selected(index):
