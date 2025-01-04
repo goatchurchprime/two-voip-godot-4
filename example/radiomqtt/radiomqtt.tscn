@@ -200,7 +200,7 @@ script = ExtResource("3_qvq17")
 
 [node name="MicWorking" type="Button" parent="HBoxMicTalk"]
 layout_mode = 2
-tooltip_text = "AudioStreamMicrophone is playing"
+tooltip_text = "stops or starts the microphone input"
 theme_override_styles/pressed = SubResource("StyleBoxFlat_3io8e")
 toggle_mode = true
 text = "Mic
