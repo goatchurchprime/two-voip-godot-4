@@ -79,10 +79,13 @@ func processheaderpacket(h):
 			audiostreamopuschunked.audiosamplerate = audiosamplerate
 			audiostreamopuschunked.mix_rate = mix_rate
 			audiobuffersize = audiostreamopuschunked.audiosamplesize*audiostreamopuschunked.audiosamplechunks
+
 		print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
 		#$AudioStreamPlayer.play()
 		setupaudioshader()
 
+	if audiostreamgeneratorplayback:
+		$AudioStreamPlayer.stream.mix_rate = mix_rate
 	if opusframesize != 0 and audiostreamopuschunked == null and not h["noopuscompression"]:
 		print("Compressed opus stream received that we cannot decompress")
 	if audiostreamopuschunked != null:

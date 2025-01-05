@@ -55,7 +55,8 @@ func _ready():
 	var caninstantiate_audiostreamplaybackmicrophone = ClassDB.can_instantiate("AudioStreamPlaybackMicrophone")
 	#caninstantiate_audiostreamplaybackmicrophone = false  # to disable it
 
-	$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
+	#$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
+	$VBoxPlayback/HBoxStream/MixRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
 
 	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
 		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
@@ -73,6 +74,7 @@ func _ready():
 		if caninstantiate_audioeffectopuschunked:
 			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
 			audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
+		
 		
 	else:
 		assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
@@ -124,9 +126,11 @@ func _ready():
 
 	if audiostreamplaybackmicrophone != null:
 		audiostreamplaybackmicrophone.start_microphone()
-		if $AudioStreamMicrophone.playing:
-			$AudioStreamMicrophone.stop()
-
+		$AudioStreamMicrophone.stop()
+		for effect_idx in range(AudioServer.get_bus_effect_count(microphoneidx)):
+			var laudioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, effect_idx)
+			if laudioeffectonmic.is_class("AudioEffectCapture"):
+				AudioServer.set_bus_effect_enabled(microphoneidx, effect_idx, false)
 
 func rechunkrecordedchunks(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
@@ -342,7 +346,7 @@ func _input(event):
 
 var timems0formicstreamestimate = 0
 var framesformicstreamestimate = 0
-const micframecheckratems = 4000
+const micframecheckratems = 40000
 func _process(_delta):
 	var talking = $HBoxBigButtons/VBoxPTT/PTT.button_pressed
 	if talking:
@@ -376,7 +380,7 @@ func _process(_delta):
 				var captureframes = audioeffectcapture.get_buffer(captureframesavailable)
 				audioopuschunkedeffect.push_chunk(captureframes)
 		else:
-			pass  # the input is arriving from the process value
+			pass  # the input is arriving from the audio process on the AudioOpusChunkedEffect
 		
 		while audioopuschunkedeffect.chunk_available():
 			var audiosamples = audioopuschunkedeffect.read_chunk(false)
