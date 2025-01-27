@@ -97,13 +97,15 @@ AudioEffectOpusChunked::~AudioEffectOpusChunked()
 };
 
 Ref<AudioEffectInstance> AudioEffectOpusChunked::_instantiate() {
-    instanceinstantiations += 1;
-    // this triggers when re-ordering effects in AudioBus
-    //if (instanceinstantiations > 1)
-    //    godot::UtilityFunctions::printerr("Warning: more than one AudioEffectOpusChunkedInstance instantiation");
     Ref<AudioEffectOpusChunkedInstance> ins;
     ins.instantiate();
     ins->base = Ref<AudioEffectOpusChunked>(this);
+    ins->instantiationnumber = instanceinstantiations;
+    instanceinstantiations += 1;
+    godot::UtilityFunctions::prints("AudioEffectOpusChunked now+1 has ", instanceinstantiations, " instantiations of AudioEffectOpusChunkedInstance");
+    // this triggers when re-ordering effects in AudioBus or on an 4 channel (8 track) bus
+    //if (instanceinstantiations > 1)
+    //    godot::UtilityFunctions::printerr("Warning: more than one AudioEffectOpusChunkedInstance instantiation");
     return ins;
 }
 
@@ -113,6 +115,7 @@ AudioEffectOpusChunkedInstance::~AudioEffectOpusChunkedInstance() {
         // this triggers when re-ordering effects in AudioBus
         //if (base->instanceinstantiations == 0)
         //    godot::UtilityFunctions::printerr("Warning: unexpected number of AudioEffectOpusChunkedInstance instantiations after destructor");
+        godot::UtilityFunctions::prints("AudioEffectOpusChunked now-1 has", base->instanceinstantiations, " instantiations of AudioEffectOpusChunkedInstance");
     }
 }
 
@@ -248,10 +251,12 @@ void AudioEffectOpusChunked::createencoder() {
 }
 
 void AudioEffectOpusChunkedInstance::_process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) {
-    base->process((const AudioFrame *)src_buffer, p_dst_frames, p_frame_count); 
+    const AudioFrame *p_src_frames = (const AudioFrame *)src_buffer;
+    for (int i = 0; i < p_frame_count; i++)
+        p_dst_frames[i] = p_src_frames[i];  // pass through (no effect)
+    if (instantiationnumber == 0)
+        base->captureprocess(p_src_frames, p_frame_count); 
 }
-
-
 
 void AudioEffectOpusChunked::push_sample(const Vector2 &sample) {
     audiosamplebuffer.set(bufferend % audiosamplebuffer.size(), sample);
@@ -265,19 +270,17 @@ void AudioEffectOpusChunked::push_sample(const Vector2 &sample) {
     }
 }
 
-void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count) {
-    if (chunknumber < 0) { 
+void AudioEffectOpusChunked::captureprocess(const AudioFrame *p_src_frames, int p_frame_count) {
+    if (chunknumber < 0) {
         if (chunknumber == -1) 
             createencoder();
         else
             return;
     }
-    if (instanceinstantiations != 1)
-        godot::UtilityFunctions::printerr("Warning: AudioEffectOpusChunked.process called with ", instanceinstantiations, " instanceinstatiations");
-    for (int i = 0; i < p_frame_count; i++) {
-        p_dst_frames[i] = p_src_frames[i];
+    //if (instanceinstantiations != 1)
+    //    godot::UtilityFunctions::printerr("Warning: AudioEffectOpusChunked.process called with ", instanceinstantiations, " instanceinstatiations");
+    for (int i = 0; i < p_frame_count; i++)
         push_sample(Vector2(p_src_frames[i].left, p_src_frames[i].right));
-    }
 }
 
 void AudioEffectOpusChunked::push_chunk(const PackedVector2Array& audiosamples) {

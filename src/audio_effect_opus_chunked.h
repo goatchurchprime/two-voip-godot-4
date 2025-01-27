@@ -73,6 +73,7 @@ class AudioEffectOpusChunkedInstance : public AudioEffectInstance {
     GDCLASS(AudioEffectOpusChunkedInstance, AudioEffectInstance);
     friend class AudioEffectOpusChunked;
     Ref<AudioEffectOpusChunked> base;
+    int instantiationnumber = -1;
 
 protected:
     static void _bind_methods() {;};
@@ -148,7 +149,7 @@ class AudioEffectOpusChunked : public AudioEffect {
     ovrLipSyncContext ovrlipsyncctx = 0;
 
     int instanceinstantiations = 0;
-    void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
+    void captureprocess(const AudioFrame *p_src_frames, int p_frame_count);
 
 protected:
     static void _bind_methods();

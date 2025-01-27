@@ -33,6 +33,12 @@ func _input(event):
 	if event is InputEventKey and event.pressed and event.keycode == KEY_D and playbackmic:
 		print(playbackmic.is_playing())
 		print(playbackmic.get_microphone_buffer(20)+playbackmic.get_microphone_buffer(20))
+	if event is InputEventKey and event.pressed and event.keycode == KEY_E:
+		print("Stopping mic")
+		$AudioStreamMic.stop()
+		await get_tree().create_timer(1.0).timeout
+		print("Starting mic")
+		$AudioStreamMic.play()
 
 var sampleratemeasurementtime = 1.5
 var maxaudioduringmeasurement = 0.0

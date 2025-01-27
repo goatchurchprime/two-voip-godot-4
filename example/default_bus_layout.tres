@@ -3,7 +3,7 @@
 [sub_resource type="AudioEffectPitchShift" id="AudioEffectPitchShift_urnej"]
 resource_name = "PitchShift"
 
-[sub_resource type="AudioEffectOpusChunked" id="AudioEffectOpusChunked_j3pel"]
+[sub_resource type="AudioEffectOpusChunked" id="AudioEffectOpusChunked_qwt4m"]
 resource_name = "OpusChunked"
 
 [sub_resource type="AudioEffectCapture" id="AudioEffectCapture_sj64h"]
@@ -26,7 +26,7 @@ bus/2/mute = true
 bus/2/bypass_fx = false
 bus/2/volume_db = 0.0
 bus/2/send = &"Master"
-bus/2/effect/0/effect = SubResource("AudioEffectOpusChunked_j3pel")
+bus/2/effect/0/effect = SubResource("AudioEffectOpusChunked_qwt4m")
 bus/2/effect/0/enabled = true
 bus/2/effect/1/effect = SubResource("AudioEffectCapture_sj64h")
 bus/2/effect/1/enabled = true
