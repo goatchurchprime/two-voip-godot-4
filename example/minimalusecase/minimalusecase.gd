@@ -5,9 +5,14 @@ var audiostreamopuschunked : AudioStreamOpusChunked
 var prepend = PackedByteArray()
 var opuspacketsbuffer = [ ]
 
-@onready var playbackmic = AudioStreamPlaybackMicrophone.new()
+@onready var playbackmic = null
+
+var dorecord = true  # set false to playback short recording
 
 func _ready():
+	if ClassDB.class_has_method("AudioStreamPlaybackMicrophone", "start"):
+		playbackmic = AudioStreamPlaybackMicrophone.new()
+
 	var microphoneidx = AudioServer.get_bus_index("MicrophoneBus")
 	opuschunked = AudioServer.get_bus_effect(microphoneidx, 0)
 
@@ -15,25 +20,42 @@ func _ready():
 	for r in opusaudiodata:
 		opuspacketsbuffer.append(PackedByteArray(r))
 
-	playbackmic.start(0.0)
+	if dorecord and playbackmic:
+		playbackmic.start(0.0)
 
 func _process(delta):
-	#_process_record(delta)
-	_process_playback(delta)
+	if dorecord:
+		_process_record(delta)
+	else:
+		_process_playback(delta)
 
 func _input(event):
-	if event is InputEventKey and event.pressed and event.keycode == KEY_D:
+	if event is InputEventKey and event.pressed and event.keycode == KEY_D and playbackmic:
 		print(playbackmic.is_playing())
 		print(playbackmic.get_microphone_buffer(20)+playbackmic.get_microphone_buffer(20))
 
-
+var sampleratemeasurementtime = 1.5
+var maxaudioduringmeasurement = 0.0
+var nchunksduringmeasurement = 0
+const measurementdurationsecs = 2.0
 func _process_record(delta):
+	var lastopusdata = null
 	while opuschunked.chunk_available():
 		var chunkmax = opuschunked.chunk_max(false, false)
+		maxaudioduringmeasurement = max(maxaudioduringmeasurement, chunkmax)
+		nchunksduringmeasurement += 1
 		#print(chunkmax)
 		var opusdata : PackedByteArray = opuschunked.read_opus_packet(prepend)
 		opuschunked.drop_chunk()
-		print("\t", opusdata, ",")
+		lastopusdata = opusdata
+		#print("\t", opusdata, ",")
+	sampleratemeasurementtime += delta
+	if sampleratemeasurementtime > measurementdurationsecs:
+		print("Measured sample rate ", nchunksduringmeasurement*opuschunked.audiosamplesize/sampleratemeasurementtime, " max ", maxaudioduringmeasurement)
+		print("  Opus data ", lastopusdata)
+		sampleratemeasurementtime = 0.0
+		maxaudioduringmeasurement = 0.0
+		nchunksduringmeasurement = 0
 
 func _process_playback(delta):
 	while audiostreamopuschunked.chunk_space_available() and len(opuspacketsbuffer) != 0:

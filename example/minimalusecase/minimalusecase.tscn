@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3 uid="uid://cx10t585wbeo2"]
 
-[ext_resource type="Script" uid="uid://c5xw7urpalycu" path="res://minimalusecase/minimalusecase.gd" id="1_m25c5"]
+[ext_resource type="Script" path="res://minimalusecase/minimalusecase.gd" id="1_m25c5"]
 
 [sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_c8xp2"]
 

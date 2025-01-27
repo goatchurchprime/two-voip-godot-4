@@ -1,6 +1,6 @@
 [gd_scene load_steps=23 format=3 uid="uid://babntosbiq5r8"]
 
-[ext_resource type="Script" uid="uid://b4vk2ccjna2l6" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
+[ext_resource type="Script" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
 [ext_resource type="Script" uid="uid://d0sl15xev22ac" path="res://radiomqtt/MQTTnetwork.gd" id="2_y485j"]
 [ext_resource type="Texture2D" uid="uid://cvyjsyigutxbh" path="res://icon.png" id="3_eh2h5"]
@@ -58,8 +58,8 @@ void fragment() {
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_cklni"]
 shader = SubResource("Shader_r847e")
-shader_parameter/voice = ExtResource("3_eh2h5")
 shader_parameter/drawresampled = false
+shader_parameter/voice = ExtResource("3_eh2h5")
 shader_parameter/voice_resampled = ExtResource("3_eh2h5")
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_onpxr"]
@@ -97,6 +97,7 @@ script = ExtResource("1_anot2")
 
 [node name="AudioStreamMicrophone" type="AudioStreamPlayer" parent="."]
 stream = SubResource("AudioStreamMicrophone_itmlg")
+bus = &"MicrophoneBus"
 
 [node name="LabelTitle" type="Label" parent="."]
 custom_minimum_size = Vector2(0, 50)
@@ -296,7 +297,6 @@ text = "Frame duration"
 layout_mode = 2
 item_count = 6
 popup/item_0/text = "2.5ms"
-popup/item_0/id = 0
 popup/item_1/text = "5ms"
 popup/item_1/id = 1
 popup/item_2/text = "10ms"
@@ -384,7 +384,6 @@ layout_mode = 2
 allow_reselect = true
 item_count = 5
 popup/item_0/text = "8KHz"
-popup/item_0/id = 0
 popup/item_1/text = "12KHz"
 popup/item_1/id = 1
 popup/item_2/text = "16KHz"
@@ -474,7 +473,6 @@ layout_mode = 2
 selected = 0
 item_count = 4
 popup/item_0/text = "(actions)"
-popup/item_0/id = 0
 popup/item_1/text = "Save"
 popup/item_1/id = 1
 popup/item_2/text = "Load"
@@ -661,7 +659,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 item_count = 4
 popup/item_0/text = "doesliverpool"
-popup/item_0/id = 0
 popup/item_1/text = "hivemq"
 popup/item_1/id = 1
 popup/item_2/text = "m.org"

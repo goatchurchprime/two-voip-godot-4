@@ -52,7 +52,7 @@ func _ready():
 	var caninstantiate_audioeffectopuschunked = ClassDB.can_instantiate("AudioEffectOpusChunked")
 	#caninstantiate_audioeffectopuschunked = false  # to disable it
 
-	var caninstantiate_audiostreamplaybackmicrophone = ClassDB.can_instantiate("AudioStreamPlaybackMicrophone")
+	var caninstantiate_audiostreamplaybackmicrophone = ClassDB.class_has_method("AudioStreamPlaybackMicrophone", "start_microphone")
 	#caninstantiate_audiostreamplaybackmicrophone = false  # to disable it
 
 	#$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
