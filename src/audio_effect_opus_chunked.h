@@ -73,7 +73,6 @@ class AudioEffectOpusChunkedInstance : public AudioEffectInstance {
     GDCLASS(AudioEffectOpusChunkedInstance, AudioEffectInstance);
     friend class AudioEffectOpusChunked;
     Ref<AudioEffectOpusChunked> base;
-    int instantiationnumber = -1;
 
 protected:
     static void _bind_methods() {;};
@@ -148,7 +147,10 @@ class AudioEffectOpusChunked : public AudioEffect {
     ovrLipSyncFrame ovrlipsyncframe;
     ovrLipSyncContext ovrlipsyncctx = 0;
 
+    // There can be up to 4 instantiations on a single effect for the channels of a 7.1 surround sound output device 
+    // Dragging effects over this effect on the bus causes unexpected and excessive instantiations
     int instanceinstantiations = 0;
+    uint64_t activeinstantiationid = -1;  // type ObjectID
     void captureprocess(const AudioFrame *p_src_frames, int p_frame_count);
 
 protected:

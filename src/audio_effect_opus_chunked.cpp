@@ -100,9 +100,9 @@ Ref<AudioEffectInstance> AudioEffectOpusChunked::_instantiate() {
     Ref<AudioEffectOpusChunkedInstance> ins;
     ins.instantiate();
     ins->base = Ref<AudioEffectOpusChunked>(this);
-    ins->instantiationnumber = instanceinstantiations;
     instanceinstantiations += 1;
-    godot::UtilityFunctions::prints("AudioEffectOpusChunked now+1 has ", instanceinstantiations, " instantiations of AudioEffectOpusChunkedInstance");
+
+    godot::UtilityFunctions::print("AudioEffectOpusInstance#", get_instance_id(), " instantiating AudioEffectOpusChunkedInstance#", ins->get_instance_id(), "  instanceinstantiations=", instanceinstantiations);
     // this triggers when re-ordering effects in AudioBus or on an 4 channel (8 track) bus
     //if (instanceinstantiations > 1)
     //    godot::UtilityFunctions::printerr("Warning: more than one AudioEffectOpusChunkedInstance instantiation");
@@ -112,10 +112,13 @@ Ref<AudioEffectInstance> AudioEffectOpusChunked::_instantiate() {
 AudioEffectOpusChunkedInstance::~AudioEffectOpusChunkedInstance() {
     if (!base.is_null()) {
         base->instanceinstantiations -= 1;
-        // this triggers when re-ordering effects in AudioBus
-        //if (base->instanceinstantiations == 0)
-        //    godot::UtilityFunctions::printerr("Warning: unexpected number of AudioEffectOpusChunkedInstance instantiations after destructor");
-        godot::UtilityFunctions::prints("AudioEffectOpusChunked now-1 has", base->instanceinstantiations, " instantiations of AudioEffectOpusChunkedInstance");
+        if (base->activeinstantiationid != -1) {
+            base->activeinstantiationid = -1;
+            godot::UtilityFunctions::print(" AudioEffectOpusChunked#", base->get_instance_id(), ".activeinstantiationnid=-1");
+        }
+        godot::UtilityFunctions::print("AudioEffectOpusChunked#", base->get_instance_id(), " deleting AudioEffectOpusChunkedInstance#", get_instance_id(), "  instanceinstantiations=", base->instanceinstantiations);
+    } else {
+        godot::UtilityFunctions::print("AudioEffectOpusChunkedInstance#", get_instance_id(), " with no AudioEffectOpusChunked deleted");
     }
 }
 
@@ -252,10 +255,22 @@ void AudioEffectOpusChunked::createencoder() {
 
 void AudioEffectOpusChunkedInstance::_process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) {
     const AudioFrame *p_src_frames = (const AudioFrame *)src_buffer;
+
+    // pass through channel frames in the Instance
     for (int i = 0; i < p_frame_count; i++)
-        p_dst_frames[i] = p_src_frames[i];  // pass through (no effect)
-    if (instantiationnumber == 0)
-        base->captureprocess(p_src_frames, p_frame_count); 
+        p_dst_frames[i] = p_src_frames[i];
+
+    // only record frames from the first valid channel
+    if (!base.is_null()) {
+        if (base->activeinstantiationid == -1) {
+            base->activeinstantiationid = get_instance_id();
+            godot::UtilityFunctions::print(" AudioEffectOpusChunked#", base->get_instance_id(), ".activeinstantiationid=", base->activeinstantiationid);
+        }
+        if (get_instance_id() == base->activeinstantiationid)
+            base->captureprocess(p_src_frames, p_frame_count); 
+    } else {
+        godot::UtilityFunctions::print(" process called on null base"); 
+    }
 }
 
 void AudioEffectOpusChunked::push_sample(const Vector2 &sample) {
@@ -277,8 +292,6 @@ void AudioEffectOpusChunked::captureprocess(const AudioFrame *p_src_frames, int 
         else
             return;
     }
-    //if (instanceinstantiations != 1)
-    //    godot::UtilityFunctions::printerr("Warning: AudioEffectOpusChunked.process called with ", instanceinstantiations, " instanceinstatiations");
     for (int i = 0; i < p_frame_count; i++)
         push_sample(Vector2(p_src_frames[i].left, p_src_frames[i].right));
 }

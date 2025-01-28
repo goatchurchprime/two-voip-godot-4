@@ -19,10 +19,6 @@ config/icon="res://icon.png"
 
 driver/enable_input=true
 
-[debug]
-
-settings/stdout/verbose_stdout=true
-
 [display]
 
 window/size/viewport_width=600
