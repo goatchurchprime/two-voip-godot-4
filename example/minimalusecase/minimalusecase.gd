@@ -7,7 +7,7 @@ var opuspacketsbuffer = [ ]
 
 @onready var playbackmic = null
 
-var dorecord = true  # set false to playback short recording
+var dorecord = false #true  # set false to playback short recording
 
 func _ready():
 	if ClassDB.class_has_method("AudioStreamPlaybackMicrophone", "start"):

@@ -150,7 +150,7 @@ class AudioEffectOpusChunked : public AudioEffect {
     // There can be up to 4 instantiations on a single effect for the channels of a 7.1 surround sound output device 
     // Dragging effects over this effect on the bus causes unexpected and excessive instantiations
     int instanceinstantiations = 0;
-    uint64_t activeinstantiationid = -1;  // type ObjectID
+    uint64_t activeinstantiationid = -1;  // type ObjectID (should be 0 if not used!!!)
     void captureprocess(const AudioFrame *p_src_frames, int p_frame_count);
 
 protected:
