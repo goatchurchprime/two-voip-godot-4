@@ -85,7 +85,7 @@ class AudioStreamOpusChunked : public AudioStream {
 
     SpeexResamplerState* speexresampler = NULL;
     int audiosamplerate = 44100;
-    int audiosamplesize = 881;
+    int audiosamplesize = 882;
     PackedVector2Array Daudioresampledbuffer;
     
     float mix_rate = 44100.0;

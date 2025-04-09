@@ -97,6 +97,7 @@ script = ExtResource("1_anot2")
 
 [node name="AudioStreamMicrophone" type="AudioStreamPlayer" parent="."]
 stream = SubResource("AudioStreamMicrophone_itmlg")
+bus = &"MicrophoneBus"
 
 [node name="LabelTitle" type="Label" parent="."]
 custom_minimum_size = Vector2(0, 50)
