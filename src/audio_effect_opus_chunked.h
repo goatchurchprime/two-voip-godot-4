@@ -109,7 +109,7 @@ class AudioEffectOpusChunked : public AudioEffect {
     friend class AudioEffectOpusChunkedInstance;
 
     int audiosamplerate = 44100;
-    int audiosamplesize = 881;
+    int audiosamplesize = 882;
     int ringbufferchunks = 50;
 
     PackedVector2Array audiosamplebuffer;  // size audiosamplesize*ringbufferchunks
