@@ -5,8 +5,6 @@ var audiostreamopuschunked : AudioStreamOpusChunked
 var prepend = PackedByteArray()
 var opuspacketsbuffer = [ ]
 
-@onready var playbackmic = AudioStreamPlaybackMicrophone.new()
-
 func _ready():
 	var microphoneidx = AudioServer.get_bus_index("MicrophoneBus")
 	opuschunked = AudioServer.get_bus_effect(microphoneidx, 0)
@@ -15,17 +13,9 @@ func _ready():
 	for r in opusaudiodata:
 		opuspacketsbuffer.append(PackedByteArray(r))
 
-	playbackmic.start(0.0)
-
 func _process(delta):
-	#_process_record(delta)
+	_process_record(delta)
 	_process_playback(delta)
-
-func _input(event):
-	if event is InputEventKey and event.pressed and event.keycode == KEY_D:
-		print(playbackmic.is_playing())
-		print(playbackmic.get_microphone_buffer(20)+playbackmic.get_microphone_buffer(20))
-
 
 func _process_record(delta):
 	while opuschunked.chunk_available():
