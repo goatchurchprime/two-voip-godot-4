@@ -104,13 +104,15 @@ Ref<AudioEffectInstance> AudioEffectOpusChunked::_instantiate() {
 }
 
 AudioEffectOpusChunkedInstance::~AudioEffectOpusChunkedInstance() {
-    if (!base.is_null()) {
+    godot::UtilityFunctions::print("ddddd AudioEffectOpusChunked INSTANCE");
+/*    if (!base.is_null()) {
         base->instanceinstantiations -= 1;
         godot::UtilityFunctions::print("----- AudioEffectOpusChunkedInstance instantiations ", base->instanceinstantiations);
         // this triggers when re-ordering effects in AudioBus
         if (base->instanceinstantiations != 0)
             godot::UtilityFunctions::printerr("Warning: unexpected number of AudioEffectOpusChunkedInstance instantiations after destructor");
     }
+*/
 }
 
 void AudioEffectOpusChunked::resetencoder(bool clearbuffers) {
