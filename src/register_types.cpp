@@ -12,7 +12,7 @@
 using namespace godot;
 
 void initialize_two_voip_module(ModuleInitializationLevel p_level) {
-    if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
+    if (p_level != MODULE_INITIALIZATION_LEVEL_SERVERS) {
         return;
     }
     ClassDB::register_class<AudioEffectOpusChunked>();
@@ -23,7 +23,7 @@ void initialize_two_voip_module(ModuleInitializationLevel p_level) {
 }
 
 void uninitialize_two_voip_module(ModuleInitializationLevel p_level) {
-    if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
+    if (p_level != MODULE_INITIALIZATION_LEVEL_SERVERS) {
         return;
     }
 }
