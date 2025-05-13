@@ -1,4 +1,4 @@
-[gd_scene load_steps=23 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=22 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" uid="uid://b4vk2ccjna2l6" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
@@ -7,8 +7,6 @@
 [ext_resource type="Script" uid="uid://bv1m08th1cbg5" path="res://radiomqtt/voxdetector.gd" id="3_qvq17"]
 [ext_resource type="AudioStream" uid="uid://y2nsu1nxx0nf" path="res://radiomqtt/laser3.wav" id="4_qfww3"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
-
-[sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_itmlg"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kcsl6"]
 bg_color = Color(0.0705882, 0.0235294, 0.564706, 1)
@@ -94,10 +92,6 @@ offset_bottom = -11.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_anot2")
-
-[node name="AudioStreamMicrophone" type="AudioStreamPlayer" parent="."]
-stream = SubResource("AudioStreamMicrophone_itmlg")
-bus = &"MicrophoneBus"
 
 [node name="LabelTitle" type="Label" parent="."]
 custom_minimum_size = Vector2(0, 50)
@@ -757,7 +751,6 @@ offset_right = 42.0
 offset_bottom = 23.0
 text = "sil"
 
-[connection signal="finished" from="AudioStreamMicrophone" to="." method="_on_audio_stream_microphone_finished"]
 [connection signal="toggled" from="HBoxBigButtons/VBoxPTT/Denoise" to="." method="_on_denoise_toggled"]
 [connection signal="toggled" from="HBoxBigButtons/VBoxVox/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
 [connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]

@@ -46,14 +46,20 @@ var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa
 
 var possibleusernames = ["Alice", "Beth", "Cath", "Dan", "Earl", "Fred", "George", "Harry", "Ivan", "John", "Kevin", "Larry", "Martin", "Oliver", "Peter", "Quentin", "Robert", "Samuel", "Thomas", "Ulrik", "Victor", "Wayne", "Xavier", "Youngs", "Zephir"]
 
+var hasmethod_inputgetmicrophonebuffer
+
 func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 	var caninstantiate_audioeffectopuschunked = ClassDB.can_instantiate("AudioEffectOpusChunked")
 	#caninstantiate_audioeffectopuschunked = false  # to disable it
 
+	# OBSOLETE
 	var caninstantiate_audiostreamplaybackmicrophone = ClassDB.can_instantiate("AudioStreamPlaybackMicrophone")
 	#caninstantiate_audiostreamplaybackmicrophone = false  # to disable it
+
+	hasmethod_inputgetmicrophonebuffer = Input.has_method("get_microphone_buffer")
+	#hasmethod_inputgetmicrophonebuffer = false  # to disable it
 
 	#$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
 	$VBoxPlayback/HBoxStream/MixRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
@@ -75,6 +81,10 @@ func _ready():
 			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
 			audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
 		
+	elif hasmethod_inputgetmicrophonebuffer:
+		if caninstantiate_audioeffectopuschunked:
+			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
+			audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
 		
 	else:
 		assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
@@ -124,7 +134,10 @@ func _ready():
 
 	SelfMember.audiobufferregulationtime = 3600.0
 
-	if audiostreamplaybackmicrophone != null:
+	if hasmethod_inputgetmicrophonebuffer:
+		Input.start_microphone()
+
+	elif audiostreamplaybackmicrophone != null:
 		audiostreamplaybackmicrophone.start_microphone()
 		$AudioStreamMicrophone.stop()
 		for effect_idx in range(AudioServer.get_bus_effect_count(microphoneidx)):
@@ -352,16 +365,17 @@ func _process(_delta):
 	if talking:
 		$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = "%.1f" % ((Time.get_ticks_msec() - talkingstarttime)*0.001)
 	if talking and not currentlytalking:
-		if not $AudioStreamMicrophone.playing and audiostreamplaybackmicrophone == null:
+		if has_node("AudioStreamMicrophone") and not $AudioStreamMicrophone.playing and audiostreamplaybackmicrophone == null:
 			$AudioStreamMicrophone.play()
 		starttalking()
 	elif not talking and currentlytalking:
 		endtalking()
 
-	var micworkingsignal = audiostreamplaybackmicrophone.is_microphone_playing() if audiostreamplaybackmicrophone != null else $AudioStreamMicrophone.playing
-	if $HBoxMicTalk/MicWorking.button_pressed != micworkingsignal:
-		print("changing micworking to ", micworkingsignal)
-		$HBoxMicTalk/MicWorking.set_pressed_no_signal(micworkingsignal)
+	if audiostreamplaybackmicrophone:
+		var micworkingsignal = audiostreamplaybackmicrophone.is_microphone_playing() if audiostreamplaybackmicrophone != null else $AudioStreamMicrophone.playing
+		if $HBoxMicTalk/MicWorking.button_pressed != micworkingsignal:
+			print("changing micworking to ", micworkingsignal)
+			$HBoxMicTalk/MicWorking.set_pressed_no_signal(micworkingsignal)
 
 	if audioopuschunkedeffect != null:
 		var framesinprocessformicstreamestimate = 0
@@ -379,6 +393,11 @@ func _process(_delta):
 			if captureframesavailable > 0:
 				var captureframes = audioeffectcapture.get_buffer(captureframesavailable)
 				audioopuschunkedeffect.push_chunk(captureframes)
+
+		elif hasmethod_inputgetmicrophonebuffer:
+			while Input.get_microphone_frames_available() >= audioopuschunkedeffect.audiosamplesize:
+				audioopuschunkedeffect.push_chunk(Input.get_microphone_buffer(audioopuschunkedeffect.audiosamplesize))
+
 		else:
 			pass  # the input is arriving from the audio process on the AudioOpusChunkedEffect
 		
