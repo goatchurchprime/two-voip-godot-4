@@ -44,7 +44,6 @@ var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa
 
 var possibleusernames = ["Alice", "Beth", "Cath", "Dan", "Earl", "Fred", "George", "Harry", "Ivan", "John", "Kevin", "Larry", "Martin", "Oliver", "Peter", "Quentin", "Robert", "Samuel", "Thomas", "Ulrik", "Victor", "Wayne", "Xavier", "Youngs", "Zephir"]
 
-var hasmethod_inputgetmicrophonebuffer
 var microphonefeed = null
 
 func _ready():
@@ -53,8 +52,9 @@ func _ready():
 	var caninstantiate_audioeffectopuschunked = ClassDB.can_instantiate("AudioEffectOpusChunked")
 	#caninstantiate_audioeffectopuschunked = false  # to disable it
 
-
-	hasmethod_inputgetmicrophonebuffer = Engine.has_singleton("MicrophoneServer")
+	if Engine.has_singleton("MicrophoneServer"):
+		microphonefeed = Engine.get_singleton("MicrophoneServer").get_feed(0)
+		microphonefeed.set_active(true)
 	
 	#$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
 	$VBoxPlayback/HBoxStream/MixRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
@@ -69,7 +69,7 @@ func _ready():
 		$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = $VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value
 		$VBoxFrameLength/HBoxOpusBitRate/SampleRate.disabled = true
 		
-	if hasmethod_inputgetmicrophonebuffer:
+	if microphonefeed:
 		if caninstantiate_audioeffectopuschunked:
 			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
 			audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
@@ -122,9 +122,6 @@ func _ready():
 
 	SelfMember.audiobufferregulationtime = 3600.0
 
-	if hasmethod_inputgetmicrophonebuffer:
-		microphonefeed = Engine.get_singleton("MicrophoneServer").get_feed(0)
-		microphonefeed.set_active(true)
 
 
 func rechunkrecordedchunks(orgsamples, newsamplesize):
@@ -353,7 +350,7 @@ func _process(_delta):
 				var captureframes = audioeffectcapture.get_buffer(captureframesavailable)
 				audioopuschunkedeffect.push_chunk(captureframes)
 
-		elif hasmethod_inputgetmicrophonebuffer:
+		elif microphonefeed:
 			while microphonefeed.get_frames_available() >= audioopuschunkedeffect.audiosamplesize:
 				audioopuschunkedeffect.push_chunk(microphonefeed.get_frames(audioopuschunkedeffect.audiosamplesize))
 
