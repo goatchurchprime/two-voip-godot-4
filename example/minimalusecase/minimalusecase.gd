@@ -5,8 +5,14 @@ var audiostreamopuschunked : AudioStreamOpusChunked
 var prepend = PackedByteArray()
 var opuspacketsbuffer = [ ]
 
+var microphonefeed : MicrophoneFeed = null
 func _ready():
-	Input.start_microphone()
+	print(AudioServer.get_input_device_list())
+	microphonefeed = MicrophoneServer.get_feed(0)
+	print(microphonefeed.get_name())
+	assert (microphonefeed.get_name() == "Default")
+	microphonefeed.set_active(true)
+	
 	opuschunked = AudioEffectOpusChunked.new()
 	audiostreamopuschunked = $AudioStreamPlayer.stream
 	for r in opusaudiodata:
@@ -17,8 +23,8 @@ func _process(_delta):
 	_process_playback(_delta)
 
 func _process_record(_delta):
-	while Input.get_microphone_frames_available() >= opuschunked.audiosamplesize:
-		opuschunked.push_chunk(Input.get_microphone_buffer(opuschunked.audiosamplesize))
+	while microphonefeed.get_frames_available() >= opuschunked.audiosamplesize:
+		opuschunked.push_chunk(microphonefeed.get_frames(opuschunked.audiosamplesize))
 		#var chunkmax = opuschunked.chunk_max(false, false)
 		#print(chunkmax)
 		var opusdata : PackedByteArray = opuschunked.read_opus_packet(prepend)

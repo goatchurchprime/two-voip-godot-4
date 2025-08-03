@@ -47,6 +47,7 @@ var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa
 var possibleusernames = ["Alice", "Beth", "Cath", "Dan", "Earl", "Fred", "George", "Harry", "Ivan", "John", "Kevin", "Larry", "Martin", "Oliver", "Peter", "Quentin", "Robert", "Samuel", "Thomas", "Ulrik", "Victor", "Wayne", "Xavier", "Youngs", "Zephir"]
 
 var hasmethod_inputgetmicrophonebuffer
+var microphonefeed = null
 
 func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
@@ -58,9 +59,8 @@ func _ready():
 	var caninstantiate_audiostreamplaybackmicrophone = ClassDB.can_instantiate("AudioStreamPlaybackMicrophone")
 	#caninstantiate_audiostreamplaybackmicrophone = false  # to disable it
 
-	hasmethod_inputgetmicrophonebuffer = Input.has_method("get_microphone_buffer")
-	#hasmethod_inputgetmicrophonebuffer = false  # to disable it
-
+	hasmethod_inputgetmicrophonebuffer = Engine.has_singleton("MicrophoneServer")
+	
 	#$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
 	$VBoxPlayback/HBoxStream/MixRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
 
@@ -135,7 +135,8 @@ func _ready():
 	SelfMember.audiobufferregulationtime = 3600.0
 
 	if hasmethod_inputgetmicrophonebuffer:
-		Input.start_microphone()
+		microphonefeed = Engine.get_singleton("MicrophoneServer").get_feed(0)
+		microphonefeed.set_active(true)
 
 	elif audiostreamplaybackmicrophone != null:
 		audiostreamplaybackmicrophone.start_microphone()
@@ -395,8 +396,8 @@ func _process(_delta):
 				audioopuschunkedeffect.push_chunk(captureframes)
 
 		elif hasmethod_inputgetmicrophonebuffer:
-			while Input.get_microphone_frames_available() >= audioopuschunkedeffect.audiosamplesize:
-				audioopuschunkedeffect.push_chunk(Input.get_microphone_buffer(audioopuschunkedeffect.audiosamplesize))
+			while microphonefeed.get_frames_available() >= audioopuschunkedeffect.audiosamplesize:
+				audioopuschunkedeffect.push_chunk(microphonefeed.get_frames(audioopuschunkedeffect.audiosamplesize))
 
 		else:
 			pass  # the input is arriving from the audio process on the AudioOpusChunkedEffect

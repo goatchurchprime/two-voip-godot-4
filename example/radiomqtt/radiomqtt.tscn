@@ -11,15 +11,15 @@
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kcsl6"]
 bg_color = Color(0.0705882, 0.0235294, 0.564706, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_30le3"]
-bg_color = Color(0.909804, 0.392157, 0.435294, 1)
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ljq7l"]
 bg_color = Color(0.101961, 0.101961, 0.101961, 1)
 corner_radius_top_left = 20
 corner_radius_top_right = 20
 corner_radius_bottom_right = 20
 corner_radius_bottom_left = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_30le3"]
+bg_color = Color(0.909804, 0.392157, 0.435294, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ak08f"]
 bg_color = Color(0.814464, 0.272608, 0.419173, 1)
@@ -133,8 +133,8 @@ layout_mode = 2
 size_flags_vertical = 3
 tooltip_text = "Hold down to talk"
 theme_override_font_sizes/font_size = 50
-theme_override_styles/pressed = SubResource("StyleBoxFlat_30le3")
 theme_override_styles/normal = SubResource("StyleBoxFlat_ljq7l")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_30le3")
 text = "PTT"
 
 [node name="HSeparator" type="HSeparator" parent="HBoxBigButtons/VBoxPTT"]
