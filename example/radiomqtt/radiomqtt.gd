@@ -11,8 +11,6 @@ var audioeffectcapture : AudioEffectCapture = null
 var audioopuschunkedeffect # : AudioEffectOpusChunked
 var audioopuschunkedeffect_forreprocessing # : AudioEffectOpusChunked
 
-@onready var audiostreamplaybackmicrophone = null # AudioStreamPlaybackMicrophone.new()
-
 # values to use when AudioEffectOpusChunked cannot be instantiated
 var frametimems : float = 20 
 var opusbitrate : int = 0
@@ -55,9 +53,6 @@ func _ready():
 	var caninstantiate_audioeffectopuschunked = ClassDB.can_instantiate("AudioEffectOpusChunked")
 	#caninstantiate_audioeffectopuschunked = false  # to disable it
 
-	# OBSOLETE
-	var caninstantiate_audiostreamplaybackmicrophone = ClassDB.can_instantiate("AudioStreamPlaybackMicrophone")
-	#caninstantiate_audiostreamplaybackmicrophone = false  # to disable it
 
 	hasmethod_inputgetmicrophonebuffer = Engine.has_singleton("MicrophoneServer")
 	
@@ -74,14 +69,7 @@ func _ready():
 		$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = $VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value
 		$VBoxFrameLength/HBoxOpusBitRate/SampleRate.disabled = true
 		
-	if caninstantiate_audiostreamplaybackmicrophone:
-		audiostreamplaybackmicrophone = ClassDB.instantiate("AudioStreamPlaybackMicrophone")
-		$HBoxMicTalk/MicWorking.text = "*" + $HBoxMicTalk/MicWorking.text
-		if caninstantiate_audioeffectopuschunked:
-			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
-			audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
-		
-	elif hasmethod_inputgetmicrophonebuffer:
+	if hasmethod_inputgetmicrophonebuffer:
 		if caninstantiate_audioeffectopuschunked:
 			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
 			audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
@@ -138,13 +126,6 @@ func _ready():
 		microphonefeed = Engine.get_singleton("MicrophoneServer").get_feed(0)
 		microphonefeed.set_active(true)
 
-	elif audiostreamplaybackmicrophone != null:
-		audiostreamplaybackmicrophone.start_microphone()
-		$AudioStreamMicrophone.stop()
-		for effect_idx in range(AudioServer.get_bus_effect_count(microphoneidx)):
-			var laudioeffectonmic : AudioEffect = AudioServer.get_bus_effect(microphoneidx, effect_idx)
-			if laudioeffectonmic.is_class("AudioEffectCapture"):
-				AudioServer.set_bus_effect_enabled(microphoneidx, effect_idx, false)
 
 func rechunkrecordedchunks(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
@@ -325,22 +306,13 @@ func starttalking():
 			audioopuschunkedeffect.resetencoder(false)
 
 func _on_mic_working_toggled(toggled_on):
-	if audiostreamplaybackmicrophone != null:
-		print("_on_mic_working_toggled audiostreamplaybackmicrophone ", audiostreamplaybackmicrophone.is_microphone_playing(), " to ", toggled_on)
-		if toggled_on:
-			audiostreamplaybackmicrophone.start_microphone()
-			print("  is_playing=", audiostreamplaybackmicrophone.is_microphone_playing())
-		else:
-			audiostreamplaybackmicrophone.stop_microphone()
-
+	print("_on_mic_working_toggled ", $AudioStreamMicrophone.playing, " to ", toggled_on)
+	if toggled_on:
+		if not $AudioStreamMicrophone.playing:
+			$AudioStreamMicrophone.play()
 	else:
-		print("_on_mic_working_toggled ", $AudioStreamMicrophone.playing, " to ", toggled_on)
-		if toggled_on:
-			if not $AudioStreamMicrophone.playing:
-				$AudioStreamMicrophone.play()
-		else:
-			if $AudioStreamMicrophone.playing:
-				$AudioStreamMicrophone.stop()
+		if $AudioStreamMicrophone.playing:
+			$AudioStreamMicrophone.stop()
 
 func _input(event):
 	if event is InputEventKey and event.is_pressed():
@@ -366,30 +338,16 @@ func _process(_delta):
 	if talking:
 		$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = "%.1f" % ((Time.get_ticks_msec() - talkingstarttime)*0.001)
 	if talking and not currentlytalking:
-		if has_node("AudioStreamMicrophone") and not $AudioStreamMicrophone.playing and audiostreamplaybackmicrophone == null:
+		if has_node("AudioStreamMicrophone") and not $AudioStreamMicrophone.playing:
 			$AudioStreamMicrophone.play()
 		starttalking()
 	elif not talking and currentlytalking:
 		endtalking()
 
-	if audiostreamplaybackmicrophone:
-		var micworkingsignal = audiostreamplaybackmicrophone.is_microphone_playing() if audiostreamplaybackmicrophone != null else $AudioStreamMicrophone.playing
-		if $HBoxMicTalk/MicWorking.button_pressed != micworkingsignal:
-			print("changing micworking to ", micworkingsignal)
-			$HBoxMicTalk/MicWorking.set_pressed_no_signal(micworkingsignal)
-
 	if audioopuschunkedeffect != null:
 		var framesinprocessformicstreamestimate = 0
 		assert (audioopuschunkedeffect != null)
-		if audiostreamplaybackmicrophone != null and audiostreamplaybackmicrophone.is_microphone_playing():
-			while true:
-				var microphonesamples = audiostreamplaybackmicrophone.get_microphone_buffer(audiosamplesize)
-				if len(microphonesamples) != 0:
-					audioopuschunkedeffect.push_chunk(microphonesamples)
-				else:
-					break
-
-		elif audioeffectcapture != null:
+		if audioeffectcapture != null:
 			var captureframesavailable = audioeffectcapture.get_frames_available()
 			if captureframesavailable > 0:
 				var captureframes = audioeffectcapture.get_buffer(captureframesavailable)
@@ -469,8 +427,6 @@ func _process(_delta):
 			if audioeffectcapture != null:
 				if audioeffectcapture.get_frames_available() > audiosamplesize:
 					audiosamples = audioeffectcapture.get_buffer(audiosamplesize)
-			elif audiostreamplaybackmicrophone != null and audiostreamplaybackmicrophone.is_microphone_playing():
-				audiosamples = audiostreamplaybackmicrophone.get_microphone_buffer(audiosamplesize)
 			if audiosamples == null or len(audiosamples) == 0:
 				break
 

@@ -83,7 +83,7 @@ bg_color = Color(0.654902, 0.266667, 0.345098, 1)
 bg_color = Color(0.509804, 0.145098, 0.203922, 1)
 
 [node name="radiomqtt" type="VBoxContainer"]
-anchors_preset = 15
+anchors_preset = -1
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 7.0
