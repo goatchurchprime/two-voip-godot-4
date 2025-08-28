@@ -59,6 +59,10 @@ func _ready():
 	#$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
 	$VBoxPlayback/HBoxStream/MixRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
 
+	for d in AudioServer.get_input_device_list():
+		$HBoxInputDevice/OptionInputDevice.add_item(d)
+	assert ($HBoxInputDevice/OptionInputDevice.get_item_text($HBoxInputDevice/OptionInputDevice.selected) == "Default")
+
 	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
 		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
 	if $VBoxFrameLength/HBoxOpusBitRate/SampleRate.selected == -1:
@@ -121,8 +125,6 @@ func _ready():
 	$HBoxMosquitto/FriendlyName.text = possibleusernames.pick_random()
 
 	SelfMember.audiobufferregulationtime = 3600.0
-
-
 
 func rechunkrecordedchunks(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
@@ -559,7 +561,6 @@ func _on_resample_rate_value_changed(value):
 func _on_sample_rate_value_changed(value):
 	updatesamplerates()
 
-
 func _on_spin_box_value_changed(value):
 	$AudioStreamMicrophone.pitch_scale = value
 
@@ -575,3 +576,8 @@ func _on_audio_optimized_check_button_toggled(toggled_on):
 
 func _on_bit_rate_value_changed(value):
 	updatesamplerates()
+
+func _on_option_input_device_item_selected(index):
+	var inputdevice : String = $HBoxInputDevice/OptionInputDevice.get_item_text(index)
+	print("Set input device: ", inputdevice)
+	AudioServer.set_input_device(inputdevice)
