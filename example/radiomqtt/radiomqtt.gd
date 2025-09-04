@@ -22,6 +22,7 @@ var opussamplerate : int = 48000
 var opusframesize : int = 960
 var opuscomplexity : int = 5
 var opusoptimizeforvoice : bool = true
+var volume_db : float = 0.0
 
 var prefixbytes = PackedByteArray([23])
 var mqttpacketencodebase64 : bool = false
@@ -77,7 +78,7 @@ func _ready():
 		if caninstantiate_audioeffectopuschunked:
 			audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
 			audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
-		
+
 	else:
 		assert ($AudioStreamMicrophone.bus == "MicrophoneBus")
 		var audioeffectonmic : AudioEffect = null
@@ -152,6 +153,7 @@ func updatesamplerates():
 	opusframesize = int(opussamplerate*frametimems/1000.0)
 	opuscomplexity = int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value)
 	opusoptimizeforvoice = $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed
+	volume_db = $VBoxFrameLength/HBoxOpusFrame/VolumeDBSpinBox.value
 
 	print("aaa audiosamplesize ", audiosamplesize, "  audiosamplerate ", audiosamplerate)
 
@@ -174,6 +176,7 @@ func updatesamplerates():
 		audioopuschunkedeffect.opuscomplexity = opuscomplexity
 		audioopuschunkedeffect.opusoptimizeforvoice = opusoptimizeforvoice
 		audioopuschunkedeffect.opusbitrate = opusbitrate
+		audioopuschunkedeffect.volume_db = volume_db
 		
 		audioopuschunkedeffect_forreprocessing.audiosamplerate = audiosamplerate
 		audioopuschunkedeffect_forreprocessing.audiosamplesize = audiosamplesize
@@ -182,6 +185,7 @@ func updatesamplerates():
 		audioopuschunkedeffect_forreprocessing.opuscomplexity = opuscomplexity
 		audioopuschunkedeffect_forreprocessing.opusoptimizeforvoice = opusoptimizeforvoice
 		audioopuschunkedeffect_forreprocessing.opusbitrate = opusbitrate
+		audioopuschunkedeffect_forreprocessing.volume_db = volume_db
 		
 		$HBoxBigButtons/VBoxPTT/Denoise.disabled = not (audioopuschunkedeffect.denoiser_available() and audioresamplerate == 48000)
 	else:
@@ -566,6 +570,11 @@ func _on_spin_box_value_changed(value):
 
 func _on_volume_db_spin_box_value_changed(value):
 	$AudioStreamMicrophone.volume_db = value
+	volume_db = value
+	if audioopuschunkedeffect != null:
+		audioopuschunkedeffect.volume_db = volume_db
+		audioopuschunkedeffect_forreprocessing.volume_db = volume_db
+	
 
 func _on_complexity_spin_box_value_changed(value):
 	updatesamplerates()

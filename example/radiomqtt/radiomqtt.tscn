@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=3 uid="uid://babntosbiq5r8"]
+[gd_scene load_steps=23 format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" uid="uid://b4vk2ccjna2l6" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
@@ -82,8 +82,10 @@ bg_color = Color(0.654902, 0.266667, 0.345098, 1)
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_m5fk6"]
 bg_color = Color(0.509804, 0.145098, 0.203922, 1)
 
+[sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_qfww3"]
+
 [node name="radiomqtt" type="VBoxContainer"]
-anchors_preset = -1
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 7.0
@@ -330,8 +332,8 @@ text = "VolumeDB"
 
 [node name="VolumeDBSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame"]
 layout_mode = 2
-min_value = -10.0
-max_value = 30.0
+min_value = -80.0
+max_value = 24.0
 step = 0.0
 
 [node name="HBoxAudioFrame" type="HBoxContainer" parent="VBoxFrameLength"]
@@ -760,6 +762,11 @@ offset_left = 2.0
 offset_right = 42.0
 offset_bottom = 23.0
 text = "sil"
+
+[node name="AudioStreamMicrophone" type="AudioStreamPlayer" parent="."]
+stream = SubResource("AudioStreamMicrophone_qfww3")
+volume_db = 24.0
+bus = &"MicrophoneBus"
 
 [connection signal="toggled" from="HBoxBigButtons/VBoxPTT/Denoise" to="." method="_on_denoise_toggled"]
 [connection signal="toggled" from="HBoxBigButtons/VBoxVox/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]

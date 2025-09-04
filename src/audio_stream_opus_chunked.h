@@ -44,6 +44,8 @@
 #include "opus.h"
 #include "speex_resampler/speex_resampler.h"
 
+// Note: This is the decoding class.  The functions are similar so don't mix it up with the encoding AudioEffect class
+
 namespace godot {
 
 class AudioStreamOpusChunked;
@@ -120,7 +122,6 @@ public:
     void push_audio_chunk(const PackedVector2Array& audiochunk);
     void push_resampled_audio_chunk(const PackedVector2Array& resampledaudiochunk);
     void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
-    
     
     float last_chunk_max();
     float last_chunk_rms();

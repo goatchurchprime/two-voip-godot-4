@@ -117,6 +117,9 @@ class AudioEffectOpusChunked : public AudioEffect {
     int bufferend = 0;    // apply %(audiosamplesize*ringbufferchunks) for actual position
     int discardedchunks = 0;
 
+    float mix_volume_db = 0.0;
+    float volume_db = 0.0;
+
     int opussamplerate = 48000;
     int opusframesize = 960;
     int opusbitrate = 12000;
@@ -153,7 +156,7 @@ class AudioEffectOpusChunked : public AudioEffect {
 protected:
     static void _bind_methods();
 
-    void push_sample(const Vector2 &sample);
+    void push_sample(const Vector2 &sample, float vol);
     void resample_single_chunk(float* paudioresamples, const float* paudiosamples);
     float denoise_single_chunk(float* pdenoisedaudioresamples, const float* paudiosamples);
     PackedByteArray opus_frame_to_opus_packet(const PackedByteArray& prefixbytes, float* paudiosamples);
@@ -180,6 +183,8 @@ public:
     int chunk_to_lipsync(bool resampled=false); 
     PackedFloat32Array read_visemes() { return visemes; };
 
+    void set_volume_db(float p_volume) { volume_db = p_volume; };
+    int get_volume_db() { return volume_db; };
     void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
     void set_opusframesize(int lopusframesize) { chunknumber = -1; opusframesize = lopusframesize; };
