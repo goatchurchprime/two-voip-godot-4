@@ -1,25 +1,9 @@
-[gd_resource type="AudioBusLayout" load_steps=3 format=3 uid="uid://orx4iw038t0c"]
-
-[sub_resource type="AudioEffectPitchShift" id="AudioEffectPitchShift_urnej"]
-resource_name = "PitchShift"
-
-[sub_resource type="AudioEffectOpusChunked" id="AudioEffectOpusChunked_j3pel"]
-resource_name = "OpusChunked"
+[gd_resource type="AudioBusLayout" format=3 uid="uid://orx4iw038t0c"]
 
 [resource]
-bus/1/name = &"SpeechBus"
+bus/1/name = &"MicrophoneBus"
 bus/1/solo = false
-bus/1/mute = false
+bus/1/mute = true
 bus/1/bypass_fx = false
 bus/1/volume_db = 0.0
 bus/1/send = &"Master"
-bus/1/effect/0/effect = SubResource("AudioEffectPitchShift_urnej")
-bus/1/effect/0/enabled = false
-bus/2/name = &"MicrophoneBus"
-bus/2/solo = false
-bus/2/mute = true
-bus/2/bypass_fx = false
-bus/2/volume_db = 0.0
-bus/2/send = &"Master"
-bus/2/effect/0/effect = SubResource("AudioEffectOpusChunked_j3pel")
-bus/2/effect/0/enabled = true

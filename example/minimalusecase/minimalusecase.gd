@@ -5,10 +5,11 @@ var audiostreamopuschunked : AudioStreamOpusChunked
 var prepend = PackedByteArray()
 var opuspacketsbuffer = [ ]
 
-var microphonefeed : MicrophoneFeed = null
+var microphonefeed = null # : MicrophoneFeed
 func _ready():
 	print(AudioServer.get_input_device_list())
-	microphonefeed = MicrophoneServer.get_feed(0)
+	assert (Engine.has_singleton("MicrophoneServer"), "Microphone Server Missing")
+	microphonefeed = Engine.get_singleton("MicrophoneServer").get_feed(0)
 	print(microphonefeed.get_name())
 	assert (microphonefeed.get_name() == "Default")
 	microphonefeed.set_active(true)
