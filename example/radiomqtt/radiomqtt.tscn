@@ -8,13 +8,8 @@
 [ext_resource type="AudioStream" uid="uid://y2nsu1nxx0nf" path="res://radiomqtt/laser3.wav" id="4_qfww3"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 
-[sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_itmlg"]
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kcsl6"]
 bg_color = Color(0.0705882, 0.0235294, 0.564706, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_30le3"]
-bg_color = Color(0.909804, 0.392157, 0.435294, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ljq7l"]
 bg_color = Color(0.101961, 0.101961, 0.101961, 1)
@@ -22,6 +17,9 @@ corner_radius_top_left = 20
 corner_radius_top_right = 20
 corner_radius_bottom_right = 20
 corner_radius_bottom_left = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_30le3"]
+bg_color = Color(0.909804, 0.392157, 0.435294, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ak08f"]
 bg_color = Color(0.814464, 0.272608, 0.419173, 1)
@@ -84,6 +82,8 @@ bg_color = Color(0.654902, 0.266667, 0.345098, 1)
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_m5fk6"]
 bg_color = Color(0.509804, 0.145098, 0.203922, 1)
 
+[sub_resource type="AudioStreamMicrophone" id="AudioStreamMicrophone_qfww3"]
+
 [node name="radiomqtt" type="VBoxContainer"]
 anchors_preset = 15
 anchor_right = 1.0
@@ -94,10 +94,6 @@ offset_bottom = -11.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_anot2")
-
-[node name="AudioStreamMicrophone" type="AudioStreamPlayer" parent="."]
-stream = SubResource("AudioStreamMicrophone_itmlg")
-bus = &"MicrophoneBus"
 
 [node name="LabelTitle" type="Label" parent="."]
 custom_minimum_size = Vector2(0, 50)
@@ -139,8 +135,8 @@ layout_mode = 2
 size_flags_vertical = 3
 tooltip_text = "Hold down to talk"
 theme_override_font_sizes/font_size = 50
-theme_override_styles/pressed = SubResource("StyleBoxFlat_30le3")
 theme_override_styles/normal = SubResource("StyleBoxFlat_ljq7l")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_30le3")
 text = "PTT"
 
 [node name="HSeparator" type="HSeparator" parent="HBoxBigButtons/VBoxPTT"]
@@ -269,6 +265,16 @@ color = Color(0.258824, 0.258824, 0.933333, 1)
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 
+[node name="HBoxInputDevice" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxInputDevice"]
+layout_mode = 2
+text = "Input device: "
+
+[node name="OptionInputDevice" type="OptionButton" parent="HBoxInputDevice"]
+layout_mode = 2
+
 [node name="HSeparator" type="HSeparator" parent="."]
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
@@ -326,8 +332,8 @@ text = "VolumeDB"
 
 [node name="VolumeDBSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame"]
 layout_mode = 2
-min_value = -10.0
-max_value = 30.0
+min_value = -80.0
+max_value = 24.0
 step = 0.0
 
 [node name="HBoxAudioFrame" type="HBoxContainer" parent="VBoxFrameLength"]
@@ -757,12 +763,17 @@ offset_right = 42.0
 offset_bottom = 23.0
 text = "sil"
 
-[connection signal="finished" from="AudioStreamMicrophone" to="." method="_on_audio_stream_microphone_finished"]
+[node name="AudioStreamMicrophone" type="AudioStreamPlayer" parent="."]
+stream = SubResource("AudioStreamMicrophone_qfww3")
+volume_db = 24.0
+bus = &"MicrophoneBus"
+
 [connection signal="toggled" from="HBoxBigButtons/VBoxPTT/Denoise" to="." method="_on_denoise_toggled"]
 [connection signal="toggled" from="HBoxBigButtons/VBoxVox/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
 [connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="toggled" from="HBoxMicTalk/MicWorking" to="." method="_on_mic_working_toggled"]
 [connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
+[connection signal="item_selected" from="HBoxInputDevice/OptionInputDevice" to="." method="_on_option_input_device_item_selected"]
 [connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
 [connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/PitchRateSpinBox" to="." method="_on_spin_box_value_changed"]
 [connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/VolumeDBSpinBox" to="." method="_on_volume_db_spin_box_value_changed"]

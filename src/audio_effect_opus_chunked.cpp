@@ -36,6 +36,8 @@ using namespace godot;
 
 void AudioEffectOpusChunked::_bind_methods() {
 
+    ClassDB::bind_method(D_METHOD("set_volume_db", "volume_db"), &AudioEffectOpusChunked::set_volume_db);
+    ClassDB::bind_method(D_METHOD("get_volume_db"), &AudioEffectOpusChunked::get_volume_db);
     ClassDB::bind_method(D_METHOD("set_opussamplerate", "opussamplerate"), &AudioEffectOpusChunked::set_opussamplerate);
     ClassDB::bind_method(D_METHOD("get_opussamplerate"), &AudioEffectOpusChunked::get_opussamplerate);
     ClassDB::bind_method(D_METHOD("set_opusframesize", "opusframesize"), &AudioEffectOpusChunked::set_opusframesize);
@@ -53,6 +55,7 @@ void AudioEffectOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_audiosamplechunks", "audiosamplechunks"), &AudioEffectOpusChunked::set_audiosamplechunks);
     ClassDB::bind_method(D_METHOD("get_audiosamplechunks"), &AudioEffectOpusChunked::get_audiosamplechunks);
 
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "volume_db", PROPERTY_HINT_RANGE, "-80,24,0.01"), "set_volume_db", "get_volume_db");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opussamplerate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_opussamplerate", "get_opussamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opusframesize", PROPERTY_HINT_RANGE, "20,2880,1"), "set_opusframesize", "get_opusframesize");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opusbitrate", PROPERTY_HINT_RANGE, "500,200000,1"), "set_opusbitrate", "get_opusbitrate");
@@ -251,10 +254,8 @@ void AudioEffectOpusChunkedInstance::_process(const void *src_buffer, AudioFrame
     base->process((const AudioFrame *)src_buffer, p_dst_frames, p_frame_count); 
 }
 
-
-
-void AudioEffectOpusChunked::push_sample(const Vector2 &sample) {
-    audiosamplebuffer.set(bufferend % audiosamplebuffer.size(), sample);
+void AudioEffectOpusChunked::push_sample(const Vector2 &sample, float vol) {
+    audiosamplebuffer.set(bufferend % audiosamplebuffer.size(), sample * vol);
     bufferend += 1; 
     if (bufferend == (chunknumber + ringbufferchunks)*audiosamplesize) {
         drop_chunk(); 
@@ -272,12 +273,20 @@ void AudioEffectOpusChunked::process(const AudioFrame *p_src_frames, AudioFrame 
         else
             return;
     }
-    if (instanceinstantiations != 1)
-        godot::UtilityFunctions::printerr("Warning: AudioEffectOpusChunked.process called with ", instanceinstantiations, " instanceinstatiations");
-    for (int i = 0; i < p_frame_count; i++) {
-        p_dst_frames[i] = p_src_frames[i];
-        push_sample(Vector2(p_src_frames[i].left, p_src_frames[i].right));
+    if (instanceinstantiations == 1) {
+        if (p_frame_count != 0) {
+            float vol = godot::UtilityFunctions::db_to_linear(mix_volume_db);
+            float vol_inc = (godot::UtilityFunctions::db_to_linear(volume_db) - vol) / float(p_frame_count);
+            for (int i = 0; i < p_frame_count; i++) {
+                p_dst_frames[i] = p_src_frames[i];
+                push_sample(Vector2(p_src_frames[i].left, p_src_frames[i].right), vol);
+                vol += vol_inc;
+            }
+        }
+    } else {
+        godot::UtilityFunctions::printerr("Warning: AudioEffectOpusChunked.process called with ", instanceinstantiations, " instanceinstatiations (is there surround sound)");
     }
+    mix_volume_db = volume_db;
 }
 
 void AudioEffectOpusChunked::push_chunk(const PackedVector2Array& audiosamples) {
@@ -287,11 +296,21 @@ void AudioEffectOpusChunked::push_chunk(const PackedVector2Array& audiosamples) 
         else
             return;
     }
-    if (instanceinstantiations != 0)
-        godot::UtilityFunctions::printerr("Warning: push_chunk on an AudioEffectOpusChunked that is instantiated on an Audio Bus");
-    for (int i = 0; i < audiosamples.size(); i++)
-        push_sample(audiosamples[i]);
+    if (instanceinstantiations == 0) {
+        if (audiosamples.size() != 0) {
+            float vol = godot::UtilityFunctions::db_to_linear(mix_volume_db);
+            float vol_inc = (godot::UtilityFunctions::db_to_linear(volume_db) - vol) / float(audiosamples.size());
+            for (int i = 0; i < audiosamples.size(); i++) {
+                push_sample(audiosamples[i], vol);
+                vol += vol_inc;
+            }
+        }
+    } else {
+        godot::UtilityFunctions::printerr("Warning: cannot push_chunk on an AudioEffectOpusChunked that is instantiated (on an AudioBus)");
+    }
+    mix_volume_db = volume_db;
 }
+
 
 bool AudioEffectOpusChunked::chunk_available() {
     return ((chunknumber >= 0) && (bufferend >= (chunknumber + 1)*audiosamplesize)); 
@@ -311,7 +330,6 @@ bool AudioEffectOpusChunked::undrop_chunk() {
     chunknumber -= 1;
     return true;
 }
-
 
 void AudioEffectOpusChunked::resampled_current_chunk() {
     if (!chunk_available() || (opusframesize == 0)) 
@@ -341,7 +359,6 @@ float AudioEffectOpusChunked::denoise_resampled_chunk() {
     }
     return audiodenoisedvalues[rchunknumber];
 }
-
 
 float AudioEffectOpusChunked::chunk_max(bool rms, bool resampled) {
     if (!chunk_available()) 

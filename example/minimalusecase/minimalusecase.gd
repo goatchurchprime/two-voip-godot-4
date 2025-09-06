@@ -5,27 +5,34 @@ var audiostreamopuschunked : AudioStreamOpusChunked
 var prepend = PackedByteArray()
 var opuspacketsbuffer = [ ]
 
+var microphonefeed = null # : MicrophoneFeed
 func _ready():
-	var microphoneidx = AudioServer.get_bus_index("MicrophoneBus")
-	opuschunked = AudioServer.get_bus_effect(microphoneidx, 0)
-
+	print(AudioServer.get_input_device_list())
+	assert (Engine.has_singleton("MicrophoneServer"), "Microphone Server Missing")
+	microphonefeed = Engine.get_singleton("MicrophoneServer").get_feed(0)
+	print(microphonefeed.get_name())
+	assert (microphonefeed.get_name() == "Default")
+	microphonefeed.set_active(true)
+	
+	opuschunked = AudioEffectOpusChunked.new()
 	audiostreamopuschunked = $AudioStreamPlayer.stream
 	for r in opusaudiodata:
 		opuspacketsbuffer.append(PackedByteArray(r))
 
-func _process(delta):
-	_process_record(delta)
-	_process_playback(delta)
+func _process(_delta):
+	_process_record(_delta)
+	_process_playback(_delta)
 
-func _process_record(delta):
-	while opuschunked.chunk_available():
-		var chunkmax = opuschunked.chunk_max(false, false)
+func _process_record(_delta):
+	while microphonefeed.get_frames_available() >= opuschunked.audiosamplesize:
+		opuschunked.push_chunk(microphonefeed.get_frames(opuschunked.audiosamplesize))
+		#var chunkmax = opuschunked.chunk_max(false, false)
 		#print(chunkmax)
 		var opusdata : PackedByteArray = opuschunked.read_opus_packet(prepend)
 		opuschunked.drop_chunk()
 		print("\t", opusdata, ",")
 
-func _process_playback(delta):
+func _process_playback(_delta):
 	while audiostreamopuschunked.chunk_space_available() and len(opuspacketsbuffer) != 0:
 		audiostreamopuschunked.push_opus_packet(opuspacketsbuffer.pop_front(), len(prepend), 0)
 
