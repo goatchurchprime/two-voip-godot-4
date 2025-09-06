@@ -31,6 +31,13 @@ def get_cmake_output_lib_dir(env: SConsEnvironment, lib_path: str) -> str:
     return os.path.join(get_cmake_build_dir(env, lib_path), "Debug" if env["dev_build"] else "Release")
 
 
+def contains_flag(list: list, flag_name: str) -> bool:
+    if any((flag_name in x for x in list)):
+        return True
+    else:
+        return False
+
+
 def print_subprocess_result(result, prefix: str):
     if result.stdout:
         print(f"{prefix} output: {result.stdout}")
@@ -105,8 +112,12 @@ def cmake_build_project(env: SConsEnvironment, lib_path: str, extra_args: list, 
     elif platform == "android":
         arch_map = { "arm32": "armeabi-v7a", "arm64": "arm64-v8a", "x86_32":  "x86", "x86_64":"x86_64" }
         platform_args += ["-G", "Ninja Multi-Config",
-                        f'-DCMAKE_TOOLCHAIN_FILE={os.getenv("ANDROID_HOME")}/ndk/25.2.9519653/build/cmake/android.toolchain.cmake',
-                        f'-DANDROID_ABI={arch_map[arch]}', f'-DANDROID_PLATFORM={env.get("android_api_level", 21)}',]
+                        f'-DANDROID_ABI={arch_map[arch]}',]
+        if not contains_flag(extra_args, "-DCMAKE_TOOLCHAIN_FILE"):
+            platform_args += [f'-DCMAKE_TOOLCHAIN_FILE={os.getenv("ANDROID_HOME")}/ndk/28.1.13356709/build/cmake/android.toolchain.cmake']
+        if not contains_flag(extra_args, "-DANDROID_PLATFORM"):
+            platform_args += [f'-DANDROID_PLATFORM={env.get("android_api_level", 21)}']
+
     elif platform == "web":
         platform_args += ["-G", "Ninja Multi-Config",
                         f'-DCMAKE_TOOLCHAIN_FILE={os.path.dirname(WhereIs("emcc"))}/cmake/Modules/Platform/Emscripten.cmake',]
