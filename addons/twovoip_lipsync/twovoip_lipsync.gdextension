@@ -20,7 +20,7 @@ android.arm64 = { "OVRLipSyncNative/Lib/Android64/libOVRLipSync.so": "" }
 ; -------------------------------------
 ; debug
 
-macos = "libs/libtwovoip.macos.template_debug.universal.framework"
+macos = "libs/libtwovoip.macos.template_debug.universal.framework/libtwovoip.macos.template_debug.universal.dylib"
 windows.x86_64 = "libs/libtwovoip.windows.template_debug.x86_64.dll"
 linux.x86_64 = "libs/libtwovoip.linux.template_debug.x86_64.so"
 
@@ -31,7 +31,7 @@ android.arm64 = "libs/libtwovoip.android.template_debug.arm64.so"
 ; -------------------------------------
 ; release
 
-macos.template_release = "libs/libtwovoip.macos.template_release.universal.framework"
+macos.template_release = "libs/libtwovoip.macos.template_release.universal.framework/libtwovoip.macos.template_release.universal.dylib"
 windows.template_release.x86_64 = "libs/libtwovoip.windows.template_release.x86_64.dll"
 linux.template_release.x86_64 = "libs/libtwovoip.linux.template_release.x86_64.so"
 

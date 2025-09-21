@@ -11,6 +11,7 @@ reloadable = false
 ; debug
 
 macos = { }
+macos.debug = { "res://addons/twovoip/libs/libtwovoip.macos.template_debug.universal.framework" : "Contents/Frameworks/" }
 windows.x86_64 = { }
 linux.x86_64 = { }
 
@@ -28,7 +29,7 @@ ios = {}
 ; -------------------------------------
 ; release
 
-macos.template_release = { }
+macos.template_release = { "res://addons/twovoip/libs/libtwovoip.macos.template_release.universal.framework" : "Contents/Frameworks/" }
 windows.template_release.x86_64 = { }
 linux.template_release.x86_64 = { }
 
@@ -47,7 +48,7 @@ ios.template_release = {}
 ; -------------------------------------
 ; debug
 
-macos = "libs/libtwovoip.macos.template_debug.universal.framework"
+macos = "libs/libtwovoip.macos.template_debug.universal.framework/libtwovoip.macos.template_debug.universal.dylib"
 windows.x86_64 = "libs/libtwovoip.windows.template_debug.x86_64.dll"
 linux.x86_64 = "libs/libtwovoip.linux.template_debug.x86_64.so"
 
@@ -64,7 +65,7 @@ ios = "libs/libtwovoip.ios.template_debug.universal.dylib"
 ; -------------------------------------
 ; release
 
-macos.template_release = "libs/libtwovoip.macos.template_release.universal.framework"
+macos.template_release = "libs/libtwovoip.macos.template_release.universal.framework/libtwovoip.macos.template_release.universal.dylib"
 windows.template_release.x86_64 = "libs/libtwovoip.windows.template_release.x86_64.dll"
 linux.template_release.x86_64 = "libs/libtwovoip.linux.template_release.x86_64.so"
 
