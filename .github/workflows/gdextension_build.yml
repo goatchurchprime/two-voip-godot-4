@@ -49,7 +49,8 @@ env:
   #PRODUCTION_BUILD: ${{!format('{0}', inputs.production_build) && 'false' || format('{0}', inputs.production_build)}} # Default false
   OUTPUT_LIBS_PATH: bin
   FORCE_DISABLE_UNITY: yes
-  GH_TOKEN: ${{ github.token }}
+  GH_TOKEN: ${{github.token}}
+  NDK_VERSION: '28.1.13356709' # r28b
 
 jobs:
 
@@ -199,30 +200,33 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Android NDK r28b
-        uses: nttld/setup-ndk@v1.5.0
-        id: setup-ndk
+      # Based on https://stackoverflow.com/q/60776512/8980874 and https://github.com/godotengine/godot/blob/4.5-stable/platform/android/detect.py#L89
+      - name: Get ANDROID_HOME
+        run: echo "path=${ANDROID_HOME}" >> $GITHUB_OUTPUT
+        id: get_android_home
+
+      - name: Restore NDK Cache
+        id: ndk-cache
+        uses: actions/cache/restore@v4
         with:
-          ndk-version: r28b
-          link-to-sdk: true
-          local-cache: true
+          path: ${{steps.get_android_home.outputs.path}}/ndk/${{env.NDK_VERSION}}
+          key: ndk-cache-${{env.NDK_VERSION}}
 
-      # TODO revisit after some updates of nttld/setup-ndk
-      - name: Restore Android Symlinks
-        run: |
-          directory="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+      - name: Install NDK
+        if: steps.ndk-cache.outputs.cache-hit != 'true'
+        run: echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;${{env.NDK_VERSION}}"
 
-          find "$directory" -type l | while read link; do
-              current_target=$(readlink "$link")
-              new_target="$directory/$(basename "$current_target")"
-              ln -sf "$new_target" "$link"
-              echo "Changed $(basename "$link") from $current_target to $new_target"
-          done
+      - name: Save NDK Cache
+        if: steps.ndk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{steps.get_android_home.outputs.path}}/ndk/${{env.NDK_VERSION}}
+          key: ndk-cache-${{env.NDK_VERSION}}
 
       - name: Compile GDExtension
         uses: ./.github/actions/compile_gdextension
         env:
-          ANDROID_NDK_ROOT: ${{steps.setup-ndk.outputs.ndk-path}}
+          ANDROID_NDK_ROOT: ${{steps.get_android_home.outputs.path}}/ndk/${{env.NDK_VERSION}}
         with:
           platform: android
           target: ${{matrix.target}}
@@ -255,9 +259,7 @@ jobs:
           submodules: recursive
 
       - name: Download Emscripten
-        uses: mymindstorm/setup-emsdk@v14
-        # Continue if failed to cache
-        # https://github.com/mymindstorm/setup-emsdk/issues/20
+        uses: pyodide/setup-emsdk@v15
         continue-on-error: true
         with:
           version: ${{env.EM_VERSION}}
