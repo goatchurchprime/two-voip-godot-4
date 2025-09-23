@@ -30,7 +30,12 @@
 
 #include "audio_effect_opus_chunked.h"
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/gd_extension_manager.hpp>
+#include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
+
+#include "utils.h"
 
 using namespace godot;
 
@@ -400,6 +405,80 @@ PackedByteArray AudioEffectOpusChunked::read_opus_packet(const PackedByteArray& 
     return opus_frame_to_opus_packet(prefixbytes, paudioresamples);
 }
 
+void AudioEffectOpusChunked::init_lipsync() {
+#ifdef OVR_LIP_SYNC
+
+    bool ovr_try_to_use_custom_path = false;
+#if (defined(MACOS_ENABLED) || defined(WINDOWS_ENABLED)) && defined(DEBUG_ENABLED)
+#define OVR_TRY_TO_USE_CUSTOM_PATH
+    // only for macOS and Windows with debug features (editor or template_debug) and in the editor build 64 bit
+    ovr_try_to_use_custom_path = OS::get_singleton()->has_feature("editor") && OS::get_singleton()->has_feature("64");
+#endif
+
+    String custom_dir = "";
+    ovrLipSyncResult rc = ovrLipSyncError_Unknown;
+
+#ifdef OVR_TRY_TO_USE_CUSTOM_PATH
+    if(ovr_try_to_use_custom_path) {
+        auto exts = GDExtensionManager::get_singleton()->get_loaded_extensions();
+        for(String ext : exts) {
+            if (ext.ends_with("twovoip_lipsync.gdextension")){
+                custom_dir = ProjectSettings::get_singleton()->globalize_path(ext.get_base_dir());
+                custom_dir = custom_dir.path_join("OVRLipSyncNative").path_join("Lib");
+
+#if defined(MACOS_ENABLED)
+                custom_dir = custom_dir.path_join("MacOS");
+#elif defined(WINDOWS_ENABLED)
+                custom_dir = custom_dir.path_join("Win64");
+#else
+#error "Not supported platform!"
+#endif
+                break;
+            }
+        }
+
+        if (!custom_dir.is_empty()) {
+            godot::UtilityFunctions::prints("Trying to load OVRLipSync from a custom folder:", custom_dir); 
+            rc = ovrLipSync_InitializeEx(resampledlipsync ? opussamplerate : audiosamplerate, 
+                resampledlipsync ? opusframesize : audiosamplesize,
+#ifdef WINDOWS_ENABLED
+                Utils::utf8toMbcs(custom_dir.utf8().get_data()));
+#else
+                custom_dir.utf8().get_data());
+#endif // WINDOWS_ENABLED
+        }
+    }
+#endif // OVR_TRY_TO_USE_CUSTOM_PATH
+
+    if (rc != ovrLipSyncSuccess) {
+        godot::UtilityFunctions::prints("Trying to load OVRLipSync using the default path."); 
+        rc = ovrLipSync_Initialize(resampledlipsync ? opussamplerate : audiosamplerate, 
+            resampledlipsync ? opusframesize : audiosamplesize);
+    }
+
+    if (rc == ovrLipSyncSuccess) {
+        ovrLipSyncContextProvider provider = ovrLipSyncContextProvider_EnhancedWithLaughter;
+        rc = ovrLipSync_CreateContextEx(&ovrlipsyncctx, provider, audiosamplerate, true);
+        if (rc == ovrLipSyncSuccess) {
+            govrlipsyncstatus = GovrLipSyncValid;
+            godot::UtilityFunctions::prints("lipsync context successfully created:", ovrlipsyncctx); 
+        } else {
+            godot::UtilityFunctions::printerr("Failed to create ovrLipSync context:", rc);
+            rc = ovrLipSync_Shutdown();
+            godot::UtilityFunctions::printerr("lipsync shutdown due to lack of context:", rc);
+            govrlipsyncstatus = GovrLipSyncUnavailable;
+        }
+    } else {
+        if (rc == ovrLipSyncError_MissingDLL)
+            godot::UtilityFunctions::printerr("Failed to initialize ovrLipSynchunk_to_lipsyncc engine: Cannot find the OVRLipSync dynamic library.");
+        else
+            godot::UtilityFunctions::printerr("Failed to initialize ovrLipSync engine:", rc);
+        govrlipsyncstatus = GovrLipSyncUnavailable;
+    }
+
+#undef OVR_TRY_TO_USE_CUSTOM_PATH
+#endif // OVR_LIP_SYNC
+}
 
 int AudioEffectOpusChunked::chunk_to_lipsync(bool resampled) {
 #ifdef OVR_LIP_SYNC
@@ -408,27 +487,7 @@ int AudioEffectOpusChunked::chunk_to_lipsync(bool resampled) {
         
     if (govrlipsyncstatus == GovrLipSyncUninitialized) {
         resampledlipsync = resampled;
-        ovrLipSyncResult rc = ovrLipSync_Initialize(resampledlipsync ? opussamplerate : audiosamplerate, 
-                                                    resampledlipsync ? opusframesize : audiosamplesize);
-        if (rc == ovrLipSyncSuccess) {
-            ovrLipSyncContextProvider provider = ovrLipSyncContextProvider_EnhancedWithLaughter;
-            rc = ovrLipSync_CreateContextEx(&ovrlipsyncctx, provider, audiosamplerate, true);
-            if (rc == ovrLipSyncSuccess) {
-                govrlipsyncstatus = GovrLipSyncValid;
-                godot::UtilityFunctions::prints("lipsync context successfully created:", ovrlipsyncctx); 
-            } else {
-                godot::UtilityFunctions::printerr("Failed to create ovrLipSync context: ", rc);
-                rc = ovrLipSync_Shutdown();
-                godot::UtilityFunctions::printerr("lipsync shutdown due to lack of context: ", rc);
-                govrlipsyncstatus = GovrLipSyncUnavailable;
-            }
-        } else {
-            if (rc == ovrLipSyncError_MissingDLL)
-                godot::UtilityFunctions::printerr("Failed to initialize ovrLipSynchunk_to_lipsyncc engine: Cannot find OVRLipSync.DLL.");
-            else
-                godot::UtilityFunctions::printerr("Failed to initialize ovrLipSync engine: ", rc);
-            govrlipsyncstatus = GovrLipSyncUnavailable;
-        }
+        init_lipsync();
     }
 
     if (govrlipsyncstatus != GovrLipSyncValid)

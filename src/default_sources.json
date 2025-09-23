@@ -4,5 +4,6 @@
   "audio_stream_opus.cpp",
   "opus_encoder_object.cpp",
   "register_types.cpp",
-  "speex_resampler/resample.c"
+  "speex_resampler/resample.c",
+  "utils.cpp"
 ]
