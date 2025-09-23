@@ -160,6 +160,7 @@ protected:
     void resample_single_chunk(float* paudioresamples, const float* paudiosamples);
     float denoise_single_chunk(float* pdenoisedaudioresamples, const float* paudiosamples);
     PackedByteArray opus_frame_to_opus_packet(const PackedByteArray& prefixbytes, float* paudiosamples);
+    void init_lipsync(); 
     
 public:
     virtual Ref<AudioEffectInstance> _instantiate() override;
