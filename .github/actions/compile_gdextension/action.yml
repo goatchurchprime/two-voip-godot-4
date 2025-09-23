@@ -67,7 +67,7 @@ runs:
       if: (runner.os == 'Linux')
       run: |
         sudo apt update
-        sudo apt install ninja-build
+        # sudo apt install ninja-build
 
         if [[ "${{inputs.platform}}" == "linux" ]] && [[ "${{inputs.arch}}" == *"32" ]]; then
           sudo apt install gcc-multilib g++-multilib
@@ -75,7 +75,8 @@ runs:
 
     - name: macOS dependencies
       shell: bash
-      if: (runner.os == 'macOS')
+      # Some time ago, macos runners got `ninja`` out of the box.
+      if: (runner.os == 'macOS') && false
       run: |
         brew install ninja
 
