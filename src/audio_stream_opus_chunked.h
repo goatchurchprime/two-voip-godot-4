@@ -127,6 +127,7 @@ public:
     float last_chunk_rms();
     PackedVector2Array read_last_chunk();
     PackedVector2Array pop_front_chunk(int frames);
+    PackedVector2Array opus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
 
     void set_opussamplerate(int lopussamplerate) { deletedecoder(); opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
