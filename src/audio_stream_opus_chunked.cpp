@@ -71,6 +71,7 @@ void AudioStreamOpusChunked::_bind_methods() {
     ClassDB::bind_method(D_METHOD("last_chunk_rms"), &AudioStreamOpusChunked::last_chunk_rms);
     ClassDB::bind_method(D_METHOD("read_last_chunk"), &AudioStreamOpusChunked::read_last_chunk);
     ClassDB::bind_method(D_METHOD("pop_front_chunk", "frames"), &AudioStreamOpusChunked::pop_front_chunk);
+    ClassDB::bind_method(D_METHOD("opus_packet_to_chunk", "opusbytepacket", "begin", "decode_fec"), &AudioStreamOpusChunked::opus_packet_to_chunk);
 }
 
 
@@ -267,6 +268,10 @@ PackedVector2Array* AudioStreamOpusChunked::Popus_packet_to_chunk(const PackedBy
     return &Daudioresampledbuffer; 
 }
 
+PackedVector2Array AudioStreamOpusChunked::opus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec) {
+    Popus_packet_to_chunk(opusbytepacket, begin, decode_fec);
+    return Daudioresampledbuffer;
+}
 
 void AudioStreamOpusChunked::push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec) {
     push_audio_chunk(*Popus_packet_to_chunk(opusbytepacket, begin, decode_fec)); 
