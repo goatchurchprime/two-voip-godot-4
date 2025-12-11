@@ -3,11 +3,6 @@
 [sub_resource type="AudioEffectPitchShift" id="AudioEffectPitchShift_urnej"]
 resource_name = "PitchShift"
 
-[sub_resource type="AudioEffectCapture" id="AudioEffectCapture_sj64h"]
-resource_local_to_scene = true
-resource_name = "Capture"
-buffer_length = 0.3
-
 [resource]
 bus/1/name = &"SpeechBus"
 bus/1/solo = false
@@ -17,11 +12,3 @@ bus/1/volume_db = 0.0
 bus/1/send = &"Master"
 bus/1/effect/0/effect = SubResource("AudioEffectPitchShift_urnej")
 bus/1/effect/0/enabled = false
-bus/2/name = &"MicrophoneBus"
-bus/2/solo = false
-bus/2/mute = true
-bus/2/bypass_fx = false
-bus/2/volume_db = 0.0
-bus/2/send = &"Master"
-bus/2/effect/0/effect = SubResource("AudioEffectCapture_sj64h")
-bus/2/effect/0/enabled = true

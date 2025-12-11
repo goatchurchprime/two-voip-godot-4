@@ -653,8 +653,7 @@ text = "presets:"
 
 [node name="Label2" type="Label" parent="MQTTnetwork/GridContainer" unique_id=832604055]
 layout_mode = 2
-text = "topic
-"
+text = "topic:"
 
 [node name="topic" type="LineEdit" parent="MQTTnetwork/GridContainer" unique_id=273557681]
 layout_mode = 2
