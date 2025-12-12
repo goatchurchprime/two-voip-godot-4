@@ -80,9 +80,6 @@ func loudnessvalues(chunkv1, chunkv2, frametimems, speechprobability):
 			if Vox.pressed:
 				PTT.set_pressed(false)
 		
-func _on_vox_toggled(toggled_on):
-	PTT.toggle_mode = toggled_on
-	PTT.set_pressed($HSliderVox/ColorRectThreshold.visible and toggled_on)
 
 func _on_silence_button_down():
 	$HSliderVox.value = 0

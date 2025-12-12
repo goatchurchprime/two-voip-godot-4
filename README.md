@@ -13,8 +13,8 @@ for indefatiguable work on the github actions that are successfully building thi
 
 **There are reliability issues with the Godot microphone implementation due to slight inconsistencies 
 between the audio output and audio input frame rates that cannot be sustained by 
-a simple buffer implemnentation on some platforms.  Fortunately this [Pull Request 100508](https://github.com/godotengine/godot/pull/100508) fixes them 
-by giving direct access to audio sample chunks via the `AudioStreamPlaybackMicrophone`.**
+a simple buffer implementation on some platforms.  Fortunately the function AudioServer.get_input_frames() was added 
+in Godot V4.6 to access the input audio buffer directly
 
 ## Demo example
 
