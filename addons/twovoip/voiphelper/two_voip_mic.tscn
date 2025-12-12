@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://dvpkwo6h7y0sj"]
+
+[ext_resource type="Script" uid="uid://ckct5jm036axl" path="res://addons/player-networking/twovoipr/two_voip_mic.gd" id="1_q7vc5"]
+
+[node name="TwoVoipMic" type="Node"]
+script = ExtResource("1_q7vc5")
