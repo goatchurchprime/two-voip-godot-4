@@ -10,15 +10,8 @@ var audioopuschunkedeffect_forreprocessing # : AudioEffectOpusChunked
 
 # values to use when AudioEffectOpusChunked cannot be instantiated
 var frametimems : float = 20 
-var opusbitrate : int = 0
 var audiosamplerate : int = 44100
 var audiosamplesize : int = 882
-var audioresamplerate : int = 48000
-var audioresamplesize : int = 960
-var opussamplerate : int = 48000
-var opusframesize : int = 960
-var opuscomplexity : int = 5
-var opusoptimizeforvoice : bool = true
 
 var prefixbytes = PackedByteArray([2,3])
 var mqttpacketencodebase64 : bool = false
@@ -110,17 +103,16 @@ func updatesamplerates():
 	frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
 	audiosamplerate = $VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value
 	audiosamplesize = int(audiosamplerate*frametimems/1000.0)
-	audioresamplerate = $VBoxFrameLength/HBoxAudioFrame/ResampleRate.value
-	audioresamplesize = int(audioresamplerate*frametimems/1000.0)
-	opussamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
-	opusframesize = int(opussamplerate*frametimems/1000.0)
-	opuscomplexity = int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value)
-	opusoptimizeforvoice = $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed
-
-	print("aaa audiosamplesize ", audiosamplesize, "  audiosamplerate ", audiosamplerate)
-	opusbitrate = int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value)
 	
-	$TwoVoipMic.setopusvalues(opussamplerate, frametimems, opusbitrate, opuscomplexity, opusoptimizeforvoice)
+	var audioresamplerate = $VBoxFrameLength/HBoxAudioFrame/ResampleRate.value
+	var audioresamplesize = int(audioresamplerate*frametimems/1000.0)
+	var opussamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
+	print("aaa audiosamplesize ", audiosamplesize, "  audiosamplerate ", audiosamplerate)
+	
+	$TwoVoipMic.setopusvalues(opussamplerate, frametimems, 
+			int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value), 
+			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), 
+			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
 	var aoce = $TwoVoipMic.audioopuschunkedeffect
 	
 	audioopuschunkedeffect_forreprocessing.audiosamplerate = aoce.audiosamplerate
@@ -138,10 +130,10 @@ func updatesamplerates():
 	$HBoxBigButtons/VBoxPTT/Denoise.disabled = not ($TwoVoipMic.audioopuschunkedeffect.denoiser_available() and audioresamplerate == 48000)
 
 	mqttpacketencodebase64 = $HBoxMosquitto/base64.button_pressed
-	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples" % audiosamplesize
+	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples" % aoce.audiosamplesize
 	$VBoxFrameLength/HBoxAudioFrame/LabResampleFrameLength.text = "%d samples" % audioresamplesize
-	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audiosamplesize:
-		recordedsamples = rechunkrecordedchunks(recordedsamples, audiosamplesize)
+	if len(recordedsamples) != 0 and len(recordedsamples[0]) != aoce.audiosamplesize:
+		recordedsamples = rechunkrecordedchunks(recordedsamples, aoce.audiosamplesize)
 	recordedopuspacketsMemSize = 0
 	recordedopuspackets = null
 	recordedresampledpackets = null
