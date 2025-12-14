@@ -54,7 +54,6 @@ func tv_incomingaudiopacket(packet):
 				if audiostreamopuschunked.opusframesize != h["opusframesize"] or \
 						audiostreamopuschunked.opussamplerate != h["opussamplerate"]:
 					setrecopusvalues(h["opussamplerate"], h["opusframesize"])
-				get_parent().get_parent().audiobuffersize = audiostreamopuschunked.audiosamplesize*audiostreamopuschunked.audiosamplechunks
 				lenchunkprefix = int(h["lenchunkprefix"])
 				opusstreamcount = int(h["opusstreamcount"])
 				asbase64 = (h["mqttpacketencoding"] == "base64")

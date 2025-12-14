@@ -3,22 +3,8 @@ extends Control
 var opuspacketsbuffer = [ ]
 @onready var twovoipspeaker = $AudioStreamPlayer/TwoVoipSpeaker
 
-var opusframesize : int = 0 # 960
-#var audiosamplesize : int = 0 # 882
-var opussamplerate : int = 48000
-var audiosamplerate : int = 44100
-var mix_rate : int = 44100
-var prefixbyteslength : int = 0
-var mqttpacketencodebase64 : bool = false
-
-var audiobuffersize : int = 50*882
-
 var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
-
-var audiobufferregulationtime = 0.7
-var audiobufferregulationpitch = 1.4
-
 
 func _ready():
     twovoipspeaker.connect("sigvoicespeedrate", on_sigvoicespeedrate)
@@ -48,8 +34,6 @@ func audiosamplestoshader(audiosamples):
 
 func receivemqttaudiometa(msg):
     assert (msg[0] == "{".to_ascii_buffer()[0])
-    var Dh = JSON.parse_string(msg.get_string_from_ascii())
-    print("---- ", Dh)
     twovoipspeaker.tv_incomingaudiopacket(msg)
 
 func on_sigvoicestartstream():
@@ -64,7 +48,7 @@ func receivemqttaudio(msg):
 var timedelaytohide = 0.1
 var prevopusframecount = -1
 func _process(delta):
-    $Node/ColorRectBufferQueue.size.x = min(1.0, $AudioStreamPlayer/TwoVoipSpeaker.audiostreamopuschunked.queue_length_frames()*1.0/audiobuffersize)*size.x
+    $Node/ColorRectBufferQueue.size.x = min(1.0, $AudioStreamPlayer/TwoVoipSpeaker.audiostreamopuschunked.queue_length_frames()*1.0/$AudioStreamPlayer/TwoVoipSpeaker.audiobuffersize)*size.x
     $AudioStreamPlayer.volume_db = $Node/Volume.value
     if $AudioStreamPlayer/TwoVoipSpeaker.opusframecount != prevopusframecount:
         var chunkv1 = $AudioStreamPlayer/TwoVoipSpeaker.audiostreamopuschunked.last_chunk_max()

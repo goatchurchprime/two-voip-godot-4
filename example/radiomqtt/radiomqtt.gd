@@ -35,7 +35,7 @@ func _ready():
 
 	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxOpusBitRate/SampleRate ]:
 		h.connect("item_selected", func (item_selected): updatesamplerates())
-	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusBitRate/BitRate ]:
+	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusBitRate/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
 		h.connect("value_changed", func (value): updatesamplerates())
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxBigButtons/VBoxPTT/Denoise ]:
 		h.connect("toggled", func (toggled_on): updatesamplerates())
@@ -76,8 +76,6 @@ func _ready():
 		d.size.y = i*8
 	$HBoxMosquitto/FriendlyName.text = possibleusernames.pick_random()
 
-	SelfMember.audiobufferregulationtime = 3600.0
-
 	await get_tree().create_timer(0.1).timeout
 	$HBoxMicTalk/MicWorking.set_pressed(true)
 	
@@ -115,6 +113,8 @@ func updatesamplerates():
 			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), 
 			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
 	$HBoxBigButtons/VBoxPTT/Denoise.disabled = not ($TwoVoipMic.audioopuschunkedeffect.denoiser_available() and audioresamplerate == 48000)
+	$TwoVoipMic.leadtime = $HBoxBigButtons/VBoxVox/Leadtime.value
+	$TwoVoipMic.hangtime = $HBoxBigButtons/VBoxVox/Hangtime.value
 	reprocessoriginalchunks()
 
 func reprocessoriginalchunks():
@@ -184,6 +184,7 @@ func on_transmitaudiopacket(opuspacket, opusframecount):
 
 func on_transmitaudiojsonpacket(audiostreampacketheader):
 	print(audiostreampacketheader)
+
 	if audiostreampacketheader.has("talkingtimestart"):
 		recordedsamples = [ ]
 		recordedopuspackets = [ ]
@@ -197,7 +198,6 @@ func on_transmitaudiojsonpacket(audiostreampacketheader):
 	
 		print("start talking")
 		audiostreampacketheader["mqttpacketencoding"] = "base64" if mqttpacketencodebase64 else "binary"
-		audiostreampacketheader["prefixbyteslength"] = audiostreampacketheader["lenchunkprefix"]
 		recordedheader = audiostreampacketheader
 		recordedfooter = { }
 		$MQTTnetwork.transportaudiopacketjson(audiostreampacketheader)
@@ -223,7 +223,6 @@ func _on_play_pressed():
 	for x in recordedopuspackets:
 		if not SelfMember.twovoipspeaker.audiostreamopuschunked.chunk_space_available():
 			var tmm = SelfMember.twovoipspeaker.audiostreamopuschunked.queue_length_frames()*0.5/SelfMember.twovoipspeaker.audiostreamopuschunked.audiosamplerate
-			prints(" pausing replay ", tmm, SelfMember.twovoipspeaker.audiostreamopuschunked.queue_length_frames(), SelfMember.twovoipspeaker.audiostreamopuschunked.audiosamplerate)
 			await get_tree().create_timer(tmm).timeout
 		SelfMember.twovoipspeaker.tv_incomingaudiopacket(x)
 	SelfMember.twovoipspeaker.tv_incomingaudiopacket(JSON.stringify(recordedfooter).to_ascii_buffer())

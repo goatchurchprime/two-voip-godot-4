@@ -50,6 +50,9 @@ func transportaudiopacketjson(jheader):
 	if audioouttopicmeta:
 		var packet = JSON.stringify(jheader).to_ascii_buffer()
 		$MQTT.publish(audioouttopicmeta, packet)
+		#print("set nodelay")
+		#$MQTT.socket.set_no_delay(true)
+
 
 func received_mqtt(topic, msg):
 	if flogfile != null:

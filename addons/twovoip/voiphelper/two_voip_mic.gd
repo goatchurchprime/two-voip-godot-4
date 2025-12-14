@@ -116,6 +116,7 @@ func processtalkstreamends():
 		talkingtimestart = Time.get_ticks_msec()*0.001
 		var leadframes = leadtime/frametimesecs
 		hangframes = hangtime/frametimesecs
+		print("leadframes ", leadframes)
 		while leadframes > 0.0 and audioopuschunkedeffect.undrop_chunk():
 			leadframes -= 1
 			talkingtimestart -= frametimesecs
@@ -194,8 +195,9 @@ func processopuschunk():
 	var opuspacket = audioopuschunkedeffect.read_opus_packet(chunkprefix)
 	transmitaudiopacket.emit(opuspacket, opusframecount)
 	opusframecount += 1
-
+	
 func _process(delta):
+	var kk = AudioServer.get_input_frames_available()
 	var microphonesamples = AudioServer.get_input_frames(AudioServer.get_input_frames_available())
 	audioopuschunkedeffect.push_chunk(microphonesamples)
 	microphoneaudiosamplescount += len(microphonesamples)
@@ -207,9 +209,13 @@ func _process(delta):
 		microphoneaudiosamplescountSecondsSampleWindow *= 1.5
 
 	processtalkstreamends()
+	var GG = 0
 	while audioopuschunkedeffect.chunk_available():
 		speakingvolume = processvox()
 		processtalkstreamends()
 		if currentlytalking:
 			processopuschunk()
+			GG += 1
 		audioopuschunkedeffect.drop_chunk()
+	if GG > 5:
+		print(" GG ", GG, "  ", kk)
