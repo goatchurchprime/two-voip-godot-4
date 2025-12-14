@@ -4,7 +4,6 @@
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
 [ext_resource type="Script" uid="uid://b52qfr30l2ty" path="res://addons/twovoip/voiphelper/two_voip_mic.gd" id="2_8yied"]
 [ext_resource type="Script" uid="uid://d0sl15xev22ac" path="res://radiomqtt/MQTTnetwork.gd" id="2_y485j"]
-[ext_resource type="AudioStream" uid="uid://y2nsu1nxx0nf" path="res://radiomqtt/laser3.wav" id="4_qfww3"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 [ext_resource type="Shader" uid="uid://bq3uv3u8jhu77" path="res://addons/twovoip/voiphelper/voxshader.gdshader" id="5_7rbsf"]
 
@@ -356,9 +355,6 @@ value = 5.0
 layout_mode = 2
 button_pressed = true
 text = "Voice optimized"
-
-[node name="AudioStreamPlayerTestNoise" type="AudioStreamPlayer" parent="VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice" unique_id=747832176]
-stream = ExtResource("4_qfww3")
 
 [node name="HSeparator4" type="HSeparator" parent="." unique_id=1623262998]
 custom_minimum_size = Vector2(0, 20)

@@ -176,7 +176,7 @@ func on_transmitaudiopacket(opuspacket, opusframecount):
 		var tm = len(recordedopuspackets)*audiosamplesize*1.0/audiosamplerate
 		$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
 
-	$MQTTnetwork.transportaudiopacket(var_to_bytes(opuspacket), mqttpacketencodebase64)
+	$MQTTnetwork.transportaudiopacket(opuspacket, mqttpacketencodebase64)
 
 func on_transmitaudiojsonpacket(audiostreampacketheader):
 	print(audiostreampacketheader)
@@ -284,7 +284,6 @@ func _on_frame_duration_item_selected(_index):
 
 func _on_sample_rate_item_selected(index):
 	$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
-	$VBoxFrameLength/HBoxOpusExtra/Compressed.button_pressed = true
 	updatesamplerates()
 
 func _on_resample_state_item_selected(_index):
@@ -313,7 +312,6 @@ func _on_complexity_spin_box_value_changed(value):
 
 func _on_audio_optimized_check_button_toggled(toggled_on):
 	updatesamplerates()
-	$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice/AudioStreamPlayerTestNoise.play()
 
 func _on_bit_rate_value_changed(value):
 	updatesamplerates()
