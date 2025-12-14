@@ -34,7 +34,7 @@ var microphoneaudiosamplescountSecondsSampleWindow = 10.0
 
 var talkingtimestart = 0
 
-func setopusvalues(opussamplerate, opusframedurationms, opusbitrate, opuscomplexity, opusoptimizeforvoice):
+func setopusvalues(audiosamplerate, opussamplerate, opusframedurationms, opusbitrate, opuscomplexity, opusoptimizeforvoice):
 	assert (not currentlytalking)
 	audioopuschunkedeffect.opussamplerate = opussamplerate
 	audioopuschunkedeffect.opusframesize = int(opussamplerate*opusframedurationms/1000.0)
@@ -42,7 +42,7 @@ func setopusvalues(opussamplerate, opusframedurationms, opusbitrate, opuscomplex
 	audioopuschunkedeffect.opuscomplexity = opuscomplexity
 	audioopuschunkedeffect.opusoptimizeforvoice = opusoptimizeforvoice
 
-	audioopuschunkedeffect.audiosamplerate = AudioServer.get_mix_rate()
+	audioopuschunkedeffect.audiosamplerate = audiosamplerate
 	audioopuschunkedeffect.audiosamplesize = int(audioopuschunkedeffect.audiosamplerate*opusframedurationms/1000.0)
 
 	var audiosampleframedata = PackedVector2Array()
