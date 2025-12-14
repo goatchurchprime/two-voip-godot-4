@@ -490,12 +490,6 @@ max_value = 3.0
 step = 0.1
 value = 1.0
 
-[node name="StereoFrameSlip" type="SpinBox" parent="VBoxPlayback/HBoxStream" unique_id=747028066]
-layout_mode = 2
-tooltip_text = "stereo frame slip"
-min_value = -900.0
-max_value = 900.0
-
 [node name="HSeparator5" type="HSeparator" parent="." unique_id=1578073327]
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2

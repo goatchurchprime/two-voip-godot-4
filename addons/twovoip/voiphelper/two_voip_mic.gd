@@ -92,7 +92,7 @@ func _on_vox_toggled(toggled_on):
 	pttbutton.toggle_mode = toggled_on
 	pttbutton.set_pressed(false)
 
-func initvoip(lmiconbutton: Button, loptioninputdevice: OptionButton, lpttbutton: Button, lvoxbutton: Button, ldenoisebutton: Button, laudiosampleframematerial: Material):
+func initvoipmic(lmiconbutton: Button, loptioninputdevice: OptionButton, lpttbutton: Button, lvoxbutton: Button, ldenoisebutton: Button, laudiosampleframematerial: Material):
 	miconbutton = lmiconbutton
 	pttbutton = lpttbutton
 	voxbutton = lvoxbutton
@@ -194,7 +194,6 @@ func processopuschunk():
 	var opuspacket = audioopuschunkedeffect.read_opus_packet(chunkprefix)
 	transmitaudiopacket.emit(opuspacket, opusframecount)
 	opusframecount += 1
-
 
 func _process(delta):
 	var microphonesamples = AudioServer.get_input_frames(AudioServer.get_input_frames_available())

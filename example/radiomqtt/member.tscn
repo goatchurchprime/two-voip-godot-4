@@ -1,9 +1,10 @@
 [gd_scene format=3 uid="uid://c1ibcb1toyerh"]
 
 [ext_resource type="Script" uid="uid://b16etfqd68ijo" path="res://radiomqtt/member.gd" id="1_o3hks"]
+[ext_resource type="Script" uid="uid://c4ejxw3wm6tur" path="res://addons/twovoip/voiphelper/two_voip_speaker.gd" id="2_137g6"]
 [ext_resource type="Texture2D" uid="uid://cvyjsyigutxbh" path="res://icon.png" id="2_atirx"]
 
-[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_agsyj"]
+[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_137g6"]
 resource_local_to_scene = true
 
 [sub_resource type="Shader" id="Shader_022wp"]
@@ -38,8 +39,11 @@ color = Color(0.423529, 0, 0.423529, 1)
 script = ExtResource("1_o3hks")
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=310240488]
-stream = SubResource("AudioStreamGenerator_agsyj")
+stream = SubResource("AudioStreamOpusChunked_137g6")
 bus = &"SpeechBus"
+
+[node name="TwoVoipSpeaker" type="Node" parent="AudioStreamPlayer" unique_id=1515189814]
+script = ExtResource("2_137g6")
 
 [node name="Label" type="Label" parent="." unique_id=1102099992]
 layout_mode = 0
@@ -79,14 +83,6 @@ offset_top = 37.0
 offset_right = -5.0
 offset_bottom = 42.0
 color = Color(0.0352941, 0.788235, 1, 1)
-
-[node name="ColorRect2" type="ColorRect" parent="Node" unique_id=718933371]
-layout_mode = 0
-offset_left = -53.0
-offset_top = 3.0
-offset_right = -10.0
-offset_bottom = 7.0
-color = Color(0.937255, 0.952941, 0, 1)
 
 [node name="Volume" type="SpinBox" parent="Node" unique_id=130648977]
 layout_mode = 0

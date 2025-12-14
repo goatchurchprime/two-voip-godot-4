@@ -15,6 +15,7 @@ const asciiopenbrace = 123 # "{".to_ascii_buffer()[0]
 const asciiclosebrace = 125 # "}".to_ascii_buffer()[0]
 var lenchunkprefix = -1
 var opusstreamcount = 0
+var asbase64 = false
 var opusframecount = 0
 const Noutoforderqueue = 4
 const Npacketinitialbatching = 2
@@ -22,11 +23,12 @@ var outoforderchunkqueue = [ ]
 var opusframequeuecount = 0
 var audiobuffersize = 50*882
 
-signal sigplaystream()
+signal sigvoicestartstream()
 signal sigvoicespeedrate(audiobufferpitchscale)
 
 func _ready():
-	audiostreamopuschunked = ClassDB.instantiate("AudioStreamOpusChunked")
+	audiostreamopuschunked = get_parent().stream
+	assert(audiostreamopuschunked.resource_local_to_scene, "AudioStream must be local_to_scene")
 	setrecopusvalues(48000, 960)
 
 func setrecopusvalues(opussamplerate, opusframesize):
@@ -47,13 +49,15 @@ func tv_incomingaudiopacket(packet):
 		var h = JSON.parse_string(packet.get_string_from_ascii())
 		if h != null:
 			print("audio json packet ", h)
-			sigplaystream.emit()
 			if h.has("talkingtimestart"):
+				sigvoicestartstream.emit()
 				if audiostreamopuschunked.opusframesize != h["opusframesize"] or \
 						audiostreamopuschunked.opussamplerate != h["opussamplerate"]:
 					setrecopusvalues(h["opussamplerate"], h["opusframesize"])
+				get_parent().get_parent().audiobuffersize = audiostreamopuschunked.audiosamplesize*audiostreamopuschunked.audiosamplechunks
 				lenchunkprefix = int(h["lenchunkprefix"])
 				opusstreamcount = int(h["opusstreamcount"])
+				asbase64 = (h["mqttpacketencoding"] == "base64")
 				opusframecount = 0
 				if h.has("opusframecount"):
 					prints("Mid speech header!!! ", h["opusframecount"])
@@ -70,6 +74,7 @@ func tv_incomingaudiopacket(packet):
 
 	elif lenchunkprefix == 0:
 		audiostreamopuschunked.push_opus_packet(packet, lenchunkprefix, 0)
+		opusframecount += 1
 		
 	elif packet[1]&128 == (opusstreamcount%2)*128:
 		assert (lenchunkprefix == 2)
@@ -81,7 +86,7 @@ func tv_incomingaudiopacket(packet):
 			opusframecountR = 0
 		if opusframecountR >= 0:
 			while opusframecountR >= Noutoforderqueue:
-				print("shifting outoforderqueue ", opusframecountR, " ", ("null" if outoforderchunkqueue[0] == null else len(outoforderchunkqueue[0])))
+				print("shifting outoforderqueue ", opusframecountI, " ", ("null" if outoforderchunkqueue[0] == null else len(outoforderchunkqueue[0])))
 				if outoforderchunkqueue[0] != null:
 					audiostreamopuschunked.push_opus_packet(outoforderchunkqueue[0], lenchunkprefix, 0)
 					opusframequeuecount -= 1
@@ -92,29 +97,23 @@ func tv_incomingaudiopacket(packet):
 				opusframecountR -= 1
 				opusframecount += 1
 				assert (opusframequeuecount >= 0)
-		
-			if false and opusframecount != 0 and opusframequeuecount == 0:
-				# optimize case to avoid using queue
-				audiostreamopuschunked.push_opus_packet(packet, lenchunkprefix, 0)
-				opusframecount += 1
 
-			else:
-				outoforderchunkqueue[opusframecountR] = packet
-				opusframequeuecount += 1
-				while outoforderchunkqueue[0] != null and opusframecount + opusframequeuecount >= Npacketinitialbatching:
-					if not audiostreamopuschunked.chunk_space_available():
-						print("!!! chunk space filled up")
-						break
-					audiostreamopuschunked.push_opus_packet(outoforderchunkqueue.pop_front(), lenchunkprefix, 0)
-					outoforderchunkqueue.push_back(null)
-					opusframecount += 1
-					opusframequeuecount -= 1
-					assert (opusframequeuecount >= 0)
+			outoforderchunkqueue[opusframecountR] = packet		
+			opusframequeuecount += 1
+			while outoforderchunkqueue[0] != null and opusframecount + opusframequeuecount >= Npacketinitialbatching:
+				if not audiostreamopuschunked.chunk_space_available():
+					print("!!! chunk space filled up")
+					break
+				audiostreamopuschunked.push_opus_packet(outoforderchunkqueue.pop_front(), lenchunkprefix, 0)
+				outoforderchunkqueue.push_back(null)
+				opusframecount += 1
+				opusframequeuecount -= 1
+				assert (opusframequeuecount >= 0)
 			
 	else:
 		print("dropping frame with opusstream number mismatch")
 
-func _process(delta):
+func D_process(delta):
 	if audiostreamopuschunked != null:
 		var bufferlengthtime = audioserveroutputlatency + audiostreamopuschunked.queue_length_frames()*1.0/audiostreamopuschunked.audiosamplerate
 		if bufferlengthtime < audiobufferregulationtime:

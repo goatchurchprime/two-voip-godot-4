@@ -8,7 +8,7 @@ var audioeffectpitchshift : AudioEffectPitchShift = null
 var audioeffectpitchshiftidx = 0
 var audioopuschunkedeffect_forreprocessing # : AudioEffectOpusChunked
 
-var prefixbytes = PackedByteArray([2,3])
+var resampledchunkprefix = PackedByteArray([2,3])
 var mqttpacketencodebase64 : bool = false
 
 var recordedsamples = [ ]
@@ -17,6 +17,7 @@ var recordedresampledpackets = null
 const maxrecordedsamples = 10*50
 var recordedopuspacketsMemSize = 0
 var recordedheader = { }
+var recordedfooter = { }
 
 var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
@@ -39,7 +40,7 @@ func _ready():
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxBigButtons/VBoxPTT/Denoise ]:
 		h.connect("toggled", func (toggled_on): updatesamplerates())
 
-	$TwoVoipMic.initvoip($HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMicTalk/VoxThreshold.material)
+	$TwoVoipMic.initvoipmic($HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMicTalk/VoxThreshold.material)
 
 	#for d in AudioServer.get_output_device_list():
 	#	%OptionOutput.add_item(d)
@@ -128,7 +129,6 @@ func reprocessoriginalchunks():
 
 	recordedheader["opusframesize"] = audioopuschunkedeffect_forreprocessing.opusframesize
 	recordedheader["opussamplerate"] = audioopuschunkedeffect_forreprocessing.opussamplerate
-	recordedheader["lenchunkprefix"] = len(prefixbytes)
 
 	mqttpacketencodebase64 = $HBoxMosquitto/base64.button_pressed
 	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples" % aoce.audiosamplesize
@@ -146,16 +146,21 @@ func reprocessoriginalchunks():
 
 	recordedopuspackets = [ ]
 	audioopuschunkedeffect_forreprocessing.resetencoder(true)
+	var resampledopusframecount = 0
 	for s in recordedsamples:
 		audioopuschunkedeffect_forreprocessing.push_chunk(s)
 		assert (audioopuschunkedeffect_forreprocessing.chunk_available())
 		audioopuschunkedeffect_forreprocessing.resampled_current_chunk()
 		if $HBoxBigButtons/VBoxPTT/Denoise.button_pressed:
 			audioopuschunkedeffect_forreprocessing.denoise_resampled_chunk()
-		var opuspacket = audioopuschunkedeffect_forreprocessing.read_opus_packet(prefixbytes)
+		resampledchunkprefix.set(0, (resampledopusframecount%256))  # 32768 frames is 10 minutes
+		resampledchunkprefix.set(1, (int(resampledopusframecount/256)&127) + (recordedheader["opusstreamcount"]%2)*128)
+		var opuspacket = audioopuschunkedeffect_forreprocessing.read_opus_packet(resampledchunkprefix)
 		audioopuschunkedeffect_forreprocessing.drop_chunk()
 		recordedopuspackets.append(opuspacket)
+		resampledopusframecount += 1
 		recordedopuspacketsMemSize += opuspacket.size() 
+	recordedfooter["opusframecount"] = resampledopusframecount
 	$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
 	$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
 	var tm = len(recordedsamples)*frametimems*0.001
@@ -194,9 +199,11 @@ func on_transmitaudiojsonpacket(audiostreampacketheader):
 		audiostreampacketheader["mqttpacketencoding"] = "base64" if mqttpacketencodebase64 else "binary"
 		audiostreampacketheader["prefixbyteslength"] = audiostreampacketheader["lenchunkprefix"]
 		recordedheader = audiostreampacketheader
+		recordedfooter = { }
 		$MQTTnetwork.transportaudiopacketjson(audiostreampacketheader)
 	
 	else:
+		recordedfooter = audiostreampacketheader
 		print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
 		$MQTTnetwork.transportaudiopacketjson({"framecount":audiostreampacketheader["opusframecount"]})
 		print("Talked for ", audiostreampacketheader["talkingtimeduration"], " seconds")
@@ -205,31 +212,6 @@ func _on_vox_threshold_gui_input(event):
 	if event is InputEventMouseButton and event.pressed:
 		$TwoVoipMic.set_voxthreshhold(event.position.x/$HBoxMicTalk/VoxThreshold.size.x)
 
-func duplicatewithhaasslippage(audiopackets, lframeslip):
-	var frameslip = abs(lframeslip)
-	var bleftside = (lframeslip >= 0)
-	var slippedaudiopackets = [ ]
-	for i in range(1, len(audiopackets)):
-		var prevpacket = audiopackets[i-1]
-		var packet = audiopackets[i]
-		var dpacket = packet.duplicate()
-		var n = len(packet)
-		if bleftside:
-			for j in range(n):
-				if j < frameslip:
-					dpacket[j].x = prevpacket[n - frameslip + j].x
-				else:
-					dpacket[j].x = packet[j - frameslip].x
-		else:
-			for j in range(n):
-				if j < frameslip:
-					dpacket[j].y = prevpacket[n - frameslip + j].y
-				else:
-					dpacket[j].y = packet[j - frameslip].y
-		slippedaudiopackets.push_back(dpacket)
-	return slippedaudiopackets
-		
-
 func _on_play_pressed():
 	if audioeffectpitchshift != null:
 		var speedup = $VBoxPlayback/HBoxStream/StreamSpeedup.value
@@ -237,24 +219,14 @@ func _on_play_pressed():
 		SelfMember.get_node("AudioStreamPlayer").pitch_scale = speedup
 		audioeffectpitchshift.pitch_scale = 1.0/speedup
 
-	var h = recordedheader.duplicate()
-	if recordedopuspackets:
-		SelfMember.processheaderpacket(h)
-		SelfMember.resampledpacketsbuffer = null
-		SelfMember.opuspacketsbuffer = recordedopuspackets.duplicate()
-	elif recordedresampledpackets != null:
-		SelfMember.processheaderpacket(h)
-		var stereoframeslip = $VBoxPlayback/HBoxStream/StereoFrameSlip.value
-		if stereoframeslip == 0:
-			SelfMember.resampledpacketsbuffer = recordedresampledpackets.duplicate()
-		else:
-			SelfMember.resampledpacketsbuffer = duplicatewithhaasslippage(recordedresampledpackets, stereoframeslip)
-
-	elif recordedsamples and SelfMember.audiostreamgeneratorplayback != null:
-		SelfMember.audiosamplesize = $TwoVoipMic.audioopuschunkedeffect.audiosamplesize
-		SelfMember.audiopacketsbuffer = recordedsamples.duplicate()
-
-	SelfMember.playbackstarttime = Time.get_ticks_msec()
+	SelfMember.twovoipspeaker.tv_incomingaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
+	for x in recordedopuspackets:
+		if not SelfMember.twovoipspeaker.audiostreamopuschunked.chunk_space_available():
+			var tmm = SelfMember.twovoipspeaker.audiostreamopuschunked.queue_length_frames()*0.5/SelfMember.twovoipspeaker.audiostreamopuschunked.audiosamplerate
+			prints(" pausing replay ", tmm, SelfMember.twovoipspeaker.audiostreamopuschunked.queue_length_frames(), SelfMember.twovoipspeaker.audiostreamopuschunked.audiosamplerate)
+			await get_tree().create_timer(tmm).timeout
+		SelfMember.twovoipspeaker.tv_incomingaudiopacket(x)
+	SelfMember.twovoipspeaker.tv_incomingaudiopacket(JSON.stringify(recordedfooter).to_ascii_buffer())
 
 var saveplaybackfile = "user://savedplayback.dat"
 func _on_sav_options_item_selected(index):
