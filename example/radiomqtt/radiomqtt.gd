@@ -34,11 +34,11 @@ func _ready():
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 
 	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxOpusBitRate/SampleRate ]:
-		h.connect("item_selected", func (item_selected): updatesamplerates())
+		h.connect("item_selected", func (_item_selected): updatesamplerates())
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusBitRate/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
-		h.connect("value_changed", func (value): updatesamplerates())
+		h.connect("value_changed", func (_value): updatesamplerates())
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxBigButtons/VBoxPTT/Denoise ]:
-		h.connect("toggled", func (toggled_on): updatesamplerates())
+		h.connect("toggled", func (_toggled_on): updatesamplerates())
 
 	$TwoVoipMic.initvoipmic($HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMicTalk/VoxThreshold.material)
 
@@ -81,7 +81,6 @@ func _ready():
 	
 	$TwoVoipMic.connect("transmitaudiojsonpacket", on_transmitaudiojsonpacket)
 	$TwoVoipMic.connect("transmitaudiopacket", on_transmitaudiopacket)
-
 
 func rechunkrecordedchunks(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
@@ -180,7 +179,7 @@ func recordoriginalchunks(audiosamples, opuspacket):
 func on_transmitaudiopacket(opuspacket, opusframecount):
 	if len(recordedsamples) < maxrecordedsamples:
 		recordoriginalchunks($TwoVoipMic.audioopuschunkedeffect.read_chunk(false), opuspacket)
-	$MQTTnetwork.transportaudiopacket(opuspacket, mqttpacketencodebase64)
+	$MQTTnetwork.transportaudiopacket(opuspacket, opusframecount, mqttpacketencodebase64)
 
 func on_transmitaudiojsonpacket(audiostreampacketheader):
 	print(audiostreampacketheader)

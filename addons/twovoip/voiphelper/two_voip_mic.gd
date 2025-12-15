@@ -153,7 +153,8 @@ func set_voxthreshhold(lvoxthreshhold):
 
 func processvox():
 	if denoisebutton.button_pressed:
-		audioopuschunkedeffect.denoise_resampled_chunk()
+		var speechnoiseprobability = audioopuschunkedeffect.denoise_resampled_chunk()
+		audiosampleframematerial.set_shader_parameter("speechnoiseprobability", speechnoiseprobability)
 	var chunkmax = audioopuschunkedeffect.chunk_max(rootmeansquaremaxmeasurement, denoisebutton.button_pressed)
 	audiosampleframematerial.set_shader_parameter("chunkmax", chunkmax)
 	if chunkmax >= voxthreshhold:
@@ -162,7 +163,6 @@ func processvox():
 		hangframescountup = 0
 		if chunkmax > chunkmaxpersist:
 			chunkmaxpersist = chunkmax
-			print("chunkmaxpersist ", chunkmaxpersist)
 			audiosampleframematerial.set_shader_parameter("chunkmaxpersist", chunkmaxpersist)
 	else:
 		if hangframescountup == hangframes:

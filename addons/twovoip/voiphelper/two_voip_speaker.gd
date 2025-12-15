@@ -60,7 +60,7 @@ func tv_incomingaudiopacket(packet):
 				opusframecount = 0
 				if h.has("opusframecount"):
 					prints("Mid speech header!!! ", h["opusframecount"])
-					opusframecount = h["opusframecount"]
+					opusframecount = int(h["opusframecount"]) + 1
 				outoforderchunkqueue.clear()
 				for i in range(Noutoforderqueue):
 					outoforderchunkqueue.push_back(null)
@@ -110,7 +110,7 @@ func tv_incomingaudiopacket(packet):
 				assert (opusframequeuecount >= 0)
 			
 	else:
-		print("dropping frame with opusstream number mismatch")
+		prints("dropping frame with opusstream number mismatch", opusstreamcount, packet[0], packet[1])
 
 func D_process(delta):
 	if audiostreamopuschunked != null:

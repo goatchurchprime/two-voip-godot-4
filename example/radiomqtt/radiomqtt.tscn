@@ -38,6 +38,7 @@ shader_parameter/voxwavecolor = Color(0.8, 0.8, 0.9, 1)
 shader_parameter/voxthreshhold = 0.2
 shader_parameter/chunkmax = 0.0
 shader_parameter/chunkmaxpersist = 0.0
+shader_parameter/speechnoiseprobability = 0.0
 shader_parameter/chunktexenabled = false
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_onpxr"]
