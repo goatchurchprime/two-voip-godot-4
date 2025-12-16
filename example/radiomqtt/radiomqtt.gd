@@ -76,6 +76,7 @@ func _ready():
 		d.size.y = i*8
 	$HBoxMosquitto/FriendlyName.text = possibleusernames.pick_random()
 
+	SelfMember.get_node("AudioStreamPlayer/TwoVoipSpeaker").set_physics_process(false)
 	await get_tree().create_timer(0.1).timeout
 	$HBoxMicTalk/MicWorking.set_pressed(true)
 	
@@ -203,8 +204,9 @@ func on_transmitaudiojsonpacket(audiostreampacketheader):
 	
 	else:
 		recordedfooter = audiostreampacketheader
+		assert(audiostreampacketheader.has("talkingtimeend"))
 		print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
-		$MQTTnetwork.transportaudiopacketjson({"framecount":audiostreampacketheader["opusframecount"]})
+		$MQTTnetwork.transportaudiopacketjson(audiostreampacketheader)
 		print("Talked for ", audiostreampacketheader["talkingtimeduration"], " seconds")
 
 func _on_vox_threshold_gui_input(event):
@@ -218,6 +220,8 @@ func _on_play_pressed():
 		SelfMember.get_node("AudioStreamPlayer").pitch_scale = speedup
 		audioeffectpitchshift.pitch_scale = 1.0/speedup
 
+	#SelfMember.twovoipspeaker.currentlyreceivingtalkingstate = 4
+	recordedheader.erase("opusframecount")
 	SelfMember.twovoipspeaker.tv_incomingaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
 	for x in recordedopuspackets:
 		if not SelfMember.twovoipspeaker.audiostreamopuschunked.chunk_space_available():

@@ -2,6 +2,10 @@ extends Control
 
 var opuspacketsbuffer = [ ]
 @onready var twovoipspeaker = $AudioStreamPlayer/TwoVoipSpeaker
+@onready var colournormal = $Node/ColorRectBufferQueue.color
+var colourfast = Color.GREEN
+var colourslow = Color.ORANGE
+var colourpause = Color.GRAY
 
 var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
@@ -12,6 +16,18 @@ func _ready():
 
 func on_sigvoicespeedrate(audiobufferpitchscale):
 	print("aaa ", audiobufferpitchscale)
+	if audiobufferpitchscale == 1.0:
+		$Node/ColorRectBufferQueue.color = colournormal
+	elif audiobufferpitchscale == 0.0:
+		$Node/ColorRectBufferQueue.color = colourpause
+	else:
+		$Node/ColorRectBufferQueue.color = colourslow if audiobufferpitchscale < 1.0 else colourfast
+
+	if audiobufferpitchscale == 0.0:
+		$AudioStreamPlayer.stream_paused = true
+	else:
+		$AudioStreamPlayer.stream_paused = false
+		$AudioStreamPlayer.pitch_scale = audiobufferpitchscale
 
 func setname(lname):
 	set_name(lname)

@@ -4,12 +4,9 @@ var audiostreamopuschunked : AudioStream = null
 #var player_audiostreamplayer = null
 
 #frametimems = opusframesize*1000.0/opusframesize
-var audioserveroutputlatency = 0.015
-var audiobufferregulationtimeLow = 0.6
-var audiobufferregulationtime = 1.2
-var audiobufferregulationpitchlow = 1.4
-var audiobufferregulationpitch = 2.0
-var audiobufferpitchscale = 1.0
+var audioserveroutputlatency = AudioServer.get_output_latency()
+var audiobufferlagtimetarget = 0.8
+var audiobufferlagtimetargettolerance = 0.15
 
 const asciiopenbrace = 123 # "{".to_ascii_buffer()[0]
 const asciiclosebrace = 125 # "}".to_ascii_buffer()[0]
@@ -23,8 +20,13 @@ var outoforderchunkqueue = [ ]
 var opusframequeuecount = 0
 var audiobuffersize = 50*882
 
+enum { AUDIOBUFFER_UNTOUCHED, AUDIOBUFFER_PAUSED, AUDIOBUFFER_FLOWING, AUDIOBUFFER_CLEARING }	
+var currentlyreceivingtalkingstate = AUDIOBUFFER_UNTOUCHED
+
 signal sigvoicestartstream()
 signal sigvoicespeedrate(audiobufferpitchscale)
+
+var lastemittedaudiobufferpitchscale = 1.0
 
 func _ready():
 	audiostreamopuschunked = get_parent().stream
@@ -35,10 +37,12 @@ func setrecopusvalues(opussamplerate, opusframesize):
 	var opusframeduration = opusframesize*1.0/opussamplerate
 	audiostreamopuschunked.opusframesize = opusframesize
 	audiostreamopuschunked.opussamplerate = opussamplerate
-	audiostreamopuschunked.audiosamplerate = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")  # AudioServer.get_mix_rate()
-	audiostreamopuschunked.mix_rate = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")  # AudioServer.get_mix_rate()
+	audiostreamopuschunked.audiosamplerate = AudioServer.get_mix_rate()
+	audiostreamopuschunked.mix_rate = AudioServer.get_mix_rate()
 	audiostreamopuschunked.audiosamplesize = int(audiostreamopuschunked.audiosamplerate*opusframeduration)
+	audiostreamopuschunked.audiosamplechunks = int(audiobufferlagtimetarget*2.0*audiostreamopuschunked.audiosamplerate/audiostreamopuschunked.audiosamplesize)
 	audiobuffersize = audiostreamopuschunked.audiosamplesize*audiostreamopuschunked.audiosamplechunks
+
 
 func tv_incomingaudiopacket(packet):
 	if audiostreamopuschunked == null:
@@ -67,6 +71,9 @@ func tv_incomingaudiopacket(packet):
 				opusframequeuecount = 0
 				assert (Npacketinitialbatching < Noutoforderqueue)
 				audiostreamopuschunked.resetdecoder()
+				currentlyreceivingtalkingstate = AUDIOBUFFER_PAUSED
+			elif h.has("talkingtimeend"):
+				currentlyreceivingtalkingstate = AUDIOBUFFER_CLEARING
 				
 	elif lenchunkprefix == -1:
 		pass
@@ -108,21 +115,39 @@ func tv_incomingaudiopacket(packet):
 				opusframecount += 1
 				opusframequeuecount -= 1
 				assert (opusframequeuecount >= 0)
-			
 	else:
 		prints("dropping frame with opusstream number mismatch", opusstreamcount, packet[0], packet[1])
 
-func D_process(delta):
-	if audiostreamopuschunked != null:
-		var bufferlengthtime = audioserveroutputlatency + audiostreamopuschunked.queue_length_frames()*1.0/audiostreamopuschunked.audiosamplerate
-		if bufferlengthtime < audiobufferregulationtime:
-			if audiobufferpitchscale != 1.0:
-				if bufferlengthtime < audiobufferregulationtimeLow:
-					audiobufferpitchscale = 1.0
-					sigvoicespeedrate.emit(audiobufferpitchscale)
-					print("SETTING audiobufferpitchscale ", audiobufferpitchscale)
+func _physics_process(delta):
+	if currentlyreceivingtalkingstate == AUDIOBUFFER_UNTOUCHED:
+		return
+	var bufferlengthtime = audioserveroutputlatency + audiostreamopuschunked.queue_length_frames()*1.0/audiostreamopuschunked.audiosamplerate
+	if currentlyreceivingtalkingstate == AUDIOBUFFER_PAUSED:
+		if bufferlengthtime < audiobufferlagtimetarget:
+			if lastemittedaudiobufferpitchscale != 0.0:
+				emit_signal("sigvoicespeedrate", 0.0)
+				print(" bufferlengthtime ", bufferlengthtime)
+				lastemittedaudiobufferpitchscale = 0.0
 		else:
-			var w = inverse_lerp(audiobufferregulationtime, audioserveroutputlatency + audiobuffersize/audiostreamopuschunked.audiosamplerate, bufferlengthtime)
-			audiobufferpitchscale = lerp(audiobufferregulationpitchlow, audiobufferregulationpitch, w)
-			sigvoicespeedrate.emit(audiobufferpitchscale)
-			print("SETTING audiobufferpitchscale ", audiobufferpitchscale)
+			emit_signal("sigvoicespeedrate", 1.0)
+			print(" bufferlengthtime ", bufferlengthtime)
+			lastemittedaudiobufferpitchscale = 1.0
+			currentlyreceivingtalkingstate = AUDIOBUFFER_FLOWING
+	
+	if currentlyreceivingtalkingstate == AUDIOBUFFER_FLOWING:
+		if lastemittedaudiobufferpitchscale == 1.0:
+			if abs(bufferlengthtime - audiobufferlagtimetarget) > audiobufferlagtimetargettolerance:
+				lastemittedaudiobufferpitchscale = 0.7 if (bufferlengthtime < audiobufferlagtimetarget) else 1.4
+				emit_signal("sigvoicespeedrate", lastemittedaudiobufferpitchscale)
+				print(" bufferlengthtime ", bufferlengthtime)
+			
+		elif (lastemittedaudiobufferpitchscale < 1.0) == (bufferlengthtime > audiobufferlagtimetarget):
+			emit_signal("sigvoicespeedrate", 1.0)
+			print(" bufferlengthtime ", bufferlengthtime)
+			lastemittedaudiobufferpitchscale = 1.0
+
+	if currentlyreceivingtalkingstate == AUDIOBUFFER_CLEARING:
+		currentlyreceivingtalkingstate = AUDIOBUFFER_UNTOUCHED
+		emit_signal("sigvoicespeedrate", 1.0)
+		print(" bufferlengthtime ", bufferlengthtime)
+		lastemittedaudiobufferpitchscale = 1.0
