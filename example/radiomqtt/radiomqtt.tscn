@@ -2,11 +2,10 @@
 
 [ext_resource type="Script" uid="uid://b4vk2ccjna2l6" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
+[ext_resource type="Script" uid="uid://b52qfr30l2ty" path="res://addons/twovoip/voiphelper/two_voip_mic.gd" id="2_8yied"]
 [ext_resource type="Script" uid="uid://d0sl15xev22ac" path="res://radiomqtt/MQTTnetwork.gd" id="2_y485j"]
-[ext_resource type="Texture2D" uid="uid://cvyjsyigutxbh" path="res://icon.png" id="3_eh2h5"]
-[ext_resource type="Script" uid="uid://bv1m08th1cbg5" path="res://radiomqtt/voxdetector.gd" id="3_qvq17"]
-[ext_resource type="AudioStream" uid="uid://y2nsu1nxx0nf" path="res://radiomqtt/laser3.wav" id="4_qfww3"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
+[ext_resource type="Shader" uid="uid://bq3uv3u8jhu77" path="res://addons/twovoip/voiphelper/voxshader.gdshader" id="5_7rbsf"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kcsl6"]
 bg_color = Color(0.0705882, 0.0235294, 0.564706, 1)
@@ -30,35 +29,17 @@ bg_color = Color(0.6, 0.6, 0.0470588, 1)
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3io8e"]
 bg_color = Color(0, 0.545098, 0.290196, 1)
 
-[sub_resource type="Shader" id="Shader_r847e"]
-code = "// NOTE: Shader automatically converted from Godot Engine 4.3.beta's CanvasItemMaterial.
-
-shader_type canvas_item;
-render_mode blend_mix;
-
-uniform sampler2D voice : repeat_enable;
-uniform bool drawresampled = false;
-uniform sampler2D voice_resampled : repeat_enable;
-
-void fragment() {
-  //COLOR = vec4(UV, 0.5, 1.0);
-  float rr = texture(voice, UV).r;
-  float dr = abs(UV.y*2.0 - rr*4.0 - 1.0);
-  float rs = (drawresampled ? texture(voice_resampled, UV).r : 0.0F);
-  float ds = abs(UV.y*2.0 - rs*4.0 - 1.0);
-  if (drawresampled && (ds < 0.1))
-    COLOR = (ds < 0.05 ? vec4(1.0,1.0,0.0,1.0) : vec4(0.5,0.5,0.0,1.0));
-  else if (dr < 0.1)
-    COLOR = vec4(0.8,0.8,0.9,1.0);
-  else
-    COLOR = vec4(0.1+max(rr,0.0)*0.7,0.1,0.1+max(-rr,0.0)*0.7,1.0);
-}"
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_cklni"]
-shader = SubResource("Shader_r847e")
-shader_parameter/voice = ExtResource("3_eh2h5")
-shader_parameter/drawresampled = false
-shader_parameter/voice_resampled = ExtResource("3_eh2h5")
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_7rbsf"]
+shader = ExtResource("5_7rbsf")
+shader_parameter/backgroundcolor = Color(0.1, 0.2, 0.8, 1)
+shader_parameter/voxthresholdcolor = Color(0.602, 0.43, 0.508, 1)
+shader_parameter/voxchunkmaxcolor = Color(0.8, 0.8, 0.08, 0.2)
+shader_parameter/voxwavecolor = Color(0.8, 0.8, 0.9, 1)
+shader_parameter/voxthreshhold = 0.2
+shader_parameter/chunkmax = 0.0
+shader_parameter/chunkmaxpersist = 0.0
+shader_parameter/speechnoiseprobability = 0.0
+shader_parameter/chunktexenabled = false
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_onpxr"]
 bg_color = Color(0.427451, 0.439216, 0, 1)
@@ -92,6 +73,9 @@ offset_bottom = -11.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_anot2")
+
+[node name="TwoVoipMic" type="Node" parent="." unique_id=745130104]
+script = ExtResource("2_8yied")
 
 [node name="LabelTitle" type="Label" parent="." unique_id=1539758880]
 custom_minimum_size = Vector2(0, 50)
@@ -209,7 +193,6 @@ size_flags_horizontal = 3
 [node name="HBoxMicTalk" type="HBoxContainer" parent="." unique_id=739237169]
 custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
-script = ExtResource("3_qvq17")
 
 [node name="MicWorking" type="Button" parent="HBoxMicTalk" unique_id=275710954]
 layout_mode = 2
@@ -220,66 +203,11 @@ text = "Mic
 Ena-
 bled"
 
-[node name="HSliderVox" type="HSlider" parent="HBoxMicTalk" unique_id=1998718468]
-z_index = 3
+[node name="VoxThreshold" type="ColorRect" parent="HBoxMicTalk" unique_id=1572518537]
+material = SubResource("ShaderMaterial_7rbsf")
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 1
-value = 20.0
-
-[node name="ColorRectBackground" type="ColorRect" parent="HBoxMicTalk/HSliderVox" unique_id=1490318172]
-z_index = -3
-material = SubResource("ShaderMaterial_cklni")
-layout_mode = 0
-offset_right = 378.0
-offset_bottom = 35.0
-mouse_filter = 1
-color = Color(0.255659, 0.255659, 0.255659, 1)
-
-[node name="ColorRectLoudness" type="ColorRect" parent="HBoxMicTalk/HSliderVox" unique_id=2066564241]
-z_index = -2
-layout_mode = 0
-offset_right = 111.0
-offset_bottom = 24.0
-mouse_filter = 1
-color = Color(0.224055, 0.434373, 0.715477, 1)
-
-[node name="ColorRectLoudnessRMS" type="ColorRect" parent="HBoxMicTalk/HSliderVox" unique_id=455980098]
-z_index = -2
-layout_mode = 0
-offset_top = 4.0
-offset_right = 111.0
-offset_bottom = 28.0
-mouse_filter = 1
-color = Color(0.223529, 0.541176, 0.713726, 1)
-
-[node name="ColorRectThreshold" type="ColorRect" parent="HBoxMicTalk/HSliderVox" unique_id=1115313635]
-z_index = -1
-layout_mode = 0
-offset_right = 4.0
-offset_bottom = 32.0
-mouse_filter = 1
-color = Color(0.689579, 0.760623, 0.0826142, 1)
-
-[node name="ColorRectDenoiseVoiceProb" type="ColorRect" parent="HBoxMicTalk/HSliderVox" unique_id=1564573235]
-layout_mode = 0
-offset_left = 193.0
-offset_top = 60.0
-offset_right = 223.0
-offset_bottom = 62.0
-color = Color(1, 1, 0.00392157, 1)
-
-[node name="ColorRectMicZero" type="ColorRect" parent="HBoxMicTalk/HSliderVox" unique_id=1742550260]
-layout_mode = 0
-offset_left = 193.0
-offset_top = 55.0
-offset_right = 223.0
-offset_bottom = 57.0
-color = Color(0.258824, 0.258824, 0.933333, 1)
-
-[node name="HSeparator2" type="HSeparator" parent="HBoxMicTalk" unique_id=1851654904]
-custom_minimum_size = Vector2(0, 20)
-layout_mode = 2
 
 [node name="HSeparator" type="HSeparator" parent="." unique_id=1762685707]
 custom_minimum_size = Vector2(0, 20)
@@ -321,17 +249,6 @@ popup/item_4/id = 4
 popup/item_5/text = "60ms"
 popup/item_5/id = 5
 
-[node name="LabelPitchRate" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1452557218]
-layout_mode = 2
-text = "Mic Pitch rate:"
-
-[node name="PitchRateSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=635521238]
-layout_mode = 2
-min_value = 0.2
-max_value = 5.0
-step = 0.0
-value = 1.0
-
 [node name="LabelVolumeDB" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=560405035]
 layout_mode = 2
 text = "VolumeDB"
@@ -355,6 +272,7 @@ layout_mode = 2
 min_value = 20.0
 max_value = 96000.0
 value = 44100.0
+editable = false
 suffix = "Hz"
 
 [node name="LabFrameLength" type="Label" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=51294929]
@@ -368,14 +286,12 @@ layout_mode = 2
 layout_mode = 2
 text = "Resampled:"
 
-[node name="ResampleRate" type="SpinBox" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=2059435756]
+[node name="ResampleRate" type="SpinBox" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=193840038]
 custom_minimum_size = Vector2(95, 0)
 layout_mode = 2
 tooltip_text = "Needs to match the Opus sample rate to be compressed"
-min_value = 20.0
-max_value = 96000.0
-value = 48000.0
-suffix = "Hz"
+max_value = 60000.0
+editable = false
 
 [node name="LabResampleFrameLength" type="Label" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=104965148]
 layout_mode = 2
@@ -420,11 +336,6 @@ value = 12000.0
 [node name="HBoxOpusExtra" type="HBoxContainer" parent="VBoxFrameLength" unique_id=920431574]
 layout_mode = 2
 
-[node name="Compressed" type="CheckButton" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=320125395]
-layout_mode = 2
-button_pressed = true
-text = "Opus Compressed"
-
 [node name="LabelComplexity" type="Label" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=154200874]
 layout_mode = 2
 text = "Opus Complexity"
@@ -438,9 +349,6 @@ value = 5.0
 layout_mode = 2
 button_pressed = true
 text = "Voice optimized"
-
-[node name="AudioStreamPlayerTestNoise" type="AudioStreamPlayer" parent="VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice" unique_id=747832176]
-stream = ExtResource("4_qfww3")
 
 [node name="HSeparator4" type="HSeparator" parent="." unique_id=1623262998]
 custom_minimum_size = Vector2(0, 20)
@@ -582,12 +490,6 @@ min_value = 0.1
 max_value = 3.0
 step = 0.1
 value = 1.0
-
-[node name="StereoFrameSlip" type="SpinBox" parent="VBoxPlayback/HBoxStream" unique_id=747028066]
-layout_mode = 2
-tooltip_text = "stereo frame slip"
-min_value = -900.0
-max_value = 900.0
 
 [node name="HSeparator5" type="HSeparator" parent="." unique_id=1578073327]
 custom_minimum_size = Vector2(0, 20)
@@ -767,26 +669,12 @@ offset_right = 42.0
 offset_bottom = 23.0
 text = "sil"
 
-[connection signal="toggled" from="HBoxBigButtons/VBoxPTT/Denoise" to="." method="_on_denoise_toggled"]
-[connection signal="toggled" from="HBoxBigButtons/VBoxVox/Vox" to="HBoxMicTalk" method="_on_vox_toggled"]
 [connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
-[connection signal="item_selected" from="HBoxInputDevice/OptionInputDevice" to="." method="_on_option_input_device_item_selected"]
-[connection signal="toggled" from="HBoxMicTalk/MicWorking" to="." method="_on_mic_working_toggled"]
-[connection signal="value_changed" from="HBoxMicTalk/HSliderVox" to="HBoxMicTalk" method="_on_h_slider_vox_value_changed"]
-[connection signal="item_selected" from="VBoxFrameLength/HBoxOpusFrame/FrameDuration" to="." method="_on_frame_duration_item_selected"]
-[connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/PitchRateSpinBox" to="." method="_on_spin_box_value_changed"]
+[connection signal="gui_input" from="HBoxMicTalk/VoxThreshold" to="." method="_on_vox_threshold_gui_input"]
 [connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/VolumeDBSpinBox" to="." method="_on_volume_db_spin_box_value_changed"]
-[connection signal="value_changed" from="VBoxFrameLength/HBoxAudioFrame/MicSampleRate" to="." method="_on_sample_rate_value_changed"]
-[connection signal="value_changed" from="VBoxFrameLength/HBoxAudioFrame/ResampleRate" to="." method="_on_resample_rate_value_changed"]
-[connection signal="item_selected" from="VBoxFrameLength/HBoxOpusBitRate/SampleRate" to="." method="_on_sample_rate_item_selected"]
-[connection signal="value_changed" from="VBoxFrameLength/HBoxOpusBitRate/BitRate" to="." method="_on_bit_rate_value_changed"]
-[connection signal="toggled" from="VBoxFrameLength/HBoxOpusExtra/Compressed" to="." method="_on_compressed_toggled"]
-[connection signal="value_changed" from="VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox" to="." method="_on_complexity_spin_box_value_changed"]
-[connection signal="toggled" from="VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice" to="." method="_on_audio_optimized_check_button_toggled"]
 [connection signal="pressed" from="VBoxPlayback/HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 [connection signal="item_selected" from="VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions" to="." method="_on_sav_options_item_selected"]
 [connection signal="broker_connection_failed" from="MQTTnetwork/MQTT" to="MQTTnetwork" method="_on_mqtt_broker_connection_failed"]
 [connection signal="toggled" from="MQTTnetwork/Connect" to="MQTTnetwork" method="_on_connect_toggled"]
 [connection signal="item_selected" from="MQTTnetwork/GridContainer/presets" to="MQTTnetwork" method="_on_mqtt_broker_item_selected"]
-[connection signal="toggled" from="HBoxMosquitto/base64" to="." method="_on_base_64_toggled"]
 [connection signal="toggled" from="HBoxLogging/ReplayButton" to="MQTTnetwork" method="_on_replay_button_toggled"]

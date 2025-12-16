@@ -33,7 +33,7 @@ func _process_record():
 		if (chunkcount % 50) == 0:
 			prints("audiomax: %.3f  data[%d]: %s" % [chunkmax, opusdata.size(), opusdata.slice(0,5)])
 			chunkmax = 0.0
-
+	
 func _process_playback():
 	while audiostreamopuschunked.chunk_space_available() and len(opuspacketsbuffer) != 0:
 		audiostreamopuschunked.push_opus_packet(opuspacketsbuffer.pop_front(), len(prepend), 0)

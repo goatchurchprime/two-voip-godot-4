@@ -6,24 +6,10 @@ extends Control
 
 var audioeffectpitchshift : AudioEffectPitchShift = null
 var audioeffectpitchshiftidx = 0
-var audioopuschunkedeffect # : AudioEffectOpusChunked
 var audioopuschunkedeffect_forreprocessing # : AudioEffectOpusChunked
 
-# values to use when AudioEffectOpusChunked cannot be instantiated
-var frametimems : float = 20 
-var opusbitrate : int = 0
-var audiosamplerate : int = 44100
-var audiosamplesize : int = 882
-var audioresamplerate : int = 48000
-var audioresamplesize : int = 960
-var opussamplerate : int = 48000
-var opusframesize : int = 960
-var opuscomplexity : int = 5
-var opusoptimizeforvoice : bool = true
-
-var prefixbytes = PackedByteArray([23])
+var resampledchunkprefix = PackedByteArray([2,3])
 var mqttpacketencodebase64 : bool = false
-var noopuscompression = false
 
 var recordedsamples = [ ]
 var recordedopuspackets = [ ]
@@ -31,6 +17,7 @@ var recordedresampledpackets = null
 const maxrecordedsamples = 10*50
 var recordedopuspacketsMemSize = 0
 var recordedheader = { }
+var recordedfooter = { }
 
 var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
@@ -46,9 +33,14 @@ func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 
-	for d in AudioServer.get_input_device_list():
-		$HBoxInputDevice/OptionInputDevice.add_item(d)
-	assert($HBoxInputDevice/OptionInputDevice.get_item_text($HBoxInputDevice/OptionInputDevice.selected) == "Default")
+	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxOpusBitRate/SampleRate ]:
+		h.connect("item_selected", func (_item_selected): updatesamplerates())
+	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusBitRate/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
+		h.connect("value_changed", func (_value): updatesamplerates())
+	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxBigButtons/VBoxPTT/Denoise ]:
+		h.connect("toggled", func (_toggled_on): updatesamplerates())
+
+	$TwoVoipMic.initvoipmic($HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMicTalk/VoxThreshold.material)
 
 	#for d in AudioServer.get_output_device_list():
 	#	%OptionOutput.add_item(d)
@@ -57,12 +49,7 @@ func _ready():
 	if not AudioServer.has_method("get_input_frames"):
 		$GodotVersionWarning.visible = true
 		print($GodotVersionWarning.text)
-	var caninstantiate_audioeffectopuschunked = ClassDB.can_instantiate("AudioEffectOpusChunked")
-	#caninstantiate_audioeffectopuschunked = false  # to disable it
-
-	if caninstantiate_audioeffectopuschunked:
-		audioopuschunkedeffect = ClassDB.instantiate("AudioEffectOpusChunked")
-		audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
+	audioopuschunkedeffect_forreprocessing = ClassDB.instantiate("AudioEffectOpusChunked")
 
 	#$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
 	$VBoxPlayback/HBoxStream/MixRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
@@ -80,7 +67,6 @@ func _ready():
 				audioeffectpitchshiftidx = effect_idx
 				break
 
-	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_mix_rate()
 	$VBoxPlayback/HBoxStream/OutSampleRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
 	updatesamplerates()
 	for i in range(1, len(visemes)):
@@ -90,8 +76,12 @@ func _ready():
 		d.size.y = i*8
 	$HBoxMosquitto/FriendlyName.text = possibleusernames.pick_random()
 
-	SelfMember.audiobufferregulationtime = 3600.0
+	SelfMember.get_node("AudioStreamPlayer/TwoVoipSpeaker").set_physics_process(false)
+	await get_tree().create_timer(0.1).timeout
 	$HBoxMicTalk/MicWorking.set_pressed(true)
+	
+	$TwoVoipMic.connect("transmitaudiojsonpacket", on_transmitaudiojsonpacket)
+	$TwoVoipMic.connect("transmitaudiopacket", on_transmitaudiopacket)
 
 func rechunkrecordedchunks(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
@@ -110,347 +100,118 @@ func rechunkrecordedchunks(orgsamples, newsamplesize):
 	return res
 			
 func updatesamplerates():
-	frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
-	audiosamplerate = $VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value
-	audiosamplesize = int(audiosamplerate*frametimems/1000.0)
-	audioresamplerate = $VBoxFrameLength/HBoxAudioFrame/ResampleRate.value
-	audioresamplesize = int(audioresamplerate*frametimems/1000.0)
-	opussamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
-	opusframesize = int(opussamplerate*frametimems/1000.0)
-	opuscomplexity = int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value)
-	opusoptimizeforvoice = $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed
+	var audiosamplerate = AudioServer.get_input_mix_rate()
+	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = audiosamplerate
+	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
+	var audioresamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
+	var audioresamplesize = int(audioresamplerate*frametimems/1000.0)
+	$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = audioresamplerate
+	var opussamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
+	$TwoVoipMic.setopusvalues(audiosamplerate,
+			opussamplerate, frametimems, 
+			int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value), 
+			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), 
+			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
+	$HBoxBigButtons/VBoxPTT/Denoise.disabled = not ($TwoVoipMic.audioopuschunkedeffect.denoiser_available() and audioresamplerate == 48000)
+	$TwoVoipMic.leadtime = $HBoxBigButtons/VBoxVox/Leadtime.value
+	$TwoVoipMic.hangtime = $HBoxBigButtons/VBoxVox/Hangtime.value
+	reprocessoriginalchunks()
 
-	print("aaa audiosamplesize ", audiosamplesize, "  audiosamplerate ", audiosamplerate)
+func reprocessoriginalchunks():
+	var aoce = $TwoVoipMic.audioopuschunkedeffect
+	audioopuschunkedeffect_forreprocessing.audiosamplerate = aoce.audiosamplerate
+	audioopuschunkedeffect_forreprocessing.audiosamplesize = aoce.audiosamplesize
+	audioopuschunkedeffect_forreprocessing.opussamplerate = aoce.opussamplerate
+	audioopuschunkedeffect_forreprocessing.opusframesize = aoce.opusframesize
+	audioopuschunkedeffect_forreprocessing.opuscomplexity = aoce.opuscomplexity
+	audioopuschunkedeffect_forreprocessing.opusoptimizeforvoice = aoce.opusoptimizeforvoice
+	audioopuschunkedeffect_forreprocessing.opusbitrate = aoce.opusbitrate
 
-	noopuscompression = false
-	if opussamplerate == audioresamplerate:
-		$VBoxFrameLength/HBoxOpusExtra/Compressed.disabled = false
-		if not $VBoxFrameLength/HBoxOpusExtra/Compressed.button_pressed:
-			noopuscompression = true
-	else:
-		$VBoxFrameLength/HBoxOpusExtra/Compressed.button_pressed = false
-		$VBoxFrameLength/HBoxOpusExtra/Compressed.disabled = true
-		noopuscompression = true
-	opusbitrate = int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value)
-	
-	if audioopuschunkedeffect != null:
-		audioopuschunkedeffect.audiosamplerate = audiosamplerate
-		audioopuschunkedeffect.audiosamplesize = audiosamplesize
-		audioopuschunkedeffect.opussamplerate = audioresamplerate
-		audioopuschunkedeffect.opusframesize = audioresamplesize
-		audioopuschunkedeffect.opuscomplexity = opuscomplexity
-		audioopuschunkedeffect.opusoptimizeforvoice = opusoptimizeforvoice
-		audioopuschunkedeffect.opusbitrate = opusbitrate
-		
-		audioopuschunkedeffect_forreprocessing.audiosamplerate = audiosamplerate
-		audioopuschunkedeffect_forreprocessing.audiosamplesize = audiosamplesize
-		audioopuschunkedeffect_forreprocessing.opussamplerate = audioresamplerate
-		audioopuschunkedeffect_forreprocessing.opusframesize = audioresamplesize
-		audioopuschunkedeffect_forreprocessing.opuscomplexity = opuscomplexity
-		audioopuschunkedeffect_forreprocessing.opusoptimizeforvoice = opusoptimizeforvoice
-		audioopuschunkedeffect_forreprocessing.opusbitrate = opusbitrate
-		
-		$HBoxBigButtons/VBoxPTT/Denoise.disabled = not (audioopuschunkedeffect.denoiser_available() and audioresamplerate == 48000)
-	else:
-		$VBoxFrameLength/HBoxOpusExtra/Compressed.disabled = true
-		$HBoxBigButtons/VBoxPTT/Denoise.disabled = true
+	recordedheader["opusframesize"] = audioopuschunkedeffect_forreprocessing.opusframesize
+	recordedheader["opussamplerate"] = audioopuschunkedeffect_forreprocessing.opussamplerate
 
 	mqttpacketencodebase64 = $HBoxMosquitto/base64.button_pressed
-	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples" % audiosamplesize
+	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples" % aoce.audiosamplesize
+
+	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
+	var audioresamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
+	var audioresamplesize = int(audioresamplerate*frametimems/1000.0)
 	$VBoxFrameLength/HBoxAudioFrame/LabResampleFrameLength.text = "%d samples" % audioresamplesize
-	recordedheader = { "opusframesize":audioresamplesize, 
-					   "opussamplerate":audioresamplerate, 
-					   "prefixbyteslength":len(prefixbytes), 
-					   "noopuscompression":noopuscompression,
-					   "mqttpacketencoding":"base64" if mqttpacketencodebase64 else "binary" }
-	if len(recordedsamples) != 0 and len(recordedsamples[0]) != audiosamplesize:
-		recordedsamples = rechunkrecordedchunks(recordedsamples, audiosamplesize)
+
+	if len(recordedsamples) != 0 and len(recordedsamples[0]) != aoce.audiosamplesize:
+		recordedsamples = rechunkrecordedchunks(recordedsamples, aoce.audiosamplesize)
 	recordedopuspacketsMemSize = 0
 	recordedopuspackets = null
 	recordedresampledpackets = null
-	if not noopuscompression:
-		recordedopuspackets = [ ]
-		audioopuschunkedeffect_forreprocessing.resetencoder(true)
-		for s in recordedsamples:
-			audioopuschunkedeffect_forreprocessing.push_chunk(s)
-			assert (audioopuschunkedeffect_forreprocessing.chunk_available())
-			audioopuschunkedeffect_forreprocessing.resampled_current_chunk()
-			if $HBoxBigButtons/VBoxPTT/Denoise.button_pressed:
-				audioopuschunkedeffect_forreprocessing.denoise_resampled_chunk()
-			var opuspacket = audioopuschunkedeffect_forreprocessing.read_opus_packet(prefixbytes)
-			audioopuschunkedeffect_forreprocessing.drop_chunk()
-			recordedopuspackets.append(opuspacket)
-			recordedopuspacketsMemSize += opuspacket.size() 
-		$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
-	elif audioopuschunkedeffect_forreprocessing != null:
-		recordedresampledpackets = [ ]
-		audioopuschunkedeffect_forreprocessing.resetencoder(true)
-		var denoise = not $HBoxBigButtons/VBoxPTT/Denoise.disabled and $HBoxBigButtons/VBoxPTT/Denoise.button_pressed
-		for s in recordedsamples:
-			audioopuschunkedeffect_forreprocessing.push_chunk(s)
-			assert (audioopuschunkedeffect_forreprocessing.chunk_available())
-			audioopuschunkedeffect_forreprocessing.resampled_current_chunk()
-			if $HBoxBigButtons/VBoxPTT/Denoise.button_pressed:
-				audioopuschunkedeffect_forreprocessing.denoise_resampled_chunk()
-			var resampledchunk = audioopuschunkedeffect_forreprocessing.read_chunk(true)
-			recordedresampledpackets.append(resampledchunk)
-			audioopuschunkedeffect_forreprocessing.drop_chunk()
-	else:
-		recordedresampledpackets = recordedsamples.duplicate()
-		$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = "1"
-		if len(recordedresampledpackets):
-			recordedopuspacketsMemSize = len(recordedresampledpackets)*len(recordedresampledpackets[0])*4
 
+	recordedopuspackets = [ ]
+	audioopuschunkedeffect_forreprocessing.resetencoder(true)
+	var resampledopusframecount = 0
+	for s in recordedsamples:
+		audioopuschunkedeffect_forreprocessing.push_chunk(s)
+		assert (audioopuschunkedeffect_forreprocessing.chunk_available())
+		audioopuschunkedeffect_forreprocessing.resampled_current_chunk()
+		if $HBoxBigButtons/VBoxPTT/Denoise.button_pressed:
+			audioopuschunkedeffect_forreprocessing.denoise_resampled_chunk()
+		resampledchunkprefix.set(0, (resampledopusframecount%256))  # 32768 frames is 10 minutes
+		resampledchunkprefix.set(1, (int(resampledopusframecount/256)&127) + (recordedheader["opusstreamcount"]%2)*128)
+		var opuspacket = audioopuschunkedeffect_forreprocessing.read_opus_packet(resampledchunkprefix)
+		audioopuschunkedeffect_forreprocessing.drop_chunk()
+		recordedopuspackets.append(opuspacket)
+		resampledopusframecount += 1
+		recordedopuspacketsMemSize += opuspacket.size() 
+	recordedfooter["opusframecount"] = resampledopusframecount
+	$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
 	$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
 	var tm = len(recordedsamples)*frametimems*0.001
+	$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = str(tm)
 	$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm if tm else 0))
-	setupaudioshader()
-	
-func setupaudioshader():
-	var audiosampleframedata_blank = PackedVector2Array()
-	audiosampleframedata_blank.resize(audiosamplesize)
-	for j in range(audiosamplesize):
-		audiosampleframedata_blank.set(j, Vector2(-0.5,0.9) if (j%10)<5 else Vector2(0.6,0.1))
-	audiosampleframetextureimage = Image.create_from_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata_blank.to_byte_array())
-	audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
-	assert (audiosampleframetexture != null)
-	$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
-	if opusframesize != 0:
-		var audioresampledframedata_blank = PackedVector2Array()
-		audioresampledframedata_blank.resize(opusframesize)
-		audioresampledframetextureimage = Image.create_from_data(opusframesize, 1, false, Image.FORMAT_RGF, audioresampledframedata_blank.to_byte_array())
-		audioresampledframetexture = ImageTexture.create_from_image(audioresampledframetextureimage)
-		assert (audioresampledframetexture != null)
-		$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("voice_resampled", audioresampledframetexture)
-		$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", true)
-	else:
-		$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", false)
 
-func audiosamplestoshader(audiosamples, resampled):
-	if resampled:
-		assert (len(audiosamples) == audioopuschunkedeffect.opusframesize)
-		audioresampledframetextureimage.set_data(audioopuschunkedeffect.opusframesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
-		audioresampledframetexture.update(audioresampledframetextureimage)
-	else:
-		assert (len(audiosamples) == audiosamplesize)
-		audiosampleframetextureimage.set_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
-		audiosampleframetexture.update(audiosampleframetextureimage)
+func recordoriginalchunks(audiosamples, opuspacket):
+	recordedsamples.append(audiosamples)
+	recordedopuspackets.append(opuspacket)
+	$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
+	recordedopuspacketsMemSize += opuspacket.size()
+	$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
+	var tm = len(recordedopuspackets)*$TwoVoipMic.audioopuschunkedeffect.audiosamplesize*1.0/$TwoVoipMic.audioopuschunkedeffect.audiosamplerate
+	$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = str(tm)
+	$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
 
-var currentlytalking = false
-var talkingstarttime = 0
-func starttalking():
-	currentlytalking = true
-	recordedsamples = [ ]
-	if not noopuscompression:
+func on_transmitaudiopacket(opuspacket, opusframecount):
+	if len(recordedsamples) < maxrecordedsamples:
+		recordoriginalchunks($TwoVoipMic.audioopuschunkedeffect.read_chunk(false), opuspacket)
+	$MQTTnetwork.transportaudiopacket(opuspacket, opusframecount, mqttpacketencodebase64)
+
+func on_transmitaudiojsonpacket(audiostreampacketheader):
+	print(audiostreampacketheader)
+
+	if audiostreampacketheader.has("talkingtimestart"):
+		recordedsamples = [ ]
 		recordedopuspackets = [ ]
-		recordedresampledpackets = null
-	else:
-		recordedopuspackets = null
-		if audioopuschunkedeffect != null:
-			recordedresampledpackets = [ ]
-		else:
-			recordedresampledpackets = null
+		recordedresampledpackets = [ ]
 
-	$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(0)
-	$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = str(0)
-	recordedopuspacketsMemSize = 0
-	$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(0)
-	$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(0)
+		$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(0)
+		$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = str(0)
+		recordedopuspacketsMemSize = 0
+		$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(0)
+		$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(0)
 	
-	print("start talking")
-	$MQTTnetwork.transportaudiopacketjson(recordedheader)
-	talkingstarttime = Time.get_ticks_msec()
+		print("start talking")
+		audiostreampacketheader["mqttpacketencoding"] = "base64" if mqttpacketencodebase64 else "binary"
+		recordedheader = audiostreampacketheader
+		recordedfooter = { }
+		$MQTTnetwork.transportaudiopacketjson(audiostreampacketheader)
 	
-	if audioopuschunkedeffect != null:
-		var leadtimems = $HBoxBigButtons/VBoxVox/Leadtime.value*1000 - frametimems
-		var Dundroppedchunks = 0
-		while leadtimems > 0 and audioopuschunkedeffect.undrop_chunk():
-			leadtimems -= frametimems
-			Dundroppedchunks += 1
-		print("Undropped ", Dundroppedchunks, " chunks")
-		if opusframesize != 0 and $VBoxFrameLength/HBoxOpusExtra/Compressed.button_pressed:
-			audioopuschunkedeffect.resetencoder(false)
-
-func _on_mic_working_toggled(toggled_on):
-	if toggled_on:
-		if OS.get_name() == "Android" and not OS.request_permission("android.permission.RECORD_AUDIO"):
-			print("Waiting for user response after requesting audio permissions")
-			# Must enable Record Audio permission in on Android
-			@warning_ignore("untyped_declaration")
-			var x = await get_tree().on_request_permissions_result
-			var permission: String = x[0]
-			var granted: bool = x[1]
-			assert(permission == "android.permission.RECORD_AUDIO")
-			print("Android Audio permission granted ", granted)
-
-		var err = AudioServer.set_input_device_active(true)
-		if err == OK:
-			$HBoxInputDevice/OptionInputDevice.disabled = true
-		else:
-			print("Mic input err: ", err)
-			$HBoxMicTalk/MicWorking.set_pressed_no_signal(false)
-
 	else:
-		AudioServer.set_input_device_active(false)
-		$HBoxInputDevice/OptionInputDevice.disabled = false
+		recordedfooter = audiostreampacketheader
+		assert(audiostreampacketheader.has("talkingtimeend"))
+		print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
+		$MQTTnetwork.transportaudiopacketjson(audiostreampacketheader)
+		print("Talked for ", audiostreampacketheader["talkingtimeduration"], " seconds")
 
-func _input(event):
-	if event is InputEventKey and event.is_pressed():
-		if event.keycode == KEY_P:
-			print("turn off processing")
-			set_process(false)
-			await get_tree().create_timer(2.0).timeout
-			set_process(true)
-			print("turn on processing")
-		if event.keycode == KEY_I or event.keycode == KEY_O:
-			$AudioStreamMicrophone.volume_db += (1 if event.keycode == KEY_I else -1)
-			print($AudioStreamMicrophone.volume_db)
-
-		if event.keycode == KEY_D:
-			audioopuschunkedeffect.Drunmicthing()
-
-
-var timems0formicstreamestimate = 0
-var framesformicstreamestimate = 0
-const micframecheckratems = 40000
-func _process(_delta):
-	var talking = $HBoxBigButtons/VBoxPTT/PTT.button_pressed
-	if talking:
-		$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = "%.1f" % ((Time.get_ticks_msec() - talkingstarttime)*0.001)
-	if talking and not currentlytalking:
-		starttalking()
-	elif not talking and currentlytalking:
-		endtalking()
-
-	if audioopuschunkedeffect != null:
-		var framesinprocessformicstreamestimate = 0
-		while true:
-			var microphonesamples = AudioServer.get_input_frames(audiosamplesize)
-			if len(microphonesamples) != 0:
-				audioopuschunkedeffect.push_chunk(microphonesamples)
-			else:
-				break
-
-		while audioopuschunkedeffect.chunk_available():
-			var audiosamples = audioopuschunkedeffect.read_chunk(false)
-			framesinprocessformicstreamestimate += len(audiosamples)
-			audiosamplestoshader(audiosamples, false)
-			audioopuschunkedeffect.resampled_current_chunk()
-			var chunkv1 = audioopuschunkedeffect.chunk_max(false, false)
-			var chunkv2 = audioopuschunkedeffect.chunk_max(true, false)
-			var speechnoiseprobability = -1.0
-			if $HBoxBigButtons/VBoxPTT/Denoise.button_pressed:
-				if opusframesize != 0 or audioopuschunkedeffect.opusframesize != 0:
-					speechnoiseprobability = audioopuschunkedeffect.denoise_resampled_chunk()
-					audiosamplestoshader(audioopuschunkedeffect.read_chunk(true), true)
-					$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", true)
-			else:
-				$HBoxMicTalk/HSliderVox/ColorRectBackground.material.set_shader_parameter("drawresampled", false)
-
-			var viseme = audioopuschunkedeffect.chunk_to_lipsync(false)
-			if viseme != prevviseme:
-				print(" viseme ", visemes[viseme], " ", chunkv2)
-				prevviseme = viseme
-			if viseme != -1:
-				var vv = audioopuschunkedeffect.read_visemes();
-				for i in range($HBoxVisemes.get_child_count()):
-					$HBoxVisemes.get_child(i).size.y = int(50*vv[i])
-				#print(" vvv ", vv[-2], "  ", vv[-1])
-				$HBoxVisemes.visible = true
-			else:
-				$HBoxVisemes.visible = false
-				
-			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2, frametimems, speechnoiseprobability)
-			if currentlytalking:
-				if len(recordedsamples) < maxrecordedsamples:
-					recordedsamples.append(audiosamples)
-				if noopuscompression:
-					recordedresampledpackets.append(audioopuschunkedeffect.read_chunk(true))
-				elif opusframesize != 0:
-					var opuspacket = audioopuschunkedeffect.read_opus_packet(prefixbytes)
-					$MQTTnetwork.transportaudiopacket(opuspacket, mqttpacketencodebase64)
-					if len(recordedopuspackets) < maxrecordedsamples:
-						recordedopuspackets.append(opuspacket)
-						$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
-						recordedopuspacketsMemSize += opuspacket.size()
-						$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
-						var tm = len(recordedopuspackets)*audioopuschunkedeffect.audiosamplesize*1.0/audioopuschunkedeffect.audiosamplerate
-						$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
-				else:
-					$MQTTnetwork.transportaudiopacket(var_to_bytes(audiosamples), mqttpacketencodebase64)
-			audioopuschunkedeffect.drop_chunk()
-
-		var timemsformicstreamestimate = Time.get_ticks_msec()
-		framesformicstreamestimate += framesinprocessformicstreamestimate
-		#if framesinprocessformicstreamestimate != 0:
-		#	print("ff ", timemsformicstreamestimate, framesformicstreamestimate)
-		var dtimems = timemsformicstreamestimate - timems0formicstreamestimate
-		if dtimems > micframecheckratems or timems0formicstreamestimate == 0:
-			if timems0formicstreamestimate != 0:
-				var micfreq = framesformicstreamestimate*1000.0/micframecheckratems
-				print("calculated mic frequency ", micfreq)
-			timems0formicstreamestimate = timemsformicstreamestimate
-			framesformicstreamestimate = 0
-
-	else:
-		while true:
-			var audiosamples = null
-			audiosamples = AudioServer.get_input_frames(audiosamplesize)
-			if audiosamples == null or len(audiosamples) == 0:
-				break
-
-			audiosamplestoshader(audiosamples, false)
-			var chunkv1 = 0.0
-			var schunkv2 = 0.0
-			for i in range(len(audiosamples)):
-				var v = audiosamples[i]
-				var vm = max(abs(v.x), abs(v.y))
-				if vm > chunkv1:
-					chunkv1 = vm
-				schunkv2 = v.x*v.x + v.y*v.y
-			var chunkv2 = sqrt(schunkv2/(len(audiosamples)*2))
-			$HBoxMicTalk.loudnessvalues(chunkv1, chunkv2, frametimems, -1.0)
-			if currentlytalking:
-				recordedsamples.append(audiosamples)
-				var framecount = len(recordedsamples)
-				var rawpacket = var_to_bytes(audiosamples)
-				recordedopuspacketsMemSize += rawpacket.size()
-				$MQTTnetwork.transportaudiopacket(rawpacket, mqttpacketencodebase64)
-				$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(framecount)
-				$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
-				var tm = framecount*audiosamplesize*1.0/audiosamplerate
-				$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
-		
-func endtalking():
-	currentlytalking = false
-	print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
-	$MQTTnetwork.transportaudiopacketjson({"framecount":len(recordedsamples)})
-	print("Talked for ", (Time.get_ticks_msec() - talkingstarttime)*0.001, " seconds")
-
-func duplicatewithhaasslippage(audiopackets, lframeslip):
-	var frameslip = abs(lframeslip)
-	var bleftside = (lframeslip >= 0)
-	var slippedaudiopackets = [ ]
-	for i in range(1, len(audiopackets)):
-		var prevpacket = audiopackets[i-1]
-		var packet = audiopackets[i]
-		var dpacket = packet.duplicate()
-		var n = len(packet)
-		if bleftside:
-			for j in range(n):
-				if j < frameslip:
-					dpacket[j].x = prevpacket[n - frameslip + j].x
-				else:
-					dpacket[j].x = packet[j - frameslip].x
-		else:
-			for j in range(n):
-				if j < frameslip:
-					dpacket[j].y = prevpacket[n - frameslip + j].y
-				else:
-					dpacket[j].y = packet[j - frameslip].y
-		slippedaudiopackets.push_back(dpacket)
-	return slippedaudiopackets
-		
+func _on_vox_threshold_gui_input(event):
+	if event is InputEventMouseButton and event.pressed:
+		$TwoVoipMic.set_voxthreshhold(event.position.x/$HBoxMicTalk/VoxThreshold.size.x)
 
 func _on_play_pressed():
 	if audioeffectpitchshift != null:
@@ -459,24 +220,15 @@ func _on_play_pressed():
 		SelfMember.get_node("AudioStreamPlayer").pitch_scale = speedup
 		audioeffectpitchshift.pitch_scale = 1.0/speedup
 
-	var h = recordedheader.duplicate()
-	if recordedopuspackets:
-		SelfMember.processheaderpacket(h)
-		SelfMember.resampledpacketsbuffer = null
-		SelfMember.opuspacketsbuffer = recordedopuspackets.duplicate()
-	elif recordedresampledpackets != null:
-		SelfMember.processheaderpacket(h)
-		var stereoframeslip = $VBoxPlayback/HBoxStream/StereoFrameSlip.value
-		if stereoframeslip == 0:
-			SelfMember.resampledpacketsbuffer = recordedresampledpackets.duplicate()
-		else:
-			SelfMember.resampledpacketsbuffer = duplicatewithhaasslippage(recordedresampledpackets, stereoframeslip)
-
-	elif recordedsamples and SelfMember.audiostreamgeneratorplayback != null:
-		SelfMember.audiosamplesize = audiosamplesize
-		SelfMember.audiopacketsbuffer = recordedsamples.duplicate()
-
-	SelfMember.playbackstarttime = Time.get_ticks_msec()
+	#SelfMember.twovoipspeaker.currentlyreceivingtalkingstate = 4
+	recordedheader.erase("opusframecount")
+	SelfMember.twovoipspeaker.tv_incomingaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
+	for x in recordedopuspackets:
+		if not SelfMember.twovoipspeaker.audiostreamopuschunked.chunk_space_available():
+			var tmm = SelfMember.twovoipspeaker.audiostreamopuschunked.queue_length_frames()*0.5/SelfMember.twovoipspeaker.audiostreamopuschunked.audiosamplerate
+			await get_tree().create_timer(tmm).timeout
+		SelfMember.twovoipspeaker.tv_incomingaudiopacket(x)
+	SelfMember.twovoipspeaker.tv_incomingaudiopacket(JSON.stringify(recordedfooter).to_ascii_buffer())
 
 var saveplaybackfile = "user://savedplayback.dat"
 func _on_sav_options_item_selected(index):
@@ -484,66 +236,15 @@ func _on_sav_options_item_selected(index):
 	if index == 1:
 		var f = FileAccess.open(saveplaybackfile, FileAccess.WRITE)
 		prints("Saving to file:", f.get_path_absolute())
-		f.store_var({"audiosamplerate":audiosamplerate,
+		f.store_var({"audiosamplerate":$TwoVoipMic.audioopuschunkedeffect.audiosamplerate,
 					 "recordedsamples":recordedsamples})
 		f.close()
 	elif index == 2:
 		var f = FileAccess.open(saveplaybackfile, FileAccess.READ)
 		prints("Loading from file:", f.get_path_absolute())
 		var dat = f.get_var()
-		if audiosamplerate != dat["audiosamplerate"]:
-			prints(" sample rates disagree!!", dat["audiosamplerate"], audiosamplerate)
+		if $TwoVoipMic.audioopuschunkedeffect.audiosamplerate != dat["audiosamplerate"]:
+			prints(" sample rates disagree!!", dat["audiosamplerate"], $TwoVoipMic.audioopuschunkedeffect.audiosamplerate)
 		recordedsamples = dat["recordedsamples"]
 		f.close()
 	$VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions.select(0)
-
-
-func _on_frame_duration_item_selected(_index):
-	updatesamplerates()
-
-func _on_sample_rate_item_selected(index):
-	$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
-	$VBoxFrameLength/HBoxOpusExtra/Compressed.button_pressed = true
-	updatesamplerates()
-
-func _on_resample_state_item_selected(_index):
-	updatesamplerates()
-
-func _on_audio_stream_microphone_finished():
-	print(" ** _on_audio_stream_microphone_finished")
-
-func _on_option_button_item_selected(_index):
-	updatesamplerates()
-
-func _on_denoise_toggled(toggled_on):
-	$HBoxMicTalk/HSliderVox.value = ($HBoxMicTalk.voiceprobthreshold if toggled_on else $HBoxMicTalk.voxthreshold)*$HBoxMicTalk/HSliderVox.max_value
-	updatesamplerates()
-
-func _on_base_64_toggled(toggled_on):
-	updatesamplerates()
-
-func _on_compressed_toggled(toggled_on):
-	updatesamplerates()
-
-func _on_resample_rate_value_changed(value):
-	updatesamplerates()
-
-func _on_sample_rate_value_changed(value):
-	updatesamplerates()
-
-
-
-func _on_complexity_spin_box_value_changed(value):
-	updatesamplerates()
-
-func _on_audio_optimized_check_button_toggled(toggled_on):
-	updatesamplerates()
-	$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice/AudioStreamPlayerTestNoise.play()
-
-func _on_bit_rate_value_changed(value):
-	updatesamplerates()
-
-func _on_option_input_device_item_selected(index: int) -> void:
-	var input_device: String = $HBoxInputDevice/OptionInputDevice.get_item_text(index)
-	print("Set input device: ", input_device)
-	AudioServer.set_input_device(input_device)

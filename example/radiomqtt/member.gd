@@ -1,195 +1,80 @@
 extends Control
 
-# AudioStreamPlayer can either be AudioStreamOpusChunked or AudioStreamGeneratorPlayback
-var audiostreamopuschunked # : AudioStreamOpusChunked
-var audiostreamgeneratorplayback : AudioStreamGeneratorPlayback
 var opuspacketsbuffer = [ ]
-var resampledpacketsbuffer = null
-var audiopacketsbuffer = [ ]
-
-var opusframesize : int = 0 # 960
-var audiosamplesize : int = 0 # 882
-var opussamplerate : int = 48000
-var audiosamplerate : int = 44100
-var mix_rate : int = 44100
-var prefixbyteslength : int = 0
-var mqttpacketencodebase64 : bool = false
-
-var chunkcount : int = 0
-var audiobuffersize : int = 50*882
+@onready var twovoipspeaker = $AudioStreamPlayer/TwoVoipSpeaker
+@onready var colournormal = $Node/ColorRectBufferQueue.color
+var colourfast = Color.GREEN
+var colourslow = Color.ORANGE
+var colourpause = Color.GRAY
 
 var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
 
-var audioserveroutputlatency = 0.015
-var audiobufferregulationtime = 0.7
-var audiobufferregulationpitch = 1.4
-
-var playbackstarttime = -1.0
-
 func _ready():
-	# we can handle the stream being AudioStreamGenerator or AudioStreamOpusChunked
-	var audiostream = $AudioStreamPlayer.stream
-	if audiostream == null:
-		if ClassDB.can_instantiate("AudioStreamOpusChunked"):
-			print("Instantiating AudioStreamOpusChunked")
-			audiostream = ClassDB.instantiate("AudioStreamOpusChunked")
-		else:
-			print("Instantiating AudioStreamGenerator")
-			audiostream = AudioStreamGenerator.new()
-		$AudioStreamPlayer.stream = audiostream
-	else:
-		assert (audiostream.resource_local_to_scene, "AudioStreamGenerator must be local_to_scene")
+	twovoipspeaker.connect("sigvoicespeedrate", on_sigvoicespeedrate)
+	twovoipspeaker.connect("sigvoicestartstream", on_sigvoicestartstream)
 
-	$AudioStreamPlayer.play()
-	if audiostream.is_class("AudioStreamOpusChunked"):
-		audiostreamopuschunked = audiostream
-		#var audiostreamopyschunkedplayback = $AudioStreamPlayer.get_stream_playback()
-		#audiostreamopyschunkedplayback.begin_resample()
-	elif audiostream.is_class("AudioStreamGenerator"):
-		if ClassDB.can_instantiate("AudioStreamOpusChunked"):
-			audiostreamopuschunked = ClassDB.instantiate("AudioStreamOpusChunked")
-		audiostreamgeneratorplayback = $AudioStreamPlayer.get_stream_playback()
+func on_sigvoicespeedrate(audiobufferpitchscale):
+	print("aaa ", audiobufferpitchscale)
+	if audiobufferpitchscale == 1.0:
+		$Node/ColorRectBufferQueue.color = colournormal
+	elif audiobufferpitchscale == 0.0:
+		$Node/ColorRectBufferQueue.color = colourpause
 	else:
-		printerr("Incorrect AudioStream type ", audiostream)
+		$Node/ColorRectBufferQueue.color = colourslow if audiobufferpitchscale < 1.0 else colourfast
+
+	if audiobufferpitchscale == 0.0:
+		$AudioStreamPlayer.stream_paused = true
+	else:
+		$AudioStreamPlayer.stream_paused = false
+		$AudioStreamPlayer.pitch_scale = audiobufferpitchscale
 
 func setname(lname):
 	set_name(lname)
 	$Label.text = name
 
-func processheaderpacket(h):
-	var radiomqtt = get_node("../..")
-	audiosamplerate = radiomqtt.get_node("VBoxPlayback/HBoxStream/OutSampleRate").value
-	mix_rate = radiomqtt.get_node("VBoxPlayback/HBoxStream/MixRate").value
-	prefixbyteslength = h["prefixbyteslength"]
-	mqttpacketencodebase64 = (h.get("mqttpacketencoding") == "base64")
-	chunkcount = 0
-	if opusframesize != h["opusframesize"] or opussamplerate != h["opussamplerate"] or \
-			((audiostreamopuschunked != null) and (audiostreamopuschunked.audiosamplesize != audiosamplesize or audiostreamopuschunked.audiosamplerate != audiosamplerate or \
-			audiostreamopuschunked.mix_rate != mix_rate)):
-		opusframesize = h["opusframesize"]
-		opussamplerate = h["opussamplerate"]
-		var frametimems = opusframesize*1000.0/opussamplerate
-		audiosamplesize = int(audiosamplerate*frametimems/1000.0)
-		resampledpacketsbuffer = null
-		if audiostreamopuschunked != null:
-			audiostreamopuschunked.opusframesize = opusframesize
-			audiostreamopuschunked.opussamplerate = opussamplerate
-			audiostreamopuschunked.audiosamplesize = audiosamplesize
-			audiostreamopuschunked.audiosamplerate = audiosamplerate
-			audiostreamopuschunked.mix_rate = mix_rate
-			audiobuffersize = audiostreamopuschunked.audiosamplesize*audiostreamopuschunked.audiosamplechunks
-
-		print("createdecoder ", opussamplerate, " ", opusframesize, " ", audiosamplerate, " ", audiosamplesize)
-		#$AudioStreamPlayer.play()
-		setupaudioshader()
-
-	if audiostreamgeneratorplayback:
-		$AudioStreamPlayer.stream.mix_rate = mix_rate
-	if opusframesize != 0 and audiostreamopuschunked == null and not h["noopuscompression"]:
-		print("Compressed opus stream received that we cannot decompress")
-	if audiostreamopuschunked != null:
-		audiostreamopuschunked.resetdecoder()
-	audioserveroutputlatency = AudioServer.get_output_latency()
-	print("audioserveroutputlatency ", audioserveroutputlatency)
-
-func setupaudioshader():
-	var audiosampleframedata : PackedVector2Array
-	audiosampleframedata.resize(audiosamplesize)
-	assert (audiosamplesize != 0)
-	audiosampleframetextureimage = Image.create_from_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosampleframedata.to_byte_array())
-	audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
-	assert (audiosampleframetexture != null)
-	$Node/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
-	$Node/ColorRectBackground.visible = false
+func setupaudioshader(width):
+	if audiosampleframetextureimage == null or audiosampleframetextureimage.get_size().x != width:
+		var audiosampleframedata : PackedVector2Array
+		audiosampleframedata.resize(width)
+		audiosampleframetextureimage = Image.create_from_data(width, 1, false, Image.FORMAT_RGF, audiosampleframedata.to_byte_array())
+		audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
+		assert (audiosampleframetexture != null)
+		$Node/ColorRectBackground.material.set_shader_parameter("voice", audiosampleframetexture)
+		$Node/ColorRectBackground.visible = false
 	
 func audiosamplestoshader(audiosamples):
-	assert (len(audiosamples)== audiosamplesize)
-	audiosampleframetextureimage.set_data(audiosamplesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
+	assert (len(audiosamples)== $AudioStreamPlayer/TwoVoipSpeaker.audiostreamopuschunked.audiosamplesize)
+	audiosampleframetextureimage.set_data($AudioStreamPlayer/TwoVoipSpeaker.audiostreamopuschunked.audiosamplesize, 1, false, Image.FORMAT_RGF, audiosamples.to_byte_array())
 	audiosampleframetexture.update(audiosampleframetextureimage)
 
 func receivemqttaudiometa(msg):
 	assert (msg[0] == "{".to_ascii_buffer()[0])
-	var h = JSON.parse_string(msg.get_string_from_ascii())
-	if h != null:
-		print("audio json packet ", h)
-		if h.has("opusframesize"):
-			processheaderpacket(h)
+	twovoipspeaker.tv_incomingaudiopacket(msg)
+
+func on_sigvoicestartstream():
+	$AudioStreamPlayer.play()
+	setupaudioshader($AudioStreamPlayer/TwoVoipSpeaker.audiostreamopuschunked.audiosamplesize)
 			
 func receivemqttaudio(msg):
-	if mqttpacketencodebase64:
+	if twovoipspeaker.asbase64:
 		msg = Marshalls.base64_to_raw(msg.get_string_from_ascii())
-	if opusframesize != 0:
-		opuspacketsbuffer.push_back(msg)
-	else:
-		var a = bytes_to_var(msg)
-		assert (a != null)
-		if a != null:
-			audiopacketsbuffer.push_back(a)
-
+	twovoipspeaker.tv_incomingaudiopacket(msg)
 
 var timedelaytohide = 0.1
+var prevopusframecount = -1
 func _process(delta):
-	$Node/ColorRect2.visible = (len(audiopacketsbuffer) + len(opuspacketsbuffer) > 0)
-	if audiostreamgeneratorplayback == null:
-		assert (audiostreamopuschunked != null)
-		var chunkv1 = 0.0
-		while audiostreamopuschunked.chunk_space_available():
-			if resampledpacketsbuffer != null and len(resampledpacketsbuffer) != 0:
-				var resampledaudiochunk = resampledpacketsbuffer.pop_front()
-				audiostreamopuschunked.push_resampled_audio_chunk(resampledaudiochunk)
-			elif len(audiopacketsbuffer) != 0:
-				audiostreamopuschunked.push_audio_chunk(audiopacketsbuffer.pop_front())
-			elif len(opuspacketsbuffer) != 0:
-				const fec = 0
-				audiostreamopuschunked.push_opus_packet(opuspacketsbuffer.pop_front(), prefixbyteslength, fec)
-			else:
-				break
-			chunkcount += 1
-			chunkv1 = audiostreamopuschunked.last_chunk_max()
-		$Node/ColorRectBufferQueue.size.x = min(1.0, audiostreamopuschunked.queue_length_frames()*1.0/audiobuffersize)*size.x
+	$Node/ColorRectBufferQueue.size.x = min(1.0, $AudioStreamPlayer/TwoVoipSpeaker.audiostreamopuschunked.queue_length_frames()*1.0/$AudioStreamPlayer/TwoVoipSpeaker.audiobuffersize)*size.x
+	$AudioStreamPlayer.volume_db = $Node/Volume.value
+	if $AudioStreamPlayer/TwoVoipSpeaker.opusframecount != prevopusframecount:
+		var chunkv1 = $AudioStreamPlayer/TwoVoipSpeaker.audiostreamopuschunked.last_chunk_max()
 		if chunkv1 != 0.0:
-			var audiosamples = audiostreamopuschunked.read_last_chunk()
+			var audiosamples = $AudioStreamPlayer/TwoVoipSpeaker.audiostreamopuschunked.read_last_chunk()
 			audiosamplestoshader(audiosamples)
 			$Node/ColorRectLoudness.size.x = $Node.size.x*chunkv1
 			$Node/ColorRectBackground.visible = true
 			timedelaytohide = 0.1
-			
-		if playbackstarttime != -1.0 and audiostreamopuschunked.queue_length_frames() == 0:
-			var playbackduration = Time.get_ticks_msec() - playbackstarttime + audioserveroutputlatency
-			playbackstarttime = -1.0
-			print("--- Playback time: ", playbackduration/1000.0)
-
-		var bufferlengthtime = audioserveroutputlatency + audiostreamopuschunked.queue_length_frames()*1.0/audiosamplerate
-		if audiobufferregulationtime == 3600:
-			pass
-		elif bufferlengthtime < audiobufferregulationtime:
-			$AudioStreamPlayer.pitch_scale = 1.0
-		else:
-			var w = inverse_lerp(audiobufferregulationtime, audioserveroutputlatency + audiobuffersize*1.0/audiosamplerate, bufferlengthtime)
-			$AudioStreamPlayer.pitch_scale = lerp(1.0, audiobufferregulationpitch, w)
-#show some view of the speedup rate on here
-
-	else:
-		while audiostreamgeneratorplayback.get_frames_available() > audiosamplesize:
-			if resampledpacketsbuffer != null and len(resampledpacketsbuffer) != 0:
-				var resampledaudiochunk = resampledpacketsbuffer.pop_front()
-				audiostreamopuschunked.push_resampled_audio_chunk(resampledaudiochunk)
-				var audiochunk = audiostreamopuschunked.pop_front_chunk(audiosamplesize)
-				assert (len(audiochunk) == audiosamplesize)
-				audiostreamgeneratorplayback.push_buffer(audiochunk)
-			elif len(audiopacketsbuffer) != 0:
-				audiostreamgeneratorplayback.push_buffer(audiopacketsbuffer.pop_front())
-			elif len(opuspacketsbuffer) != 0:
-				const fec = 0
-				audiostreamopuschunked.push_opus_packet(opuspacketsbuffer.pop_front(), prefixbyteslength, fec)
-				var audiochunk = audiostreamopuschunked.pop_front_chunk(audiosamplesize)
-				assert (len(audiochunk) == audiosamplesize)
-				audiostreamgeneratorplayback.push_buffer(audiochunk)
-			else:
-				break
-
-	$AudioStreamPlayer.volume_db = $Node/Volume.value
+		prevopusframecount = $AudioStreamPlayer/TwoVoipSpeaker.opusframecount
 	
 	if timedelaytohide > 0.0:
 		timedelaytohide -= delta

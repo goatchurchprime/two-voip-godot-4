@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3 uid="uid://c1ibcb1toyerh"]
+[gd_scene format=3 uid="uid://c1ibcb1toyerh"]
 
 [ext_resource type="Script" uid="uid://b16etfqd68ijo" path="res://radiomqtt/member.gd" id="1_o3hks"]
+[ext_resource type="Script" uid="uid://c4ejxw3wm6tur" path="res://addons/twovoip/voiphelper/two_voip_speaker.gd" id="2_137g6"]
 [ext_resource type="Texture2D" uid="uid://cvyjsyigutxbh" path="res://icon.png" id="2_atirx"]
 
-[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_agsyj"]
+[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_137g6"]
 resource_local_to_scene = true
 
 [sub_resource type="Shader" id="Shader_022wp"]
@@ -27,7 +28,7 @@ shader = SubResource("Shader_022wp")
 shader_parameter/blue = 1.0
 shader_parameter/voice = ExtResource("2_atirx")
 
-[node name="Member" type="ColorRect"]
+[node name="Member" type="ColorRect" unique_id=1106839630]
 custom_minimum_size = Vector2(290, 40)
 anchors_preset = -1
 anchor_right = 0.028
@@ -37,26 +38,28 @@ offset_bottom = 5.0
 color = Color(0.423529, 0, 0.423529, 1)
 script = ExtResource("1_o3hks")
 
-[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
-stream = SubResource("AudioStreamGenerator_agsyj")
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=310240488]
+stream = SubResource("AudioStreamOpusChunked_137g6")
 bus = &"SpeechBus"
 
-[node name="Label" type="Label" parent="."]
-layout_mode = 2
+[node name="TwoVoipSpeaker" type="Node" parent="AudioStreamPlayer" unique_id=1515189814]
+script = ExtResource("2_137g6")
+
+[node name="Label" type="Label" parent="." unique_id=1102099992]
+layout_mode = 0
 offset_top = 8.0
 offset_right = 50.0
 offset_bottom = 31.0
 text = "empty"
 
-[node name="Node" type="Control" parent="."]
+[node name="Node" type="Control" parent="." unique_id=1923024467]
 custom_minimum_size = Vector2(240, 0)
-layout_mode = 2
 anchors_preset = 0
 offset_left = 54.0
 offset_right = 377.0
 offset_bottom = 40.0
 
-[node name="ColorRectBackground" type="ColorRect" parent="Node"]
+[node name="ColorRectBackground" type="ColorRect" parent="Node" unique_id=1729874256]
 material = SubResource("ShaderMaterial_67gbo")
 layout_mode = 0
 offset_left = 3.0
@@ -65,7 +68,7 @@ offset_right = 233.0
 offset_bottom = 35.0
 color = Color(0.255659, 0.255659, 0.255659, 1)
 
-[node name="ColorRectLoudness" type="ColorRect" parent="Node"]
+[node name="ColorRectLoudness" type="ColorRect" parent="Node" unique_id=734575820]
 layout_mode = 0
 offset_left = 1.0
 offset_top = 10.0
@@ -73,7 +76,7 @@ offset_right = 112.0
 offset_bottom = 34.0
 color = Color(0.223529, 0.435294, 0.713726, 0.537255)
 
-[node name="ColorRectBufferQueue" type="ColorRect" parent="Node"]
+[node name="ColorRectBufferQueue" type="ColorRect" parent="Node" unique_id=176855979]
 layout_mode = 0
 offset_left = -54.0
 offset_top = 37.0
@@ -81,15 +84,7 @@ offset_right = -5.0
 offset_bottom = 42.0
 color = Color(0.0352941, 0.788235, 1, 1)
 
-[node name="ColorRect2" type="ColorRect" parent="Node"]
-layout_mode = 0
-offset_left = -53.0
-offset_top = 3.0
-offset_right = -10.0
-offset_bottom = 7.0
-color = Color(0.937255, 0.952941, 0, 1)
-
-[node name="Volume" type="SpinBox" parent="Node"]
+[node name="Volume" type="SpinBox" parent="Node" unique_id=130648977]
 layout_mode = 0
 offset_left = 150.0
 offset_top = 4.0
