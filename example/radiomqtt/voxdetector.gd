@@ -22,7 +22,6 @@ func _on_h_slider_vox_value_changed(value):
 	
 func _ready():
 	await get_tree().process_frame 
-	$HSliderVox/ColorRectBackground.size = $HSliderVox.size
 	$HSliderVox/ColorRectLoudness.size = Vector2($HSliderVox.size.x, $HSliderVox.size.y/2)
 	$HSliderVox/ColorRectLoudness.position = Vector2(0, $HSliderVox.size.y/4)
 	$HSliderVox/ColorRectLoudnessRMS.size = Vector2($HSliderVox.size.x, $HSliderVox.size.y/4)

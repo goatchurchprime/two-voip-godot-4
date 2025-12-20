@@ -139,7 +139,7 @@ func on_broker_disconnect():
 func DDconn():
 	print("eeeek CONNECTED ")
 	
-func _input(event):
+func D_input(event):
 	if event is InputEventKey and event.is_pressed() and event.keycode == KEY_9:
 		$MQTT.broker_connected.connect(DDconn)
 #		if not $MQTT.connect_to_broker("tcp://mosquitto.doesliverpool.xyz:1883"):

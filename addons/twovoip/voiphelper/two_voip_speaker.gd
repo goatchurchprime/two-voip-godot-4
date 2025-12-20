@@ -1,6 +1,7 @@
 extends Node
 
-var audiostreamopuschunked : AudioStream = null
+var audiostreamopus : AudioStreamOpus = null
+var audiostreamplaybackopus : AudioStreamPlaybackOpus = null
 #var player_audiostreamplayer = null
 
 #frametimems = opusframesize*1000.0/opusframesize
@@ -18,7 +19,6 @@ const Noutoforderqueue = 4
 const Npacketinitialbatching = 2
 var outoforderchunkqueue = [ ]
 var opusframequeuecount = 0
-var audiobuffersize = 50*882
 
 enum { AUDIOBUFFER_UNTOUCHED, AUDIOBUFFER_PAUSED, AUDIOBUFFER_FLOWING, AUDIOBUFFER_CLEARING }	
 var currentlyreceivingtalkingstate = AUDIOBUFFER_UNTOUCHED
@@ -29,23 +29,16 @@ signal sigvoicespeedrate(audiobufferpitchscale)
 var lastemittedaudiobufferpitchscale = 1.0
 
 func _ready():
-	audiostreamopuschunked = get_parent().stream
-	assert(audiostreamopuschunked.resource_local_to_scene, "AudioStream must be local_to_scene")
+	audiostreamopus = get_parent().stream
+	audiostreamplaybackopus = get_parent().get_stream_playback()
+	assert(audiostreamopus.resource_local_to_scene, "AudioStream must be local_to_scene")
 	setrecopusvalues(48000, 960)
 
-func setrecopusvalues(opussamplerate, opusframesize):
-	var opusframeduration = opusframesize*1.0/opussamplerate
-	audiostreamopuschunked.opusframesize = opusframesize
-	audiostreamopuschunked.opussamplerate = opussamplerate
-	audiostreamopuschunked.audiosamplerate = AudioServer.get_mix_rate()
-	audiostreamopuschunked.mix_rate = AudioServer.get_mix_rate()
-	audiostreamopuschunked.audiosamplesize = int(audiostreamopuschunked.audiosamplerate*opusframeduration)
-	audiostreamopuschunked.audiosamplechunks = int(audiobufferlagtimetarget*2.0*audiostreamopuschunked.audiosamplerate/audiostreamopuschunked.audiosamplesize)
-	audiobuffersize = audiostreamopuschunked.audiosamplesize*audiostreamopuschunked.audiosamplechunks
-
+func setrecopusvalues(opus_sample_rate, opusframesize):
+	audiostreamopus.opus_sample_rate = opus_sample_rate
 
 func tv_incomingaudiopacket(packet):
-	if audiostreamopuschunked == null:
+	if audiostreamopus == null:
 		return
 	if len(packet) <= 3:
 		print("Bad packet too short")
@@ -55,8 +48,7 @@ func tv_incomingaudiopacket(packet):
 			print("audio json packet ", h)
 			if h.has("talkingtimestart"):
 				sigvoicestartstream.emit()
-				if audiostreamopuschunked.opusframesize != h["opusframesize"] or \
-						audiostreamopuschunked.opussamplerate != h["opussamplerate"]:
+				if audiostreamopus.opus_sample_rate != h["opussamplerate"]:
 					setrecopusvalues(h["opussamplerate"], h["opusframesize"])
 				lenchunkprefix = int(h["lenchunkprefix"])
 				opusstreamcount = int(h["opusstreamcount"])
@@ -70,7 +62,7 @@ func tv_incomingaudiopacket(packet):
 					outoforderchunkqueue.push_back(null)
 				opusframequeuecount = 0
 				assert (Npacketinitialbatching < Noutoforderqueue)
-				audiostreamopuschunked.resetdecoder()
+				audiostreamplaybackopus.reset_decoder()
 				currentlyreceivingtalkingstate = AUDIOBUFFER_PAUSED
 			elif h.has("talkingtimeend"):
 				currentlyreceivingtalkingstate = AUDIOBUFFER_CLEARING
@@ -79,7 +71,7 @@ func tv_incomingaudiopacket(packet):
 		pass
 
 	elif lenchunkprefix == 0:
-		audiostreamopuschunked.push_opus_packet(packet, lenchunkprefix, 0)
+		audiostreamopus.push_opus_packet(packet, lenchunkprefix, 0)
 		opusframecount += 1
 		
 	elif packet[1]&128 == (opusstreamcount%2)*128:
@@ -94,10 +86,10 @@ func tv_incomingaudiopacket(packet):
 			while opusframecountR >= Noutoforderqueue:
 				print("shifting outoforderqueue ", opusframecountI, " ", ("null" if outoforderchunkqueue[0] == null else len(outoforderchunkqueue[0])))
 				if outoforderchunkqueue[0] != null:
-					audiostreamopuschunked.push_opus_packet(outoforderchunkqueue[0], lenchunkprefix, 0)
+					audiostreamplaybackopus.push_opus_packet(outoforderchunkqueue[0], lenchunkprefix, 0)
 					opusframequeuecount -= 1
 				elif outoforderchunkqueue[1] != null:
-					audiostreamopuschunked.push_opus_packet(outoforderchunkqueue[1], lenchunkprefix, 1)
+					audiostreamplaybackopus.push_opus_packet(outoforderchunkqueue[1], lenchunkprefix, 1)
 				outoforderchunkqueue.pop_front()
 				outoforderchunkqueue.push_back(null)
 				opusframecountR -= 1
@@ -107,10 +99,10 @@ func tv_incomingaudiopacket(packet):
 			outoforderchunkqueue[opusframecountR] = packet		
 			opusframequeuecount += 1
 			while outoforderchunkqueue[0] != null and opusframecount + opusframequeuecount >= Npacketinitialbatching:
-				if not audiostreamopuschunked.chunk_space_available():
-					print("!!! chunk space filled up")
+				if not audiostreamplaybackopus.opus_segment_space_available():
+					print("!!! segment space filled up")
 					break
-				audiostreamopuschunked.push_opus_packet(outoforderchunkqueue.pop_front(), lenchunkprefix, 0)
+				audiostreamplaybackopus.push_opus_packet(outoforderchunkqueue.pop_front(), lenchunkprefix, 0)
 				outoforderchunkqueue.push_back(null)
 				opusframecount += 1
 				opusframequeuecount -= 1
@@ -121,7 +113,7 @@ func tv_incomingaudiopacket(packet):
 func _physics_process(delta):
 	if currentlyreceivingtalkingstate == AUDIOBUFFER_UNTOUCHED:
 		return
-	var bufferlengthtime = audioserveroutputlatency + audiostreamopuschunked.queue_length_frames()*1.0/audiostreamopuschunked.audiosamplerate
+	var bufferlengthtime = audioserveroutputlatency + audiostreamplaybackopus.queue_length_frames()*1.0/audiostreamopus.opus_sample_rate
 	if currentlyreceivingtalkingstate == AUDIOBUFFER_PAUSED:
 		if bufferlengthtime < audiobufferlagtimetarget:
 			if lastemittedaudiobufferpitchscale != 0.0:

@@ -47,6 +47,33 @@ namespace godot {
 
 class AudioStreamOpus;
 
+
+class AudioStreamOpus : public AudioStream {
+    GDCLASS(AudioStreamOpus, AudioStream)
+    friend class AudioStreamPlaybackOpus;
+
+    float opus_sample_rate = 48000.0;
+    float buffer_len = 2.0;
+    int buffersizechanges = 0;
+
+protected:
+    static void _bind_methods();
+
+public:
+    virtual Ref<AudioStreamPlayback> _instantiate_playback() const override;
+    virtual String _get_stream_name() const override { return "Opus Peer"; }
+    virtual double _get_length() const override { return 0; }
+    virtual bool _is_monophonic() const override { return true; }
+    virtual double _get_bpm() const override { return 0.0; }
+    virtual int32_t _get_beat_count() const override { return 0; }
+    
+    void set_opus_sample_rate(int p_sample_rate) { opus_sample_rate = p_sample_rate; buffersizechanges++; };
+    float get_opus_sample_rate() { return opus_sample_rate; };
+    
+    void set_buffer_length(int p_seconds) { buffer_len = p_seconds; buffersizechanges++; };
+    int get_buffer_length() { return buffer_len; };
+};
+
 class AudioStreamPlaybackOpus : public AudioStreamPlaybackResampled {
     GDCLASS(AudioStreamPlaybackOpus, AudioStreamPlaybackResampled)
     friend class AudioStreamOpus;
@@ -55,13 +82,31 @@ class AudioStreamPlaybackOpus : public AudioStreamPlaybackResampled {
     int skips = 0;
     bool active = false;
     float mixed = 0.0;
+    int match_buffersizechanges = 0;
+
+    OpusDecoder* opusdecoder = NULL;
+    PackedVector2Array audiounpackedbuffer;
+    int Naudiounpackedbuffer = 6000;   //  *  If this is less than the maximum packet duration (120ms; 5760 for 48kHz), this function will    
+
+    PackedVector2Array audiosamplebuffer;
+
+    int Naudiosamplebuffer = 96000;
+    int bufferbegin = 0;
+    int buffertail = 0;
+    
+    int lastpacketsizeforfec = 960;
+    float lastchunkmax = 0.0;
+    int Apop_front_chunk(AudioFrame *buffer, int frames);
+
+    void create_decoder();
+    void delete_decoder();
 
 protected:
-    static void _bind_methods() {;};
+    static void _bind_methods();
 
 public:
     virtual int32_t _mix_resampled(AudioFrame *dst_buffer, int32_t frame_count) override;
-    virtual double _get_stream_sampling_rate() const override;
+    virtual double _get_stream_sampling_rate() const override  { return base->opus_sample_rate; };
 
     virtual void _start(double p_from_pos = 0.0) override;
     virtual void _stop() override;
@@ -70,58 +115,19 @@ public:
     virtual double _get_playback_position() const override;
     virtual void _seek(double p_time) override;
     virtual void _tag_used_streams() override;
-};
 
-
-class AudioStreamOpus : public AudioStream {
-    GDCLASS(AudioStreamOpus, AudioStream)
-    friend class AudioStreamPlaybackOpusChunked;
-
-    int opussamplerate = 48000;
-    int opusframesize = 960;
-    OpusDecoder* opusdecoder = NULL;
-    PackedVector2Array audiopreresampledbuffer;
-    int Naudiopreresampledbuffer = ;
+    void reset_decoder();
     
-    float mix_rate = 44100.0;
-
-    PackedVector2Array audiosamplebuffer;
-    int Naudiosamplebuffer = 96000
-    
-    int bufferbegin = 0;
-    int buffertail = 0;
-    
-    int missingsamples = 0;
-    PackedVector2Array* Popus_packet_to_chunk(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
-    int Apop_front_chunk(AudioFrame *buffer, int frames);
-
-protected:
-    static void _bind_methods();
-
-public:
-    virtual Ref<AudioStreamPlayback> _instantiate_playback() const override;
-    virtual String _get_stream_name() const override { return "OpusChunked Peer"; }
-    virtual double _get_length() const override { return 0; }
-    virtual bool _is_monophonic() const override { return true; }
-    virtual double _get_bpm() const override { return 0.0; }
-    virtual int32_t _get_beat_count() const override { return 0; }
-
-    void createdecoder();
-    void deletedecoder();
-    void resetdecoder();
-    
-    bool chunk_space_available();
+    bool opus_segment_space_available();
     int queue_length_frames();
     void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
-    
-    void set_opussamplerate(int lopussamplerate) { deletedecoder(); opussamplerate = lopussamplerate; };
-    int get_opussamplerate() { return opussamplerate; };
-    void set_mix_rate(int lmix_rate) { deletedecoder(); mix_rate = lmix_rate; };
-    int get_mix_rate() { return mix_rate; };
+    float get_last_chunk_max() { return lastchunkmax; };
 
-    AudioStreamOpusChunked() {;};
-    ~AudioStreamOpusChunked() { deletedecoder(); };
+    ~AudioStreamPlaybackOpus() { delete_decoder(); };
+
 };
+
+
 
 }
 

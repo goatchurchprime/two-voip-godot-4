@@ -29,6 +29,7 @@ var visemes = [ "sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa
 
 var possibleusernames = ["Alice", "Beth", "Cath", "Dan", "Earl", "Fred", "George", "Harry", "Ivan", "John", "Kevin", "Larry", "Martin", "Oliver", "Peter", "Quentin", "Robert", "Samuel", "Thomas", "Ulrik", "Victor", "Wayne", "Xavier", "Youngs", "Zephir"]
 
+
 func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
@@ -224,8 +225,9 @@ func _on_play_pressed():
 	recordedheader.erase("opusframecount")
 	SelfMember.twovoipspeaker.tv_incomingaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
 	for x in recordedopuspackets:
-		if not SelfMember.twovoipspeaker.audiostreamopuschunked.chunk_space_available():
-			var tmm = SelfMember.twovoipspeaker.audiostreamopuschunked.queue_length_frames()*0.5/SelfMember.twovoipspeaker.audiostreamopuschunked.audiosamplerate
+		if not SelfMember.twovoipspeaker.audiostreamplaybackopus.opus_segment_space_available():
+			var tmm = SelfMember.twovoipspeaker.audiostreamplaybackopus.queue_length_frames()*0.5/SelfMember.twovoipspeaker.audiostreamopus.opus_sample_rate
+			print("pausing tmm ", tmm)
 			await get_tree().create_timer(tmm).timeout
 		SelfMember.twovoipspeaker.tv_incomingaudiopacket(x)
 	SelfMember.twovoipspeaker.tv_incomingaudiopacket(JSON.stringify(recordedfooter).to_ascii_buffer())

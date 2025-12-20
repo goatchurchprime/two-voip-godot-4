@@ -2,31 +2,9 @@
 
 [ext_resource type="Script" uid="uid://b16etfqd68ijo" path="res://radiomqtt/member.gd" id="1_o3hks"]
 [ext_resource type="Script" uid="uid://c4ejxw3wm6tur" path="res://addons/twovoip/voiphelper/two_voip_speaker.gd" id="2_137g6"]
-[ext_resource type="Texture2D" uid="uid://cvyjsyigutxbh" path="res://icon.png" id="2_atirx"]
 
-[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_137g6"]
+[sub_resource type="AudioStreamOpus" id="AudioStreamOpus_137g6"]
 resource_local_to_scene = true
-
-[sub_resource type="Shader" id="Shader_022wp"]
-code = "// NOTE: Shader automatically converted from Godot Engine 4.3.beta's CanvasItemMaterial.
-
-shader_type canvas_item;
-render_mode blend_mix;
-
-uniform float blue = 1.0; // you can assign a default value to uniforms
-uniform sampler2D voice : repeat_enable;
-
-void fragment() {
-  COLOR = vec4(UV, 0.5, 1.0);
-  vec4 v = texture(voice, UV);
-  float d = UV.y*2.0 - v.r*4.0 - 1.0;
-  COLOR = (abs(d) < 0.1 ? vec4(0.8,0.8,0.9,1.0) : vec4(0.1,0.1,0.1,1.0));
-}"
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_67gbo"]
-shader = SubResource("Shader_022wp")
-shader_parameter/blue = 1.0
-shader_parameter/voice = ExtResource("2_atirx")
 
 [node name="Member" type="ColorRect" unique_id=1106839630]
 custom_minimum_size = Vector2(290, 40)
@@ -39,7 +17,8 @@ color = Color(0.423529, 0, 0.423529, 1)
 script = ExtResource("1_o3hks")
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=310240488]
-stream = SubResource("AudioStreamOpusChunked_137g6")
+stream = SubResource("AudioStreamOpus_137g6")
+autoplay = true
 bus = &"SpeechBus"
 
 [node name="TwoVoipSpeaker" type="Node" parent="AudioStreamPlayer" unique_id=1515189814]
@@ -59,22 +38,13 @@ offset_left = 54.0
 offset_right = 377.0
 offset_bottom = 40.0
 
-[node name="ColorRectBackground" type="ColorRect" parent="Node" unique_id=1729874256]
-material = SubResource("ShaderMaterial_67gbo")
-layout_mode = 0
-offset_left = 3.0
-offset_top = 5.0
-offset_right = 233.0
-offset_bottom = 35.0
-color = Color(0.255659, 0.255659, 0.255659, 1)
-
 [node name="ColorRectLoudness" type="ColorRect" parent="Node" unique_id=734575820]
 layout_mode = 0
-offset_left = 1.0
-offset_top = 10.0
-offset_right = 112.0
-offset_bottom = 34.0
-color = Color(0.223529, 0.435294, 0.713726, 0.537255)
+offset_left = -52.0
+offset_top = 2.0
+offset_right = 55.0
+offset_bottom = 10.0
+color = Color(0.9137255, 0.94509804, 0.9882353, 0.9098039)
 
 [node name="ColorRectBufferQueue" type="ColorRect" parent="Node" unique_id=176855979]
 layout_mode = 0
