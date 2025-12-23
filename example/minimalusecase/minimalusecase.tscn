@@ -2,11 +2,10 @@
 
 [ext_resource type="Script" uid="uid://c5xw7urpalycu" path="res://minimalusecase/minimalusecase.gd" id="1_m25c5"]
 
-[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_g3jhr"]
+[sub_resource type="AudioStreamOpus" id="AudioStreamOpus_q43gt"]
 
 [node name="MinimalUseCase" type="Node" unique_id=686249874]
 script = ExtResource("1_m25c5")
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=1686527214]
-stream = SubResource("AudioStreamOpusChunked_g3jhr")
-autoplay = true
+stream = SubResource("AudioStreamOpus_q43gt")

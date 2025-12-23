@@ -2,6 +2,7 @@
 
 #include "audio_effect_opus_chunked.h"
 #include "audio_stream_opus_chunked.h"
+#include "audio_stream_opus.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
@@ -20,6 +21,8 @@ void initialize_two_voip_module(ModuleInitializationLevel p_level) {
 
     ClassDB::register_class<AudioStreamOpusChunked>();
     ClassDB::register_class<AudioStreamPlaybackOpusChunked>();
+    ClassDB::register_class<AudioStreamOpus>();
+    ClassDB::register_class<AudioStreamPlaybackOpus>();
 }
 
 void uninitialize_two_voip_module(ModuleInitializationLevel p_level) {
