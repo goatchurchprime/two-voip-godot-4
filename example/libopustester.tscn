@@ -2,8 +2,8 @@
 
 [ext_resource type="Script" uid="uid://cv46gix55rom8" path="res://libopustester.gd" id="1_mogti"]
 
-[sub_resource type="AudioStreamOpusChunked" id="AudioStreamOpusChunked_mogti"]
+[sub_resource type="AudioStreamOpus" id="AudioStreamOpus_mogti"]
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" unique_id=1636864351]
-stream = SubResource("AudioStreamOpusChunked_mogti")
+stream = SubResource("AudioStreamOpus_mogti")
 script = ExtResource("1_mogti")

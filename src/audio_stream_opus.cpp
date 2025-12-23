@@ -73,7 +73,7 @@ AudioStreamPlaybackOpus::AudioStreamPlaybackOpus() {
 void AudioStreamPlaybackOpus::initialize(const AudioStreamOpus* pbase) {
     godot::UtilityFunctions::print("initialize AudioStreamPlaybackOpus"); 
     base = Ref<AudioStreamOpus>(pbase);
-    int opuserror = 0;  // will be one of OPUS_OK=0, OPUS_BAD_ARG=-1, OPUS_ALLOC_FAIL=-7, OPUS_INTERNAL_ERROR=-3
+    int opuserror = 0;
     godot::UtilityFunctions::print("opus_decoder_create "); 
     opusdecoder = opus_decoder_create(base->opus_sample_rate, base->opus_channels, &opuserror);
     godot::UtilityFunctions::print("opus_decoder_created "); 
@@ -82,7 +82,7 @@ void AudioStreamPlaybackOpus::initialize(const AudioStreamOpus* pbase) {
         audiounpackedbuffer.resize(Naudiounpackedbuffer);
         audiosamplebuffer.resize(Naudiosamplebuffer); 
     } else {
-        godot::UtilityFunctions::printerr("Opus_decoder_create error ", opuserror); 
+        godot::UtilityFunctions::printerr("Opus_decoder_create error ", opuserror);   // will be one of OPUS_BAD_ARG=-1, OPUS_ALLOC_FAIL=-7, OPUS_INTERNAL_ERROR=-3
         if (!((base->opus_sample_rate == 8000) || (base->opus_sample_rate == 12000) || (base->opus_sample_rate == 16000) || (base->opus_sample_rate == 24000) || (base->opus_sample_rate == 48000))) {
             godot::UtilityFunctions::printerr("Opus sample rate must be one of 48000,24000,16000,12000,8000"); 
         }

@@ -6,7 +6,7 @@ extends AudioStreamPlayer
 func _ready():
 	var fin = FileAccess.open("res://sound.ogg", FileAccess.READ)
 	var oggsblocks = [ ]
-	for i in range(24):
+	for i in range(99):
 		var gg = { }
 		gg["oggs"] = fin.get_buffer(4)
 		if gg["oggs"] != "OggS".to_ascii_buffer():
@@ -28,18 +28,28 @@ func _ready():
 	print(len(oggsblocks), " blocks")
 	var oh = oggsblocks[0]["buff"]
 	assert(oh.slice(0, 8) == "OpusHead".to_ascii_buffer())
-	var ohd = { "version":oh[8], "channelcount":oh[9], "preskip":oh.decode_u16(10), "sample_rate":oh.decode_u32(12), "outputgain":oh.decode_u16(16) }
+	var ohd = { "version":oh[8], 
+				"channelcount":oh[9], 
+				"preskip":oh.decode_u16(10), 
+				"sample_rate":oh.decode_u32(12), 
+				"outputgain":oh.decode_u16(16) }
 	print(ohd)
-
+	stream.opus_channels = ohd["channelcount"]
+	stream.opus_sample_rate = ohd["sample_rate"]
+	play()
 	for gg in oggsblocks.slice(3, 8):
 		print([gg["absolute_granule_position"], gg["page_sequence_number"]])
 	
-	var gg = oggsblocks[3]
-	print(gg["segment_table"])
-	print(gg["buff"].slice(0, 8).get_string_from_ascii())
+	var audiostreamplaybackopus : AudioStreamPlaybackOpus = get_stream_playback()
 	
-	for bb in buffblocks(gg["segment_table"], gg["buff"]):
-		print(bb)
+	for gg in oggsblocks.slice(3):
+		print(gg["segment_table"])
+		var bbs = buffblocks(gg["segment_table"], gg["buff"])
+		print("bbs ", len(bbs))
+		for bb in bbs:
+			while not audiostreamplaybackopus.opus_segment_space_available():
+				await get_tree().create_timer(0.1).timeout
+			audiostreamplaybackopus.push_opus_packet(bb, 0, 0)
 	
 func buffblocks(st, buff):
 	var siprev = 0
@@ -47,7 +57,7 @@ func buffblocks(st, buff):
 	var buffblocks = [ ]
 	for s in st:
 		si += s
-		if si != 255:
+		if s != 255:
 			buffblocks.push_back(buff.slice(siprev, si))
 			siprev = si
 	return buffblocks
