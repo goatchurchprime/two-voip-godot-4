@@ -74,9 +74,9 @@ void AudioStreamPlaybackOpus::initialize(const AudioStreamOpus* pbase) {
     godot::UtilityFunctions::print("initialize AudioStreamPlaybackOpus"); 
     base = Ref<AudioStreamOpus>(pbase);
     int opuserror = 0;  // will be one of OPUS_OK=0, OPUS_BAD_ARG=-1, OPUS_ALLOC_FAIL=-7, OPUS_INTERNAL_ERROR=-3
-    godot::UtilityFunctions::print("opus_decoder_create ", (long)(this)); 
+    godot::UtilityFunctions::print("opus_decoder_create "); 
     opusdecoder = opus_decoder_create(base->opus_sample_rate, base->opus_channels, &opuserror);
-    godot::UtilityFunctions::print("opus_decoder_created ", (long)(this)); 
+    godot::UtilityFunctions::print("opus_decoder_created "); 
     if (opuserror == 0) {
         Naudiosamplebuffer = (int)(base->buffer_len*base->opus_sample_rate);
         audiounpackedbuffer.resize(Naudiounpackedbuffer);
@@ -98,7 +98,7 @@ void AudioStreamPlaybackOpus::initialize(const AudioStreamOpus* pbase) {
 AudioStreamPlaybackOpus::~AudioStreamPlaybackOpus() {
     if (opusdecoder != NULL) {
         opus_decoder_destroy(opusdecoder);
-        godot::UtilityFunctions::print("opus_decoder_destroy ", (long)(this)); 
+        godot::UtilityFunctions::print("opus_decoder_destroy "); 
         opusdecoder = NULL;
     }
 }
