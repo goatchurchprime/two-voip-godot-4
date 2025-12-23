@@ -47,14 +47,15 @@ func receivemqttaudio(msg):
 var timedelaytohide = 0.1
 var prevopusframecount = -1
 func _process(delta):
-	$Node/ColorRectBufferQueue.size.x = min(1.0, $AudioStreamPlayer/TwoVoipSpeaker.audiostreamplaybackopus.queue_length_frames()/$AudioStreamPlayer.stream.opus_sample_rate/$AudioStreamPlayer.stream.buffer_length)*size.x
-	$AudioStreamPlayer.volume_db = $Node/Volume.value
-	if $AudioStreamPlayer/TwoVoipSpeaker.opusframecount != prevopusframecount:
-		var chunkv1 = $AudioStreamPlayer/TwoVoipSpeaker.audiostreamplaybackopus.get_last_chunk_max()
-		if chunkv1 != 0.0:
-			$Node/ColorRectLoudness.size.x = chunkv1*size.x
-			timedelaytohide = 0.1
-		prevopusframecount = $AudioStreamPlayer/TwoVoipSpeaker.opusframecount
+	if twovoipspeaker.audiostreamplaybackopus:
+		$Node/ColorRectBufferQueue.size.x = min(1.0, twovoipspeaker.audiostreamplaybackopus.queue_length_frames()/$AudioStreamPlayer.stream.opus_sample_rate/$AudioStreamPlayer.stream.buffer_length)*size.x
+		$AudioStreamPlayer.volume_db = $Node/Volume.value
+		if twovoipspeaker.opusframecount != prevopusframecount:
+			var chunkv1 = twovoipspeaker.audiostreamplaybackopus.get_last_chunk_max()
+			if chunkv1 != 0.0:
+				$Node/ColorRectLoudness.size.x = chunkv1*size.x
+				timedelaytohide = 0.1
+			prevopusframecount = twovoipspeaker.opusframecount
 	
 	if timedelaytohide > 0.0:
 		timedelaytohide -= delta

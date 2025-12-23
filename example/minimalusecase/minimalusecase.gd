@@ -1,20 +1,26 @@
 extends Node
 
-var opuschunked : AudioEffectOpusChunked = AudioEffectOpusChunked.new()
-@onready var audiostreamopus : AudioStreamOpus = $AudioStreamPlayer.stream
+var opuschunked : AudioEffectOpusChunked
+var audiostreamopus : AudioStreamOpus
+var audiostreamplaybackopus : AudioStreamPlaybackOpus
 var prepend = PackedByteArray()
 var opuspacketsbuffer = [ ]
 
 func _ready():
+	opuschunked = AudioEffectOpusChunked.new()
+	audiostreamopus = $AudioStreamPlayer.stream
+	$AudioStreamPlayer.play()
+	audiostreamplaybackopus = $AudioStreamPlayer.get_stream_playback()
+
 	AudioServer.set_input_device_active(true)
 
 	# Voice says: "Listen to me"
-	print("Message length (seconds): ", len(opusaudiodata)*1.0*0.02/audiostreamopus.opus_sample_rate)
+	print("Message length (seconds): ", len(opusaudiodata)*960.0/audiostreamopus.opus_sample_rate)
 	for r in opusaudiodata:
 		opuspacketsbuffer.append(PackedByteArray(r))
 
 func _process(_delta):
-	_process_record()
+	#_process_record()
 	_process_playback()
 
 var chunkcount = 0
@@ -34,8 +40,8 @@ func _process_record():
 			chunkmax = 0.0
 	
 func _process_playback():
-	while audiostreamopus.segment_space_available() and len(opuspacketsbuffer) != 0:
-		audiostreamopus.push_opus_packet(opuspacketsbuffer.pop_front(), len(prepend), 0)
+	while audiostreamplaybackopus.opus_segment_space_available() and len(opuspacketsbuffer) != 0:
+		audiostreamplaybackopus.push_opus_packet(opuspacketsbuffer.pop_front(), len(prepend), 0)
 
 var opusaudiodata = [
 	[72, 11, 228, 193, 34, 35, 97, 240],

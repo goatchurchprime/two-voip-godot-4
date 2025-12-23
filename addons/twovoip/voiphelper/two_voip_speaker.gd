@@ -32,9 +32,9 @@ func _ready():
 	audiostreamopus = get_parent().stream
 	audiostreamplaybackopus = get_parent().get_stream_playback()
 	assert(audiostreamopus.resource_local_to_scene, "AudioStream must be local_to_scene")
-	setrecopusvalues(48000, 960)
+	setrecopusvalues(48000)
 
-func setrecopusvalues(opus_sample_rate, opusframesize):
+func setrecopusvalues(opus_sample_rate):
 	audiostreamopus.opus_sample_rate = opus_sample_rate
 
 func tv_incomingaudiopacket(packet):
@@ -49,7 +49,7 @@ func tv_incomingaudiopacket(packet):
 			if h.has("talkingtimestart"):
 				sigvoicestartstream.emit()
 				if audiostreamopus.opus_sample_rate != h["opussamplerate"]:
-					setrecopusvalues(h["opussamplerate"], h["opusframesize"])
+					setrecopusvalues(h["opussamplerate"])
 				lenchunkprefix = int(h["lenchunkprefix"])
 				opusstreamcount = int(h["opusstreamcount"])
 				asbase64 = (h["mqttpacketencoding"] == "base64")
@@ -62,7 +62,7 @@ func tv_incomingaudiopacket(packet):
 					outoforderchunkqueue.push_back(null)
 				opusframequeuecount = 0
 				assert (Npacketinitialbatching < Noutoforderqueue)
-				audiostreamplaybackopus.reset_decoder()
+				audiostreamplaybackopus.reset_opus_decoder()
 				currentlyreceivingtalkingstate = AUDIOBUFFER_PAUSED
 			elif h.has("talkingtimeend"):
 				currentlyreceivingtalkingstate = AUDIOBUFFER_CLEARING

@@ -52,9 +52,10 @@ class AudioStreamOpus : public AudioStream {
     GDCLASS(AudioStreamOpus, AudioStream)
     friend class AudioStreamPlaybackOpus;
 
-    float opus_sample_rate = 48000.0;
+    float opus_sample_rate = 48000.0;  // must be one of 48000,24000,16000,12000,8000
+    int opus_channels = 2;  // must be 1 or 2
+
     float buffer_len = 2.0;
-    int buffersizechanges = 0;
 
 protected:
     static void _bind_methods();
@@ -67,10 +68,11 @@ public:
     virtual double _get_bpm() const override { return 0.0; }
     virtual int32_t _get_beat_count() const override { return 0; }
     
-    void set_opus_sample_rate(int p_sample_rate) { opus_sample_rate = p_sample_rate; buffersizechanges++; };
+    void set_opus_sample_rate(int p_sample_rate) { opus_sample_rate = p_sample_rate;  };
     float get_opus_sample_rate() { return opus_sample_rate; };
-    
-    void set_buffer_length(int p_seconds) { buffer_len = p_seconds; buffersizechanges++; };
+    void set_opus_channels(int p_channels) { opus_channels = p_channels;  };
+    float get_opus_channels() { return opus_channels; };
+    void set_buffer_length(int p_seconds) { buffer_len = p_seconds; };
     int get_buffer_length() { return buffer_len; };
 };
 
@@ -82,7 +84,6 @@ class AudioStreamPlaybackOpus : public AudioStreamPlaybackResampled {
     int skips = 0;
     bool active = false;
     float mixed = 0.0;
-    int match_buffersizechanges = 0;
 
     OpusDecoder* opusdecoder = NULL;
     PackedVector2Array audiounpackedbuffer;
@@ -96,13 +97,11 @@ class AudioStreamPlaybackOpus : public AudioStreamPlaybackResampled {
     
     int lastpacketsizeforfec = 960;
     float lastchunkmax = 0.0;
-    int Apop_front_chunk(AudioFrame *buffer, int frames);
-
-    void create_decoder();
-    void delete_decoder();
+    int pop_front_frames(AudioFrame *buffer, int frames);
 
 protected:
     static void _bind_methods();
+    void initialize(const AudioStreamOpus* pbase);
 
 public:
     virtual int32_t _mix_resampled(AudioFrame *dst_buffer, int32_t frame_count) override;
@@ -116,15 +115,14 @@ public:
     virtual void _seek(double p_time) override;
     virtual void _tag_used_streams() override;
 
-    void reset_decoder();
-    
+    void reset_opus_decoder();
     bool opus_segment_space_available();
     int queue_length_frames();
     void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
     float get_last_chunk_max() { return lastchunkmax; };
 
-    ~AudioStreamPlaybackOpus() { delete_decoder(); };
-
+    AudioStreamPlaybackOpus();
+    ~AudioStreamPlaybackOpus();
 };
 
 

@@ -37,64 +37,78 @@ void AudioStreamOpus::_bind_methods() {
 
     ClassDB::bind_method(D_METHOD("set_opus_sample_rate", "opus_sample_rate"), &AudioStreamOpus::set_opus_sample_rate);
     ClassDB::bind_method(D_METHOD("get_opus_sample_rate"), &AudioStreamOpus::get_opus_sample_rate);
+    ClassDB::bind_method(D_METHOD("set_opus_channels", "opus_sample_rate"), &AudioStreamOpus::set_opus_channels);
+    ClassDB::bind_method(D_METHOD("get_opus_channels"), &AudioStreamOpus::get_opus_channels);
     ClassDB::bind_method(D_METHOD("set_buffer_length", "seconds"), &AudioStreamOpus::set_buffer_length);
     ClassDB::bind_method(D_METHOD("get_buffer_length"), &AudioStreamOpus::get_buffer_length);
 
 
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "buffer_length", PROPERTY_HINT_RANGE, "0.01,10,0.01,suffix:s"), "set_buffer_length", "get_buffer_length");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "opus_sample_rate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_opus_sample_rate", "get_opus_sample_rate");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "opus_channels", PROPERTY_HINT_RANGE, "1,2,1"), "set_opus_channels", "get_opus_channels");
 }
 
+void AudioStreamPlaybackOpus::_bind_methods() {
+
+    ClassDB::bind_method(D_METHOD("get_last_chunk_max"), &AudioStreamPlaybackOpus::get_last_chunk_max);
+    ClassDB::bind_method(D_METHOD("opus_segment_space_available"), &AudioStreamPlaybackOpus::opus_segment_space_available);
+    ClassDB::bind_method(D_METHOD("queue_length_frames"), &AudioStreamPlaybackOpus::queue_length_frames);
+    ClassDB::bind_method(D_METHOD("push_opus_packet", "opusbytepacket", "begin", "decode_fec"), &AudioStreamPlaybackOpus::push_opus_packet);
+    ClassDB::bind_method(D_METHOD("reset_opus_decoder"), &AudioStreamPlaybackOpus::reset_opus_decoder);
+}
 
 Ref<AudioStreamPlayback> AudioStreamOpus::_instantiate_playback() const {
+    godot::UtilityFunctions::prints("ref AudioStreamPlaybackOpus");
     Ref<AudioStreamPlaybackOpus> playback;
+    godot::UtilityFunctions::prints("instantiate AudioStreamPlaybackOpus");
     playback.instantiate();
-    playback->base = Ref<AudioStreamOpus>(this);
-    godot::UtilityFunctions::prints("instantiate_playback");
+    playback->initialize(this); 
     return playback;
 }
 
-void AudioStreamPlaybackOpus::delete_decoder() {
+AudioStreamPlaybackOpus::AudioStreamPlaybackOpus() {
+    godot::UtilityFunctions::print("construct AudioStreamPlaybackOpus"); 
+}
+
+void AudioStreamPlaybackOpus::initialize(const AudioStreamOpus* pbase) {
+    godot::UtilityFunctions::print("initialize AudioStreamPlaybackOpus"); 
+    base = Ref<AudioStreamOpus>(pbase);
+    int opuserror = 0;  // will be one of OPUS_OK=0, OPUS_BAD_ARG=-1, OPUS_ALLOC_FAIL=-7, OPUS_INTERNAL_ERROR=-3
+    godot::UtilityFunctions::print("opus_decoder_create ", (long)(this)); 
+    opusdecoder = opus_decoder_create(base->opus_sample_rate, base->opus_channels, &opuserror);
+    godot::UtilityFunctions::print("opus_decoder_created ", (long)(this)); 
+    if (opuserror == 0) {
+        Naudiosamplebuffer = (int)(base->buffer_len*base->opus_sample_rate);
+        audiounpackedbuffer.resize(Naudiounpackedbuffer);
+        audiosamplebuffer.resize(Naudiosamplebuffer); 
+    } else {
+        godot::UtilityFunctions::printerr("Opus_decoder_create error ", opuserror); 
+        if (!((base->opus_sample_rate == 8000) || (base->opus_sample_rate == 12000) || (base->opus_sample_rate == 16000) || (base->opus_sample_rate == 24000) || (base->opus_sample_rate == 48000))) {
+            godot::UtilityFunctions::printerr("Opus sample rate must be one of 48000,24000,16000,12000,8000"); 
+        }
+        if (!((base->opus_channels == 1) || (base->opus_channels == 2))) {
+            godot::UtilityFunctions::printerr("Opus channels must be 1 or 2"); 
+        }
+        opusdecoder = NULL;  // or assert this
+    }
+    bufferbegin = 0;
+    buffertail = 0; 
+}
+
+AudioStreamPlaybackOpus::~AudioStreamPlaybackOpus() {
     if (opusdecoder != NULL) {
         opus_decoder_destroy(opusdecoder);
+        godot::UtilityFunctions::print("opus_decoder_destroy ", (long)(this)); 
         opusdecoder = NULL;
     }
 }
 
-void AudioStreamPlaybackOpus::reset_decoder() {
+void AudioStreamPlaybackOpus::reset_opus_decoder() {
     if (opusdecoder != NULL) 
         opus_decoder_ctl(opusdecoder, OPUS_RESET_STATE);
     // playback->begin_resample(); // there should be a link to the playback stream, but there isn't
 }
 
-void AudioStreamPlaybackOpus::create_decoder() {
-    delete_decoder();  // In case called from GDScript
-    int opuserror = 0;
-    int channels = 2;
-    
-    opusdecoder = opus_decoder_create(base->opus_sample_rate, channels, &opuserror);
-    if (opuserror != 0) {
-        godot::UtilityFunctions::print("------non-opus sample rate for decoder resample testing "); 
-        godot::UtilityFunctions::print(opusdecoder); 
-        godot::UtilityFunctions::print("non-opus sample rate for decoder resample testing "); 
-        if ((base->opus_sample_rate == 8000) || (base->opus_sample_rate == 12000) || (base->opus_sample_rate == 16000) || (base->opus_sample_rate == 24000) || (base->opus_sample_rate == 48000)) {
-            godot::UtilityFunctions::printerr("opus_decoder_create error ", opuserror); 
-            return;
-        }
-        godot::UtilityFunctions::print("------non-opus sample rate for decoder resample testing "); 
-        godot::UtilityFunctions::print(opusdecoder); 
-        godot::UtilityFunctions::print("non-opus sample rate for decoder resample testing "); 
-        opusdecoder = NULL;
-    }
- 
-    Naudiosamplebuffer = (int)(base->buffer_len*base->opus_sample_rate);
-    audiounpackedbuffer.resize(Naudiounpackedbuffer);
-    audiosamplebuffer.resize(Naudiosamplebuffer); 
-
-    bufferbegin = 0;
-    buffertail = 0; 
-    match_buffersizechanges = base->buffersizechanges;
-}
 
 int AudioStreamPlaybackOpus::queue_length_frames() {
     int queueframes = buffertail - bufferbegin;
@@ -104,38 +118,36 @@ int AudioStreamPlaybackOpus::queue_length_frames() {
 }
 
 bool AudioStreamPlaybackOpus::opus_segment_space_available() {
-    return (audiounpackedbuffer.size() < Naudiosamplebuffer - queue_length_frames());
+    return ((opusdecoder != NULL) && (audiounpackedbuffer.size() < Naudiosamplebuffer - queue_length_frames()));
 }
-
 
 //  *  not be capable of decoding some packets. In the case of PLC (data==NULL) or FEC (decode_fec=1),
 //  *  then frame_size needs to be exactly the duration of audio that is missing, otherwise the
 //  *  decoder will not be in the optimal state to decode the next incoming packet. For the PLC and
 //  *  FEC cases, frame_size <b>must</b> be a multiple of 2.5 ms.
 void AudioStreamPlaybackOpus::push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec) {
-    if ((match_buffersizechanges != base->buffersizechanges) || (opusdecoder == NULL)) {
-        create_decoder();
-    }
-    
-    int decodedsamples = opus_decode_float(opusdecoder, 
-                opusbytepacket.ptr() + begin, opusbytepacket.size() - begin, 
-                (float*)audiounpackedbuffer.ptrw(), 
-                (decode_fec ? lastpacketsizeforfec : audiounpackedbuffer.size()), 
-                decode_fec);
-    // assert(decodedsamples < audiounpackedbuffer.size());  // make sure there was suffient space
-    if (decodedsamples)
-        lastpacketsizeforfec = decodedsamples;
-    for (int i = 0; i < decodedsamples; i++) {
-        audiosamplebuffer.set(buffertail, audiounpackedbuffer[i]);
-        buffertail += 1;
-        if (buffertail == Naudiosamplebuffer)
-            buffertail = 0;
+    if (opusdecoder != NULL) {
+        int decodedsamples = opus_decode_float(opusdecoder, 
+                    opusbytepacket.ptr() + begin, opusbytepacket.size() - begin, 
+                    (float*)audiounpackedbuffer.ptrw(), 
+                    (decode_fec ? lastpacketsizeforfec : audiounpackedbuffer.size()), 
+                    decode_fec);
+        // assert(decodedsamples < audiounpackedbuffer.size());  // make sure there was suffient space
+        if (decodedsamples)
+            lastpacketsizeforfec = decodedsamples;
+        for (int i = 0; i < decodedsamples; i++) {
+            audiosamplebuffer.set(buffertail, audiounpackedbuffer[i]);
+            buffertail += 1;
+            if (buffertail == Naudiosamplebuffer)
+                buffertail = 0;
+        }
     }
 }
 
-int AudioStreamPlaybackOpus::Apop_front_chunk(AudioFrame *buffer, int frames) {
+int AudioStreamPlaybackOpus::pop_front_frames(AudioFrame *buffer, int frames) {
     int i = 0; 
     float chunkmax = 0.0;
+
     while (i < frames) {
         if (bufferbegin == buffertail) 
             break;
@@ -153,20 +165,8 @@ int AudioStreamPlaybackOpus::Apop_front_chunk(AudioFrame *buffer, int frames) {
     return i;
 }
 
-
-void AudioStreamPlaybackOpus::_bind_methods() {
-
-    ClassDB::bind_method(D_METHOD("get_last_chunk_max"), &AudioStreamPlaybackOpus::get_last_chunk_max);
-    ClassDB::bind_method(D_METHOD("opus_segment_space_available"), &AudioStreamPlaybackOpus::opus_segment_space_available);
-    ClassDB::bind_method(D_METHOD("queue_length_frames"), &AudioStreamPlaybackOpus::queue_length_frames);
-    ClassDB::bind_method(D_METHOD("push_opus_packet", "opusbytepacket", "begin", "decode_fec"), &AudioStreamPlaybackOpus::push_opus_packet);
-
-    ClassDB::bind_method(D_METHOD("reset_decoder"), &AudioStreamPlaybackOpus::reset_decoder);
-}
-
-
 int32_t AudioStreamPlaybackOpus::_mix_resampled(AudioFrame *buffer, int32_t frames) {
-    int rframes = Apop_front_chunk(buffer, frames);
+    int rframes = pop_front_frames(buffer, frames);
     mixed += rframes/_get_stream_sampling_rate();
     for (int i = rframes; i < frames; i++) {
         buffer[i] = { 0.0F, 0.0F };  // pad excess with zeros so the stream never ends
@@ -174,7 +174,6 @@ int32_t AudioStreamPlaybackOpus::_mix_resampled(AudioFrame *buffer, int32_t fram
     }
     return frames;
 }
-
 
 
 void AudioStreamPlaybackOpus::_start(double p_from_pos) {
