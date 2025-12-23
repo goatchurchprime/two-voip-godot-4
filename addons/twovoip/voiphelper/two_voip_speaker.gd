@@ -2,12 +2,14 @@ extends Node
 
 var audiostreamopus : AudioStreamOpus = null
 var audiostreamplaybackopus : AudioStreamPlaybackOpus = null
-#var player_audiostreamplayer = null
+
+# Consider looking at netem for simulating network traffic
+# https://man7.org/linux/man-pages/man8/tc-netem.8.html
 
 #frametimems = opusframesize*1000.0/opusframesize
 var audioserveroutputlatency = AudioServer.get_output_latency()
-var audiobufferlagtimetarget = 0.8
-var audiobufferlagtimetargettolerance = 0.15
+@export var audiobufferlagtimetarget = 0.6
+@export var audiobufferlagtimetargettolerance = 0.35
 
 const asciiopenbrace = 123 # "{".to_ascii_buffer()[0]
 const asciiclosebrace = 125 # "}".to_ascii_buffer()[0]
@@ -20,23 +22,24 @@ const Npacketinitialbatching = 2
 var outoforderchunkqueue = [ ]
 var opusframequeuecount = 0
 
-enum { AUDIOBUFFER_UNTOUCHED, AUDIOBUFFER_PAUSED, AUDIOBUFFER_FLOWING, AUDIOBUFFER_CLEARING }	
+enum { AUDIOBUFFER_UNTOUCHED, AUDIOBUFFER_FILLING, AUDIOBUFFER_FLOWING, AUDIOBUFFER_CLEARING }	
 var currentlyreceivingtalkingstate = AUDIOBUFFER_UNTOUCHED
 
-signal sigvoicestartstream()
 signal sigvoicespeedrate(audiobufferpitchscale)
 
 var lastemittedaudiobufferpitchscale = 1.0
 
 func _ready():
 	audiostreamopus = get_parent().stream
-	audiostreamplaybackopus = get_parent().get_stream_playback()
-	assert(audiostreamopus.resource_local_to_scene, "AudioStream must be local_to_scene")
-	setrecopusvalues(48000)
+	assert(audiostreamopus.resource_local_to_scene, "AudioStream should be local_to_scene")
 
-func setrecopusvalues(opus_sample_rate):
-	audiostreamopus.opus_sample_rate = opus_sample_rate
-
+func setrecopusvalues(opus_sample_rate, opus_channels):
+	if not get_parent().playing or audiostreamopus.opus_sample_rate != opus_sample_rate or audiostreamopus.opus_channels != opus_channels:
+		audiostreamopus.opus_sample_rate = opus_sample_rate
+		audiostreamopus.opus_channels = opus_channels
+		get_parent().play()
+		audiostreamplaybackopus = get_parent().get_stream_playback()
+		
 func tv_incomingaudiopacket(packet):
 	if audiostreamopus == null:
 		return
@@ -47,9 +50,7 @@ func tv_incomingaudiopacket(packet):
 		if h != null:
 			print("audio json packet ", h)
 			if h.has("talkingtimestart"):
-				sigvoicestartstream.emit()
-				if audiostreamopus.opus_sample_rate != h["opussamplerate"]:
-					setrecopusvalues(h["opussamplerate"])
+				setrecopusvalues(h["opussamplerate"], h.get("opuschannels", 2))
 				lenchunkprefix = int(h["lenchunkprefix"])
 				opusstreamcount = int(h["opusstreamcount"])
 				asbase64 = (h["mqttpacketencoding"] == "base64")
@@ -63,10 +64,10 @@ func tv_incomingaudiopacket(packet):
 				opusframequeuecount = 0
 				assert (Npacketinitialbatching < Noutoforderqueue)
 				audiostreamplaybackopus.reset_opus_decoder()
-				currentlyreceivingtalkingstate = AUDIOBUFFER_PAUSED
+				currentlyreceivingtalkingstate = AUDIOBUFFER_FILLING
 			elif h.has("talkingtimeend"):
 				currentlyreceivingtalkingstate = AUDIOBUFFER_CLEARING
-				
+
 	elif lenchunkprefix == -1:
 		pass
 
@@ -96,7 +97,7 @@ func tv_incomingaudiopacket(packet):
 				opusframecount += 1
 				assert (opusframequeuecount >= 0)
 
-			outoforderchunkqueue[opusframecountR] = packet		
+			outoforderchunkqueue[opusframecountR] = packet
 			opusframequeuecount += 1
 			while outoforderchunkqueue[0] != null and opusframecount + opusframequeuecount >= Npacketinitialbatching:
 				if not audiostreamplaybackopus.opus_segment_space_available():
@@ -110,36 +111,37 @@ func tv_incomingaudiopacket(packet):
 	else:
 		prints("dropping frame with opusstream number mismatch", opusstreamcount, packet[0], packet[1])
 
+func setpitchscale(pitchscale):
+	if pitchscale != lastemittedaudiobufferpitchscale:
+		if pitchscale != 0.0:
+			if lastemittedaudiobufferpitchscale == 0.0:
+				get_parent().stream_paused = false
+			get_parent().pitch_scale = pitchscale
+		else:
+			get_parent().stream_paused = true
+		lastemittedaudiobufferpitchscale = pitchscale
+
 func _physics_process(delta):
 	if currentlyreceivingtalkingstate == AUDIOBUFFER_UNTOUCHED:
 		return
 	var bufferlengthtime = audioserveroutputlatency + audiostreamplaybackopus.queue_length_frames()*1.0/audiostreamopus.opus_sample_rate
-	if currentlyreceivingtalkingstate == AUDIOBUFFER_PAUSED:
+	if currentlyreceivingtalkingstate == AUDIOBUFFER_FILLING:
 		if bufferlengthtime < audiobufferlagtimetarget:
-			if lastemittedaudiobufferpitchscale != 0.0:
-				emit_signal("sigvoicespeedrate", 0.0)
-				print(" bufferlengthtime ", bufferlengthtime)
-				lastemittedaudiobufferpitchscale = 0.0
+			setpitchscale(0.0)
 		else:
-			emit_signal("sigvoicespeedrate", 1.0)
-			print(" bufferlengthtime ", bufferlengthtime)
-			lastemittedaudiobufferpitchscale = 1.0
+			setpitchscale(1.0)
 			currentlyreceivingtalkingstate = AUDIOBUFFER_FLOWING
 	
 	if currentlyreceivingtalkingstate == AUDIOBUFFER_FLOWING:
 		if lastemittedaudiobufferpitchscale == 1.0:
 			if abs(bufferlengthtime - audiobufferlagtimetarget) > audiobufferlagtimetargettolerance:
-				lastemittedaudiobufferpitchscale = 0.7 if (bufferlengthtime < audiobufferlagtimetarget) else 1.4
-				emit_signal("sigvoicespeedrate", lastemittedaudiobufferpitchscale)
-				print(" bufferlengthtime ", bufferlengthtime)
+				setpitchscale(0.7 if (bufferlengthtime < audiobufferlagtimetarget) else 1.4)
+				print(" set lastemittedaudiobufferpitchscale to ", lastemittedaudiobufferpitchscale)
 			
 		elif (lastemittedaudiobufferpitchscale < 1.0) == (bufferlengthtime > audiobufferlagtimetarget):
-			emit_signal("sigvoicespeedrate", 1.0)
-			print(" bufferlengthtime ", bufferlengthtime)
-			lastemittedaudiobufferpitchscale = 1.0
+			setpitchscale(1.0)
+			print(" set lastemittedaudiobufferpitchscale to ", lastemittedaudiobufferpitchscale)
 
 	if currentlyreceivingtalkingstate == AUDIOBUFFER_CLEARING:
 		currentlyreceivingtalkingstate = AUDIOBUFFER_UNTOUCHED
-		emit_signal("sigvoicespeedrate", 1.0)
-		print(" bufferlengthtime ", bufferlengthtime)
-		lastemittedaudiobufferpitchscale = 1.0
+		setpitchscale(1.0)
