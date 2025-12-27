@@ -86,93 +86,37 @@ typedef enum {
 
 class TwovoipOpusEncoder : public RefCounted {
     GDCLASS(TwovoipOpusEncoder, RefCounted)
+    
+    int input_mix_rate = 44100;   // AudioServer.get_input_mixrate()
+    int opus_sample_rate = 48000; // AudioServer.get_input_mixrate()
+    int channels = 2;
+    
+    SpeexResamplerState* speex_resampler = NULL;
+    DenoiseState* rnnoise_st = NULL;
+    OpusEncoder* opus_encoder = NULL;
 
-    int audiosamplerate = 44100;
-    int audiosamplesize = 882;
-    int ringbufferchunks = 50;
-
-    PackedVector2Array audiosamplebuffer;  // size audiosamplesize*ringbufferchunks
-    int chunknumber = -1; // -1 is uninitialized, -2 is error state
-    int bufferend = 0;    // apply %(audiosamplesize*ringbufferchunks) for actual position
-    int discardedchunks = 0;
-
-    int opussamplerate = 48000;
-    int opusframesize = 960;
-    int opusbitrate = 12000;
-    int complexity = 5;
-    int signal_type = OPUS_SIGNAL_VOICE;
-
-    SpeexResamplerState* speexresampler = NULL;
-    PackedVector2Array audioresampledbuffer;  // size opusframesize*ringbufferchunks
-    PackedVector2Array singleresamplebuffer;  // size opusframesize, for use by chunk_to_opus_packet()
-    int lastresampledchunk = -1;
-    SpeexResamplerState* speexbackresampler = NULL;
-
-    DenoiseState *st = NULL;
-    int rnnoiseframesize = 0;
-    PackedVector2Array audiodenoisedbuffer;  // size opusframesize*ringbufferchunks
-    PackedFloat32Array audiodenoisedvalues;  // size ringbufferchunks
-    int lastdenoisedchunk = -1;
+    PackedVector2Array pre_encoded_chunk; 
     PackedFloat32Array rnnoise_in;
     PackedFloat32Array rnnoise_out;
-
-    OpusEncoder* opusencoder = NULL;
-    PackedByteArray opusbytebuffer;
-    int lastopuschunk = -1;
-
+    PackedByteArray opus_byte_buffer;
+    
     DGovrLipSyncStatus govrlipsyncstatus = DGovrLipSyncUninitialized;
     bool resampledlipsync;
     PackedFloat32Array visemes; 
     ovrLipSyncFrame ovrlipsyncframe;
     ovrLipSyncContext ovrlipsyncctx = 0;
 
-    int instanceinstantiations = 0;
-    void process(const AudioFrame *p_src_frames, AudioFrame *p_dst_frames, int p_frame_count);
-
 protected:
     static void _bind_methods();
-
-    void push_sample(const Vector2 &sample);
-    void resample_single_chunk(float* paudioresamples, const float* paudiosamples);
-    float denoise_single_chunk(float* pdenoisedaudioresamples, const float* paudiosamples);
-    PackedByteArray opus_frame_to_opus_packet(const PackedByteArray& prefixbytes, float* paudiosamples);
     
 public:
-    void createencoder();
-    void deleteencoder();
-    void resetencoder(bool clearbuffers);
+    bool create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, bool use_rnnoise);
+    bool create_opus_encoder(int bit_rate, int complexity);
 
-    bool chunk_available();
-    void drop_chunk();
-    bool undrop_chunk();
-    void push_chunk(const PackedVector2Array& audiosamples); 
-
-    void resampled_current_chunk();
-    float denoise_resampled_chunk();
-    bool denoiser_available();
-    PackedVector2Array read_chunk(bool resampled=false);
-    float chunk_max(bool rms=false, bool resampled=false);
-
-    PackedByteArray read_opus_packet(const PackedByteArray& prefixbytes); 
-    int chunk_to_lipsync(bool resampled=false); 
-    PackedFloat32Array read_visemes() { return visemes; };
-
-    void set_opussamplerate(int lopussamplerate) { chunknumber = -1; opussamplerate = lopussamplerate; };
-    int get_opussamplerate() { return opussamplerate; };
-    void set_opusframesize(int lopusframesize) { chunknumber = -1; opusframesize = lopusframesize; };
-    int get_opusframesize() { return opusframesize; };
-    void set_opusbitrate(int lopusbitrate) { chunknumber = -1; opusbitrate = lopusbitrate; };
-    int get_opusbitrate() { return opusbitrate; };
-    void set_audiosamplerate(int laudiosamplerate) { chunknumber = -1; audiosamplerate = laudiosamplerate; };
-    int get_audiosamplerate() { return audiosamplerate; };
-    void set_audiosamplesize(int laudiosamplesize) { chunknumber = -1; audiosamplesize = laudiosamplesize; };
-    int get_audiosamplesize() { return audiosamplesize; };
-    void set_audiosamplechunks(int laudiosamplechunks) { chunknumber = -1; ringbufferchunks = laudiosamplechunks; };
-    int get_audiosamplechunks() { return ringbufferchunks; };
-    void set_opuscomplexity(int lcomplexity) { chunknumber = -1; complexity = lcomplexity; };
-    int get_opuscomplexity() { return complexity; };
-    void set_opusoptimizeforvoice(bool loptimizeforvoice) { chunknumber = -1; signal_type = (loptimizeforvoice ? OPUS_SIGNAL_VOICE : OPUS_SIGNAL_MUSIC); };
-    bool get_opusoptimizeforvoice() { return (signal_type == OPUS_SIGNAL_VOICE); };
+    int calc_audio_chunk_size(int opus_chunk_size);
+    float process_pre_encoded_chunk(PackedVector2Array audio_frames, int opus_chunk_size, bool speech_probability, bool rms);
+    PackedVector2Array fetch_pre_encoded_chunk() { return pre_encoded_chunk; }
+    PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes);
 
     TwovoipOpusEncoder();
     ~TwovoipOpusEncoder();

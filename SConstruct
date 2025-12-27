@@ -24,9 +24,9 @@ patches_to_apply_rmnoise = [
 ]
 
 patches_to_apply_godot = [
-    "patches/godot_cpp_exclude_unused_classes.patch", # Removes unused godot-cpp classes from the build process
-    "patches/unity_build.patch", # Speeds up the build by merging the source files. It can increase the size of assemblies.
-    "patches/web_threads.patch", # Adds the build flag that appeared in Godot 4.3. Required for a web build compatible with Godot 4.3.
+    #"patches/godot_cpp_exclude_unused_classes.patch", # Removes unused godot-cpp classes from the build process
+    #"patches/unity_build.patch", # Speeds up the build by merging the source files. It can increase the size of assemblies.
+    #"patches/web_threads.patch", # Adds the build flag that appeared in Godot 4.3. Required for a web build compatible with Godot 4.3.
 ]
 
 print("If you add new source files (e.g. .cpp, .c), do not forget to specify them in 'src/default_sources.json'.\n\tOr add them to 'setup_defines_and_flags' inside 'lib_utils.py '.")
