@@ -39,6 +39,7 @@ using namespace godot;
 void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("create_sampler", "p_input_mix_rate", "p_channels", "use_rnnoise"), &TwovoipOpusEncoder::create_sampler);
     ClassDB::bind_method(D_METHOD("create_opus_encoder", "bit_rate", "complexity"), &TwovoipOpusEncoder::create_opus_encoder);
+    ClassDB::bind_method(D_METHOD("reset_opus_encoder"), &TwovoipOpusEncoder::reset_opus_encoder);
     ClassDB::bind_method(D_METHOD("calc_audio_chunk_size", "opus_chunk_size"), &TwovoipOpusEncoder::calc_audio_chunk_size);
     ClassDB::bind_method(D_METHOD("process_pre_encoded_chunk", "audio_frames", "opus_chunk_size", "speech_probability", "rms"), &TwovoipOpusEncoder::process_pre_encoded_chunk);
     ClassDB::bind_method(D_METHOD("fetch_pre_encoded_chunk"), &TwovoipOpusEncoder::fetch_pre_encoded_chunk);
@@ -121,6 +122,10 @@ bool TwovoipOpusEncoder::create_opus_encoder(int bit_rate, int complexity) {
     return true;
 }
 
+void TwovoipOpusEncoder::reset_opus_encoder() {
+    if (opus_encoder != NULL) 
+        opus_encoder_ctl(opus_encoder, OPUS_RESET_STATE);
+}
 
 int TwovoipOpusEncoder::calc_audio_chunk_size(int opus_chunk_size) {
     int audio_chunk_size = opus_chunk_size*input_mix_rate/opus_sample_rate;
