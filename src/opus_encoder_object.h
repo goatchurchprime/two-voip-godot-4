@@ -111,7 +111,7 @@ protected:
     
 public:
     bool create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, bool use_rnnoise);
-    bool create_opus_encoder(int bit_rate, int complexity);
+    bool create_opus_encoder(int bit_rate, int complexity, bool voice_optimal);
     void reset_opus_encoder();
 
     int calc_audio_chunk_size(int opus_chunk_size);

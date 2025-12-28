@@ -98,19 +98,15 @@ func rechunkrecordedchunks(orgsamples, newsamplesize):
 	return res
 			
 func updatesamplerates():
-	var audiosamplerate = AudioServer.get_input_mix_rate()
-	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = audiosamplerate
+	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_input_mix_rate()
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
-	var audioresamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
-	var audioresamplesize = int(audioresamplerate*frametimems/1000.0)
-	$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = audioresamplerate
 	var opussamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
-	$TwoVoipMic.setopusvalues(audiosamplerate,
-			opussamplerate, frametimems, 
+	$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = opussamplerate
+	$TwoVoipMic.setopusvalues(opussamplerate, frametimems, 
 			int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value), 
 			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), 
 			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
-	$HBoxBigButtons/VBoxPTT/Denoise.disabled = not (audioresamplerate == 48000)
+	$HBoxBigButtons/VBoxPTT/Denoise.disabled = not (opussamplerate == 48000)
 	$TwoVoipMic.leadtime = $HBoxBigButtons/VBoxVox/Leadtime.value
 	$TwoVoipMic.hangtime = $HBoxBigButtons/VBoxVox/Hangtime.value
 	reprocessoriginalchunks()
@@ -118,8 +114,8 @@ func updatesamplerates():
 func reprocessoriginalchunks():
 	var opussamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
 	opusencoder_forreprocessing.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, 2, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed)
-	opusencoder_forreprocessing.create_opus_encoder(int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value), int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value))
-	#		$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
+	opusencoder_forreprocessing.create_opus_encoder(int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value), int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
+	opusencoder_forreprocessing.reset_opus_encoder()
 	recordedheader["opusframesize"] = $TwoVoipMic.opus_chunk_size
 	recordedheader["opussamplerate"] = opussamplerate
 

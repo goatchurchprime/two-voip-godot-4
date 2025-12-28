@@ -37,10 +37,10 @@ var opus_chunk_size = 960
 var audio_chunk_size = 882
 var frametimesecs = 0.02
 var opussamplerate = 48000
-func setopusvalues(audiosamplerate, p_opussamplerate, opusframedurationms, opusbitrate, opuscomplexity, opusoptimizeforvoice):
+func setopusvalues(p_opussamplerate, opusframedurationms, opusbitrate, opuscomplexity, opusoptimizeforvoice):
 	opussamplerate = p_opussamplerate
 	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, 2, denoisebutton.button_pressed)
-	opusencoder.create_opus_encoder(opusbitrate, opuscomplexity)
+	opusencoder.create_opus_encoder(opusbitrate, opuscomplexity, opusoptimizeforvoice)
 	# optimize for voice
 
 	assert (not currentlytalking)
@@ -129,7 +129,7 @@ func processtalkstreamends():
 			"opusstreamcount":opusstreamcount, 
 			"talkingtimestart":talkingtimestart
 		}
-		#opusencoder.reset_encoder(false)
+		opusencoder.reset_opus_encoder()
 		transmitaudiojsonpacket.emit(audiostreampacketheader)
 		#get_parent().PlayerConnections.peerconnections_possiblymissingaudioheaders.clear()
 		opusframecount = 0

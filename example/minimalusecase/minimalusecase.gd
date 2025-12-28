@@ -14,7 +14,7 @@ func _ready():
 
 	AudioServer.set_input_device_active(true)
 	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false)
-	opusencoder.create_opus_encoder(12000, 5)
+	opusencoder.create_opus_encoder(12000, 5, true)
 
 	# Voice says: "Listen to me"
 	print("Message length (seconds): ", len(opusaudiodata)*960.0/audiostreamopus.opus_sample_rate)

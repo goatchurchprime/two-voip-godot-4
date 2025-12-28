@@ -91,14 +91,14 @@ bool TwovoipOpusEncoder::create_sampler(int p_input_mix_rate, int p_opus_sample_
 }
 
 
-bool TwovoipOpusEncoder::create_opus_encoder(int bit_rate, int complexity) {
+bool TwovoipOpusEncoder::create_opus_encoder(int bit_rate, int complexity, bool voice_optimal) {
     if (opus_encoder != NULL) {
         opus_encoder_destroy(opus_encoder);
         opus_encoder = NULL;
     }
 
     int opus_application = OPUS_APPLICATION_VOIP; // this option includes in-band forward error correction
-    int signal_type = OPUS_SIGNAL_VOICE;
+    int signal_type = (voice_optimal ? OPUS_SIGNAL_VOICE : OPUS_SIGNAL_MUSIC);
     int opuserror = 0;
     // opussamplerate is one of 8000,12000,16000,24000,48000
     opus_encoder = opus_encoder_create(opus_sample_rate, channels, opus_application, &opuserror);
@@ -163,7 +163,7 @@ float TwovoipOpusEncoder::process_pre_encoded_chunk(PackedVector2Array audio_fra
         for (int j = 0; j < nnoisechunks; j++) {
             for (int i = 0; i < rnnoise_get_frame_size(); i++) 
                 rnnoise_in[i] = (pre_encoded_chunk[j*rnnoise_get_frame_size() + i].x + pre_encoded_chunk[j*rnnoise_get_frame_size() + i].y)*0.5F*32768.0F;
-            float speech_prob = rnnoise_process_frame(rnnoise_st, (float*)rnnoise_in.ptr(), (float*)rnnoise_out.ptrw());
+            float speech_prob = rnnoise_process_frame(rnnoise_st, (float*)rnnoise_out.ptr(), (float*)rnnoise_in.ptrw());
             if (speech_probability && (speech_prob > res))
                 res = speech_prob;
             for (int i = 0; i < rnnoise_get_frame_size(); i++) {
