@@ -298,29 +298,7 @@ layout_mode = 2
 layout_mode = 2
 text = "Resampled:"
 
-[node name="ResampleRate" type="SpinBox" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=193840038]
-custom_minimum_size = Vector2(95, 0)
-layout_mode = 2
-tooltip_text = "Needs to match the Opus sample rate to be compressed"
-max_value = 60000.0
-editable = false
-
-[node name="LabResampleFrameLength" type="Label" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=104965148]
-layout_mode = 2
-text = "0 samples"
-
-[node name="HBoxOpusBitRate" type="HBoxContainer" parent="VBoxFrameLength" unique_id=1851029909]
-layout_mode = 2
-
-[node name="LabOpus" type="Label" parent="VBoxFrameLength/HBoxOpusBitRate" unique_id=336018539]
-layout_mode = 2
-text = "Opus Frame:"
-
-[node name="LabSampleRate" type="Label" parent="VBoxFrameLength/HBoxOpusBitRate" unique_id=320522670]
-layout_mode = 2
-text = "Sample Rate"
-
-[node name="SampleRate" type="OptionButton" parent="VBoxFrameLength/HBoxOpusBitRate" unique_id=510280838]
+[node name="SampleRate" type="OptionButton" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=510280838]
 layout_mode = 2
 allow_reselect = true
 item_count = 5
@@ -335,22 +313,26 @@ popup/item_3/id = 3
 popup/item_4/text = "48KHz"
 popup/item_4/id = 4
 
-[node name="LabBitRate" type="Label" parent="VBoxFrameLength/HBoxOpusBitRate" unique_id=2139038166]
+[node name="LabResampleFrameLength" type="Label" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=104965148]
 layout_mode = 2
-text = "Bit Rate"
+text = "0 samples"
 
-[node name="BitRate" type="SpinBox" parent="VBoxFrameLength/HBoxOpusBitRate" unique_id=1832636715]
+[node name="HBoxOpusExtra" type="HBoxContainer" parent="VBoxFrameLength" unique_id=920431574]
+layout_mode = 2
+
+[node name="LabBitRate" type="Label" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=2139038166]
+layout_mode = 2
+text = "Opus Bit Rate"
+
+[node name="BitRate" type="SpinBox" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=1832636715]
 layout_mode = 2
 min_value = 500.0
 max_value = 200000.0
 value = 12000.0
 
-[node name="HBoxOpusExtra" type="HBoxContainer" parent="VBoxFrameLength" unique_id=920431574]
-layout_mode = 2
-
 [node name="LabelComplexity" type="Label" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=154200874]
 layout_mode = 2
-text = "Opus Complexity"
+text = "Complexity"
 
 [node name="ComplexitySpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=2057587954]
 layout_mode = 2
@@ -462,32 +444,6 @@ layout_mode = 2
 [node name="LabelStream" type="Label" parent="VBoxPlayback/HBoxStream" unique_id=1338355197]
 layout_mode = 2
 text = "Play"
-
-[node name="LabelSamplerate" type="Label" parent="VBoxPlayback/HBoxStream" unique_id=510119127]
-layout_mode = 2
-text = "sample"
-
-[node name="OutSampleRate" type="SpinBox" parent="VBoxPlayback/HBoxStream" unique_id=22014124]
-custom_minimum_size = Vector2(95, 0)
-layout_mode = 2
-min_value = 8000.0
-max_value = 96000.0
-step = 100.0
-value = 44100.0
-suffix = "Hz"
-
-[node name="LabelMixrate" type="Label" parent="VBoxPlayback/HBoxStream" unique_id=876558687]
-layout_mode = 2
-text = "mix"
-
-[node name="MixRate" type="SpinBox" parent="VBoxPlayback/HBoxStream" unique_id=1555292807]
-custom_minimum_size = Vector2(95, 0)
-layout_mode = 2
-min_value = 8000.0
-max_value = 96000.0
-step = 100.0
-value = 44100.0
-suffix = "Hz"
 
 [node name="LabelSpeedup" type="Label" parent="VBoxPlayback/HBoxStream" unique_id=292302886]
 layout_mode = 2

@@ -32,9 +32,9 @@ func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 
-	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxOpusBitRate/SampleRate, $VBoxFrameLength/HBoxOpusFrame/OptionChannels ]:
+	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxAudioFrame/SampleRate, $VBoxFrameLength/HBoxOpusFrame/OptionChannels ]:
 		h.connect("item_selected", func (_item_selected): updatesamplerates())
-	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusBitRate/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
+	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusExtra/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
 		h.connect("value_changed", func (_value): updatesamplerates())
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxBigButtons/VBoxPTT/Denoise ]:
 		h.connect("toggled", func (_toggled_on): updatesamplerates())
@@ -49,15 +49,12 @@ func _ready():
 		$GodotVersionWarning.visible = true
 		print($GodotVersionWarning.text)
 
-	#$VBoxPlayback/HBoxStream/MixRate.value = AudioServer.get_mix_rate()
-	$VBoxPlayback/HBoxStream/MixRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
-
 	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
 		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
 	if $VBoxFrameLength/HBoxOpusFrame/OptionChannels.selected == -1:
 		$VBoxFrameLength/HBoxOpusFrame/OptionChannels.select(1)
-	if $VBoxFrameLength/HBoxOpusBitRate/SampleRate.selected == -1:
-		$VBoxFrameLength/HBoxOpusBitRate/SampleRate.select(4)
+	if $VBoxFrameLength/HBoxAudioFrame/SampleRate.selected == -1:
+		$VBoxFrameLength/HBoxAudioFrame/SampleRate.select(4)
 
 	if speechbusidx != -1:
 		for effect_idx in range(AudioServer.get_bus_effect_count(speechbusidx)):
@@ -67,7 +64,6 @@ func _ready():
 				audioeffectpitchshiftidx = effect_idx
 				break
 
-	$VBoxPlayback/HBoxStream/OutSampleRate.value = ProjectSettings.get_setting_with_override("audio/driver/mix_rate")
 	updatesamplerates()
 	for i in range(1, len(visemes)):
 		var d = $HBoxVisemes/ColorRect.duplicate()
@@ -102,11 +98,10 @@ func rechunkrecordedchunks(orgsamples, newsamplesize):
 func updatesamplerates():
 	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_input_mix_rate()
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
-	var opussamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
-	$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = opussamplerate
+	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
 	$TwoVoipMic.setopusvalues(opussamplerate, frametimems, 
 			int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text),
-			int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value), 
+			int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), 
 			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), 
 			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
 	$HBoxBigButtons/VBoxPTT/Denoise.disabled = not (opussamplerate == 48000)
@@ -115,10 +110,10 @@ func updatesamplerates():
 	reprocessoriginalchunks()
 
 func reprocessoriginalchunks():
-	var opussamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
+	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
 	var opuschannels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
 	opusencoder_forreprocessing.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed)
-	opusencoder_forreprocessing.create_opus_encoder(int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value), int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
+	opusencoder_forreprocessing.create_opus_encoder(int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
 	opusencoder_forreprocessing.reset_opus_encoder()
 	recordedheader["opusframesize"] = $TwoVoipMic.opus_chunk_size
 	recordedheader["opussamplerate"] = opussamplerate
@@ -129,7 +124,7 @@ func reprocessoriginalchunks():
 	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d frames" % $TwoVoipMic.audio_chunk_size
 
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
-	var audioresamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
+	var audioresamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
 	var audioresamplesize = int(audioresamplerate*frametimems/1000.0)
 	$VBoxFrameLength/HBoxAudioFrame/LabResampleFrameLength.text = "%d frames" % audioresamplesize
 
