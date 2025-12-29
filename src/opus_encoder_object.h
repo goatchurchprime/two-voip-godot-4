@@ -95,7 +95,8 @@ class TwovoipOpusEncoder : public RefCounted {
     DenoiseState* rnnoise_st = NULL;
     OpusEncoder* opus_encoder = NULL;
 
-    PackedVector2Array pre_encoded_chunk; 
+    PackedFloat32Array mono_audio_frames; 
+    PackedFloat32Array pre_encoded_chunk; 
     PackedFloat32Array rnnoise_in;
     PackedFloat32Array rnnoise_out;
     PackedByteArray opus_byte_buffer;
@@ -116,7 +117,7 @@ public:
 
     int calc_audio_chunk_size(int opus_chunk_size);
     float process_pre_encoded_chunk(PackedVector2Array audio_frames, int opus_chunk_size, bool speech_probability, bool rms);
-    PackedVector2Array fetch_pre_encoded_chunk() { return pre_encoded_chunk; }
+    PackedVector2Array fetch_pre_encoded_chunk() { return PackedVector2Array(); pre_encoded_chunk; }
     PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes);
 
     TwovoipOpusEncoder();

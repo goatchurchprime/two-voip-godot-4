@@ -134,53 +134,73 @@ int TwovoipOpusEncoder::calc_audio_chunk_size(int opus_chunk_size) {
 
 float TwovoipOpusEncoder::process_pre_encoded_chunk(PackedVector2Array audio_frames, int opus_chunk_size, bool speech_probability, bool rms) {
     float res = 0.0;
-    if (pre_encoded_chunk.size() != opus_chunk_size)
-        pre_encoded_chunk.resize(opus_chunk_size);
+    if (pre_encoded_chunk.size() != opus_chunk_size*channels)
+        pre_encoded_chunk.resize(opus_chunk_size*channels);
 
     int audio_chunk_size = opus_chunk_size*input_mix_rate/opus_sample_rate;
     // PackedVector2Array audio_frames = AudioServer::get_singleton()->get_input_frames(audio_chunk_size);
     if (audio_frames.size() != audio_chunk_size) 
         return -1.0;
     
+    const float* speexin;
+    if (channels == 1) {
+        if (mono_audio_frames.size() != audio_chunk_size)
+            mono_audio_frames.resize(audio_chunk_size);
+        for (int i = 0; i < audio_chunk_size; i++) {
+            mono_audio_frames[i] = (audio_frames[i].x + audio_frames[i].y)*0.5;
+        }
+        speexin = (const float*)mono_audio_frames.ptr();
+    } else {
+        speexin = (const float*)audio_frames.ptr();
+    }
     if (speex_resampler != NULL) {
         unsigned int Uaudiosamplesize = audio_chunk_size;
         unsigned int Uopusframesize = opus_chunk_size;
         int sxerr = speex_resampler_process_interleaved_float(speex_resampler, 
-                                                              (float*)audio_frames.ptr(), &Uaudiosamplesize, 
+                                                              speexin, &Uaudiosamplesize, 
                                                               (float*)pre_encoded_chunk.ptrw(), &Uopusframesize);
     } else if (audio_chunk_size == opus_chunk_size) {
-        for (int i = 0; i < opus_chunk_size; i++)
-            pre_encoded_chunk[i] = audio_frames[i];
+        memcpy((float*)pre_encoded_chunk.ptrw(), (const float*)speexin, opus_chunk_size*channels);
     } else {
-        for (int i = 0; i < opus_chunk_size; i++) {
-            pre_encoded_chunk[i].x = 0.0;
-            pre_encoded_chunk[i].y = 0.0;
+        for (int i = 0; i < pre_encoded_chunk.size(); i++) {
+            pre_encoded_chunk[i] = 0.0;
         }
     }
     
     if ((rnnoise_st != NULL) && ((opus_chunk_size % rnnoise_get_frame_size()) == 0)) {
         int nnoisechunks = (int)(opus_chunk_size/rnnoise_get_frame_size());
         for (int j = 0; j < nnoisechunks; j++) {
-            for (int i = 0; i < rnnoise_get_frame_size(); i++) 
-                rnnoise_in[i] = (pre_encoded_chunk[j*rnnoise_get_frame_size() + i].x + pre_encoded_chunk[j*rnnoise_get_frame_size() + i].y)*0.5F*32768.0F;
+            for (int i = 0; i < rnnoise_get_frame_size(); i++) {
+                int k = j*rnnoise_get_frame_size() + i;
+                if (channels == 2) {
+                    rnnoise_in[i] = (pre_encoded_chunk[k*2] + pre_encoded_chunk[k*2+1])*0.5F*32768.0F; 
+                } else {
+                    rnnoise_in[i] = pre_encoded_chunk[k]*32768.0F; 
+                }
+            }
             float speech_prob = rnnoise_process_frame(rnnoise_st, (float*)rnnoise_out.ptr(), (float*)rnnoise_in.ptrw());
             if (speech_probability && (speech_prob > res))
                 res = speech_prob;
             for (int i = 0; i < rnnoise_get_frame_size(); i++) {
-                pre_encoded_chunk[j*rnnoise_get_frame_size() + i].x = rnnoise_out[i]/32768.0F;
-                pre_encoded_chunk[j*rnnoise_get_frame_size() + i].y = rnnoise_out[i]/32768.0F;
+                int k = j*rnnoise_get_frame_size() + i;
+                if (channels == 2) {
+                    pre_encoded_chunk[k*2] = rnnoise_out[i]/32768.0F;
+                    pre_encoded_chunk[k*2 + 1] = rnnoise_out[i]/32768.0F;
+                } else {
+                    pre_encoded_chunk[k] = rnnoise_out[i]/32768.0F;
+                }
             }
         }
     }
     if (!speech_probability) {
         if (rms) {
             float s = 0.0F;
-            for (int i = 0; i < opus_chunk_size; i++)
-                s += pre_encoded_chunk[i].length_squared();
+            for (int i = 0; i < opus_chunk_size*channels; i++)
+                s += pre_encoded_chunk[i]*pre_encoded_chunk[i];
             res = sqrt(s/opus_chunk_size);
         } else {
-            for (int i = 0; i < opus_chunk_size; i++)
-                res = std::max<float>(std::max<float>(res, fabs(pre_encoded_chunk[i].x)), fabs(pre_encoded_chunk[i].y));
+            for (int i = 0; i < opus_chunk_size*channels; i++)
+                res = std::max<float>(res, fabs(pre_encoded_chunk[i]));
         }
     }
     return res;
@@ -191,7 +211,7 @@ PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_b
         godot::UtilityFunctions::printerr("Error: opusencoder is null");
         return PackedByteArray();
     }
-    int max_opus_byte_buffer = prefix_bytes.size() + 8*pre_encoded_chunk.size();
+    int max_opus_byte_buffer = prefix_bytes.size() + 4*pre_encoded_chunk.size();
     if (max_opus_byte_buffer > opus_byte_buffer.size())
         opus_byte_buffer.resize(max_opus_byte_buffer);
     
@@ -199,7 +219,7 @@ PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_b
     int nprefbytes = prefix_bytes.size();
     if (nprefbytes != 0) 
         memcpy(popus_bytes, prefix_bytes.ptr(), nprefbytes); 
-    int bytepacketsize = opus_encode_float(opus_encoder, (const float*)pre_encoded_chunk.ptr(), pre_encoded_chunk.size(), 
+    int bytepacketsize = opus_encode_float(opus_encoder, (const float*)pre_encoded_chunk.ptr(), pre_encoded_chunk.size()/channels, 
                                            opus_byte_buffer.ptrw() + nprefbytes, max_opus_byte_buffer - nprefbytes);
     return opus_byte_buffer.slice(0, nprefbytes + bytepacketsize);
 }

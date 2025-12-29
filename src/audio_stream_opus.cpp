@@ -79,7 +79,7 @@ void AudioStreamPlaybackOpus::initialize(const AudioStreamOpus* pbase) {
     godot::UtilityFunctions::print("opus_decoder_created "); 
     if (opuserror == 0) {
         Naudiosamplebuffer = (int)(base->buffer_len*base->opus_sample_rate);
-        audiounpackedbuffer.resize(Naudiounpackedbuffer);
+        audiounpackedbuffer.resize(Naudiounpackedbuffer*base->opus_channels);
         audiosamplebuffer.resize(Naudiosamplebuffer); 
     } else {
         godot::UtilityFunctions::printerr("Opus_decoder_create error ", opuserror);   // will be one of OPUS_BAD_ARG=-1, OPUS_ALLOC_FAIL=-7, OPUS_INTERNAL_ERROR=-3
@@ -136,7 +136,11 @@ void AudioStreamPlaybackOpus::push_opus_packet(const PackedByteArray& opusbytepa
         if (decodedsamples)
             lastpacketsizeforfec = decodedsamples;
         for (int i = 0; i < decodedsamples; i++) {
-            audiosamplebuffer.set(buffertail, audiounpackedbuffer[i]);
+            if (base->opus_channels == 2) {
+                audiosamplebuffer.set(buffertail, Vector2(audiounpackedbuffer[i*2], audiounpackedbuffer[i*2+1]));
+            } else {
+                audiosamplebuffer.set(buffertail, Vector2(audiounpackedbuffer[i], audiounpackedbuffer[i]));
+            }
             buffertail += 1;
             if (buffertail == Naudiosamplebuffer)
                 buffertail = 0;

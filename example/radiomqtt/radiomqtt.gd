@@ -32,7 +32,7 @@ func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 
-	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxOpusBitRate/SampleRate ]:
+	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxOpusBitRate/SampleRate, $VBoxFrameLength/HBoxOpusFrame/OptionChannels ]:
 		h.connect("item_selected", func (_item_selected): updatesamplerates())
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusBitRate/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
 		h.connect("value_changed", func (_value): updatesamplerates())
@@ -54,6 +54,8 @@ func _ready():
 
 	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
 		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
+	if $VBoxFrameLength/HBoxOpusFrame/OptionChannels.selected == -1:
+		$VBoxFrameLength/HBoxOpusFrame/OptionChannels.select(1)
 	if $VBoxFrameLength/HBoxOpusBitRate/SampleRate.selected == -1:
 		$VBoxFrameLength/HBoxOpusBitRate/SampleRate.select(4)
 
@@ -103,6 +105,7 @@ func updatesamplerates():
 	var opussamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
 	$VBoxFrameLength/HBoxAudioFrame/ResampleRate.value = opussamplerate
 	$TwoVoipMic.setopusvalues(opussamplerate, frametimems, 
+			int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text),
 			int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value), 
 			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), 
 			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
@@ -113,19 +116,22 @@ func updatesamplerates():
 
 func reprocessoriginalchunks():
 	var opussamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
-	opusencoder_forreprocessing.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, 2, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed)
+	var opuschannels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
+	opusencoder_forreprocessing.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed)
 	opusencoder_forreprocessing.create_opus_encoder(int($VBoxFrameLength/HBoxOpusBitRate/BitRate.value), int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
 	opusencoder_forreprocessing.reset_opus_encoder()
 	recordedheader["opusframesize"] = $TwoVoipMic.opus_chunk_size
 	recordedheader["opussamplerate"] = opussamplerate
+	recordedheader["opuschannels"] = opuschannels
+	
 
 	mqttpacketencodebase64 = $HBoxMosquitto/base64.button_pressed
-	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d samples" % $TwoVoipMic.opus_chunk_size
+	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d frames" % $TwoVoipMic.audio_chunk_size
 
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
 	var audioresamplerate = int($VBoxFrameLength/HBoxOpusBitRate/SampleRate.text)*1000
 	var audioresamplesize = int(audioresamplerate*frametimems/1000.0)
-	$VBoxFrameLength/HBoxAudioFrame/LabResampleFrameLength.text = "%d samples" % audioresamplesize
+	$VBoxFrameLength/HBoxAudioFrame/LabResampleFrameLength.text = "%d frames" % audioresamplesize
 
 	if len(recordedsamples) != 0 and len(recordedsamples[0]) != $TwoVoipMic.audio_chunk_size:
 		recordedsamples = rechunkrecordedchunks(recordedsamples, $TwoVoipMic.audio_chunk_size)

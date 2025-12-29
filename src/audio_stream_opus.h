@@ -86,7 +86,7 @@ class AudioStreamPlaybackOpus : public AudioStreamPlaybackResampled {
     float mixed = 0.0;
 
     OpusDecoder* opusdecoder = NULL;
-    PackedVector2Array audiounpackedbuffer;
+    PackedFloat32Array audiounpackedbuffer;
     int Naudiounpackedbuffer = 6000;   //  *  If this is less than the maximum packet duration (120ms; 5760 for 48kHz), this function will    
 
     PackedVector2Array audiosamplebuffer;

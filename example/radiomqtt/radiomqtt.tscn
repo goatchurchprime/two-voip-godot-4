@@ -259,6 +259,18 @@ min_value = -10.0
 max_value = 30.0
 step = 0.0
 
+[node name="LabChannels" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1456455889]
+layout_mode = 2
+text = "Channels:"
+
+[node name="OptionChannels" type="OptionButton" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=221249697]
+layout_mode = 2
+item_count = 2
+popup/item_0/text = "1"
+popup/item_0/id = 0
+popup/item_1/text = "2"
+popup/item_1/id = 1
+
 [node name="HBoxAudioFrame" type="HBoxContainer" parent="VBoxFrameLength" unique_id=256979740]
 layout_mode = 2
 

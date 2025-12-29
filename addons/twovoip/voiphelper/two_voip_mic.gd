@@ -22,9 +22,6 @@ var audiosampleframematerial = null
 
 signal transmitaudiopacket(opuspacket, opusframecount)
 signal transmitaudiojsonpacket(audiostreampacketheader)
-signal micaudiowarnings(name, value)
-
-var micnotplayingwarning = false
 
 const rootmeansquaremaxmeasurement = false
 
@@ -37,9 +34,11 @@ var opus_chunk_size = 960
 var audio_chunk_size = 882
 var frametimesecs = 0.02
 var opussamplerate = 48000
-func setopusvalues(p_opussamplerate, opusframedurationms, opusbitrate, opuscomplexity, opusoptimizeforvoice):
+var opuschannels = 2
+func setopusvalues(p_opussamplerate, opusframedurationms, p_channels, opusbitrate, opuscomplexity, opusoptimizeforvoice):
 	opussamplerate = p_opussamplerate
-	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, 2, denoisebutton.button_pressed)
+	opuschannels = p_channels
+	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoisebutton.button_pressed)
 	opusencoder.create_opus_encoder(opusbitrate, opuscomplexity, opusoptimizeforvoice)
 	# optimize for voice
 
@@ -125,6 +124,7 @@ func processtalkstreamends():
 		var audiostreampacketheader = { 
 			"opusframesize":opus_chunk_size, 
 			"opussamplerate":opussamplerate, 
+			"opuschannels":opuschannels,
 			"lenchunkprefix":len(chunkprefix), 
 			"opusstreamcount":opusstreamcount, 
 			"talkingtimestart":talkingtimestart
