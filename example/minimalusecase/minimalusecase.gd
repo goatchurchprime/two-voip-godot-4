@@ -1,18 +1,20 @@
 extends Node
 
-var opuschunked : AudioEffectOpusChunked
+var opusencoder : TwovoipOpusEncoder
 var audiostreamopus : AudioStreamOpus
 var audiostreamplaybackopus : AudioStreamPlaybackOpus
 var prepend = PackedByteArray()
 var opuspacketsbuffer = [ ]
 
 func _ready():
-	opuschunked = AudioEffectOpusChunked.new()
+	opusencoder = TwovoipOpusEncoder.new()
 	audiostreamopus = $AudioStreamPlayer.stream
 	$AudioStreamPlayer.play()
 	audiostreamplaybackopus = $AudioStreamPlayer.get_stream_playback()
 
 	AudioServer.set_input_device_active(true)
+	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false)
+	opusencoder.create_opus_encoder(12000, 5, true)
 
 	# Voice says: "Listen to me"
 	print("Message length (seconds): ", len(opusaudiodata)*960.0/audiostreamopus.opus_sample_rate)
@@ -20,21 +22,21 @@ func _ready():
 		opuspacketsbuffer.append(PackedByteArray(r))
 
 func _process(_delta):
-	#_process_record()
+	_process_record()
 	_process_playback()
 
 var chunkcount = 0
 var chunkmax = 0.0
 func _process_record():
+	var opus_chunk_size = 960
 	while true:
-		var chunk = AudioServer.get_input_frames(opuschunked.audiosamplesize)
-		if not chunk:
+		var frames = AudioServer.get_input_frames(opusencoder.calc_audio_chunk_size(opus_chunk_size))
+		var lchunkmax = opusencoder.process_pre_encoded_chunk(frames, opus_chunk_size, false, false)
+		if lchunkmax == -1.0:
 			break
-		opuschunked.push_chunk(chunk)
 		chunkcount += 1
-		chunkmax = max(chunkmax, opuschunked.chunk_max(false, false))
-		var opusdata : PackedByteArray = opuschunked.read_opus_packet(prepend)
-		opuschunked.drop_chunk()
+		chunkmax = max(chunkmax, lchunkmax)
+		var opusdata : PackedByteArray = opusencoder.encode_chunk(prepend);
 		if (chunkcount % 50) == 0:
 			prints("audiomax: %.3f  data[%d]: %s" % [chunkmax, opusdata.size(), opusdata.slice(0,5)])
 			chunkmax = 0.0
