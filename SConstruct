@@ -133,6 +133,8 @@ def get_android_toolchain() -> str:
 
 def build_opus(target, source, env: SConsEnvironment):
     extra_flags = []
+    if env["platform"] in ["windows"]:
+        extra_flags += ["-DOPUS_STATIC_RUNTIME=ON"]
     if env["platform"] == "web":
         extra_flags += ["-DOPUS_STACK_PROTECTOR=0"]
     if env["platform"] in ["linux", "web"]:

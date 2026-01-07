@@ -73,6 +73,15 @@ def generate_framework_folder(env: SConsEnvironment, project_name: str, lib_name
     lib_version = get_library_version()
     lib_filename_noext = os.path.splitext(lib_filename)[0]
 
+    # Godot has a list of required properties:
+    # platform/macos/export/export_plugin.cpp: EditorExportPlatformMacOS::_copy_and_sign_files
+    # "CFBundleExecutable"
+    # "CFBundleIdentifier"
+    # "CFBundlePackageType"
+    # "CFBundleInfoDictionaryVersion"
+    # "CFBundleName"
+    # "CFBundleSupportedPlatforms"
+
     info_plist = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -88,9 +97,9 @@ def generate_framework_folder(env: SConsEnvironment, project_name: str, lib_name
 	<key>CFBundleDisplayName</key>
 	<string>{project_name}</string>
 	<key>CFBundleIdentifier</key>
-	<string>ru.dmitriysalnikov.{lib_name}</string>
+	<string>com.goatchurchprime.{lib_name}</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright (c) Dmitriy Salnikov.</string>
+	<string>Copyright (c) Julian Todd.</string>
 	<key>CFBundleVersion</key>
 	<string>{lib_version}</string>
 	<key>CFBundleShortVersionString</key>
@@ -103,6 +112,10 @@ def generate_framework_folder(env: SConsEnvironment, project_name: str, lib_name
 	<string>macosx</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>{min_version}</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
 </dict>
 </plist>
     """
