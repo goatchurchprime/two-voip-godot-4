@@ -160,7 +160,7 @@ float TwovoipOpusEncoder::process_pre_encoded_chunk(PackedVector2Array audio_fra
                                                               speexin, &Uaudiosamplesize, 
                                                               (float*)pre_encoded_chunk.ptrw(), &Uopusframesize);
     } else if (audio_chunk_size == opus_chunk_size) {
-        memcpy((float*)pre_encoded_chunk.ptrw(), (const float*)speexin, opus_chunk_size*channels);
+        memcpy((float*)pre_encoded_chunk.ptrw(), (const float*)speexin, opus_chunk_size*sizeof(float)*channels);
     } else {
         for (int i = 0; i < pre_encoded_chunk.size(); i++) {
             pre_encoded_chunk[i] = 0.0;
