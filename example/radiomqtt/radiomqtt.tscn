@@ -579,7 +579,6 @@ tooltip_text = "run this to monitor messages
 passing through the MQTT broker.  
 [base64] recommended."
 text = "mosquitto_sub ..."
-editable = false
 
 [node name="HBoxLogging" type="HBoxContainer" parent="." unique_id=745135561]
 layout_mode = 2

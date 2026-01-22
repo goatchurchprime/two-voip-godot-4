@@ -201,6 +201,7 @@ func _on_connect_toggled(toggled_on):
 		$Connect/ColorRectConnecting.visible = true
 		#get_node("../HBoxMosquitto/Cmd").text = "mosquitto_sub -h %s%s -v -t %s/# -T %s/+/audio" % [$GridContainer/broker.text, userpass, $GridContainer/topic.text, $GridContainer/topic.text] 
 		get_node("../HBoxMosquitto/Cmd").text = "mosquitto_sub -h %s%s -v -t %s/#" % [$GridContainer/broker.text, userpass, $GridContainer/topic.text] 
+		print("mosquitto_sub -h %s%s -v -t %s/#" % [$GridContainer/broker.text, userpass, $GridContainer/topic.text]) 
 		if OS.has_feature("web"):
 			get_node("../HBoxMosquitto/Cmd").enabroomtopicwordsled = true
 
