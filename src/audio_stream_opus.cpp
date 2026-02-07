@@ -50,11 +50,13 @@ void AudioStreamOpus::_bind_methods() {
 
 void AudioStreamPlaybackOpus::_bind_methods() {
 
-    ClassDB::bind_method(D_METHOD("get_last_chunk_max"), &AudioStreamPlaybackOpus::get_last_chunk_max);
-    ClassDB::bind_method(D_METHOD("opus_segment_space_available"), &AudioStreamPlaybackOpus::opus_segment_space_available);
+    ClassDB::bind_method(D_METHOD("available_space_frames"), &AudioStreamPlaybackOpus::available_space_frames);
     ClassDB::bind_method(D_METHOD("queue_length_frames"), &AudioStreamPlaybackOpus::queue_length_frames);
     ClassDB::bind_method(D_METHOD("push_opus_packet", "opusbytepacket", "begin", "decode_fec"), &AudioStreamPlaybackOpus::push_opus_packet);
-    ClassDB::bind_method(D_METHOD("reset_opus_decoder"), &AudioStreamPlaybackOpus::reset_opus_decoder);
+    ClassDB::bind_method(D_METHOD("mark_end_opus_stream", "clear_mark"), &AudioStreamPlaybackOpus::mark_end_opus_stream);
+    ClassDB::bind_method(D_METHOD("get_chunk_max"), &AudioStreamPlaybackOpus::get_chunk_max);
+    ClassDB::bind_method(D_METHOD("get_skips", "overflow"), &AudioStreamPlaybackOpus::get_skips);
+    ClassDB::bind_method(D_METHOD("set_sinewave_frames", "sinewaveframes", "volume"), &AudioStreamPlaybackOpus::set_sinewave_frames);
 }
 
 Ref<AudioStreamPlayback> AudioStreamOpus::_instantiate_playback() const {
@@ -78,9 +80,9 @@ void AudioStreamPlaybackOpus::initialize(const AudioStreamOpus* pbase) {
     opusdecoder = opus_decoder_create(base->opus_sample_rate, base->opus_channels, &opuserror);
     godot::UtilityFunctions::print("opus_decoder_created "); 
     if (opuserror == 0) {
-        Naudiosamplebuffer = (int)(base->buffer_len*base->opus_sample_rate);
-        audiounpackedbuffer.resize(Naudiounpackedbuffer*base->opus_channels);
-        audiosamplebuffer.resize(Naudiosamplebuffer); 
+        audiounpackedbuffer.resize(48000*60/1000*2); // max opus chunk size is 60ms x 48000Hz x 2channels 
+        int audiosamplebuffersize = (int)(base->buffer_len*base->opus_sample_rate);
+        audiosamplebuffer.resize(audiosamplebuffersize); 
     } else {
         godot::UtilityFunctions::printerr("Opus_decoder_create error ", opuserror);   // will be one of OPUS_BAD_ARG=-1, OPUS_ALLOC_FAIL=-7, OPUS_INTERNAL_ERROR=-3
         if (!((base->opus_sample_rate == 8000) || (base->opus_sample_rate == 12000) || (base->opus_sample_rate == 16000) || (base->opus_sample_rate == 24000) || (base->opus_sample_rate == 48000))) {
@@ -103,22 +105,28 @@ AudioStreamPlaybackOpus::~AudioStreamPlaybackOpus() {
     }
 }
 
-void AudioStreamPlaybackOpus::reset_opus_decoder() {
-    if (opusdecoder != NULL) 
-        opus_decoder_ctl(opusdecoder, OPUS_RESET_STATE);
-    // playback->begin_resample(); // there should be a link to the playback stream, but there isn't
+void AudioStreamPlaybackOpus::mark_end_opus_stream(bool clearmark) {
+    if (clearmark) {
+        bufferstreamend = -1;
+        begin_resample();
+    } else {
+        if (opusdecoder != NULL) 
+            opus_decoder_ctl(opusdecoder, OPUS_RESET_STATE);
+        bufferstreamend = buffertail;
+    }
+    godot::UtilityFunctions::prints("bufferstreamend set to", bufferstreamend);
 }
 
+int AudioStreamPlaybackOpus::get_skips(bool overflow) {
+    return (overflow ? skips_over : skips);
+}
 
 int AudioStreamPlaybackOpus::queue_length_frames() {
-    int queueframes = buffertail - bufferbegin;
-    if (queueframes < 0)
-        queueframes += Naudiosamplebuffer;
-    return queueframes;
+    return buffertail - bufferbegin;
 }
 
-bool AudioStreamPlaybackOpus::opus_segment_space_available() {
-    return ((opusdecoder != NULL) && (audiounpackedbuffer.size() < Naudiosamplebuffer - queue_length_frames()));
+int AudioStreamPlaybackOpus::available_space_frames() {
+    return audiosamplebuffer.size() - queue_length_frames() - 1;
 }
 
 //  *  not be capable of decoding some packets. In the case of PLC (data==NULL) or FEC (decode_fec=1),
@@ -135,56 +143,85 @@ void AudioStreamPlaybackOpus::push_opus_packet(const PackedByteArray& opusbytepa
         // assert(decodedsamples < audiounpackedbuffer.size());  // make sure there was suffient space
         if (decodedsamples)
             lastpacketsizeforfec = decodedsamples;
-        for (int i = 0; i < decodedsamples; i++) {
-            if (base->opus_channels == 2) {
-                audiosamplebuffer.set(buffertail, Vector2(audiounpackedbuffer[i*2], audiounpackedbuffer[i*2+1]));
-            } else {
-                audiosamplebuffer.set(buffertail, Vector2(audiounpackedbuffer[i], audiounpackedbuffer[i]));
+
+        // Replace decoded audio with pure sine wave to listen for crackles in playback.
+        if (Dsinewaveframes > 0) {
+            for (int i = 0; i < decodedsamples; i++) {
+                float w = sin(Dsinewavephase*2*3.14159265358979323846/Dsinewaveframes)*Dsinewavevolume;
+                if (base->opus_channels == 2) {
+                    audiounpackedbuffer[i*2] = w;
+                    audiounpackedbuffer[i*2+1] = w;
+                } else {
+                    audiounpackedbuffer[i] = w;
+                }
+                Dsinewavephase++;
+                if (Dsinewavephase == Dsinewaveframes)
+                    Dsinewavephase = 0;
             }
-            buffertail += 1;
-            if (buffertail == Naudiosamplebuffer)
-                buffertail = 0;
+        }
+
+        // Copy the samples into the RingBuffer.
+        int ib1 = (bufferbegin + audiosamplebuffer.size() - 1) % audiosamplebuffer.size();
+        for (int i = 0; i < decodedsamples; i++) {
+            int it = buffertail % audiosamplebuffer.size();
+            if (it == ib1) {
+                skips_over++;
+                continue;
+            }
+            if (base->opus_channels == 2) {
+                audiosamplebuffer.set(it, Vector2(audiounpackedbuffer[i*2], audiounpackedbuffer[i*2+1]));
+            } else {
+                audiosamplebuffer.set(it, Vector2(audiounpackedbuffer[i], audiounpackedbuffer[i]));
+            }
+            buffertail++;
         }
     }
 }
 
-int AudioStreamPlaybackOpus::pop_front_frames(AudioFrame *buffer, int frames) {
-    int i = 0; 
-    float chunkmax = 0.0;
+float AudioStreamPlaybackOpus::get_chunk_max() { 
+    float res = chunkmax;
+    chunkmax = 0.0;
+    return res;
+};
 
-    while (i < frames) {
-        if (bufferbegin == buffertail) 
-            break;
-        buffer[i] = { audiosamplebuffer[bufferbegin].x, audiosamplebuffer[bufferbegin].y };
-        float l = fabs(buffer[i].left);
-        if (chunkmax < l)  chunkmax = l;
-        float r = fabs(buffer[i].right);
-        if (chunkmax < r)  chunkmax = r;
-        bufferbegin += 1;
-        if (bufferbegin == Naudiosamplebuffer) 
-            bufferbegin = 0;
-        i++;
-    }
-    lastchunkmax = chunkmax;
-    return i;
+void AudioStreamPlaybackOpus::set_sinewave_frames(int sinewaveframes, float volume) {
+    Dsinewaveframes = sinewaveframes;
+    Dsinewavephase = 0;
+    Dsinewavevolume = volume;
+    godot::UtilityFunctions::prints("Sinewave frames set to", Dsinewaveframes, "volume", Dsinewavevolume);
 }
 
 int32_t AudioStreamPlaybackOpus::_mix_resampled(AudioFrame *buffer, int32_t frames) {
-    int rframes = pop_front_frames(buffer, frames);
-    mixed += rframes/_get_stream_sampling_rate();
-    for (int i = rframes; i < frames; i++) {
-        buffer[i] = { 0.0F, 0.0F };  // pad excess with zeros so the stream never ends
-        skips += 1;
+    int i = 0; 
+    while (i < frames) {
+        if (bufferbegin == bufferstreamend) {
+            buffer[i] = { 0.0, 0.0 };  // we should fade down when we get to the streamend
+        } else if (bufferbegin == buffertail) {
+            buffer[i] = { 0.0, 0.0 };
+            skips++;
+        } else {
+            int ib = bufferbegin % audiosamplebuffer.size();
+            buffer[i] = { audiosamplebuffer[ib].x, audiosamplebuffer[ib].y };
+            bufferbegin++;
+        }
+        float l = fabs(buffer[i].left);
+        if (chunkmax < l)
+            chunkmax = l;
+        float r = fabs(buffer[i].right);
+        if (chunkmax < r)
+            chunkmax = r;
+        i++;
     }
+    mixed += frames/_get_stream_sampling_rate();
     return frames;
 }
-
 
 void AudioStreamPlaybackOpus::_start(double p_from_pos) {
     if (mixed == 0.0) {
         begin_resample();
     }
     skips = 0;
+    skips_over = 0;
     active = true;
     mixed = 0.0;
 }

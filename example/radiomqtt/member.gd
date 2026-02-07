@@ -26,13 +26,12 @@ func _process(delta):
 	if twovoipspeaker.audiostreamplaybackopus:
 		$Node/ColorRectBufferQueue.size.x = min(1.0, twovoipspeaker.audiostreamplaybackopus.queue_length_frames()/$AudioStreamPlayer.stream.opus_sample_rate/$AudioStreamPlayer.stream.buffer_length)*size.x
 		$AudioStreamPlayer.volume_db = $Node/Volume.value
-		if twovoipspeaker.opusframecount != prevopusframecount:
-			var chunkv1 = twovoipspeaker.audiostreamplaybackopus.get_last_chunk_max()
-			if chunkv1 != 0.0:
-				chunkv1 = min(chunkv1*10, 1.0)
-				$Node/ColorRectLoudness.size.x = chunkv1*size.x
-				timedelaytohide = 0.1
-			prevopusframecount = twovoipspeaker.opusframecount
+		var chunkv1 = twovoipspeaker.audiostreamplaybackopus.get_chunk_max()
+		if chunkv1 != 0.0:
+			chunkv1 = min(chunkv1*10, 1.0)
+			$Node/ColorRectLoudness.size.x = chunkv1*size.x
+			timedelaytohide = 0.1
+		prevopusframecount = twovoipspeaker.opusframecount
 
 		if $AudioStreamPlayer.stream_paused:
 			$Node/ColorRectBufferQueue.color = colourpause

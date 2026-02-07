@@ -27,8 +27,8 @@ func _process(_delta):
 
 var chunkcount = 0
 var chunkmax = 0.0
+var opus_chunk_size = 960
 func _process_record():
-	var opus_chunk_size = 960
 	while true:
 		var frames = AudioServer.get_input_frames(opusencoder.calc_audio_chunk_size(opus_chunk_size))
 		var lchunkmax = opusencoder.process_pre_encoded_chunk(frames, opus_chunk_size, false, false)
@@ -42,7 +42,7 @@ func _process_record():
 			chunkmax = 0.0
 	
 func _process_playback():
-	while audiostreamplaybackopus.opus_segment_space_available() and len(opuspacketsbuffer) != 0:
+	while opus_chunk_size < audiostreamplaybackopus.available_space_frames() and len(opuspacketsbuffer) != 0:
 		audiostreamplaybackopus.push_opus_packet(opuspacketsbuffer.pop_front(), len(prepend), 0)
 
 var opusaudiodata = [

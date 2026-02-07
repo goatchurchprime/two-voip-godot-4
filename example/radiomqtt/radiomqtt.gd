@@ -72,7 +72,6 @@ func _ready():
 		d.size.y = i*8
 	$HBoxMosquitto/FriendlyName.text = possibleusernames.pick_random()
 
-	SelfMember.get_node("AudioStreamPlayer/TwoVoipSpeaker").set_physics_process(false)
 	await get_tree().create_timer(0.1).timeout
 	$HBoxMicTalk/MicWorking.set_pressed(true)
 	
@@ -118,7 +117,6 @@ func reprocessoriginalchunks():
 	recordedheader["opusframesize"] = $TwoVoipMic.opus_chunk_size
 	recordedheader["opussamplerate"] = opussamplerate
 	recordedheader["opuschannels"] = opuschannels
-	
 
 	mqttpacketencodebase64 = $HBoxMosquitto/base64.button_pressed
 	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d frames" % $TwoVoipMic.audio_chunk_size
@@ -209,10 +207,12 @@ func _on_play_pressed():
 	recordedheader.erase("opusframecount")
 	SelfMember.twovoipspeaker.tv_incomingaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
 	for x in recordedopuspackets:
-		if not SelfMember.twovoipspeaker.audiostreamplaybackopus.opus_segment_space_available():
+		if recordedheader["opusframesize"] > SelfMember.twovoipspeaker.audiostreamplaybackopus.available_space_frames():
 			var tmm = SelfMember.twovoipspeaker.audiostreamplaybackopus.queue_length_frames()*0.5/SelfMember.twovoipspeaker.audiostreamopus.opus_sample_rate
-			print("pausing tmm ", tmm)
+			print(" ** pausing tmm ", tmm)
+			print(" available space before ", SelfMember.twovoipspeaker.audiostreamplaybackopus.available_space_frames()/SelfMember.twovoipspeaker.audiostreamopus.opus_sample_rate)
 			await get_tree().create_timer(tmm).timeout
+			print(" available space after ", SelfMember.twovoipspeaker.audiostreamplaybackopus.available_space_frames()/SelfMember.twovoipspeaker.audiostreamopus.opus_sample_rate)
 		SelfMember.twovoipspeaker.tv_incomingaudiopacket(x)
 	SelfMember.twovoipspeaker.tv_incomingaudiopacket(JSON.stringify(recordedfooter).to_ascii_buffer())
 

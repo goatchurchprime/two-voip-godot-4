@@ -47,7 +47,7 @@ func _ready():
 		var bbs = buffblocks(gg["segment_table"], gg["buff"])
 		print("bbs ", len(bbs))
 		for bb in bbs:
-			while not audiostreamplaybackopus.opus_segment_space_available():
+			while 48000*60/1000 > audiostreamplaybackopus.available_space_frames():
 				await get_tree().create_timer(0.1).timeout
 			audiostreamplaybackopus.push_opus_packet(bb, 0, 0)
 	

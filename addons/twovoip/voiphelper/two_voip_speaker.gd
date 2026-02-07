@@ -17,6 +17,7 @@ var lenchunkprefix = -1
 var opusstreamcount = 0
 var asbase64 = false
 var opusframecount = 0
+var opusframesize = 960
 const Noutoforderqueue = 4
 const Npacketinitialbatching = 2
 var outoforderchunkqueue = [ ]
@@ -35,11 +36,13 @@ func _ready():
 
 func setrecopusvalues(opus_sample_rate, opus_channels):
 	if not get_parent().playing or audiostreamopus.opus_sample_rate != opus_sample_rate or audiostreamopus.opus_channels != opus_channels:
+		prints(":newplay: ", get_parent().playing, audiostreamopus.opus_sample_rate, opus_sample_rate, audiostreamopus.opus_channels, opus_channels)
 		audiostreamopus.opus_sample_rate = opus_sample_rate
 		audiostreamopus.opus_channels = opus_channels
 		get_parent().play()
 		audiostreamplaybackopus = get_parent().get_stream_playback()
-		
+		set_sinewave_out(sinewaveoutmode)
+
 func tv_incomingaudiopacket(packet):
 	if audiostreamopus == null:
 		return
@@ -53,6 +56,7 @@ func tv_incomingaudiopacket(packet):
 				setrecopusvalues(h["opussamplerate"], h.get("opuschannels", 2))
 				lenchunkprefix = int(h["lenchunkprefix"])
 				opusstreamcount = int(h["opusstreamcount"])
+				opusframesize = int(h["opusframesize"])
 				asbase64 = (h["mqttpacketencoding"] == "base64")
 				opusframecount = 0
 				if h.has("opusframecount"):
@@ -63,10 +67,11 @@ func tv_incomingaudiopacket(packet):
 					outoforderchunkqueue.push_back(null)
 				opusframequeuecount = 0
 				assert (Npacketinitialbatching < Noutoforderqueue)
-				audiostreamplaybackopus.reset_opus_decoder()
 				currentlyreceivingtalkingstate = AUDIOBUFFER_FILLING
+				print("set currentlyreceivingtalkingstate to AUDIOBUFFER_FILLING")
 			elif h.has("talkingtimeend"):
-				currentlyreceivingtalkingstate = AUDIOBUFFER_CLEARING
+				audiostreamplaybackopus.mark_end_opus_stream(false)
+				print("audiostreamplaybackopus.mark_end_opus_stream(true)")
 
 	elif lenchunkprefix == -1:
 		pass
@@ -100,7 +105,7 @@ func tv_incomingaudiopacket(packet):
 			outoforderchunkqueue[opusframecountR] = packet
 			opusframequeuecount += 1
 			while outoforderchunkqueue[0] != null and opusframecount + opusframequeuecount >= Npacketinitialbatching:
-				if not audiostreamplaybackopus.opus_segment_space_available():
+				if opusframesize > audiostreamplaybackopus.available_space_frames():
 					print("!!! segment space filled up")
 					break
 				audiostreamplaybackopus.push_opus_packet(outoforderchunkqueue.pop_front(), lenchunkprefix, 0)
@@ -113,13 +118,12 @@ func tv_incomingaudiopacket(packet):
 
 func setpitchscale(pitchscale):
 	if pitchscale != lastemittedaudiobufferpitchscale:
-		if pitchscale != 0.0:
-			if lastemittedaudiobufferpitchscale == 0.0:
-				get_parent().stream_paused = false
-			get_parent().pitch_scale = pitchscale
-		else:
-			get_parent().stream_paused = true
+		get_parent().pitch_scale = pitchscale
 		lastemittedaudiobufferpitchscale = pitchscale
+
+func _process(delta):
+	if audiostreamplaybackopus:
+		pass # print(" q ", audiostreamplaybackopus.queue_length_frames())
 
 func _physics_process(delta):
 	if currentlyreceivingtalkingstate == AUDIOBUFFER_UNTOUCHED:
@@ -127,9 +131,8 @@ func _physics_process(delta):
 	var bufferlengthtime = audioserveroutputlatency + audiostreamplaybackopus.queue_length_frames()*1.0/audiostreamopus.opus_sample_rate
 	if currentlyreceivingtalkingstate == AUDIOBUFFER_FILLING:
 		if bufferlengthtime < audiobufferlagtimetarget:
-			setpitchscale(0.0)
-		else:
-			setpitchscale(1.0)
+			audiostreamplaybackopus.mark_end_opus_stream(true)
+			print("audiostreamplaybackopus.mark_end_opus_stream(true)")
 			currentlyreceivingtalkingstate = AUDIOBUFFER_FLOWING
 	
 	if currentlyreceivingtalkingstate == AUDIOBUFFER_FLOWING:
@@ -144,4 +147,11 @@ func _physics_process(delta):
 
 	if currentlyreceivingtalkingstate == AUDIOBUFFER_CLEARING:
 		currentlyreceivingtalkingstate = AUDIOBUFFER_UNTOUCHED
+		prints("Skips in playback run", audiostreamplaybackopus.get_skips(false), "skips overrun", audiostreamplaybackopus.get_skips(true))
 		setpitchscale(1.0)
+
+var sinewaveoutmode = false
+func set_sinewave_out(toggled_on):
+	sinewaveoutmode = toggled_on
+	if audiostreamplaybackopus:
+		audiostreamplaybackopus.set_sinewave_frames(audiostreamopus.opus_sample_rate/440 if toggled_on else 0, 0.05)

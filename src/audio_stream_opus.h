@@ -52,10 +52,9 @@ class AudioStreamOpus : public AudioStream {
     GDCLASS(AudioStreamOpus, AudioStream)
     friend class AudioStreamPlaybackOpus;
 
-    float opus_sample_rate = 48000.0;  // must be one of 48000,24000,16000,12000,8000
-    int opus_channels = 2;  // must be 1 or 2
-
-    float buffer_len = 2.0;
+    float opus_sample_rate = 48000.0;  // Must be one of 48000,24000,16000,12000,8000.
+    int opus_channels = 2;  // Must be 1 or 2.
+    float buffer_len = 2.0; // In seconds, and only matters when AudioStreamPlaybackOpus::initialize() is called.
 
 protected:
     static void _bind_methods();
@@ -81,7 +80,6 @@ class AudioStreamPlaybackOpus : public AudioStreamPlaybackResampled {
     friend class AudioStreamOpus;
     Ref<AudioStreamOpus> base;
     
-    int skips = 0;
     bool active = false;
     float mixed = 0.0;
 
@@ -89,15 +87,21 @@ class AudioStreamPlaybackOpus : public AudioStreamPlaybackResampled {
     PackedFloat32Array audiounpackedbuffer;
     int Naudiounpackedbuffer = 6000;   //  *  If this is less than the maximum packet duration (120ms; 5760 for 48kHz), this function will    
 
-    PackedVector2Array audiosamplebuffer;
-
-    int Naudiosamplebuffer = 96000;
+    PackedVector2Array audiosamplebuffer;  // a ringbuffer
     int bufferbegin = 0;
     int buffertail = 0;
+    int bufferstreamend = -1;  // paused when bufferbegin==bufferstreamend
+    int skips = 0;  // counts when we hit buffertail before bufferstreamend
+    int skips_over = 0;  // buffertail overflows the ring buffer
     
     int lastpacketsizeforfec = 960;
-    float lastchunkmax = 0.0;
+    float chunkmax = 0.0;
     int pop_front_frames(AudioFrame *buffer, int frames);
+
+    // Used to maps a pure sound wave in place of incoming audio data to check if problems are in playback or the data
+    int Dsinewaveframes = 0;
+    int Dsinewavephase = 0;
+    float Dsinewavevolume = 1.0;
 
 protected:
     static void _bind_methods();
@@ -115,16 +119,16 @@ public:
     virtual void _seek(double p_time) override;
     virtual void _tag_used_streams() override;
 
-    void reset_opus_decoder();
-    bool opus_segment_space_available();
+    int available_space_frames();
     int queue_length_frames();
     void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
-    float get_last_chunk_max() { return lastchunkmax; };
-
+    float get_chunk_max();
+    int get_skips(bool overflow);
+    void mark_end_opus_stream(bool clearmark);
+    void set_sinewave_frames(int sinewaveframes, float volume);
     AudioStreamPlaybackOpus();
     ~AudioStreamPlaybackOpus();
 };
-
 
 
 }

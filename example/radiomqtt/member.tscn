@@ -53,6 +53,16 @@ offset_right = -5.0
 offset_bottom = 42.0
 color = Color(0.0352941, 0.788235, 1, 1)
 
+[node name="ButtonToneOutput" type="Button" parent="Node" unique_id=1661628005]
+layout_mode = 0
+offset_left = 131.0
+offset_top = 4.0
+offset_right = 149.0
+offset_bottom = 35.0
+tooltip_text = "Substitute audio packets with steady tone"
+toggle_mode = true
+text = "T"
+
 [node name="Volume" type="SpinBox" parent="Node" unique_id=130648977]
 layout_mode = 0
 offset_left = 150.0
@@ -61,3 +71,5 @@ offset_right = 233.062
 offset_bottom = 35.0
 min_value = -80.0
 max_value = 24.0
+
+[connection signal="toggled" from="Node/ButtonToneOutput" to="AudioStreamPlayer/TwoVoipSpeaker" method="set_sinewave_out"]
