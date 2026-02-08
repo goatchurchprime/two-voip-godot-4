@@ -197,24 +197,14 @@ func _on_vox_threshold_gui_input(event):
 		$TwoVoipMic.set_voxthreshhold(event.position.x/$HBoxMicTalk/VoxThreshold.size.x)
 
 func _on_play_pressed():
-	if audioeffectpitchshift != null:
+	if false and audioeffectpitchshift != null:
 		var speedup = $VBoxPlayback/HBoxStream/StreamSpeedup.value
 		AudioServer.set_bus_effect_enabled(speechbusidx, audioeffectpitchshiftidx, (speedup != 1.0))
 		SelfMember.get_node("AudioStreamPlayer").pitch_scale = speedup
 		audioeffectpitchshift.pitch_scale = 1.0/speedup
 
-	#SelfMember.twovoipspeaker.currentlyreceivingtalkingstate = 4
 	recordedheader.erase("opusframecount")
-	SelfMember.twovoipspeaker.tv_incomingaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
-	for x in recordedopuspackets:
-		if recordedheader["opusframesize"] > SelfMember.twovoipspeaker.audiostreamplaybackopus.available_space_frames():
-			var tmm = SelfMember.twovoipspeaker.audiostreamplaybackopus.queue_length_frames()*0.5/SelfMember.twovoipspeaker.audiostreamopus.opus_sample_rate
-			print(" ** pausing tmm ", tmm)
-			print(" available space before ", SelfMember.twovoipspeaker.audiostreamplaybackopus.available_space_frames()/SelfMember.twovoipspeaker.audiostreamopus.opus_sample_rate)
-			await get_tree().create_timer(tmm).timeout
-			print(" available space after ", SelfMember.twovoipspeaker.audiostreamplaybackopus.available_space_frames()/SelfMember.twovoipspeaker.audiostreamopus.opus_sample_rate)
-		SelfMember.twovoipspeaker.tv_incomingaudiopacket(x)
-	SelfMember.twovoipspeaker.tv_incomingaudiopacket(JSON.stringify(recordedfooter).to_ascii_buffer())
+	SelfMember.twovoipspeaker.replayrecording($VBoxPlayback/HBoxStream/StreamSpeedup.value, recordedheader, recordedopuspackets, recordedfooter)
 
 var saveplaybackfile = "user://savedplayback.dat"
 func _on_sav_options_item_selected(index):

@@ -95,6 +95,7 @@ void AudioStreamPlaybackOpus::initialize(const AudioStreamOpus* pbase) {
     }
     bufferbegin = 0;
     buffertail = 0; 
+    bufferstreamend = buffertail; // start out paused
 }
 
 AudioStreamPlaybackOpus::~AudioStreamPlaybackOpus() {
@@ -108,11 +109,11 @@ AudioStreamPlaybackOpus::~AudioStreamPlaybackOpus() {
 void AudioStreamPlaybackOpus::mark_end_opus_stream(bool clearmark) {
     if (clearmark) {
         bufferstreamend = -1;
-        begin_resample();
+        begin_resample(); // we assume we are paused
     } else {
         if (opusdecoder != NULL) 
             opus_decoder_ctl(opusdecoder, OPUS_RESET_STATE);
-        bufferstreamend = buffertail;
+        bufferstreamend = buffertail; // this sets the pause point
     }
     godot::UtilityFunctions::prints("bufferstreamend set to", bufferstreamend);
 }

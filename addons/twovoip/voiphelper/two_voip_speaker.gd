@@ -23,8 +23,7 @@ const Npacketinitialbatching = 2
 var outoforderchunkqueue = [ ]
 var opusframequeuecount = 0
 
-enum { AUDIOBUFFER_UNTOUCHED, AUDIOBUFFER_FILLING, AUDIOBUFFER_FLOWING, AUDIOBUFFER_CLEARING }	
-var currentlyreceivingtalkingstate = AUDIOBUFFER_UNTOUCHED
+var playbackpausedonmark = false
 
 signal sigvoicespeedrate(audiobufferpitchscale)
 
@@ -39,9 +38,20 @@ func setrecopusvalues(opus_sample_rate, opus_channels):
 		prints(":newplay: ", get_parent().playing, audiostreamopus.opus_sample_rate, opus_sample_rate, audiostreamopus.opus_channels, opus_channels)
 		audiostreamopus.opus_sample_rate = opus_sample_rate
 		audiostreamopus.opus_channels = opus_channels
-		get_parent().play()
+		get_parent().play()  # creates a new playback
 		audiostreamplaybackopus = get_parent().get_stream_playback()
 		set_sinewave_out(sinewaveoutmode)
+		audiostreamplaybackopus.mark_end_opus_stream(false)
+		pausereached = false
+		playbackpausedonmark = true
+
+func unpausewhenbufferready():
+	assert (playbackpausedonmark)
+	var bufferlengthtime = audioserveroutputlatency + audiostreamplaybackopus.queue_length_frames()*1.0/audiostreamopus.opus_sample_rate
+	if bufferlengthtime > audiobufferlagtimetarget:
+		audiostreamplaybackopus.mark_end_opus_stream(true)
+		print("audiostreamplaybackopus.mark_end_opus_stream(true)")
+		playbackpausedonmark = false
 
 func tv_incomingaudiopacket(packet):
 	if audiostreamopus == null:
@@ -67,11 +77,14 @@ func tv_incomingaudiopacket(packet):
 					outoforderchunkqueue.push_back(null)
 				opusframequeuecount = 0
 				assert (Npacketinitialbatching < Noutoforderqueue)
-				currentlyreceivingtalkingstate = AUDIOBUFFER_FILLING
-				print("set currentlyreceivingtalkingstate to AUDIOBUFFER_FILLING")
 			elif h.has("talkingtimeend"):
-				audiostreamplaybackopus.mark_end_opus_stream(false)
-				print("audiostreamplaybackopus.mark_end_opus_stream(true)")
+				if playbackpausedonmark and audiostreamplaybackopus.queue_length_frames() == 0:
+					audiostreamplaybackopus.mark_end_opus_stream(true)
+					print("clear audiostreamplaybackopus.mark_end_opus_stream(true) before next pause")
+#				audiostreamplaybackopus.mark_end_opus_stream(false)
+				print("audiostreamplaybackopus.mark_end_opus_stream(false)")
+				playbackpausedonmark = true
+				pausereached = false
 
 	elif lenchunkprefix == -1:
 		pass
@@ -79,7 +92,9 @@ func tv_incomingaudiopacket(packet):
 	elif lenchunkprefix == 0:
 		audiostreamopus.push_opus_packet(packet, lenchunkprefix, 0)
 		opusframecount += 1
-		
+		if playbackpausedonmark:
+			unpausewhenbufferready()
+
 	elif packet[1]&128 == (opusstreamcount%2)*128:
 		assert (lenchunkprefix == 2)
 		var opusframecountI = packet[0] + (packet[1]&127)*256
@@ -113,6 +128,10 @@ func tv_incomingaudiopacket(packet):
 				opusframecount += 1
 				opusframequeuecount -= 1
 				assert (opusframequeuecount >= 0)
+
+		if playbackpausedonmark:
+			unpausewhenbufferready()
+
 	else:
 		prints("dropping frame with opusstream number mismatch", opusstreamcount, packet[0], packet[1])
 
@@ -125,30 +144,43 @@ func _process(delta):
 	if audiostreamplaybackopus:
 		pass # print(" q ", audiostreamplaybackopus.queue_length_frames())
 
+var playingrecording = false
+var pausereached = false
+var prevskips = 0
 func _physics_process(delta):
-	if currentlyreceivingtalkingstate == AUDIOBUFFER_UNTOUCHED:
+	if audiostreamplaybackopus == null:
 		return
-	var bufferlengthtime = audioserveroutputlatency + audiostreamplaybackopus.queue_length_frames()*1.0/audiostreamopus.opus_sample_rate
-	if currentlyreceivingtalkingstate == AUDIOBUFFER_FILLING:
-		if bufferlengthtime < audiobufferlagtimetarget:
-			audiostreamplaybackopus.mark_end_opus_stream(true)
-			print("audiostreamplaybackopus.mark_end_opus_stream(true)")
-			currentlyreceivingtalkingstate = AUDIOBUFFER_FLOWING
-	
-	if currentlyreceivingtalkingstate == AUDIOBUFFER_FLOWING:
+	if playingrecording:
+		return
+	var queuelengthframes = audiostreamplaybackopus.queue_length_frames()
+	if not pausereached and queuelengthframes == 0:
+		pausereached = true
+		var currskips = audiostreamplaybackopus.get_skips(false)
+		print("Skips during playback: ", currskips - prevskips)
+		prevskips = currskips
+		
+	var bufferlengthtime = audioserveroutputlatency + queuelengthframes*1.0/audiostreamopus.opus_sample_rate
+	if not playbackpausedonmark:
 		if lastemittedaudiobufferpitchscale == 1.0:
 			if abs(bufferlengthtime - audiobufferlagtimetarget) > audiobufferlagtimetargettolerance:
 				setpitchscale(0.7 if (bufferlengthtime < audiobufferlagtimetarget) else 1.4)
 				print(" set lastemittedaudiobufferpitchscale to ", lastemittedaudiobufferpitchscale)
-			
+
 		elif (lastemittedaudiobufferpitchscale < 1.0) == (bufferlengthtime > audiobufferlagtimetarget):
 			setpitchscale(1.0)
 			print(" set lastemittedaudiobufferpitchscale to ", lastemittedaudiobufferpitchscale)
 
-	if currentlyreceivingtalkingstate == AUDIOBUFFER_CLEARING:
-		currentlyreceivingtalkingstate = AUDIOBUFFER_UNTOUCHED
-		prints("Skips in playback run", audiostreamplaybackopus.get_skips(false), "skips overrun", audiostreamplaybackopus.get_skips(true))
-		setpitchscale(1.0)
+func replayrecording(speedup, recordedheader, recordedopuspackets, recordedfooter):
+	playingrecording = true
+	tv_incomingaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
+	setpitchscale(speedup)
+	for x in recordedopuspackets:
+		if recordedheader["opusframesize"] > audiostreamplaybackopus.available_space_frames():
+			var tmm = audiostreamplaybackopus.queue_length_frames()*0.5/audiostreamopus.opus_sample_rate
+			await get_tree().create_timer(tmm).timeout
+		tv_incomingaudiopacket(x)
+	tv_incomingaudiopacket(JSON.stringify(recordedfooter).to_ascii_buffer())
+	playingrecording = false
 
 var sinewaveoutmode = false
 func set_sinewave_out(toggled_on):
