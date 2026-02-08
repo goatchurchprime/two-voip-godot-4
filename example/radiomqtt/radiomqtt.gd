@@ -163,7 +163,7 @@ func recordoriginalchunks(audiosamples, opuspacket):
 func on_transmitaudiopacket(opuspacket, opusframecount):
 	if len(recordedsamples) < maxrecordedsamples:
 		recordoriginalchunks($TwoVoipMic.audio_chunk, opuspacket)
-	$MQTTnetwork.transportaudiopacket(opuspacket, opusframecount, mqttpacketencodebase64)
+	$MQTTnetwork.transportaudiopacket(opuspacket, opusframecount, mqttpacketencodebase64, max(0, $HBoxLogging/TransmissionNoise.selected))
 
 func on_transmitaudiojsonpacket(audiostreampacketheader):
 	print(audiostreampacketheader)

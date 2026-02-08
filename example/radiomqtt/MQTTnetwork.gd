@@ -43,10 +43,15 @@ func _on_mqtt_broker_item_selected(index):
 		$GridContainer/broker.text = "mosquitto.doesliverpool.xyz"
 
 var jmidheader = null
-func transportaudiopacket(packet, opusframecount, asbase64):
+func transportaudiopacket(packet, opusframecount, asbase64, dithertype):
 	if jmidheader:
 		jmidheader["opusframecount"] = opusframecount
 	if audioouttopic:
+		if dithertype:
+			if randf() < 0.2:
+				var tt = abs(randfn(0.0, 0.1))
+				print("Delaying dither ", tt)
+				await get_tree().create_timer(tt).timeout
 		if asbase64:
 			$MQTT.publish(audioouttopic, Marshalls.raw_to_base64(packet).to_ascii_buffer())
 		else:

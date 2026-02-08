@@ -99,6 +99,7 @@ func tv_incomingaudiopacket(packet):
 	elif packet[1]&128 == (opusstreamcount%2)*128:
 		assert (lenchunkprefix == 2)
 		var opusframecountI = packet[0] + (packet[1]&127)*256
+		print(opusframecountI)
 		var opusframecountR = opusframecountI - opusframecount
 		if opusframecountR < 0:
 			print("framecount Wrapround 10mins? ", opusframecount, " ", opusframecountI)
@@ -141,9 +142,6 @@ func setpitchscale(pitchscale):
 		sigvoicespeedrate.emit(pitchscale)
 		lastemittedaudiobufferpitchscale = pitchscale
 
-func _process(delta):
-	if audiostreamplaybackopus:
-		pass # print(" q ", audiostreamplaybackopus.queue_length_frames())
 
 var playingrecording = false
 var pausereached = false

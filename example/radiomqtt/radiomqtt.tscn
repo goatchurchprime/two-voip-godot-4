@@ -326,8 +326,9 @@ text = "Opus Bit Rate"
 
 [node name="BitRate" type="SpinBox" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=1832636715]
 layout_mode = 2
-min_value = 500.0
+min_value = 1000.0
 max_value = 200000.0
+step = 1000.0
 value = 12000.0
 
 [node name="LabelComplexity" type="Label" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=154200874]
@@ -598,6 +599,18 @@ layout_mode = 2
 layout_mode = 2
 toggle_mode = true
 text = "Replay"
+
+[node name="TransmissionNoise" type="OptionButton" parent="HBoxLogging" unique_id=137179689]
+layout_mode = 2
+tooltip_text = "Transmission noise for robustness test"
+selected = 0
+item_count = 3
+popup/item_0/text = "No dither"
+popup/item_0/id = 0
+popup/item_1/text = "Slight dither"
+popup/item_1/id = 1
+popup/item_2/text = "Big order dither"
+popup/item_2/id = 2
 
 [node name="HSeparator6" type="HSeparator" parent="." unique_id=732837562]
 custom_minimum_size = Vector2(0, 20)
