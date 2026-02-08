@@ -51,7 +51,6 @@ func unpausewhenbufferready():
 	var bufferlengthtime = audioserveroutputlatency + audiostreamplaybackopus.queue_length_frames()*1.0/audiostreamopus.opus_sample_rate
 	if bufferlengthtime > audiobufferlagtimetarget:
 		audiostreamplaybackopus.mark_end_opus_stream(true)
-		print("audiostreamplaybackopus.mark_end_opus_stream(true)")
 		playbackpausedonmark = false
 
 func tv_incomingaudiopacket(packet):
@@ -81,9 +80,7 @@ func tv_incomingaudiopacket(packet):
 			elif h.has("talkingtimeend"):
 				if playbackpausedonmark and audiostreamplaybackopus.queue_length_frames() == 0:
 					audiostreamplaybackopus.mark_end_opus_stream(true)
-					print("clear audiostreamplaybackopus.mark_end_opus_stream(true) before next pause")
 				audiostreamplaybackopus.mark_end_opus_stream(false)
-				print("audiostreamplaybackopus.mark_end_opus_stream(false)")
 				playbackpausedonmark = true
 				pausereached = false
 
@@ -99,20 +96,28 @@ func tv_incomingaudiopacket(packet):
 	elif packet[1]&128 == (opusstreamcount%2)*128:
 		assert (lenchunkprefix == 2)
 		var opusframecountI = packet[0] + (packet[1]&127)*256
-		print(opusframecountI)
 		var opusframecountR = opusframecountI - opusframecount
 		if opusframecountR < 0:
-			print("framecount Wrapround 10mins? ", opusframecount, " ", opusframecountI)
-			opusframecount = opusframecountI
-			opusframecountR = 0
+			if opusframecountR < -30000:
+				print("framecount Wrapround 10mins? ", opusframecount, " ", opusframecountI)
+				opusframecount = opusframecountI
+				opusframecountR = 0
+			else:
+				print("late arriving frame ignored ", opusframecountR)
+			
 		if opusframecountR >= 0:
 			while opusframecountR >= Noutoforderqueue:
 				print("shifting outoforderqueue ", opusframecountI, " ", ("null" if outoforderchunkqueue[0] == null else len(outoforderchunkqueue[0])))
 				if outoforderchunkqueue[0] != null:
 					audiostreamplaybackopus.push_opus_packet(outoforderchunkqueue[0], lenchunkprefix, 0)
 					opusframequeuecount -= 1
-				elif outoforderchunkqueue[1] != null:
-					audiostreamplaybackopus.push_opus_packet(outoforderchunkqueue[1], lenchunkprefix, 1)
+				else:
+					var nextvalidpacketforfec = packet
+					for i in range(1, Noutoforderqueue):
+						if outoforderchunkqueue[i] != null:
+							nextvalidpacketforfec = outoforderchunkqueue[i]
+							break
+					audiostreamplaybackopus.push_opus_packet(nextvalidpacketforfec, lenchunkprefix, 1)
 				outoforderchunkqueue.pop_front()
 				outoforderchunkqueue.push_back(null)
 				opusframecountR -= 1
