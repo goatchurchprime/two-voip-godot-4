@@ -20,6 +20,13 @@ func receivemqttaudio(msg):
 		msg = Marshalls.base64_to_raw(msg.get_string_from_ascii())
 	twovoipspeaker.tv_incomingaudiopacket(msg)
 
+
+func setspeedrate(pitchscale):
+	$AudioStreamPlayer.pitch_scale = pitchscale
+
+func _ready():
+	$AudioStreamPlayer/TwoVoipSpeaker.connect("sigvoicespeedrate", setspeedrate)
+
 var timedelaytohide = 0.1
 var prevopusframecount = -1
 func _process(delta):
@@ -33,9 +40,7 @@ func _process(delta):
 			timedelaytohide = 0.1
 		prevopusframecount = twovoipspeaker.opusframecount
 
-		if $AudioStreamPlayer.stream_paused:
-			$Node/ColorRectBufferQueue.color = colourpause
-		elif $AudioStreamPlayer.pitch_scale == 1.0:
+		if $AudioStreamPlayer.pitch_scale == 1.0:
 			$Node/ColorRectBufferQueue.color = colournormal
 		else:
 			$Node/ColorRectBufferQueue.color = colourslow if $AudioStreamPlayer.pitch_scale < 1.0 else colourfast

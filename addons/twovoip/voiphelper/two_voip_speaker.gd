@@ -41,9 +41,10 @@ func setrecopusvalues(opus_sample_rate, opus_channels):
 		get_parent().play()  # creates a new playback
 		audiostreamplaybackopus = get_parent().get_stream_playback()
 		set_sinewave_out(sinewaveoutmode)
-		audiostreamplaybackopus.mark_end_opus_stream(false)
-		pausereached = false
+		# begins in a paused state
+		# audiostreamplaybackopus.mark_end_opus_stream(false)
 		playbackpausedonmark = true
+		pausereached = false
 
 func unpausewhenbufferready():
 	assert (playbackpausedonmark)
@@ -81,7 +82,7 @@ func tv_incomingaudiopacket(packet):
 				if playbackpausedonmark and audiostreamplaybackopus.queue_length_frames() == 0:
 					audiostreamplaybackopus.mark_end_opus_stream(true)
 					print("clear audiostreamplaybackopus.mark_end_opus_stream(true) before next pause")
-#				audiostreamplaybackopus.mark_end_opus_stream(false)
+				audiostreamplaybackopus.mark_end_opus_stream(false)
 				print("audiostreamplaybackopus.mark_end_opus_stream(false)")
 				playbackpausedonmark = true
 				pausereached = false
@@ -137,7 +138,7 @@ func tv_incomingaudiopacket(packet):
 
 func setpitchscale(pitchscale):
 	if pitchscale != lastemittedaudiobufferpitchscale:
-		get_parent().pitch_scale = pitchscale
+		sigvoicespeedrate.emit(pitchscale)
 		lastemittedaudiobufferpitchscale = pitchscale
 
 func _process(delta):

@@ -109,11 +109,13 @@ AudioStreamPlaybackOpus::~AudioStreamPlaybackOpus() {
 void AudioStreamPlaybackOpus::mark_end_opus_stream(bool clearmark) {
     if (clearmark) {
         bufferstreamend = -1;
-        begin_resample(); // we assume we are paused
+        if (queue_length_frames() == 0)
+            begin_resample(); 
     } else {
         if (opusdecoder != NULL) 
             opus_decoder_ctl(opusdecoder, OPUS_RESET_STATE);
         bufferstreamend = buffertail; // this sets the pause point
+            // as we reach this marker we should fade out as if for AudioStreamPlaybackListNode::FADE_OUT_TO_PAUSE
     }
     godot::UtilityFunctions::prints("bufferstreamend set to", bufferstreamend);
 }
