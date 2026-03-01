@@ -41,9 +41,10 @@ func _ready():
 
 	$TwoVoipMic.initvoipmic($HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMicTalk/VoxThreshold.material)
 
-	#for d in AudioServer.get_output_device_list():
-	#	%OptionOutput.add_item(d)
-	#assert(%OptionOutput.get_item_text(%OptionOutput.selected) == "Default")
+	for d in AudioServer.get_output_device_list():
+		$HBoxOutputDevice/OptionOutputDevice.add_item(d)
+	assert($HBoxOutputDevice/OptionOutputDevice.get_item_text($HBoxOutputDevice/OptionOutputDevice.selected) == "Default")
+	$HBoxOutputDevice/OptionOutputDevice.connect("item_selected", _on_optionoutputdevice)
 
 	if not AudioServer.has_method("get_input_frames"):
 		$GodotVersionWarning.visible = true
@@ -77,6 +78,11 @@ func _ready():
 	
 	$TwoVoipMic.connect("transmitaudiojsonpacket", on_transmitaudiojsonpacket)
 	$TwoVoipMic.connect("transmitaudiopacket", on_transmitaudiopacket)
+
+func _on_optionoutputdevice(index: int) -> void:
+	var output_device: String = $HBoxOutputDevice/OptionOutputDevice.get_item_text(index)
+	print("Set input device: ", output_device)
+	AudioServer.set_input_device(output_device)
 
 func rechunkrecordedchunks(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)
