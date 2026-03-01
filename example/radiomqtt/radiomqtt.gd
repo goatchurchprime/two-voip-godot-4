@@ -79,6 +79,18 @@ func _ready():
 	$TwoVoipMic.connect("transmitaudiojsonpacket", on_transmitaudiojsonpacket)
 	$TwoVoipMic.connect("transmitaudiopacket", on_transmitaudiopacket)
 
+	# handle lower resolution screens
+	var window_size = get_node("/root").size
+	var screen_size = DisplayServer.screen_get_size()
+	if window_size.y > screen_size.y - 100:
+		var rat = screen_size.y*0.9/window_size.y
+		get_node("/root").set_size(window_size*rat)
+		var window_position = DisplayServer.window_get_position()
+		if window_position.y == 0:
+			window_position.y = 30
+			DisplayServer.window_set_position(window_position)
+
+
 func _on_optionoutputdevice(index: int) -> void:
 	var output_device: String = $HBoxOutputDevice/OptionOutputDevice.get_item_text(index)
 	print("Set input device: ", output_device)
