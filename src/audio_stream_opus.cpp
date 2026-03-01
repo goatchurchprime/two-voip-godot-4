@@ -102,7 +102,7 @@ AudioStreamPlaybackOpus::~AudioStreamPlaybackOpus() {
     if (opusdecoder != NULL) {
         opus_decoder_destroy(opusdecoder);
         godot::UtilityFunctions::print("opus_decoder_destroy "); 
-        opusdecoder = NULL;
+        opusdecoder = NULL; 
     }
 }
 

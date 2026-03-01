@@ -16,6 +16,7 @@ var recordedopuspackets = [ ]
 var recordedresampledpackets = null
 const maxrecordedsamples = 10*50
 var recordedopuspacketsMemSize = 0
+var recordedchunkmax = 0.0
 var recordedheader = { }
 var recordedfooter = { }
 
@@ -40,6 +41,7 @@ func _ready():
 		h.connect("toggled", func (_toggled_on): updatesamplerates())
 
 	$TwoVoipMic.initvoipmic($HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMicTalk/VoxThreshold.material)
+	$TwoVoipMic.set_voxthreshhold(0.07)
 
 	#for d in AudioServer.get_output_device_list():
 	#	%OptionOutput.add_item(d)
@@ -129,17 +131,20 @@ func reprocessoriginalchunks():
 	if len(recordedsamples) != 0 and len(recordedsamples[0]) != $TwoVoipMic.audio_chunk_size:
 		recordedsamples = rechunkrecordedchunks(recordedsamples, $TwoVoipMic.audio_chunk_size)
 	recordedopuspacketsMemSize = 0
+	recordedchunkmax = 0.0
 	recordedopuspackets = null
 	recordedresampledpackets = null
 
 	recordedopuspackets = [ ]
 	#opusencoder_forreprocessing.resetencoder(true)
 	var resampledopusframecount = 0
+	var gain = $VBoxFrameLength/HBoxOpusFrame/GainSpinBox.value
 	for s in recordedsamples:
-		opusencoder_forreprocessing.process_pre_encoded_chunk(s, $TwoVoipMic.opus_chunk_size, false, false)
+		var chunkmax = opusencoder_forreprocessing.process_pre_encoded_chunk(s, $TwoVoipMic.opus_chunk_size, false, false)
+		recordedchunkmax = max(recordedchunkmax, chunkmax)
 		resampledchunkprefix.set(0, (resampledopusframecount%256))  # 32768 frames is 10 minutes
 		resampledchunkprefix.set(1, (int(resampledopusframecount/256)&127) + (recordedheader["opusstreamcount"]%2)*128)
-		var opuspacket : PackedByteArray = opusencoder_forreprocessing.encode_chunk(resampledchunkprefix)
+		var opuspacket : PackedByteArray = opusencoder_forreprocessing.encode_chunk(resampledchunkprefix, gain)
 		recordedopuspackets.append(opuspacket)
 		resampledopusframecount += 1
 		recordedopuspacketsMemSize += opuspacket.size() 
@@ -149,8 +154,9 @@ func reprocessoriginalchunks():
 	var tm = len(recordedsamples)*frametimems*0.001
 	$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = str(tm)
 	$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm if tm else 0))
+	$VBoxPlayback/HBoxStream/ChunkMax.text = str(recordedchunkmax)
 
-func recordoriginalchunks(audiosamples, opuspacket):
+func recordoriginalchunks(audiosamples, chunkmax, opuspacket):
 	recordedsamples.append(audiosamples)
 	recordedopuspackets.append(opuspacket)
 	$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
@@ -159,10 +165,12 @@ func recordoriginalchunks(audiosamples, opuspacket):
 	var tm = len(recordedopuspackets)*$TwoVoipMic.audio_chunk_size*1.0/AudioServer.get_input_mix_rate()
 	$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = str(tm)
 	$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm))
+	recordedchunkmax = max(recordedchunkmax, chunkmax)
+	$VBoxPlayback/HBoxStream/ChunkMax.text = str(recordedchunkmax)
 
 func on_transmitaudiopacket(opuspacket, opusframecount):
 	if len(recordedsamples) < maxrecordedsamples:
-		recordoriginalchunks($TwoVoipMic.audio_chunk, opuspacket)
+		recordoriginalchunks($TwoVoipMic.audio_chunk, $TwoVoipMic.last_chunkmax, opuspacket)
 	$MQTTnetwork.transportaudiopacket(opuspacket, opusframecount, mqttpacketencodebase64, max(0, $HBoxLogging/TransmissionNoise.selected))
 
 func on_transmitaudiojsonpacket(audiostreampacketheader):
@@ -176,6 +184,7 @@ func on_transmitaudiojsonpacket(audiostreampacketheader):
 		$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(0)
 		$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = str(0)
 		recordedopuspacketsMemSize = 0
+		recordedchunkmax = 0.0
 		$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(0)
 		$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(0)
 	
@@ -224,3 +233,7 @@ func _on_sav_options_item_selected(index):
 		recordedsamples = dat["recordedsamples"]
 		f.close()
 	$VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions.select(0)
+
+func _on_volume_db_spin_box_value_changed(value):
+	$TwoVoipMic.set_gain(value)
+	reprocessoriginalchunks()

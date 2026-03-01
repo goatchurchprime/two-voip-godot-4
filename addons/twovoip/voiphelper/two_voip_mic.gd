@@ -4,9 +4,9 @@ var opusencoder : TwovoipOpusEncoder = TwovoipOpusEncoder.new()
 var chunkprefix : PackedByteArray = PackedByteArray([0,0]) 
 
 var leadtime : float = 0.15
-var hangtime : float  = 1.2
-var voxthreshhold = 0.2
-var speakingvolume = 0.0
+var hangtime : float  = 0.7
+var voxthreshhold = 0.07
+var microphone_gain = 1.0
 
 var currentlytalking = false
 var opusframecount = 0
@@ -153,6 +153,9 @@ func set_voxthreshhold(lvoxthreshhold):
 	voxthreshhold = lvoxthreshhold
 	audiosampleframematerial.set_shader_parameter("voxthreshhold", voxthreshhold)
 
+func set_gain(gain):
+	print("set microphone gain to ", gain)
+	microphone_gain = gain
 
 func processvox(chunkmax, audio_chunk):
 	if denoisebutton.button_pressed:
@@ -178,11 +181,9 @@ func processvox(chunkmax, audio_chunk):
 		audiosampleframematerial.set_shader_parameter("chunktexenabled", true)
 		audiosampleframetextureimage.set_data(audio_chunk_size, 1, false, Image.FORMAT_RGF, audio_chunk.to_byte_array())
 		audiosampleframetexture.update(audiosampleframetextureimage)
-		return chunkmax
 
 	else:
 		audiosampleframematerial.set_shader_parameter("chunktexenabled", false)
-		return 0.0
 
 func processopuschunk():
 	assert(currentlytalking)
@@ -191,11 +192,13 @@ func processopuschunk():
 		chunkprefix.set(1, (int(opusframecount/256)&127) + (opusstreamcount%2)*128)
 	else:
 		assert (len(chunkprefix) == 0)
-	var opuspacket : PackedByteArray = opusencoder.encode_chunk(chunkprefix)
+	var opuspacket : PackedByteArray = opusencoder.encode_chunk(chunkprefix, microphone_gain)
 	transmitaudiopacket.emit(opuspacket, opusframecount)
 	opusframecount += 1
 	
 var audio_chunk = null
+var last_chunkmax = 0.0
+
 func _process(delta):
 	microphoneaudiosamplescountSeconds += delta
 	processtalkstreamends()
@@ -203,14 +206,14 @@ func _process(delta):
 		audio_chunk = AudioServer.get_input_frames(opusencoder.calc_audio_chunk_size(opus_chunk_size))
 		if len(audio_chunk) == 0:
 			break
-		var chunkmax = opusencoder.process_pre_encoded_chunk(audio_chunk, opus_chunk_size, denoisebutton.button_pressed, rootmeansquaremaxmeasurement)
+		last_chunkmax = opusencoder.process_pre_encoded_chunk(audio_chunk, opus_chunk_size, denoisebutton.button_pressed, rootmeansquaremaxmeasurement)
 		microphoneaudiosamplescount += len(audio_chunk)
 		if microphoneaudiosamplescountSeconds > microphoneaudiosamplescountSecondsSampleWindow:
 			print("measured mic audiosamples rate ", microphoneaudiosamplescount/microphoneaudiosamplescountSeconds)
 			microphoneaudiosamplescount = 0
 			microphoneaudiosamplescountSeconds = 0.0
 			microphoneaudiosamplescountSecondsSampleWindow *= 1.5
-		speakingvolume = processvox(chunkmax, audio_chunk)
+		processvox(last_chunkmax, audio_chunk)
 		if currentlytalking:
 			processopuschunk()
 	audio_chunk = null

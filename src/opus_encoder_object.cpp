@@ -43,7 +43,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("calc_audio_chunk_size", "opus_chunk_size"), &TwovoipOpusEncoder::calc_audio_chunk_size);
     ClassDB::bind_method(D_METHOD("process_pre_encoded_chunk", "audio_frames", "opus_chunk_size", "speech_probability", "rms"), &TwovoipOpusEncoder::process_pre_encoded_chunk);
     ClassDB::bind_method(D_METHOD("fetch_pre_encoded_chunk"), &TwovoipOpusEncoder::fetch_pre_encoded_chunk);
-    ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes"), &TwovoipOpusEncoder::encode_chunk);
+    ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes", "gain"), &TwovoipOpusEncoder::encode_chunk, NULL, DEFVAL(1.0));
 }
 
 TwovoipOpusEncoder::TwovoipOpusEncoder() {
@@ -206,10 +206,15 @@ float TwovoipOpusEncoder::process_pre_encoded_chunk(PackedVector2Array audio_fra
     return res;
 }
 
-PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_bytes) {
+PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_bytes, float gain) {
     if (opus_encoder == NULL) {
         godot::UtilityFunctions::printerr("Error: opusencoder is null");
         return PackedByteArray();
+    }
+    if (gain != 1.0) {
+        for (int i = 0; i < pre_encoded_chunk.size(); i++) {
+            pre_encoded_chunk[i] *= gain;   // okay to rewrite as not going to use buffer again
+        }
     }
     int max_opus_byte_buffer = prefix_bytes.size() + 4*pre_encoded_chunk.size();
     if (max_opus_byte_buffer > opus_byte_buffer.size())

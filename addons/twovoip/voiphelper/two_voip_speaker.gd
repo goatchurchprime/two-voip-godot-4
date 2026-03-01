@@ -29,6 +29,8 @@ signal sigvoicespeedrate(audiobufferpitchscale)
 
 var lastemittedaudiobufferpitchscale = 1.0
 
+var runninglagtimeminimum = -1.0
+
 func _ready():
 	audiostreamopus = get_parent().stream
 	assert(audiostreamopus.resource_local_to_scene, "AudioStream should be local_to_scene")
@@ -52,6 +54,7 @@ func unpausewhenbufferready():
 	if bufferlengthtime > audiobufferlagtimetarget:
 		audiostreamplaybackopus.mark_end_opus_stream(true)
 		playbackpausedonmark = false
+		runninglagtimeminimum = bufferlengthtime
 
 func tv_incomingaudiopacket(packet):
 	if audiostreamopus == null:
@@ -62,6 +65,7 @@ func tv_incomingaudiopacket(packet):
 		var h = JSON.parse_string(packet.get_string_from_ascii())
 		if h != null:
 			print("audio json packet ", h)
+
 			if h.has("talkingtimestart"):
 				setrecopusvalues(h["opussamplerate"], h.get("opuschannels", 2))
 				lenchunkprefix = int(h["lenchunkprefix"])
@@ -77,12 +81,15 @@ func tv_incomingaudiopacket(packet):
 					outoforderchunkqueue.push_back(null)
 				opusframequeuecount = 0
 				assert (Npacketinitialbatching < Noutoforderqueue)
+				runninglagtimeminimum = -1.0
+
 			elif h.has("talkingtimeend"):
 				if playbackpausedonmark and audiostreamplaybackopus.queue_length_frames() == 0:
 					audiostreamplaybackopus.mark_end_opus_stream(true)
 				audiostreamplaybackopus.mark_end_opus_stream(false)
 				playbackpausedonmark = true
 				pausereached = false
+				print("runninglagtimeminimum: ", runninglagtimeminimum, " (target: ", audiobufferlagtimetarget, ")")
 
 	elif lenchunkprefix == -1:
 		pass
@@ -165,6 +172,7 @@ func _physics_process(delta):
 		
 	var bufferlengthtime = audioserveroutputlatency + queuelengthframes*1.0/audiostreamopus.opus_sample_rate
 	if not playbackpausedonmark:
+		runninglagtimeminimum = bufferlengthtime
 		if lastemittedaudiobufferpitchscale == 1.0:
 			if abs(bufferlengthtime - audiobufferlagtimetarget) > audiobufferlagtimetargettolerance:
 				setpitchscale(0.7 if (bufferlengthtime < audiobufferlagtimetarget) else 1.4)
@@ -173,6 +181,12 @@ func _physics_process(delta):
 		elif (lastemittedaudiobufferpitchscale < 1.0) == (bufferlengthtime > audiobufferlagtimetarget):
 			setpitchscale(1.0)
 			print(" set lastemittedaudiobufferpitchscale to ", lastemittedaudiobufferpitchscale)
+	
+	# leave the run-out at the same pitchscale
+	#elif lastemittedaudiobufferpitchscale != 1.0:
+	#	setpitchscale(1.0)
+	#	print(" set lastemittedaudiobufferpitchscale to ", lastemittedaudiobufferpitchscale)
+
 
 func replayrecording(speedup, recordedheader, recordedopuspackets, recordedfooter):
 	playingrecording = true

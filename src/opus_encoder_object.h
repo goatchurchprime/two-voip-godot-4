@@ -118,7 +118,7 @@ public:
     int calc_audio_chunk_size(int opus_chunk_size);
     float process_pre_encoded_chunk(PackedVector2Array audio_frames, int opus_chunk_size, bool speech_probability, bool rms);
     PackedVector2Array fetch_pre_encoded_chunk() { return PackedVector2Array(); pre_encoded_chunk; }
-    PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes);
+    PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes, float gain=1.0);
 
     TwovoipOpusEncoder();
     ~TwovoipOpusEncoder();
