@@ -155,10 +155,11 @@ text = "Vox"
 
 [node name="Leadtime" type="SpinBox" parent="HBoxBigButtons/VBoxVox" unique_id=723963365]
 layout_mode = 2
-tooltip_text = "Pre-trigger audio time that processing is backdated from before Vox threshold"
+tooltip_text = "Pre-trigger audio time that processing is backdated from before Vox threshold
+(Not implemented)"
 max_value = 1.0
 step = 0.05
-value = 0.1
+editable = false
 update_on_text_changed = true
 prefix = "Leadtime:"
 suffix = "Seconds"
@@ -282,6 +283,12 @@ popup/item_0/text = "1"
 popup/item_0/id = 0
 popup/item_1/text = "2"
 popup/item_1/id = 1
+
+[node name="AutoGainControl" type="CheckButton" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1563638136]
+layout_mode = 2
+tooltip_text = "Not implemented"
+disabled = true
+text = "Auto gain"
 
 [node name="HBoxAudioFrame" type="HBoxContainer" parent="VBoxFrameLength" unique_id=256979740]
 layout_mode = 2
@@ -604,22 +611,6 @@ text = "mosquitto_sub ..."
 [node name="HBoxLogging" type="HBoxContainer" parent="." unique_id=745135561]
 layout_mode = 2
 
-[node name="LogButton" type="CheckButton" parent="HBoxLogging" unique_id=1687608625]
-layout_mode = 2
-text = "LogAll Rec"
-
-[node name="Label" type="Label" parent="HBoxLogging" unique_id=1125675589]
-layout_mode = 2
-text = "Packets: "
-
-[node name="PacketCount" type="LineEdit" parent="HBoxLogging" unique_id=641339160]
-layout_mode = 2
-
-[node name="ReplayButton" type="Button" parent="HBoxLogging" unique_id=1122272257]
-layout_mode = 2
-toggle_mode = true
-text = "Replay"
-
 [node name="TransmissionNoise" type="OptionButton" parent="HBoxLogging" unique_id=137179689]
 layout_mode = 2
 tooltip_text = "Transmission noise for robustness test"
@@ -631,6 +622,27 @@ popup/item_1/text = "Slight dither"
 popup/item_1/id = 1
 popup/item_2/text = "Big order dither"
 popup/item_2/id = 2
+
+[node name="VSeparator" type="VSeparator" parent="HBoxLogging" unique_id=1410400528]
+layout_mode = 2
+
+[node name="LogButton" type="CheckButton" parent="HBoxLogging" unique_id=1687608625]
+layout_mode = 2
+tooltip_text = "Log all events from connection to disconnection."
+text = "LogAll Rec"
+
+[node name="Label" type="Label" parent="HBoxLogging" unique_id=1125675589]
+layout_mode = 2
+text = "Packets: "
+
+[node name="PacketCount" type="LineEdit" parent="HBoxLogging" unique_id=641339160]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ReplayButton" type="Button" parent="HBoxLogging" unique_id=1122272257]
+layout_mode = 2
+toggle_mode = true
+text = "Replay"
 
 [node name="HSeparator6" type="HSeparator" parent="." unique_id=732837562]
 custom_minimum_size = Vector2(0, 20)

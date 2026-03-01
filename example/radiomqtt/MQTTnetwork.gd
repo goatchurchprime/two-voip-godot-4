@@ -166,6 +166,7 @@ func D_input(event):
 
 func _on_connect_toggled(toggled_on):
 	var LogButton = get_node("../HBoxLogging/LogButton")
+	get_node("../HBoxLogging/ReplayButton").disabled = toggled_on
 	LogButton.disabled = toggled_on
 	if toggled_on:
 		if LogButton.button_pressed:
@@ -253,6 +254,7 @@ func _on_replay_button_toggled(toggled_on):
 	statustopic = "%s/%s/status" % [roomtopic, myname]
 
 	var l = flogfileR.get_line()
+	var loglinenumber = 1
 	while ReplayButton.button_pressed and l:
 		var sl = l.split(" ")
 		var timediff = int(sl[0]) - Time.get_ticks_msec()
@@ -268,7 +270,10 @@ func _on_replay_button_toggled(toggled_on):
 		print(l)
 		if flogfile == null:
 			received_mqtt(sl[1], sl[2].to_ascii_buffer())
+		get_node("../HBoxLogging/PacketCount").text = str(logfilepackcount)
 		l = flogfileR.get_line()
+		loglinenumber += 1
+		get_node("../HBoxLogging/PacketCount").text = "%d/%d" % [loglinenumber, logfilepackcount]
 	ReplayButton.button_pressed = false
 	flogfileR.close()
 	print("*** End replay")
