@@ -43,9 +43,10 @@ func _ready():
 	$TwoVoipMic.initvoipmic($HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMicTalk/VoxThreshold.material)
 	$TwoVoipMic.set_voxthreshhold(0.07)
 
-	#for d in AudioServer.get_output_device_list():
-	#	%OptionOutput.add_item(d)
-	#assert(%OptionOutput.get_item_text(%OptionOutput.selected) == "Default")
+	for d in AudioServer.get_output_device_list():
+		$HBoxOutputDevice/OptionOutputDevice.add_item(d)
+	assert($HBoxOutputDevice/OptionOutputDevice.get_item_text($HBoxOutputDevice/OptionOutputDevice.selected) == "Default")
+	$HBoxOutputDevice/OptionOutputDevice.connect("item_selected", _on_optionoutputdevice)
 
 	if not AudioServer.has_method("get_input_frames"):
 		$GodotVersionWarning.visible = true
@@ -79,6 +80,23 @@ func _ready():
 	
 	$TwoVoipMic.connect("transmitaudiojsonpacket", on_transmitaudiojsonpacket)
 	$TwoVoipMic.connect("transmitaudiopacket", on_transmitaudiopacket)
+
+	# handle lower resolution screens
+	var window_size = get_node("/root").size
+	var screen_size = DisplayServer.screen_get_size()
+	if window_size.y > screen_size.y - 100:
+		var rat = screen_size.y*0.9/window_size.y
+		get_node("/root").set_size(window_size*rat)
+		var window_position = DisplayServer.window_get_position()
+		if window_position.y == 0:
+			window_position.y = 30
+			DisplayServer.window_set_position(window_position)
+
+
+func _on_optionoutputdevice(index: int) -> void:
+	var output_device: String = $HBoxOutputDevice/OptionOutputDevice.get_item_text(index)
+	print("Set input device: ", output_device)
+	AudioServer.set_input_device(output_device)
 
 func rechunkrecordedchunks(orgsamples, newsamplesize):
 	assert (newsamplesize > 0)

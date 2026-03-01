@@ -190,6 +190,17 @@ text = "Input device: "
 layout_mode = 2
 size_flags_horizontal = 3
 
+[node name="HBoxOutputDevice" type="HBoxContainer" parent="." unique_id=708767531]
+layout_mode = 2
+
+[node name="LabelOutputDevice" type="Label" parent="HBoxOutputDevice" unique_id=685886256]
+layout_mode = 2
+text = "Output device: "
+
+[node name="OptionOutputDevice" type="OptionButton" parent="HBoxOutputDevice" unique_id=1592492941]
+layout_mode = 2
+size_flags_horizontal = 3
+
 [node name="HBoxMicTalk" type="HBoxContainer" parent="." unique_id=739237169]
 custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
