@@ -43,7 +43,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("calc_audio_chunk_size", "opus_chunk_size"), &TwovoipOpusEncoder::calc_audio_chunk_size);
     ClassDB::bind_method(D_METHOD("process_pre_encoded_chunk", "audio_frames", "opus_chunk_size", "speech_probability", "rms"), &TwovoipOpusEncoder::process_pre_encoded_chunk);
     ClassDB::bind_method(D_METHOD("fetch_pre_encoded_chunk"), &TwovoipOpusEncoder::fetch_pre_encoded_chunk);
-    ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes", "gain"), &TwovoipOpusEncoder::encode_chunk, NULL, DEFVAL(1.0));
+    ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes", "gain"), &TwovoipOpusEncoder::encode_chunk, DEFVAL(PackedByteArray()), DEFVAL(1.0));
 }
 
 TwovoipOpusEncoder::TwovoipOpusEncoder() {

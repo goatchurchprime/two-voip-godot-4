@@ -43,7 +43,7 @@ void AudioStreamOpus::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_buffer_length"), &AudioStreamOpus::get_buffer_length);
 
 
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "buffer_length", PROPERTY_HINT_RANGE, "0.01,10,0.01,suffix:s"), "set_buffer_length", "get_buffer_length");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "buffer_length", PROPERTY_HINT_RANGE, "0.1,10.0,0.1,suffix:s"), "set_buffer_length", "get_buffer_length");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "opus_sample_rate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_opus_sample_rate", "get_opus_sample_rate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opus_channels", PROPERTY_HINT_RANGE, "1,2,1"), "set_opus_channels", "get_opus_channels");
 }

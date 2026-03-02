@@ -11,6 +11,7 @@ func _ready():
 	audiostreamopus = $AudioStreamPlayer.stream
 	$AudioStreamPlayer.play()
 	audiostreamplaybackopus = $AudioStreamPlayer.get_stream_playback()
+	audiostreamplaybackopus.mark_end_opus_stream(true)
 
 	AudioServer.set_input_device_active(true)
 	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false)
@@ -43,7 +44,7 @@ func _process_record():
 	
 func _process_playback():
 	while opus_chunk_size < audiostreamplaybackopus.available_space_frames() and len(opuspacketsbuffer) != 0:
-		audiostreamplaybackopus.push_opus_packet(opuspacketsbuffer.pop_front(), len(prepend), 0)
+		audiostreamplaybackopus.push_opus_packet(opuspacketsbuffer.pop_front(), 0, 0)
 
 var opusaudiodata = [
 	[72, 11, 228, 193, 34, 35, 97, 240],

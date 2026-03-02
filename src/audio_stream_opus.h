@@ -71,8 +71,8 @@ public:
     float get_opus_sample_rate() { return opus_sample_rate; };
     void set_opus_channels(int p_channels) { opus_channels = p_channels;  };
     float get_opus_channels() { return opus_channels; };
-    void set_buffer_length(int p_seconds) { buffer_len = p_seconds; };
-    int get_buffer_length() { return buffer_len; };
+    void set_buffer_length(float p_seconds) { buffer_len = p_seconds; };
+    float get_buffer_length() { return buffer_len; };
 };
 
 class AudioStreamPlaybackOpus : public AudioStreamPlaybackResampled {
