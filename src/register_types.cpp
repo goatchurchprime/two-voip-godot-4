@@ -1,15 +1,16 @@
 #include "register_types.h"
 
-#include "audio_effect_opus_chunked.h"
-#include "audio_stream_opus_chunked.h"
 #include "audio_stream_opus.h"
 #include "opus_encoder_object.h"
+#include "audio_effect_fft_block.h"
+
+#include "audio_effect_opus_chunked.h"
+#include "audio_stream_opus_chunked.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/godot.hpp>
-
 
 using namespace godot;
 
@@ -17,15 +18,20 @@ void initialize_two_voip_module(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SERVERS) {
         return;
     }
+
+    ClassDB::register_class<AudioStreamOpus>();
+    ClassDB::register_class<AudioStreamPlaybackOpus>();
+    ClassDB::register_class<TwovoipOpusEncoder>();
+
+    ClassDB::register_class<AudioEffectFFTBlock>();
+    ClassDB::register_class<AudioEffectFFTBlockInstance>();
+
+    // these are obsolete
     ClassDB::register_class<AudioEffectOpusChunked>();
     ClassDB::register_class<AudioEffectOpusChunkedInstance>();
 
     ClassDB::register_class<AudioStreamOpusChunked>();
     ClassDB::register_class<AudioStreamPlaybackOpusChunked>();
-
-    ClassDB::register_class<AudioStreamOpus>();
-    ClassDB::register_class<AudioStreamPlaybackOpus>();
-    ClassDB::register_class<TwovoipOpusEncoder>();
 }
 
 void uninitialize_two_voip_module(ModuleInitializationLevel p_level) {
