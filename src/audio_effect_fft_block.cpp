@@ -56,7 +56,7 @@ void AudioEffectFFTBlock::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplesize", PROPERTY_HINT_RANGE, "10,4000,1"), "set_audiosamplesize", "get_audiosamplesize");
 
     ClassDB::bind_method(D_METHOD("push_chunk", "audiosamples"), &AudioEffectFFTBlock::push_chunk);
-    ClassDB::bind_method(D_METHOD("set_images", "audiosampleframetexture"), &AudioEffectFFTBlock::set_images);
+    ClassDB::bind_method(D_METHOD("set_images", "audiosampleframetextureimage", "audiosampleframetexture", "windowarray"), &AudioEffectFFTBlock::set_images);
 }
 
 
@@ -177,14 +177,8 @@ void AudioEffectFFTBlock::createencoder() {
     deleteencoder();  
     audiosamplebuffer.resize(audiosamplebuffer_size); 
     bufferend = 0;
-
     fftslab.resize(fftsize*2*4*fftrows);
     fftirow = 0;
-
-    if (opusframesize == 0)
-        return;
-        
-    singleresamplebuffer.resize(opusframesize);
 }
 
 void AudioEffectFFTBlockInstance::_process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) {
@@ -198,7 +192,7 @@ void AudioEffectFFTBlock::push_sample(const Vector2 &sample) {
         float* ac = ((float*)fftslab.ptrw()) + fftirow*(fftsize*2);
         for (int i = 0; i < fftsize; i++) {
             Vector2 v = audiosamplebuffer[(bufferend - 1024 + i)%audiosamplebuffer.size()];
-            ac[i*2] = (v.x + v.y)*0.5;
+            ac[i*2] = (v.x + v.y)*0.5*windowarray[i];
             ac[i*2 + 1] = 0.0;
         }
         smbFft(ac, fftsize, -1);
@@ -220,9 +214,14 @@ void AudioEffectFFTBlock::push_chunk(const PackedVector2Array& audiosamples) {
         push_sample(audiosamples[i]);
 }
 
-void AudioEffectFFTBlock::set_images(Ref<Image> laudiosampleframetextureimage, Ref<ImageTexture> laudiosampleframetexture) {
+void AudioEffectFFTBlock::set_images(Ref<Image> laudiosampleframetextureimage, Ref<ImageTexture> laudiosampleframetexture, PackedFloat32Array lwindowarray) {
     audiosampleframetextureimage = laudiosampleframetextureimage;
     audiosampleframetexture = laudiosampleframetexture;
+    windowarray = lwindowarray;
+ 
+    fftrows = audiosampleframetextureimage->get_height();
+    fftslab.resize(fftsize*2*4*fftrows);
+    fftirow = 0;
 }
 
 

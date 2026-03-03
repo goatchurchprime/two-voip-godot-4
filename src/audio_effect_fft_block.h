@@ -85,6 +85,7 @@ class AudioEffectFFTBlock : public AudioEffect {
     
     Ref<Image> audiosampleframetextureimage;
     Ref<ImageTexture> audiosampleframetexture;
+    PackedFloat32Array windowarray;
 
     int bufferend = 0;    // apply %(audiosamplesize*ringbufferchunks) for actual position
 
@@ -108,7 +109,7 @@ protected:
 public:
     virtual Ref<AudioEffectInstance> _instantiate() override;
 
-    void set_images(Ref<Image> laudiosampleframetextureimage, Ref<ImageTexture> laudiosampleframetexture);
+    void set_images(Ref<Image> laudiosampleframetextureimage, Ref<ImageTexture> laudiosampleframetexture, PackedFloat32Array lwindowarray);
 
     void createencoder();
     void deleteencoder();
