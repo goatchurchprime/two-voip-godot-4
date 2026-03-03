@@ -49,6 +49,7 @@ void AudioEffectFFTBlock::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_audiosamplerate"), &AudioEffectFFTBlock::get_audiosamplerate);
     ClassDB::bind_method(D_METHOD("set_audiosamplesize", "audiosamplesize"), &AudioEffectFFTBlock::set_audiosamplesize);
     ClassDB::bind_method(D_METHOD("get_audiosamplesize"), &AudioEffectFFTBlock::get_audiosamplesize);
+    ClassDB::bind_method(D_METHOD("get_fftirow"), &AudioEffectFFTBlock::get_fftirow);
 
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opussamplerate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_opussamplerate", "get_opussamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opusframesize", PROPERTY_HINT_RANGE, "20,2880,1"), "set_opusframesize", "get_opusframesize");

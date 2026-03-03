@@ -10,6 +10,7 @@ shader_parameter/voxthresholdcolor = Color(0.0077323737, 0.27356955, 0.46968406,
 shader_parameter/voxchunkmaxcolor = Color(0.1, 0.8, 0.08, 0.2)
 shader_parameter/voxwavecolor = Color(0.8, 0.8, 0.9, 1)
 shader_parameter/fftgain = 1.0
+shader_parameter/rowoffset = 0.0
 
 [node name="FFTSpectrum" type="Control" unique_id=677098584]
 layout_mode = 3

@@ -8,11 +8,12 @@ uniform vec4 voxwavecolor : source_color = vec4(0.8,0.8,0.9,1.0);
 uniform float fftgain = 1.0;
 
 uniform sampler2D chunktexture : filter_nearest;
+uniform float rowoffset = 0.0;
 
 void fragment() {
 	COLOR = voxthresholdcolor;
-	float d;
-	vec4 v = texture(chunktexture, vec2(UV.x*0.125, UV.y));
+	float uvy = fract(UV.x+rowoffset);
+	vec4 v = texture(chunktexture, vec2((1.0-UV.y)*0.125, uvy));
 	float a = fftgain*sqrt(v.r*v.r + v.g*v.g);
 	if (a < 1.0) {
 		COLOR.r = a;

@@ -130,6 +130,8 @@ public:
     void set_audiosamplesize(int laudiosamplesize) { audiosamplesize = laudiosamplesize; };
     int get_audiosamplesize() { return audiosamplesize; };
 
+    int get_fftirow() { return fftirow; };
+
     AudioEffectFFTBlock();
     ~AudioEffectFFTBlock();
 };

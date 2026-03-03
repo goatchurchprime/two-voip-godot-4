@@ -8,7 +8,7 @@ var windowarray : PackedFloat32Array
 @onready var audiosampleframematerial = $FFTImage.material
 
 var fftsize = 1024
-var fftrows = 32
+var fftrows = 128
 
 func _ready():
 	audioeffectfftblock = AudioEffectFFTBlock.new()
@@ -27,7 +27,7 @@ func _ready():
 		var lam = i*1.0/(fftsize - 1)
 		windowarray[i] = 0.5*(1.0 - cos(2*PI*lam))
 	audiosampleframematerial.set_shader_parameter("chunktexture", audiosampleframetexture)
-	var advancestep = 512
+	var advancestep = 1024
 	audioeffectfftblock.set_images(audiosampleframetextureimage, audiosampleframetexture, windowarray, advancestep)
 	prints("ffff ", fftsize, fftrows)
 
@@ -39,6 +39,8 @@ func _process_record():
 		var frames = AudioServer.get_input_frames(256)
 		if len(frames):
 			audioeffectfftblock.push_chunk(frames)
+			audiosampleframematerial.set_shader_parameter("rowoffset", audioeffectfftblock.get_fftirow()*1.0/fftrows)
+
 		else:
 			break
 
