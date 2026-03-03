@@ -39,34 +39,98 @@
 
 using namespace godot;
 
-void AudioEffectOpusChunked::_bind_methods() {
+void AudioEffectFFTBlock::_bind_methods() {
 
-    ClassDB::bind_method(D_METHOD("set_opussamplerate", "opussamplerate"), &AudioEffectOpusChunked::set_opussamplerate);
-    ClassDB::bind_method(D_METHOD("get_opussamplerate"), &AudioEffectOpusChunked::get_opussamplerate);
-    ClassDB::bind_method(D_METHOD("set_opusframesize", "opusframesize"), &AudioEffectOpusChunked::set_opusframesize);
-    ClassDB::bind_method(D_METHOD("get_opusframesize"), &AudioEffectOpusChunked::get_opusframesize);
-    ClassDB::bind_method(D_METHOD("set_audiosamplerate", "audiosamplerate"), &AudioEffectOpusChunked::set_audiosamplerate);
-    ClassDB::bind_method(D_METHOD("get_audiosamplerate"), &AudioEffectOpusChunked::get_audiosamplerate);
-    ClassDB::bind_method(D_METHOD("set_audiosamplesize", "audiosamplesize"), &AudioEffectOpusChunked::set_audiosamplesize);
-    ClassDB::bind_method(D_METHOD("get_audiosamplesize"), &AudioEffectOpusChunked::get_audiosamplesize);
-    ClassDB::bind_method(D_METHOD("set_audiosamplechunks", "audiosamplechunks"), &AudioEffectOpusChunked::set_audiosamplechunks);
-    ClassDB::bind_method(D_METHOD("get_audiosamplechunks"), &AudioEffectOpusChunked::get_audiosamplechunks);
+    ClassDB::bind_method(D_METHOD("set_opussamplerate", "opussamplerate"), &AudioEffectFFTBlock::set_opussamplerate);
+    ClassDB::bind_method(D_METHOD("get_opussamplerate"), &AudioEffectFFTBlock::get_opussamplerate);
+    ClassDB::bind_method(D_METHOD("set_opusframesize", "opusframesize"), &AudioEffectFFTBlock::set_opusframesize);
+    ClassDB::bind_method(D_METHOD("get_opusframesize"), &AudioEffectFFTBlock::get_opusframesize);
+    ClassDB::bind_method(D_METHOD("set_audiosamplerate", "audiosamplerate"), &AudioEffectFFTBlock::set_audiosamplerate);
+    ClassDB::bind_method(D_METHOD("get_audiosamplerate"), &AudioEffectFFTBlock::get_audiosamplerate);
+    ClassDB::bind_method(D_METHOD("set_audiosamplesize", "audiosamplesize"), &AudioEffectFFTBlock::set_audiosamplesize);
+    ClassDB::bind_method(D_METHOD("get_audiosamplesize"), &AudioEffectFFTBlock::get_audiosamplesize);
 
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opussamplerate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_opussamplerate", "get_opussamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opusframesize", PROPERTY_HINT_RANGE, "20,2880,1"), "set_opusframesize", "get_opusframesize");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplerate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_audiosamplerate", "get_audiosamplerate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplesize", PROPERTY_HINT_RANGE, "10,4000,1"), "set_audiosamplesize", "get_audiosamplesize");
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "audiosamplechunks", PROPERTY_HINT_RANGE, "1,200,1"), "set_audiosamplechunks", "get_audiosamplechunks");
 
-    ClassDB::bind_method(D_METHOD("push_chunk", "audiosamples"), &AudioEffectOpusChunked::push_chunk);
-
-    ClassDB::bind_method(D_METHOD("read_chunk", "resampled"), &AudioEffectOpusChunked::read_chunk);
-    ClassDB::bind_method(D_METHOD("resetencoder", "clearbuffers"), &AudioEffectOpusChunked::resetencoder);
+    ClassDB::bind_method(D_METHOD("push_chunk", "audiosamples"), &AudioEffectFFTBlock::push_chunk);
+    ClassDB::bind_method(D_METHOD("set_images", "audiosampleframetexture"), &AudioEffectFFTBlock::set_images);
 }
 
-const int MAXPREFIXBYTES = 100;
+
+
+static void smbFft(float *fftBuffer, long fftFrameSize, long sign)
+/*
+	FFT routine, (C)1996 S.M.Bernsee. Sign = -1 is FFT, 1 is iFFT (inverse)
+	Fills fftBuffer[0...2*fftFrameSize-1] with the Fourier transform of the
+	time domain data in fftBuffer[0...2*fftFrameSize-1]. The FFT array takes
+	and returns the cosine and sine parts in an interleaved manner, ie.
+	fftBuffer[0] = cosPart[0], fftBuffer[1] = sinPart[0], asf. fftFrameSize
+	must be a power of 2. It expects a complex input signal (see footnote 2),
+	ie. when working with 'common' audio signals our input signal has to be
+	passed as {in[0],0.,in[1],0.,in[2],0.,...} asf. In that case, the transform
+	of the frequencies of interest is in fftBuffer[0...fftFrameSize].
+*/
+{
+	float wr, wi, arg, *p1, *p2, temp;
+	float tr, ti, ur, ui, *p1r, *p1i, *p2r, *p2i;
+	long i, bitm, j, le, le2, k, logN;
+	logN = (long)(Math::log((double)fftFrameSize) / Math::log(2.) + .5);
+
+	for (i = 2; i < 2 * fftFrameSize - 2; i += 2) {
+		for (bitm = 2, j = 0; bitm < 2 * fftFrameSize; bitm <<= 1) {
+			if (i & bitm) {
+				j++;
+			}
+			j <<= 1;
+		}
+		if (i < j) {
+			p1 = fftBuffer + i;
+			p2 = fftBuffer + j;
+			temp = *p1;
+			*(p1++) = *p2;
+			*(p2++) = temp;
+			temp = *p1;
+			*p1 = *p2;
+			*p2 = temp;
+		}
+	}
+	for (k = 0, le = 2; k < logN; k++) {
+		le <<= 1;
+		le2 = le >> 1;
+		ur = 1.0;
+		ui = 0.0;
+		arg = Math_PI / (le2 >> 1);
+		wr = std::cos(arg);
+		wi = sign * std::sin(arg);
+		for (j = 0; j < le2; j += 2) {
+			p1r = fftBuffer + j;
+			p1i = p1r + 1;
+			p2r = p1r + le2;
+			p2i = p2r + 1;
+			for (i = j; i < 2 * fftFrameSize; i += le) {
+				tr = *p2r * ur - *p2i * ui;
+				ti = *p2r * ui + *p2i * ur;
+				*p2r = *p1r - tr;
+				*p2i = *p1i - ti;
+				*p1r += tr;
+				*p1i += ti;
+				p1r += le;
+				p1i += le;
+				p2r += le;
+				p2i += le;
+			}
+			tr = ur * wr - ui * wi;
+			ui = ur * wi + ui * wr;
+			ur = tr;
+		}
+	}
+}
 
 AudioEffectFFTBlock::AudioEffectFFTBlock() {
+    createencoder();
 }
 
 AudioEffectFFTBlock::~AudioEffectFFTBlock() 
@@ -98,8 +162,6 @@ void AudioEffectFFTBlock::resetencoder(bool clearbuffers) {
     if (speexresampler != NULL)
         speex_resampler_reset_mem(speexresampler);
     if (clearbuffers) {
-        DEV_ASSERT(audiosamplebuffer.size() == audiosamplesize*ringbufferchunks); 
-        chunknumber = 0;
         bufferend = 0;
     }
 }
@@ -113,24 +175,16 @@ void AudioEffectFFTBlock::deleteencoder() {
 
 void AudioEffectFFTBlock::createencoder() {
     deleteencoder();  
-    audiosamplebuffer.resize(audiosamplesize*ringbufferchunks); 
-    chunknumber = 0;
+    audiosamplebuffer.resize(audiosamplebuffer_size); 
     bufferend = 0;
+
+    fftslab.resize(fftsize*2*4*fftrows);
+    fftirow = 0;
 
     if (opusframesize == 0)
         return;
         
     singleresamplebuffer.resize(opusframesize);
-    if (audiosamplesize != opusframesize) {
-        int speexerror = 0; 
-        int resamplingquality = 10;
-        // the speex resampler needs sample rates to be consistent with the sample buffer sizes
-        speexresampler = speex_resampler_init(channels, audiosamplerate, opussamplerate, resamplingquality, &speexerror);
-        godot::UtilityFunctions::prints("Encoder timeframeopus resampler", Dtimeframeopus, "timeframeaudio", Dtimeframeaudio); 
-    } else {
-        godot::UtilityFunctions::prints("Encoder timeframeopus no-resampling needed", Dtimeframeopus, "timeframeaudio", Dtimeframeaudio); 
-    }
-
 }
 
 void AudioEffectFFTBlockInstance::_process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) {
@@ -140,12 +194,17 @@ void AudioEffectFFTBlockInstance::_process(const void *src_buffer, AudioFrame *p
 void AudioEffectFFTBlock::push_sample(const Vector2 &sample) {
     audiosamplebuffer.set(bufferend % audiosamplebuffer.size(), sample);
     bufferend += 1; 
-    if (bufferend == (chunknumber + ringbufferchunks)*audiosamplesize) {
-        drop_chunk(); 
-        discardedchunks += 1; 
-        if (!Engine::get_singleton()->is_editor_hint())
-            if ((discardedchunks < 5) || ((discardedchunks % 1000) == 0))
-                godot::UtilityFunctions::prints("Discarding chunk", discardedchunks, bufferend, (chunknumber + 1)*audiosamplesize); 
+    if ((bufferend % fftsize) == 0) {
+        float* ac = ((float*)fftslab.ptrw()) + fftirow*(fftsize*2);
+        for (int i = 0; i < fftsize; i++) {
+            Vector2 v = audiosamplebuffer[(bufferend - 1024 + i)%audiosamplebuffer.size()];
+            ac[i*2] = v.x;
+            ac[i*2 + 1] = v.y;
+        }
+        audiosampleframetextureimage->set_data(fftsize, fftrows, false, Image::FORMAT_RGF, fftslab);
+        audiosampleframetexture->update(audiosampleframetextureimage);
+        fftirow = (fftirow + 1)%fftrows;
+        ;// smbFFT(fftblock);
     }
 }
 
@@ -159,6 +218,11 @@ void AudioEffectFFTBlock::process(const AudioFrame *p_src_frames, AudioFrame *p_
 void AudioEffectFFTBlock::push_chunk(const PackedVector2Array& audiosamples) {
     for (int i = 0; i < audiosamples.size(); i++)
         push_sample(audiosamples[i]);
+}
+
+void AudioEffectFFTBlock::set_images(Ref<Image> laudiosampleframetextureimage, Ref<ImageTexture> laudiosampleframetexture) {
+    audiosampleframetextureimage = laudiosampleframetextureimage;
+    audiosampleframetexture = laudiosampleframetexture;
 }
 
 

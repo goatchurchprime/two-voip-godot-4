@@ -42,7 +42,9 @@
 #include <godot_cpp/classes/audio_stream_playback.hpp>
 #include <godot_cpp/classes/audio_frame.hpp>
 #include <godot_cpp/classes/audio_stream_playback_resampled.hpp>
-//#include <godot_cpp/classes/audio_stream_playback_microphone.hpp>
+#include <godot_cpp/classes/image.hpp>
+#include <godot_cpp/classes/image_texture.hpp>
+
 
 #include "speex_resampler/speex_resampler.h"
 
@@ -73,7 +75,17 @@ class AudioEffectFFTBlock : public AudioEffect {
     int audiosamplerate = 44100;
     int audiosamplesize = 882;
 
-    PackedVector2Array audiosamplebuffer;
+    PackedVector2Array audiosamplebuffer; 
+
+    int audiosamplebuffer_size = 10240;
+    int fftsize = 1024;
+    int fftrows = 16;
+    int fftirow = 0;
+    PackedByteArray fftslab; 
+    
+    Ref<Image> audiosampleframetextureimage;
+    Ref<ImageTexture> audiosampleframetexture;
+
     int bufferend = 0;    // apply %(audiosamplesize*ringbufferchunks) for actual position
 
     int opussamplerate = 48000;
@@ -96,6 +108,8 @@ protected:
 public:
     virtual Ref<AudioEffectInstance> _instantiate() override;
 
+    void set_images(Ref<Image> laudiosampleframetextureimage, Ref<ImageTexture> laudiosampleframetexture);
+
     void createencoder();
     void deleteencoder();
     void resetencoder(bool clearbuffers);
@@ -104,7 +118,6 @@ public:
     void drop_chunk();
     bool undrop_chunk();
     void push_chunk(const PackedVector2Array& audiosamples); 
-
 
     void set_opussamplerate(int lopussamplerate) { opussamplerate = lopussamplerate; };
     int get_opussamplerate() { return opussamplerate; };
