@@ -198,13 +198,13 @@ void AudioEffectFFTBlock::push_sample(const Vector2 &sample) {
         float* ac = ((float*)fftslab.ptrw()) + fftirow*(fftsize*2);
         for (int i = 0; i < fftsize; i++) {
             Vector2 v = audiosamplebuffer[(bufferend - 1024 + i)%audiosamplebuffer.size()];
-            ac[i*2] = v.x;
-            ac[i*2 + 1] = v.y;
+            ac[i*2] = (v.x + v.y)*0.5;
+            ac[i*2 + 1] = 0.0;
         }
+        smbFft(ac, fftsize, -1);
         audiosampleframetextureimage->set_data(fftsize, fftrows, false, Image::FORMAT_RGF, fftslab);
         audiosampleframetexture->update(audiosampleframetextureimage);
         fftirow = (fftirow + 1)%fftrows;
-        ;// smbFFT(fftblock);
     }
 }
 
