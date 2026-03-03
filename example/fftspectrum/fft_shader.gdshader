@@ -14,6 +14,11 @@ void fragment() {
 	float d;
 	vec4 v = texture(chunktexture, vec2(UV.x*0.125, UV.y));
 	float a = fftgain*sqrt(v.r*v.r + v.g*v.g);
-	COLOR.r = a;
-	COLOR.g = a;
+	if (a < 1.0) {
+		COLOR.r = a;
+		COLOR.g = 0.0;
+	} else {
+		COLOR.g = a - 1.0;
+		COLOR.r = 1.0 - COLOR.g*0.25;
+	}
 }

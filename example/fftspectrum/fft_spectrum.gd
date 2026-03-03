@@ -27,7 +27,8 @@ func _ready():
 		var lam = i*1.0/(fftsize - 1)
 		windowarray[i] = 0.5*(1.0 - cos(2*PI*lam))
 	audiosampleframematerial.set_shader_parameter("chunktexture", audiosampleframetexture)
-	audioeffectfftblock.set_images(audiosampleframetextureimage, audiosampleframetexture, windowarray)
+	var advancestep = 512
+	audioeffectfftblock.set_images(audiosampleframetextureimage, audiosampleframetexture, windowarray, advancestep)
 	prints("ffff ", fftsize, fftrows)
 
 func _process(_delta):
