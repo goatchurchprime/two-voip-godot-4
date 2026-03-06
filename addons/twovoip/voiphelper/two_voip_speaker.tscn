@@ -2,5 +2,5 @@
 
 [ext_resource type="Script" uid="uid://c4ejxw3wm6tur" path="res://addons/twovoip/voiphelper/two_voip_speaker.gd" id="1_8w568"]
 
-[node name="TwoVoipSpeaker" type="Node"]
+[node name="TwoVoipSpeaker" type="Node" unique_id=227661049]
 script = ExtResource("1_8w568")

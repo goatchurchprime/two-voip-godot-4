@@ -1,0 +1,38 @@
+[gd_scene format=3 uid="uid://4cpv581vt1dg"]
+
+[ext_resource type="Script" uid="uid://ummb6hiyq5t4" path="res://fftspectrum/fft_spectrum.gd" id="1_ao67x"]
+[ext_resource type="Shader" uid="uid://hcpifst6qknp" path="res://fftspectrum/fft_shader.gdshader" id="2_frmi3"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vjdoq"]
+shader = ExtResource("2_frmi3")
+shader_parameter/backgroundcolor = Color(0.6, 0.2, 0.8, 1)
+shader_parameter/voxthresholdcolor = Color(0.0077323737, 0.27356955, 0.46968406, 1)
+shader_parameter/voxchunkmaxcolor = Color(0.1, 0.8, 0.08, 0.2)
+shader_parameter/voxwavecolor = Color(0.8, 0.8, 0.9, 1)
+shader_parameter/fftgain = 1.0
+shader_parameter/rowoffset = 0.0
+
+[node name="FFTSpectrum" type="Control" unique_id=677098584]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_ao67x")
+
+[node name="FFTImage" type="ColorRect" parent="." unique_id=784197163]
+material = SubResource("ShaderMaterial_vjdoq")
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 0
+offset_left = 6.0
+offset_top = 138.0
+offset_right = 579.0
+offset_bottom = 585.0
+size_flags_horizontal = 3
+
+[node name="HSliderAmp" type="HSlider" parent="." unique_id=554529377]
+layout_mode = 0
+offset_left = 21.0
+offset_top = 101.0
+offset_right = 553.0
+offset_bottom = 117.0
+value = 50.0
+
+[connection signal="value_changed" from="HSliderAmp" to="." method="_on_h_slider_amp_value_changed"]
