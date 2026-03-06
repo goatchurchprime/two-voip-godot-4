@@ -1,6 +1,7 @@
 extends Node
 
 var audiostreamopus : AudioStreamOpus = null
+var audioplayeropus = null
 var audiostreamplaybackopus : AudioStreamPlaybackOpus = null
 
 # Consider looking at netem for simulating network traffic
@@ -15,7 +16,6 @@ const asciiopenbrace = 123 # "{".to_ascii_buffer()[0]
 const asciiclosebrace = 125 # "}".to_ascii_buffer()[0]
 var lenchunkprefix = -1
 var opusstreamcount = 0
-var asbase64 = false
 var opusframecount = 0
 var opusframesize = 960
 const Noutoforderqueue = 4
@@ -31,17 +31,27 @@ var lastemittedaudiobufferpitchscale = 1.0
 
 var runninglagtimeminimum = -1.0
 
+
 func _ready():
-	audiostreamopus = get_parent().stream
-	assert(audiostreamopus.resource_local_to_scene, "AudioStream should be local_to_scene")
+	if get_parent().has_method("findaudioplayer"):
+		audioplayeropus = get_parent().findaudioplayer()
+		audiostreamopus = audioplayeropus.stream
+	elif get_parent().get("stream"):
+		audioplayeropus = get_parent()
+		audiostreamopus = audioplayeropus.stream
+	else:
+		audiostreamopus = null
+		printerr("No audio stream")
+	if audiostreamopus:
+		assert(audiostreamopus.resource_local_to_scene, "AudioStream should be local_to_scene")
 
 func setrecopusvalues(opus_sample_rate, opus_channels):
-	if not get_parent().playing or audiostreamopus.opus_sample_rate != opus_sample_rate or audiostreamopus.opus_channels != opus_channels:
-		prints(":newplay: ", get_parent().playing, audiostreamopus.opus_sample_rate, opus_sample_rate, audiostreamopus.opus_channels, opus_channels)
+	if not audioplayeropus.playing or audiostreamopus.opus_sample_rate != opus_sample_rate or audiostreamopus.opus_channels != opus_channels:
+		prints(":newplay: ", audioplayeropus.playing, audiostreamopus.opus_sample_rate, opus_sample_rate, audiostreamopus.opus_channels, opus_channels)
 		audiostreamopus.opus_sample_rate = opus_sample_rate
 		audiostreamopus.opus_channels = opus_channels
-		get_parent().play()  # creates a new playback
-		audiostreamplaybackopus = get_parent().get_stream_playback()
+		audioplayeropus.play()  # creates a new playback
+		audiostreamplaybackopus = audioplayeropus.get_stream_playback()
 		set_sinewave_out(sinewaveoutmode)
 		# begins in a paused state
 		# audiostreamplaybackopus.mark_end_opus_stream(false)
@@ -71,7 +81,6 @@ func tv_incomingaudiopacket(packet):
 				lenchunkprefix = int(h["lenchunkprefix"])
 				opusstreamcount = int(h["opusstreamcount"])
 				opusframesize = int(h["opusframesize"])
-				asbase64 = (h["mqttpacketencoding"] == "base64")
 				opusframecount = 0
 				if h.has("opusframecount"):
 					prints("Mid speech header!!! ", h["opusframecount"])

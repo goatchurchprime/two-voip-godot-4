@@ -96,13 +96,25 @@ func _on_vox_toggled(toggled_on):
 
 func initvoipmic(lmiconbutton: Button, loptioninputdevice: OptionButton, lpttbutton: Button, lvoxbutton: Button, ldenoisebutton: Button, laudiosampleframematerial: Material):
 	miconbutton = lmiconbutton
-	pttbutton = lpttbutton
+	assert(miconbutton.toggle_mode == true)
+	if miconbutton == null:
+		miconbutton = Button.new()
+		miconbutton.toggle_mode = true
+		miconbutton.button_pressed = true
+	pttbutton = (lpttbutton if lpttbutton else Button.new())
 	voxbutton = lvoxbutton
+	if voxbutton == null:
+		voxbutton = Button.new()
+		voxbutton.toggle_mode = true
+		voxbutton.button_pressed = true
 	denoisebutton = ldenoisebutton
+	if denoisebutton == null:
+		denoisebutton = Button.new()
+		denoisebutton.toggle_mode = true
 	audiosampleframematerial = laudiosampleframematerial
 	
 	assert(miconbutton.toggle_mode == true)
-	optioninputdevice = loptioninputdevice
+	optioninputdevice = loptioninputdevice if loptioninputdevice else OptionButton.new()
 	assert(optioninputdevice.item_count == 0)
 	for d in AudioServer.get_input_device_list():
 		optioninputdevice.add_item(d)

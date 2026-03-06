@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://babntosbiq5r8"]
 
 [ext_resource type="Script" uid="uid://b4vk2ccjna2l6" path="res://radiomqtt/radiomqtt.gd" id="1_anot2"]
+[ext_resource type="PackedScene" uid="uid://dvpkwo6h7y0sj" path="res://addons/twovoip/voiphelper/two_voip_mic.tscn" id="2_0f5ov"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
-[ext_resource type="Script" uid="uid://b52qfr30l2ty" path="res://addons/twovoip/voiphelper/two_voip_mic.gd" id="2_8yied"]
 [ext_resource type="Script" uid="uid://d0sl15xev22ac" path="res://radiomqtt/MQTTnetwork.gd" id="2_y485j"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 [ext_resource type="Shader" uid="uid://bq3uv3u8jhu77" path="res://addons/twovoip/voiphelper/voxshader.gdshader" id="5_7rbsf"]
@@ -74,8 +74,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_anot2")
 
-[node name="TwoVoipMic" type="Node" parent="." unique_id=745130104]
-script = ExtResource("2_8yied")
+[node name="TwoVoipMic" parent="." unique_id=1643438198 instance=ExtResource("2_0f5ov")]
 
 [node name="LabelTitle" type="Label" parent="." unique_id=1539758880]
 custom_minimum_size = Vector2(0, 50)
