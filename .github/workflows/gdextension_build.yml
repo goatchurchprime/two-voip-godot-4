@@ -78,7 +78,7 @@ jobs:
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
           artifact: windows.${{matrix.target}}.${{matrix.arch}}.${{contains(matrix.lipsync, 'yes') && '-lipsync' || '-base'}}
-          additional: lto=yes lipsync=${{matrix.lipsync}}
+          additional: lto=full lipsync=${{matrix.lipsync}}
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
 
@@ -108,7 +108,7 @@ jobs:
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
           artifact: linux.${{matrix.target}}.${{matrix.arch}}.${{contains(matrix.lipsync, 'yes') && '-lipsync' || '-base'}}
-          additional: lto=yes
+          additional: lto=full
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
 
@@ -143,7 +143,7 @@ jobs:
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
           artifact: macos.${{matrix.target}}.${{matrix.arch}}${{contains(matrix.lipsync, 'yes') && '-lipsync' || '-base'}}
-          additional: lto=yes lipsync=${{matrix.lipsync}} macos_deployment_target=10.15
+          additional: lto=full lipsync=${{matrix.lipsync}} macos_deployment_target=10.15
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
 
@@ -172,7 +172,7 @@ jobs:
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
           artifact: ios.${{matrix.target}}.${{matrix.arch}}-base
-          additional: lto=yes
+          additional: lto=full
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
 
@@ -232,7 +232,7 @@ jobs:
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
           artifact: android.${{matrix.target}}.${{matrix.arch}}${{contains(matrix.lipsync, 'yes') && '-lipsync' || '-base'}}
-          additional: lto=yes lipsync=${{matrix.lipsync}} ANDROID_HOME=""
+          additional: lto=full lipsync=${{matrix.lipsync}} ANDROID_HOME=""
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
 
@@ -272,7 +272,7 @@ jobs:
           target: ${{matrix.target}}
           arch: ${{matrix.arch}}
           artifact: web.${{matrix.target}}.${{matrix.arch}}.threads_${{matrix.threads}}-base
-          additional: lto=yes threads=${{matrix.threads}}
+          additional: lto=full threads=${{matrix.threads}}
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
 

@@ -2,6 +2,7 @@
 
 from SCons.Script import SConscript
 from SCons.Script.SConscript import SConsEnvironment
+from SCons.Script import ARGLIST, ARGUMENTS, BUILD_TARGETS, COMMAND_LINE_TARGETS, DEFAULT_TARGETS
 
 import SCons, SCons.Script
 import sys, os, platform
@@ -10,6 +11,9 @@ import lib_utils, lib_utils_external
 # Fixing the encoding of the console
 if platform.system() == "Windows":
     os.system("chcp 65001")
+
+EnsureSConsVersion(4, 0)  # type: ignore
+EnsurePythonVersion(3, 8)  # type: ignore
 
 # Project config
 project_name = "TwoVoIP"
@@ -26,16 +30,19 @@ patches_to_apply_rmnoise = [
 patches_to_apply_godot = [
     "patches/godot_cpp_exclude_unused_classes.patch", # Removes unused godot-cpp classes from the build process
     "patches/unity_build.patch", # Speeds up the build by merging the source files. It can increase the size of assemblies.
-    "patches/web_threads.patch", # Adds the build flag that appeared in Godot 4.3. Required for a web build compatible with Godot 4.3.
 ]
 
-print("If you add new source files (e.g. .cpp, .c), do not forget to specify them in 'src/default_sources.json'.\n\tOr add them to 'setup_defines_and_flags' inside 'lib_utils.py '.")
+print(
+    f"If you add new source files (e.g. .cpp, .c), do not forget to specify them in '{src_folder}/default_sources.json'."
+    + f"\n\tOr add them to 'setup_defines_and_flags' inside 'SConstruct'."
+)
 print("To apply git patches, use 'scons apply_patches'.")
 print("To build the opus library, use 'scons build_opus'.")
 
 # Additional console arguments
 def setup_options(env: SConsEnvironment, arguments):
     from SCons.Variables import Variables, BoolVariable, EnumVariable, PathVariable
+
     opts = Variables([], arguments)
 
     # It must be here for lib_utils.py
@@ -43,7 +50,6 @@ def setup_options(env: SConsEnvironment, arguments):
     opts.Add(PathVariable("ovrlipsync_dir", "Path to the OVRLipSyncNative directory", os.path.join(os.path.dirname(default_output_lipsync_dir), "OVRLipSyncNative"), PathVariable.PathIsDirCreate))
 
     opts.Add(BoolVariable("lipsync", "Enable lipsync support", False))
-    opts.Add(BoolVariable("lto", "Link-time optimization", False))
     opts.Add(BoolVariable("rnnoise", "Enable rnnoise support", True))
 
     opts.Update(env)
@@ -51,11 +57,10 @@ def setup_options(env: SConsEnvironment, arguments):
 
 
 # Additional compilation flags
-def setup_defines_and_flags(env: SConsEnvironment, src_out):
+def setup_defines_and_flags(env: SConsEnvironment, src_out: list):
     # Add more sources to `src_out` if needed
 
-
-    if env["lto"]:
+    if env["lto"] != "none":
         if env.get("is_msvc", False):
             env.AppendUnique(CCFLAGS=["/GL"],
                              ARFLAGS=["/LTCG"],
@@ -63,6 +68,9 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
         else:
             env.AppendUnique(CCFLAGS=["-flto"],
                              LINKFLAGS=["-flto"],)
+    else:
+        if env.get("is_msvc", False):
+            env.AppendUnique(LINKFLAGS=["/incremental:no"])
 
     env.Append(CPPPATH="opus/include", LIBS=["opus"], LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "opus")])
 
@@ -102,6 +110,7 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
                         CPPDEFINES=["OVR_LIP_SYNC"])
 
     if env.get("is_msvc", False):
+        env.Append(CCFLAGS=["/GF"])  # Eliminate Duplicate Strings
         env.Append(LINKFLAGS=["/WX:NO"])
 
     if env["platform"] in ["linux"]: # , "android"?
@@ -119,6 +128,7 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out):
         )
     print()
 
+
 def apply_patches(target, source, env: SConsEnvironment):
     rc = lib_utils_external.apply_git_patches(env, patches_to_apply_rmnoise, "noise-suppression-for-voice")
     if rc:
@@ -127,7 +137,8 @@ def apply_patches(target, source, env: SConsEnvironment):
 
 def get_android_toolchain() -> str:
     sys.path.insert(0, "godot-cpp/tools")
-    import android
+    import android  # type: ignore
+
     sys.path.pop(0)
     return os.path.join(android.get_android_ndk_root(env), "build/cmake/android.toolchain.cmake")
 
@@ -165,12 +176,14 @@ additional_src = []
 setup_options(env, args)
 setup_defines_and_flags(env, additional_src)
 
+extra_tags = ""
+
 output_path = env["addon_output_dir"]
 if output_path == default_output_dir:
     if env["lipsync"]:
         output_path = default_output_lipsync_dir
 
-lib_utils.get_library_object(env, project_name, lib_name, output_path, src_folder, additional_src)
+lib_utils.get_library_object(env, project_name, lib_name, extra_tags, output_path, src_folder, additional_src)
 
 # Register console commands
 env.Command("apply_patches", [], apply_patches)

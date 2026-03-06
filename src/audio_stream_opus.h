@@ -109,7 +109,7 @@ protected:
 
 public:
     virtual int32_t _mix_resampled(AudioFrame *dst_buffer, int32_t frame_count) override;
-    virtual double _get_stream_sampling_rate() const override  { return base->opus_sample_rate; };
+    virtual float _get_stream_sampling_rate() const override  { return base->opus_sample_rate; };
 
     virtual void _start(double p_from_pos = 0.0) override;
     virtual void _stop() override;
