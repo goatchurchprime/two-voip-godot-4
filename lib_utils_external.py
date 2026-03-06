@@ -19,10 +19,10 @@ def get_cmake_build_dir(env: SConsEnvironment, lib_path: str) -> str:
     abs_scons_root = os.path.dirname(os.path.abspath(__file__))
     # CMake doesn't seem to be able to work with the cache at all...
     #
-    #scons_cache_path = os.environ.get("SCONS_CACHE")
-    #if scons_cache_path:
+    # scons_cache_path = os.environ.get("SCONS_CACHE")
+    # if scons_cache_path:
     #    return os.path.join(abs_scons_root, scons_cache_path, "cmake", lib_path, get_cmake_build_dir_name(env))
-    #else:
+    # else:
     return os.path.join(abs_scons_root, lib_path, get_cmake_build_dir_name(env))
 
 
@@ -45,7 +45,7 @@ def print_subprocess_result(result, prefix: str):
         print(f"{prefix} errors: {result.stderr}")
 
 
-def apply_git_patches(env: SConsEnvironment, patches_to_apply: list, root_path: str):
+def apply_git_patches(env: SConsEnvironment, patches_to_apply: list, working_dir: str):
     for patch in patches_to_apply:
         print()
         try:
@@ -53,7 +53,7 @@ def apply_git_patches(env: SConsEnvironment, patches_to_apply: list, root_path: 
                 [
                     "git",
                     "apply",
-                    "--directory=" + root_path,
+                    f"--directory={working_dir}",
                     "--ignore-space-change",
                     "--ignore-whitespace",
                     "--reverse",
@@ -72,14 +72,14 @@ def apply_git_patches(env: SConsEnvironment, patches_to_apply: list, root_path: 
 
         try:
             result = subprocess.run(
-                ["git", "apply", "--directory=" + root_path, "--ignore-space-change", "--ignore-whitespace", patch],
+                ["git", "apply", f"--directory={working_dir}", "--ignore-space-change", "--ignore-whitespace", patch],
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 encoding="utf-8",
             )
             print_subprocess_result(result, "git")
-            print(f"Successfully applied patch: {patch}")
+            print(f"Successfully applied patch: '{patch}'")
         except subprocess.CalledProcessError as e:
             print_subprocess_result(e, "git")
             print("Please fix the patches, disable them, or try to git reset!")
@@ -87,7 +87,8 @@ def apply_git_patches(env: SConsEnvironment, patches_to_apply: list, root_path: 
     print()
     return 0
 
-def cmake_build_project(env: SConsEnvironment, lib_path: str, extra_args: list, extra_c_compiler_flags: dict = {}):
+
+def cmake_build_project(env: SConsEnvironment, lib_path: str, extra_args: list, extra_c_compiler_flags: dict = {}, vs_proj_version: str = ""):
     print()
     arch = env["arch"]
     platform = env["platform"]
@@ -99,7 +100,18 @@ def cmake_build_project(env: SConsEnvironment, lib_path: str, extra_args: list, 
     if platform == "windows":
         msvc_runtime_type = "/MT" if env["use_static_cpp"] else "/MD"
         arch_map = { "arm32": "ARM", "arm64": "ARM64", "x86_32":  "Win32", "x86_64":"x64" }
-        platform_args += ["-G", "Visual Studio 17 2022",
+        scons_msbuild_map = {
+            "14.5": "Visual Studio 18 2026",
+            "14.3": "Visual Studio 17 2022",
+            "14.2": "Visual Studio 16 2019",
+            "14.1": "Visual Studio 15 2017",
+        }
+        vs_proj = vs_proj_version
+        if len(vs_proj_version) == 0:
+            vs_proj = scons_msbuild_map[env["MSVC_VERSION"]]
+            print(f'Selected Visual Studio version for the CMake project: "{vs_proj}"')
+
+        platform_args += ["-G", vs_proj,
                           "-A", arch_map[arch],
                           # CMAKE_MSVC_RUNTIME_LIBRARY does not work with the Visual Studio project
                           #"-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded" + ("" if env["use_static_cpp"] else "DLL")]
@@ -141,9 +153,15 @@ def cmake_build_project(env: SConsEnvironment, lib_path: str, extra_args: list, 
     curdir = os.curdir
     os.chdir(lib_path)
     try:
+        build_dir = get_cmake_build_dir(env, lib_path)
+
         def config():
+            proc_args = ["cmake", f"-B{build_dir}"] + platform_args + extra_args
+            print()
+            print("CMake configuration is run with the following arguments:", " ".join(proc_args))
+            print()
             result = subprocess.run(
-                ["cmake", f"-B{get_cmake_build_dir(env, lib_path)}"] + platform_args + extra_args,
+                proc_args,
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -156,11 +174,15 @@ def cmake_build_project(env: SConsEnvironment, lib_path: str, extra_args: list, 
         except subprocess.CalledProcessError as e:
             print_subprocess_result(e, "cmake config")
             print(f"Attempt to clean up the build directory and reconfigure it...\n")
-            shutil.rmtree(get_cmake_build_dir(env, lib_path))
+            shutil.rmtree(build_dir)
             config()
 
+        proc_args = ["cmake", "--build", build_dir] + build_args
+        print()
+        print("CMake build is run with arguments:", " ".join(proc_args))
+        print()
         result = subprocess.run(
-            ["cmake", "--build", get_cmake_build_dir(env, lib_path)] + build_args,
+            proc_args,
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

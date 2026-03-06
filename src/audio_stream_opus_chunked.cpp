@@ -327,7 +327,7 @@ PackedVector2Array AudioStreamOpusChunked::pop_front_chunk(int frames) {
 }
 
 
-double AudioStreamPlaybackOpusChunked::_get_stream_sampling_rate() const { 
+float AudioStreamPlaybackOpusChunked::_get_stream_sampling_rate() const { 
     return base->mix_rate; 
 };
 
