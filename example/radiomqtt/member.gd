@@ -23,11 +23,6 @@ func receivemqttaudio(msg):
 		msg = Marshalls.base64_to_raw(msg.get_string_from_ascii())
 	twovoipspeaker.tv_incomingaudiopacket(msg)
 
-func setspeedrate(pitchscale):
-	$AudioStreamPlayer.pitch_scale = pitchscale
-
-func _ready():
-	$AudioStreamPlayer/TwoVoipSpeaker.connect("sigvoicespeedrate", setspeedrate)
 
 var timedelaytohide = 0.1
 var prevopusframecount = -1

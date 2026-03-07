@@ -1,7 +1,7 @@
 extends Node
 
-var audiostreamopus : AudioStreamOpus = null
 var audioplayeropus = null
+var audiostreamopus : AudioStreamOpus = null
 var audiostreamplaybackopus : AudioStreamPlaybackOpus = null
 
 # Consider looking at netem for simulating network traffic
@@ -25,25 +25,19 @@ var opusframequeuecount = 0
 
 var playbackpausedonmark = false
 
-signal sigvoicespeedrate(audiobufferpitchscale)
-
 var lastemittedaudiobufferpitchscale = 1.0
-
 var runninglagtimeminimum = -1.0
 
 
 func _ready():
-	if get_parent().has_method("findaudioplayer"):
-		audioplayeropus = get_parent().findaudioplayer()
-		audiostreamopus = audioplayeropus.stream
-	elif get_parent().get("stream"):
-		audioplayeropus = get_parent()
-		audiostreamopus = audioplayeropus.stream
+	audioplayeropus = get_parent().findaudioplayer() if get_parent().has_method("findaudioplayer") else get_parent()
+	if audioplayeropus.has_method("set_stream"):
+		audiostreamopus = AudioStreamOpus.new()
+		audioplayeropus.set_stream(audiostreamopus)
 	else:
-		audiostreamopus = null
-		printerr("No audio stream")
-	if audiostreamopus:
-		assert(audiostreamopus.resource_local_to_scene, "AudioStream should be local_to_scene")
+		audioplayeropus = null
+		printerr("No audio stream player")
+
 
 func setrecopusvalues(opus_sample_rate, opus_channels):
 	if not audioplayeropus.playing or audiostreamopus.opus_sample_rate != opus_sample_rate or audiostreamopus.opus_channels != opus_channels:
@@ -160,9 +154,8 @@ func tv_incomingaudiopacket(packet):
 
 func setpitchscale(pitchscale):
 	if pitchscale != lastemittedaudiobufferpitchscale:
-		sigvoicespeedrate.emit(pitchscale)
+		audioplayeropus.pitch_scale = pitchscale
 		lastemittedaudiobufferpitchscale = pitchscale
-
 
 var playingrecording = false
 var pausereached = false
