@@ -15,3 +15,5 @@ func RPC_incomingaudiopacket(playername, packet):
 func set_receiving(playername, toggled_on):
 	if toggled_on:
 		$InputPlayer.add_receiving_player(playername)
+	else:
+		$InputPlayer.remove_receiving_player(playername)

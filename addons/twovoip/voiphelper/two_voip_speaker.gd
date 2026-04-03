@@ -14,8 +14,9 @@ var audioserveroutputlatency = AudioServer.get_output_latency()
 
 const asciiopenbrace = 123 # "{".to_ascii_buffer()[0]
 const asciiclosebrace = 125 # "}".to_ascii_buffer()[0]
-var lenchunkprefix = -1
+var lenchunkprefix = 2
 var opusstreamcount = 0
+var inopusstream = false
 var opusframecount = 0
 var opusframesize = 960
 const Noutoforderqueue = 4
@@ -60,6 +61,11 @@ func unpausewhenbufferready():
 		playbackpausedonmark = false
 		runninglagtimeminimum = bufferlengthtime
 
+func external_end_stream():
+	if inopusstream:
+		print(":externally ending the stream at cutout")
+		tv_incomingaudiopacket(JSON.stringify({"talkingtimeend":-1}).to_ascii_buffer())
+
 func tv_incomingaudiopacket(packet):
 	if audiostreamopus == null:
 		return
@@ -85,6 +91,7 @@ func tv_incomingaudiopacket(packet):
 				opusframequeuecount = 0
 				assert (Npacketinitialbatching < Noutoforderqueue)
 				runninglagtimeminimum = -1.0
+				inopusstream = true
 
 			elif h.has("talkingtimeend"):
 				if playbackpausedonmark and audiostreamplaybackopus.queue_length_frames() == 0:
@@ -93,6 +100,7 @@ func tv_incomingaudiopacket(packet):
 				playbackpausedonmark = true
 				pausereached = false
 				print("runninglagtimeminimum: ", runninglagtimeminimum, " (target: ", audiobufferlagtimetarget, ")")
+				inopusstream = true
 
 	elif lenchunkprefix == -1:
 		pass

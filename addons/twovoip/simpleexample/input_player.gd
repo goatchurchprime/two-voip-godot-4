@@ -30,11 +30,17 @@ func _on_feedback_display_gui_input(event):
 
 var outputplayers = [ ]
 var new_outputplayers = [ ]
+var removed_outputplayers = [ ]
 var recorded_audiostreampacketheader = null
 
 func add_receiving_player(playername):
 	outputplayers.append(playername)
 	new_outputplayers.append(playername)
+
+func remove_receiving_player(playername):
+	assert (outputplayers.has(playername))
+	outputplayers.erase(playername)
+	new_outputplayers.erase(playername)
 
 func transmitaudiojsonpacket(jsonpacket : Dictionary):
 	if jsonpacket.has("talkingtimestart"):

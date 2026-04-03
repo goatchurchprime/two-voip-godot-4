@@ -9,6 +9,8 @@ func RPC_incomingaudiopacket(packet):
 
 func _on_receiving_button_toggled(toggled_on):
 	networkingnode.set_receiving(String(get_name()), toggled_on)
+	if not toggled_on:
+		$TwoVoipSpeaker.external_end_stream()
 	
 func findaudioplayer():
 	return $AudioStreamPlayer
