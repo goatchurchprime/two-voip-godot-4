@@ -1,0 +1,147 @@
+[gd_scene format=3 uid="uid://b1h3i7sjvnwlk"]
+
+[ext_resource type="Script" uid="uid://c3emh3ej6vjud" path="res://addons/twovoip/simpleexample/minimal_demo.gd" id="1_d67ik"]
+[ext_resource type="Script" uid="uid://uwvfo8fwg4a8" path="res://addons/twovoip/simpleexample/input_player.gd" id="2_82h6d"]
+[ext_resource type="PackedScene" uid="uid://dvpkwo6h7y0sj" path="res://addons/twovoip/voiphelper/two_voip_mic.tscn" id="2_d5hfh"]
+[ext_resource type="Shader" uid="uid://bq3uv3u8jhu77" path="res://addons/twovoip/voiphelper/voxshader.gdshader" id="4_82h6d"]
+[ext_resource type="PackedScene" uid="uid://lyg0f2yyo7wd" path="res://addons/twovoip/simpleexample/output_player.tscn" id="5_kb0gc"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_kb0gc"]
+shader = ExtResource("4_82h6d")
+shader_parameter/backgroundcolor = Color(0.1, 0.2, 0.8, 1)
+shader_parameter/voxthresholdcolor = Color(0.602, 0.43, 0.508, 1)
+shader_parameter/voxchunkmaxcolor = Color(0.8, 0.8, 0.08, 0.2)
+shader_parameter/voxwavecolor = Color(0.8, 0.8, 0.9, 1)
+shader_parameter/voxthreshhold = 0.2
+shader_parameter/chunkmax = 0.0
+shader_parameter/chunkmaxpersist = 0.0
+shader_parameter/speechnoiseprobability = 0.0
+shader_parameter/chunktexenabled = false
+
+[node name="MinimalDemo" type="Control" unique_id=1689475287]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_d67ik")
+
+[node name="TitleLabel" type="Label" parent="." unique_id=429401648]
+layout_mode = 0
+offset_left = 26.0
+offset_top = 20.0
+offset_right = 410.0
+offset_bottom = 43.0
+text = "Demo to help with voiphelper integration"
+
+[node name="InputPlayer" type="Control" parent="." unique_id=150791326]
+anchors_preset = 0
+offset_left = 57.0
+offset_top = 40.0
+offset_right = 97.0
+offset_bottom = 80.0
+script = ExtResource("2_82h6d")
+
+[node name="InputLabel" type="Label" parent="InputPlayer" unique_id=89517593]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 2.1680002
+anchor_bottom = 1.2670001
+offset_left = 19.0
+offset_top = 31.0
+offset_right = -27.720009
+offset_bottom = 3.3199959
+text = "Basic microphone controls"
+
+[node name="TwoVoipMic" parent="InputPlayer" unique_id=2054874447 instance=ExtResource("2_d5hfh")]
+
+[node name="MicOnButton" type="Button" parent="InputPlayer" unique_id=1703122268]
+layout_mode = 0
+offset_left = 47.0
+offset_top = 72.0
+offset_right = 110.0
+offset_bottom = 103.0
+toggle_mode = true
+button_pressed = true
+text = "Mic On"
+
+[node name="PTTButton" type="Button" parent="InputPlayer" unique_id=1257371628]
+layout_mode = 0
+offset_left = 125.0
+offset_top = 72.0
+offset_right = 161.0
+offset_bottom = 103.0
+text = "PTT"
+
+[node name="VoxButton" type="Button" parent="InputPlayer" unique_id=750547273]
+layout_mode = 0
+offset_left = 173.0
+offset_top = 69.0
+offset_right = 210.0
+offset_bottom = 100.0
+toggle_mode = true
+button_pressed = true
+text = "Vox"
+
+[node name="DenoiseButton" type="Button" parent="InputPlayer" unique_id=1162379916]
+layout_mode = 0
+offset_left = 234.0
+offset_top = 68.0
+offset_right = 305.0
+offset_bottom = 99.0
+toggle_mode = true
+text = "Denoise"
+
+[node name="InputOptionButton" type="OptionButton" parent="InputPlayer" unique_id=219495730]
+layout_mode = 0
+offset_left = 50.0
+offset_top = 112.0
+offset_right = 82.0
+offset_bottom = 132.0
+
+[node name="FeedbackDisplay" type="ColorRect" parent="InputPlayer" unique_id=185557707]
+material = SubResource("ShaderMaterial_kb0gc")
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 50.0
+offset_top = 153.0
+offset_right = 432.0
+offset_bottom = 173.0
+
+[node name="OutputPlayersLabel" type="Label" parent="." unique_id=1586952382]
+layout_mode = 0
+offset_left = 32.0
+offset_top = 299.0
+offset_right = 144.0
+offset_bottom = 322.0
+text = "OutputPlayers"
+
+[node name="OutputPlayers" type="Control" parent="." unique_id=1669634504]
+anchors_preset = 0
+offset_left = 32.0
+offset_top = 299.0
+offset_right = 189.0
+offset_bottom = 456.0
+
+[node name="OutputPlayer" parent="OutputPlayers" unique_id=1416507291 instance=ExtResource("5_kb0gc")]
+layout_mode = 0
+offset_left = 49.0
+offset_top = 27.0
+offset_right = 89.0
+offset_bottom = 67.0
+
+[node name="OutputPlayer2" parent="OutputPlayers" unique_id=733402135 instance=ExtResource("5_kb0gc")]
+layout_mode = 0
+offset_left = 50.0
+offset_top = 77.0
+offset_right = 90.0
+offset_bottom = 117.0
+
+[connection signal="transmitaudiojsonpacket" from="InputPlayer/TwoVoipMic" to="InputPlayer" method="transmitaudiojsonpacket"]
+[connection signal="transmitaudiopacket" from="InputPlayer/TwoVoipMic" to="InputPlayer" method="transmitaudiopacket"]
+[connection signal="gui_input" from="InputPlayer/FeedbackDisplay" to="InputPlayer" method="_on_feedback_display_gui_input"]
+
+[editable path="OutputPlayers/OutputPlayer"]

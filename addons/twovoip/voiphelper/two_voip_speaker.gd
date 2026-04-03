@@ -36,7 +36,7 @@ func _ready():
 		audioplayeropus.set_stream(audiostreamopus)
 	else:
 		audioplayeropus = null
-		printerr("No audio stream player")
+		assert(false, "Audiostream player not found!")
 
 
 func setrecopusvalues(opus_sample_rate, opus_channels):
@@ -76,7 +76,7 @@ func tv_incomingaudiopacket(packet):
 				opusstreamcount = int(h["opusstreamcount"])
 				opusframesize = int(h["opusframesize"])
 				opusframecount = 0
-				if h.has("opusframecount"):
+				if h.get("opusframecount", 0) != 0:
 					prints("Mid speech header!!! ", h["opusframecount"])
 					opusframecount = int(h["opusframecount"]) + 1
 				outoforderchunkqueue.clear()

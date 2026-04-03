@@ -1,0 +1,61 @@
+[gd_scene format=3 uid="uid://lyg0f2yyo7wd"]
+
+[ext_resource type="Script" uid="uid://cwa54ibk0sa53" path="res://addons/twovoip/simpleexample/output_player.gd" id="1_7nss1"]
+[ext_resource type="PackedScene" uid="uid://c613yggmsl08x" path="res://addons/twovoip/voiphelper/two_voip_speaker.tscn" id="2_a0art"]
+
+[node name="OutputPlayer" type="Control" unique_id=1416507291]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 94.0
+offset_top = 47.0
+offset_right = 134.0
+offset_bottom = 87.0
+script = ExtResource("1_7nss1")
+
+[node name="PlayerLabel" type="Label" parent="." unique_id=1441482472]
+layout_mode = 0
+offset_left = -64.0
+offset_top = 26.0
+offset_right = -6.0
+offset_bottom = 49.0
+text = "Player1"
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=1464447874]
+
+[node name="TwoVoipSpeaker" parent="." unique_id=227661049 instance=ExtResource("2_a0art")]
+
+[node name="ReceivingButton" type="CheckButton" parent="." unique_id=1034077926]
+layout_mode = 0
+offset_left = 165.0
+offset_top = 22.0
+offset_right = 287.0
+offset_bottom = 53.0
+text = "Receiving"
+
+[node name="SineOutputButton" type="Button" parent="." unique_id=350038516]
+layout_mode = 0
+offset_left = 363.0
+offset_top = 19.0
+offset_right = 460.0
+offset_bottom = 50.0
+toggle_mode = true
+text = "SineOutput"
+
+[node name="ColorRectLoudness" type="ColorRect" parent="." unique_id=1660253840]
+layout_mode = 0
+offset_left = 98.0
+offset_top = 32.0
+offset_right = 150.0
+offset_bottom = 43.0
+color = Color(1, 0.9843137, 0.03137255, 1)
+
+[node name="ColorRectBuffer" type="ColorRect" parent="." unique_id=1702059590]
+layout_mode = 0
+offset_left = 296.0
+offset_top = 30.0
+offset_right = 348.0
+offset_bottom = 41.0
+color = Color(0.13725491, 0.85882354, 0.8392157, 1)
+
+[connection signal="toggled" from="ReceivingButton" to="." method="_on_receiving_button_toggled"]
+[connection signal="toggled" from="SineOutputButton" to="." method="_on_sine_output_button_toggled"]
