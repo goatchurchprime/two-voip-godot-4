@@ -4,9 +4,6 @@
 #include "opus_encoder_object.h"
 #include "audio_effect_fft_block.h"
 
-#include "audio_effect_opus_chunked.h"
-#include "audio_stream_opus_chunked.h"
-
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -25,13 +22,6 @@ void initialize_two_voip_module(ModuleInitializationLevel p_level) {
 
     ClassDB::register_class<AudioEffectFFTBlock>();
     ClassDB::register_class<AudioEffectFFTBlockInstance>();
-
-    // these are obsolete
-    ClassDB::register_class<AudioEffectOpusChunked>();
-    ClassDB::register_class<AudioEffectOpusChunkedInstance>();
-
-    ClassDB::register_class<AudioStreamOpusChunked>();
-    ClassDB::register_class<AudioStreamPlaybackOpusChunked>();
 }
 
 void uninitialize_two_voip_module(ModuleInitializationLevel p_level) {
