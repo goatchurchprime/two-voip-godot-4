@@ -2,8 +2,6 @@
   "opus_encoder_object.cpp",
   "audio_stream_opus.cpp",
   "audio_effect_fft_block.cpp",
-  "audio_effect_opus_chunked.cpp",
-  "audio_stream_opus_chunked.cpp",
   "register_types.cpp",
   "speex_resampler/resample.c",
   "utils.cpp"
