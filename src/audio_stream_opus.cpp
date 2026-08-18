@@ -37,6 +37,8 @@ void AudioStreamOpus::_bind_methods() {
 
     ClassDB::bind_method(D_METHOD("set_opus_sample_rate", "opus_sample_rate"), &AudioStreamOpus::set_opus_sample_rate);
     ClassDB::bind_method(D_METHOD("get_opus_sample_rate"), &AudioStreamOpus::get_opus_sample_rate);
+    ClassDB::bind_method(D_METHOD("set_stream_sample_rate", "stream_sample_rate"), &AudioStreamOpus::set_stream_sample_rate);
+    ClassDB::bind_method(D_METHOD("get_stream_sample_rate"), &AudioStreamOpus::get_stream_sample_rate);
     ClassDB::bind_method(D_METHOD("set_opus_channels", "opus_sample_rate"), &AudioStreamOpus::set_opus_channels);
     ClassDB::bind_method(D_METHOD("get_opus_channels"), &AudioStreamOpus::get_opus_channels);
     ClassDB::bind_method(D_METHOD("set_buffer_length", "seconds"), &AudioStreamOpus::set_buffer_length);
@@ -45,6 +47,7 @@ void AudioStreamOpus::_bind_methods() {
 
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "buffer_length", PROPERTY_HINT_RANGE, "0.1,10.0,0.1,suffix:s"), "set_buffer_length", "get_buffer_length");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "opus_sample_rate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_opus_sample_rate", "get_opus_sample_rate");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "stream_sample_rate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_stream_sample_rate", "get_stream_sample_rate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "opus_channels", PROPERTY_HINT_RANGE, "1,2,1"), "set_opus_channels", "get_opus_channels");
 }
 
@@ -76,7 +79,7 @@ void AudioStreamPlaybackOpus::initialize(const AudioStreamOpus* pbase) {
     godot::UtilityFunctions::print("initialize AudioStreamPlaybackOpus"); 
     base = Ref<AudioStreamOpus>(pbase);
     int opuserror = 0;
-    godot::UtilityFunctions::print("opus_decoder_create "); 
+    godot::UtilityFunctions::print("opus_decoder_create sample-rate ", base->opus_sample_rate); 
     opusdecoder = opus_decoder_create(base->opus_sample_rate, base->opus_channels, &opuserror);
     godot::UtilityFunctions::print("opus_decoder_created "); 
     if (opuserror == 0) {
@@ -143,6 +146,8 @@ void AudioStreamPlaybackOpus::push_opus_packet(const PackedByteArray& opusbytepa
                     (float*)audiounpackedbuffer.ptrw(), 
                     (decode_fec ? lastpacketsizeforfec : audiounpackedbuffer.size()), 
                     decode_fec);
+        // assert(decodedsamples == opus_sample_rate*frameduration)
+        printf(" --decodedsamples %d\n", decodedsamples); 
         // assert(decodedsamples < audiounpackedbuffer.size());  // make sure there was suffient space
         if (decodedsamples)
             lastpacketsizeforfec = decodedsamples;

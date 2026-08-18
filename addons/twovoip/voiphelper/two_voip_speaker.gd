@@ -40,10 +40,11 @@ func _ready():
 		assert(false, "Audiostream player not found!")
 
 
-func setrecopusvalues(opus_sample_rate, opus_channels):
+func setrecopusvalues(opus_sample_rate, stream_sample_rate, opus_channels):
 	if not audioplayeropus.playing or audiostreamopus.opus_sample_rate != opus_sample_rate or audiostreamopus.opus_channels != opus_channels:
 		prints(":newplay: ", audioplayeropus.playing, audiostreamopus.opus_sample_rate, opus_sample_rate, audiostreamopus.opus_channels, opus_channels)
 		audiostreamopus.opus_sample_rate = opus_sample_rate
+		audiostreamopus.stream_sample_rate = stream_sample_rate
 		audiostreamopus.opus_channels = opus_channels
 		audioplayeropus.play()  # creates a new playback
 		audiostreamplaybackopus = audioplayeropus.get_stream_playback()
@@ -77,7 +78,11 @@ func tv_incomingaudiopacket(packet):
 			print("audio json packet ", h)
 
 			if h.has("talkingtimestart"):
-				setrecopusvalues(h["opussamplerate"], h.get("opuschannels", 2))
+				var opus_sample_rate = h["opussamplerate"]
+				var stream_sample_rate = opus_sample_rate
+				#stream_sample_rate = 24000
+				opus_sample_rate = 48000
+				setrecopusvalues(opus_sample_rate, stream_sample_rate, h.get("opuschannels", 2))
 				lenchunkprefix = int(h["lenchunkprefix"])
 				opusstreamcount = int(h["opusstreamcount"])
 				opusframesize = int(h["opusframesize"])
@@ -161,6 +166,7 @@ func tv_incomingaudiopacket(packet):
 		prints("dropping frame with opusstream number mismatch", opusstreamcount, packet[0], packet[1])
 
 func setpitchscale(pitchscale):
+	print("  set pitch scale ", pitchscale)
 	if pitchscale != lastemittedaudiobufferpitchscale:
 		audioplayeropus.pitch_scale = pitchscale
 		lastemittedaudiobufferpitchscale = pitchscale
@@ -181,11 +187,12 @@ func _physics_process(delta):
 		prevskips = currskips
 		
 	var bufferlengthtime = audioserveroutputlatency + queuelengthframes*1.0/audiostreamopus.opus_sample_rate
+	#print("bufflengtime ", bufferlengthtime, " targ ", audiobufferlagtimetarget, " ", audioplayeropus.pitch_scale)
 	if not playbackpausedonmark:
 		runninglagtimeminimum = bufferlengthtime
 		if lastemittedaudiobufferpitchscale == 1.0:
 			if abs(bufferlengthtime - audiobufferlagtimetarget) > audiobufferlagtimetargettolerance:
-				setpitchscale(0.7 if (bufferlengthtime < audiobufferlagtimetarget) else 1.4)
+				setpitchscale(0.5 if (bufferlengthtime < audiobufferlagtimetarget) else 1.4)
 				print(" set lastemittedaudiobufferpitchscale to ", lastemittedaudiobufferpitchscale)
 
 		elif (lastemittedaudiobufferpitchscale < 1.0) == (bufferlengthtime > audiobufferlagtimetarget):
@@ -214,4 +221,4 @@ var sinewaveoutmode = false
 func set_sinewave_out(toggled_on):
 	sinewaveoutmode = toggled_on
 	if audiostreamplaybackopus:
-		audiostreamplaybackopus.set_sinewave_frames(audiostreamopus.opus_sample_rate/440 if toggled_on else 0, 0.05)
+		audiostreamplaybackopus.set_sinewave_frames(audiostreamopus.stream_sample_rate/440 if toggled_on else 0, 0.05)

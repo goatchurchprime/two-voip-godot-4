@@ -1,7 +1,5 @@
 extends AudioStreamPlayer
 
-
-
 # See https://xiph.org/ogg/doc/framing.html
 func _ready():
 	var fin = FileAccess.open("res://sound.ogg", FileAccess.READ)

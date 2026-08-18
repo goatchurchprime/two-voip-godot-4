@@ -52,7 +52,8 @@ class AudioStreamOpus : public AudioStream {
     GDCLASS(AudioStreamOpus, AudioStream)
     friend class AudioStreamPlaybackOpus;
 
-    float opus_sample_rate = 48000.0;  // Must be one of 48000,24000,16000,12000,8000.
+    float opus_sample_rate = 48000.0;  // Must be one of 48000,24000,16000,12000,8000 and defines the decodedsamples value of opus_decode_float(opusdecoder). Does not need to be the same as the encoded_sample_rate
+    float stream_sample_rate = 48000.0;  // This should always be the same as opus_sample_rate, but useful for debugging.
     int opus_channels = 2;  // Must be 1 or 2.
     float buffer_len = 2.0; // In seconds, and only matters when AudioStreamPlaybackOpus::initialize() is called.
 
@@ -69,6 +70,8 @@ public:
     
     void set_opus_sample_rate(int p_sample_rate) { opus_sample_rate = p_sample_rate;  };
     float get_opus_sample_rate() { return opus_sample_rate; };
+    void set_stream_sample_rate(int p_sample_rate) { stream_sample_rate = p_sample_rate;  };
+    float get_stream_sample_rate() { return stream_sample_rate; };
     void set_opus_channels(int p_channels) { opus_channels = p_channels;  };
     float get_opus_channels() { return opus_channels; };
     void set_buffer_length(float p_seconds) { buffer_len = p_seconds; };
@@ -109,7 +112,7 @@ protected:
 
 public:
     virtual int32_t _mix_resampled(AudioFrame *dst_buffer, int32_t frame_count) override;
-    virtual float _get_stream_sampling_rate() const override  { return base->opus_sample_rate; };
+    virtual float _get_stream_sampling_rate() const override  { return base->stream_sample_rate; };
 
     virtual void _start(double p_from_pos = 0.0) override;
     virtual void _stop() override;
