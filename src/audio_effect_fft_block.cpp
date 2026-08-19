@@ -134,8 +134,7 @@ AudioEffectFFTBlock::AudioEffectFFTBlock() {
     createencoder();
 }
 
-AudioEffectFFTBlock::~AudioEffectFFTBlock() 
-{
+AudioEffectFFTBlock::~AudioEffectFFTBlock() {
     deleteencoder();
 };
 
@@ -178,6 +177,9 @@ void AudioEffectFFTBlock::createencoder() {
     bufferend = fftsize;
     fftslab.resize(fftsize*2*4*fftrows);
     fftirow = 0;
+    if (windowarray.size() != fftsize) {
+	windowarray.resize(fftsize);
+    }
 }
 
 void AudioEffectFFTBlockInstance::_process(const void *src_buffer, AudioFrame *p_dst_frames, int p_frame_count) {
@@ -190,13 +192,16 @@ void AudioEffectFFTBlock::push_sample(const Vector2 &sample) {
     if ((bufferend % advancestep) == 0) {
         float* ac = ((float*)fftslab.ptrw()) + fftirow*(fftsize*2);
         for (int i = 0; i < fftsize; i++) {
-            Vector2 v = audiosamplebuffer[(bufferend - fftsize + i)%audiosamplebuffer.size()];
+            int n = (bufferend - fftsize + i + audiosamplebuffer.size())%audiosamplebuffer.size();
+            Vector2 v = audiosamplebuffer[n];
             ac[i*2] = (v.x + v.y)*0.5*windowarray[i];
             ac[i*2 + 1] = 0.0;
         }
         smbFft(ac, fftsize, -1);
-        audiosampleframetextureimage->set_data(fftsize, fftrows, false, Image::FORMAT_RGF, fftslab);
-        audiosampleframetexture->update(audiosampleframetextureimage);
+	if (!audiosampleframetextureimage.is_null()) {
+	    audiosampleframetextureimage->set_data(fftsize, fftrows, false, Image::FORMAT_RGF, fftslab);
+	    audiosampleframetexture->update(audiosampleframetextureimage);
+	}
         fftirow = (fftirow + 1)%fftrows;
     }
 }
@@ -220,11 +225,6 @@ void AudioEffectFFTBlock::set_images(Ref<Image> laudiosampleframetextureimage, R
  
     fftsize = audiosampleframetextureimage->get_width();
     fftrows = audiosampleframetextureimage->get_height();
-    fftslab.resize(fftsize*2*4*fftrows);
-    fftirow = 0;
     advancestep = ladvancestep;
+    createencoder();
 }
-
-
-
-
