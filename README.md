@@ -1,33 +1,32 @@
 ## Description
 
-Welcome to the GodotEngine GDExtension [twovoip](https://godotengine.org/asset-library/asset/3169) 
-that applies the [xiph/opus](https://github.com/xiph/opus) compression library 
-(and optionally the [xiph/rnnoise](https://github.com/xiph/rnnoise) de-noiser and 
-[OVRLipSync](https://developer.oculus.com/documentation/native/audio-ovrlipsync-native/) viseme detector)
-to an audio stream of speech from the microphone. 
-The starting point for this project was [one-voip-godot-4](https://github.com/RevoluPowered/one-voip-godot-4/).
+Welcome to the GodotEngine GDExtension [twovoip](https://store.godotengine.org/asset/goatchurch/twovoip/) designed 
+to cater to all your VoIP (Voice Over IP) needs when building networked games in Godot.
+
+This plugin uses the industry standard [xiph/opus](https://github.com/xiph/opus) compression library 
+and the [xiph/rnnoise](https://github.com/xiph/rnnoise) de-noiser all wrapped in an easy-to-integrate voiphelper 
+component to enable you to get your game players speaking to one another over the network in minutes.
 
 Thanks to [@ajlennon](https://github.com/ajlennon) and [@DmitriySalnikov](https://github.com/DmitriySalnikov) 
-for indefatiguable work on the github actions that are successfully building this plugin across 
+for work on the github actions that are successfully building this plugin across 
 [all six](https://docs.godotengine.org/en/stable/about/list_of_features.html#platforms) GodotEngine supported platforms.
 
-**There are reliability issues with the Godot microphone implementation due to slight inconsistencies 
-between the audio output and audio input frame rates that cannot be sustained by 
-a simple buffer implementation on some platforms.  Fortunately the function AudioServer.get_input_frames() was added 
-in Godot V4.6 to access the input audio buffer directly
-
-## Demo example
+## High level demo
 
 An HTML5 demo is hosted at https://goatchurch.itch.io/twovoip-mqtt
 
 The purpose of this demo is to test all the features so you can hear what the opus compression and noise cancelling settings do to a voice recording, as well as debug sample rate issues.
 
-1. Clone/Download this repository and open the project in the `example/` directory in Godot 4.3.
-2. Go to assetlib, search for twovoip, and install it.  (Now on version 3.3)
-3. Run the app. 
-4. If the microphone is working, then you should see a waveform in the app like this:
+1. Clone/Download this repository.
+2. Open the project in the `example/` directory in Godot 4.6.
+3. Go to assetstore, search for twovoip, and install it.
+4. Run the main scene `radiomqtt.tscn`. 
+5. If the microphone is working, then you should see a waveform in the app like this:
 
 ![image](https://github.com/user-attachments/assets/6571635a-a134-4efb-862b-9e62f04854d6)
+
+Use the [mic_record](https://github.com/godotengine/godot-demo-projects/tree/master/audio/mic_record) demo project
+to resolve issues only to do with the microphone.
 
 If there is no response on MacOS, it could be [this issue](https://github.com/quellus/GDTuber/issues/76)  
 Go to Project Settings (with Advanced Settings selected) -> Audio -> Driver -> Mix rate and set to 48000
@@ -64,9 +63,15 @@ Finally, there is an MQTT transmission section to push audio packets over the ne
 
 MQTT is a lightweight protocol implemented in another GodotEngine GDExtension [https://godotengine.org/asset-library/asset/1993](godot-mqtt) and described [here](https://github.com/goatchurchprime/godot-mqtt/?tab=readme-ov-file#mqtt). Its publish and subscribe, and retained and last will messages system provides a simple basis for each player track who is joining or leaving the network.  There is a line of text beginning with `mosquitto_sub` command that you can copy into your terminal window to watch the data fly by. 
 
+## Using the voiphelper
 
-## Minimal Use Case
+You are recommended to use the voiphelper module rather than implement your voip system directly from the 
+core opus and rnnoise components as you will merely be re-implementing its functionality of 
+packet reordering, jitter buffers, and dynamic lag estimation.  It's an art to get all of this running 
+smoothly against all the glitches that you get from a network system, and it's better if we all share the same 
+system that can be progressively improved, rather than do our own thing with what is not actually a very interesting problem.
 
+-----------
 If you are familiar with the [Godot Audio system](https://docs.godotengine.org/en/stable/tutorials/audio/index.html), the following minimal use case of this plugin should make sense:
 
 As outlined in the [docs](https://docs.godotengine.org/en/stable/tutorials/audio/recording_with_microphone.html), 
