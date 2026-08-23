@@ -46,7 +46,7 @@ This section has the "Play" button to decode and play back the most recent recor
 
 Finally, there is an MQTT transmission section to push audio packets over the network via a broker on a topic.  Click the \[Connect\] button to go online while a friend does the same on another computer and you should be able to talk to one another over the internet (don't forget to use the PTT button).  Several presets are given for convenience, and it will automatically use websockets if you are operating from HTML5.
 
-MQTT is a lightweight protocol implemented in another GodotEngine GDExtension [https://godotengine.org/asset-library/asset/1993](godot-mqtt) and described [here](https://github.com/goatchurchprime/godot-mqtt/?tab=readme-ov-file#mqtt). Its publish and subscribe, and retained and last will messages system provides a simple basis for each player track who is joining or leaving the network.  There is a line of text beginning with `mosquitto_sub` command that you can copy into your terminal window to watch the data fly by. 
+MQTT is a lightweight protocol implemented in another GodotEngine GDExtension [https://godotengine.org/asset-library/asset/1993](godot-mqtt) and described [here](https://github.com/goatchurchprime/godot-mqtt/?tab=readme-ov-file#mqtt). Its publish, subscribe, retained and last will messaging system provides an effective framework for tracking the joining state of each player.  There is a line of text beginning with `mosquitto_sub` command that you can copy into your terminal window to watch the data fly by. 
 
 There is a fuzzing system to degrade the data and a logging system so you can record and replay an episode of packets.
 
@@ -54,87 +54,76 @@ The table of users shows who is connected to this broker and whether they are tr
 
 The "T" button for each user replaces the incoming audio data after it is unpacked with a pure 440Hz tone.  This feature is to help discriminate the nature of broken up audio as to whether it is due to gaps between the incoming packets as it is played back, or just bad audio being transmitted in the first place.
 
-
 ## Using the voiphelper
 
-You are recommended to use the voiphelper module rather than implement your voip system directly from the 
-core opus and rnnoise components as you will merely be re-implementing its functionality of 
-packet reordering, jitter buffers, and dynamic lag estimation.  It's an art to get all of this running 
-smoothly against all the glitches that you get from a network system, and it's better if we all share the same 
-system that can be progressively improved, rather than do our own thing with what is not actually a very interesting problem.
+You are recommended to use the voiphelper module rather than implement your VoIP system directly from the
+core opus and rnnoise components as you will merely be re-implementing its functionality of
+packet reordering, jitter buffers, and dynamic lag estimation.
+It takes a lot of developer time to get all of this running smoothly and 
+taking advantage of low latency unreliable channels of some network systems.
 
------------
-If you are familiar with the [Godot Audio system](https://docs.godotengine.org/en/stable/tutorials/audio/index.html), the following minimal use case of this plugin should make sense:
+### simpleexample
 
-As outlined in the [docs](https://docs.godotengine.org/en/stable/tutorials/audio/recording_with_microphone.html), 
-create an `AudioStreamPlayer` with `stream=AudioStreamMicrophone`, set it to Autoplay, and 
-ensure your ProjectSettings have `audio/driver/enable_input` set to true.
-Set its bus to a new bus called "MicrophoneBus" which should be Muted to 
-stop it creating a feedback loop to the output.  Add an effect 
-`OpusChunked` to the MicrophoneBus.  This will only be an option if the `twovoip` addon is installed.
+This module contains the minimal wrapper for the `TwoVoipMic` and `TwoVoipSpeaker` modules of `voiphelper`.
 
-Assuming that `AudioEffectOpusChunked` is the first one on the bus, you can get a reference to it with
-```GDScript
-var microphoneidx = AudioServer.get_bus_index("MicrophoneBus")
-var opuschunked : AudioEffectOpusChunked = AudioServer.get_bus_effect(microphoneidx, 0)
-```
+#### Input player
 
-Now you can consume and transmit the byte chunks with the following code:
-```GDScript
-func _process(delta):
-    var prepend = PackedByteArray()
-    while opuschunked.chunk_available():
-        var opusdata : PackedByteArray = opuschunked.read_opus_packet(prepend)
-        opuschunked.drop_chunk()
-        transmit(opusdata)
-```
+The `TwoVoipMic` module needs to be connected to the buttons `MicOn`, `PTT`, `Vox`, `Denoise` and an `InputOption` of type [OptionButton](https://docs.godotengine.org/en/stable/classes/class_optionbutton.html#optionbutton) that gets populated with the results of 
+[AudioServer.get_input_device_list()](https://docs.godotengine.org/en/stable/classes/class_audioserver.html#class-audioserver-method-get-input-device-list).  These are optional.  If you don't give it a reference to a button then that feature won't be available.
 
-At the other end you can decode the opus packets into an `AudioStreamPlayer` whose 
-stream is set to an `AudioStreamOpusChunked`.
+The other parameters are set by `setopusvalues()`:
+ * `opussamplerate` is chosen from [48000, 24000, 12000, 8000]
+ * `opusframedurationms` which must be one of [5, 10, 20, 40, 60]
+ * `channels` is 1 for mono and 2 for stereo
+ * `opusbitrate` a range between 500 and 64000
+ * `opuscomplexity` a number between 1 and 10
+ * `opusoptimizeforvoice` a boolean value
 
-```GDScript
-var audiostreamopuschunked : AudioStreamOpusChunked = $AudioStreamPlayer.stream
-var opuspacketsbuffer = [ ]   # append incoming packets to this list
-func _process(delta):
-    while audiostreamopuschunked.chunk_space_available():
-        audiostreamopuschunked.push_opus_packet(opuspacketsbuffer.pop_front(), 0, 0)
-```
+Pass in a shader material based on `voxshader.gdshader` as the final parameter to create a visual preview of the noise from
+the microphone.
 
-Opus packets don't have any context, so if you want to number them so they can be shuffled 
-if they get out of order in the particular network data channel you are using, you can use the `prepend` 
-array to splice an index value into a header.
-Then `prefixbyteslength` needs to be the same length as this header so it can be split off 
-on its way to the decoder.
-The forward error correction flag, `fec`, can be set to 1 if the previous packet is missing.
- 
-If you want to attach only native Godot classes to the audio busses and audio streams 
-you can do the same thing as above 
-using the corresponding `AudioEffectCapture` and `AudioStreamGeneratorPlayback` object to 
-handle the audio chunks in the form of
-`PackerVector2Array`s while running these two external classes in isolation, like 
-`audioopuschunkedeffect.chunk_to_opus_packet(prefixbytes, audiosamples, denoise)`
-and:
-```GDScript
-var audiostreamgeneratorplayback = $AudioStreamPlayer.get_stream_playback()
-while audiostreamgeneratorplayback.get_frames_available() > audiostreamopuschunked.audiosamplesize:
-    var audiochunk = audiostreamopuschunked.opus_packet_to_chunk(opuspacketsbuffer.pop_front(), prefixbyteslength, fec)
-    audiostreamgeneratorplayback.push_buffer(audiochunk)
-    audiostreamgeneratorplayback.push_buffer(audiopacketsbuffer.pop_front())
-```
+If the `Vox` option is set, then `TwoVoipMic.set_voxthreshhold(voxthreshhold)` will set the gating threshold threshold
+(this sets the visual parameter in the shader).  Also in the module are `hangtime` the time the microphone will
+keep running after the noise has fallen below the voxthreshold, and `leadtime` the time before the theshold was 
+reached that is captured.
 
-The `chunk_max()` function is for implementing a Vox (Voice Activity Detection) feature 
-so that you can save processor cycles by dropping chunks before you opus encoding them. 
-Or you can use `denoise_resampled_chunk()` (which requires resampling to 48kHz) to read a 
-speech probability, or optionally measure `chunk_max()` post de-noising.
+To be implemented: microphone_gain = 1.0
 
-The opus compression and denoiser features need the chunks to be sent to them in order 
-because they use the state recorded from earlier audio samples to provide context and improve the performance 
-of the current chunk.  Use `flush_opus_encoder()` if you anticipate a gap from the previous chunk 
-(eg the PTT was off for a period and there was no processing).
-The `undrop_chunk()` function can roll back the chunk buffer and by some milliseconds 
-so you can avoid clipping at the start of a speech sequence.
+#### Output player
 
-## Build structure
+The `TwoVoipSpeaker` module handles incoming voip packets in the function 
+`tv_incomingaudiopacket(packet)` and manages an `AudioStreamOpus` object the given `AudioStreamPlayer`.
+
+The packets are either a raw opus chunk that will be unpacked by the opus library, or a header or footer json object:
+
+Header parameters:
+
+ * opusframesize  
+ * opussamplerate 
+ * opuschannels
+ * lenchunkprefix is usually 2 bytes for a counter used to detect missing or out of order packets if transmitted unreliably 
+ * opusstreamcount 
+ * opusframecount
+ * talkingtimestart
+
+Footer parameters:
+ * opusstreamcount
+ * opusframecount
+ * talkingtimeduration
+ * talkingtimeend
+
+#### Networking layer
+
+The `TwoVoipMic` module outputs its data via two signals:
+
+ * transmitaudiojsonpacket - a JSON header or footer
+ * transmitaudiopacket - a packed opus packet
+
+Both sets of data (the former stringified into the latter) need to be sent to the `TwoVoipSpeaker.tv_incomingaudiopacket(packet)`
+function for each of the networked players.
+
+
+## Building the addon
 
 There are three submodules in this repository.  
 
@@ -166,50 +155,4 @@ scons apply_patches
 scons platform=web target=template_release build_opus
 scons platform=web target=template_release build_rnnoise
 scons platform=web target=template_release
-```
-
-## With OVRLipSync
-
-This is a highly speculative component that takes advantage of the chunking feature in the OpusChunked effect,
-but which is currently closed source and distributed as a library only for Windows, Android and Mac.
-There is [no Linux version](https://github.com/godotengine/godot-proposals/discussions/9718).
-The github actions compiles a version for the available platforms 
-with `scons lipsync=yes` and creates an `addons/twovoip_lipsync` that can be copied into a project
-
-Download the OVRLipSync libraries from https://developer.oculus.com/documentation/native/audio-ovrlipsync-native/
-and unzip into top level as OVRLipSyncNative directory in this project.  There is a stub include file
-for Linux that allows this GDExtension to compile without this library.
-
-On Windows you may need to copy the `OVRLipSyncNative/Lib/Win64/OVRLipSync.dll` file to the same directory
-as your `GodotEngine.exe` so that it finds and links it.
-
-For the addon to work correctly, `twovoip_lipsync` and `twovoip` cannot be used in the same project.
-
-
-### Nixos automated (not working)
-
-The build system is defined by the flake.nix file
-
- * makes a result directory that needs to be copied into addons
-
-```
-nix build
-cp result/addons/twovoip/*so addons/twovoip
-```
-
- * android version:
-
-```
-nix build .#android
-cp result/addons/twovoip/*so addons/twovoip
-```
-
-On Windows:
-
-Use Visual Studio 2022 Community Edition with CMake option to open opus
-directory and convert cmake script to sln and then compile.
-
-```
-cd ../..
-python -m SCons
 ```
