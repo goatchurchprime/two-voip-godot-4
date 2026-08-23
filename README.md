@@ -122,6 +122,8 @@ The `TwoVoipMic` module outputs its data via two signals:
 Both sets of data (the former stringified into the latter) need to be sent to the `TwoVoipSpeaker.tv_incomingaudiopacket(packet)`
 function for each of the networked players.
 
+The reason for the implementation by two functions is so that the network layer can insert an intermediate header 
+for the middle of a stream for when a new player joins when one of the players is talking.
 
 ## Building the addon
 
