@@ -18,7 +18,7 @@ shader_parameter/chunkmaxpersist = 0.0
 shader_parameter/speechnoiseprobability = 0.0
 shader_parameter/chunktexenabled = false
 
-[node name="MinimalDemo" type="Control" unique_id=1689475287]
+[node name="NetworkingNode" type="Control" unique_id=1689475287]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -43,6 +43,8 @@ offset_right = 97.0
 offset_bottom = 80.0
 script = ExtResource("2_82h6d")
 
+[node name="TwoVoipMic" parent="InputPlayer" unique_id=2054874447 instance=ExtResource("2_d5hfh")]
+
 [node name="InputLabel" type="Label" parent="InputPlayer" unique_id=89517593]
 layout_mode = 1
 anchors_preset = -1
@@ -53,8 +55,6 @@ offset_top = 31.0
 offset_right = -27.720009
 offset_bottom = 3.3199959
 text = "Basic microphone controls"
-
-[node name="TwoVoipMic" parent="InputPlayer" unique_id=2054874447 instance=ExtResource("2_d5hfh")]
 
 [node name="MicOnButton" type="Button" parent="InputPlayer" unique_id=1703122268]
 layout_mode = 0
@@ -113,11 +113,12 @@ offset_bottom = 173.0
 
 [node name="OutputPlayersLabel" type="Label" parent="." unique_id=1586952382]
 layout_mode = 0
-offset_left = 32.0
+offset_left = 17.0
 offset_top = 299.0
 offset_right = 144.0
 offset_bottom = 322.0
 text = "OutputPlayers"
+uppercase = true
 
 [node name="OutputPlayers" type="Control" parent="." unique_id=1669634504]
 anchors_preset = 0
@@ -140,8 +141,6 @@ offset_top = 77.0
 offset_right = 90.0
 offset_bottom = 117.0
 
-[connection signal="transmitaudiojsonpacket" from="InputPlayer/TwoVoipMic" to="InputPlayer" method="transmitaudiojsonpacket"]
-[connection signal="transmitaudiopacket" from="InputPlayer/TwoVoipMic" to="InputPlayer" method="transmitaudiopacket"]
 [connection signal="gui_input" from="InputPlayer/FeedbackDisplay" to="InputPlayer" method="_on_feedback_display_gui_input"]
 
 [editable path="OutputPlayers/OutputPlayer"]
