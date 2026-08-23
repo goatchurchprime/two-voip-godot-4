@@ -1,5 +1,10 @@
 extends Node
 
+# Just the bare use of the TwovoipOpusEncoder and the AudioStreamOpus
+# to prove that the C++ compiled part of the library works.
+# You are recommended to use the voiphelper and its simpleexample
+# as your starting point.
+
 var opusencoder : TwovoipOpusEncoder
 var audiostreamopus : AudioStreamOpus
 var audiostreamplaybackopus : AudioStreamPlaybackOpus

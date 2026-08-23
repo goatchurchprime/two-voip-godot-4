@@ -40,8 +40,8 @@ func _ready():
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMosquitto/base64 ]:
 		h.connect("toggled", func (_toggled_on): updatesamplerates())
 
-	$TwoVoipMic.initvoipmic($HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMicTalk/VoxThreshold.material)
-	$TwoVoipMic.set_voxthreshhold(0.017)
+	$TwoVoipMic.init_voip_mic($HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMicTalk/VoxThreshold.material)
+	$TwoVoipMic.set_vox_threshhold(0.017)
 
 	for d in AudioServer.get_output_device_list():
 		$HBoxOutputDevice/OptionOutputDevice.add_item(d)
@@ -78,8 +78,8 @@ func _ready():
 	await get_tree().create_timer(0.1).timeout
 	$HBoxMicTalk/MicWorking.set_pressed(true)
 	
-	$TwoVoipMic.connect("transmitaudiojsonpacket", on_transmitaudiojsonpacket)
-	$TwoVoipMic.connect("transmitaudiopacket", on_transmitaudiopacket)
+	$TwoVoipMic.connect("transmit_audio_json_packet", on_transmit_audio_json_packet)
+	$TwoVoipMic.connect("transmit_audio_packet", on_transmit_audio_packet)
 
 	# handle lower resolution screens
 	var window_size = get_node("/root").size
@@ -118,14 +118,14 @@ func updatesamplerates():
 	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_input_mix_rate()
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
-	$TwoVoipMic.setopusvalues(opussamplerate, frametimems, 
+	$TwoVoipMic.set_opus_values(opussamplerate, frametimems, 
 			int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text),
 			int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), 
 			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), 
 			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
 	$HBoxBigButtons/VBoxPTT/Denoise.disabled = not (opussamplerate == 48000)
-	$TwoVoipMic.leadtime = $HBoxBigButtons/VBoxVox/Leadtime.value
-	$TwoVoipMic.hangtime = $HBoxBigButtons/VBoxVox/Hangtime.value
+	$TwoVoipMic.lead_time = $HBoxBigButtons/VBoxVox/Leadtime.value
+	$TwoVoipMic.hang_time = $HBoxBigButtons/VBoxVox/Hangtime.value
 	reprocessoriginalchunks()
 
 func reprocessoriginalchunks():
@@ -186,12 +186,12 @@ func recordoriginalchunks(audiosamples, chunkmax, opuspacket):
 	recordedchunkmax = max(recordedchunkmax, chunkmax)
 	$VBoxPlayback/HBoxStream/ChunkMax.text = str(recordedchunkmax)
 
-func on_transmitaudiopacket(opuspacket, opusframecount):
+func on_transmit_audio_packet(opuspacket, opusframecount):
 	if len(recordedsamples) < maxrecordedsamples:
 		recordoriginalchunks($TwoVoipMic.audio_chunk, $TwoVoipMic.last_chunkmax, opuspacket)
 	$MQTTnetwork.transportaudiopacket(opuspacket, opusframecount, mqttpacketencodebase64, max(0, $HBoxLogging/TransmissionNoise.selected))
 
-func on_transmitaudiojsonpacket(audiostreampacketheader):
+func on_transmit_audio_json_packet(audiostreampacketheader):
 	print(audiostreampacketheader)
 
 	if audiostreampacketheader.has("talkingtimestart"):
@@ -221,7 +221,7 @@ func on_transmitaudiojsonpacket(audiostreampacketheader):
 
 func _on_vox_threshold_gui_input(event):
 	if event is InputEventMouseButton and event.pressed:
-		$TwoVoipMic.set_voxthreshhold(event.position.x/$HBoxMicTalk/VoxThreshold.size.x)
+		$TwoVoipMic.set_vox_threshhold(event.position.x/$HBoxMicTalk/VoxThreshold.size.x)
 
 func _on_play_pressed():
 	if false and audioeffectpitchshift != null:

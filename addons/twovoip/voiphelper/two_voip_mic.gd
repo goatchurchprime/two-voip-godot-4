@@ -3,9 +3,9 @@ extends Node
 var opusencoder : TwovoipOpusEncoder = TwovoipOpusEncoder.new()
 var chunkprefix : PackedByteArray = PackedByteArray([0,0]) 
 
-var leadtime : float = 0.15
-var hangtime : float  = 0.7
-var voxthreshhold = 0.07
+var lead_time : float = 0.15
+var hang_time : float  = 0.7
+var vox_threshhold = 0.07
 var microphone_gain = 1.0
 
 var currentlytalking = false
@@ -20,8 +20,8 @@ var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
 var audiosampleframematerial = null
 
-signal transmitaudiopacket(opuspacket : PackedByteArray, opusframecount : int)
-signal transmitaudiojsonpacket(audiostreampacketheader : Dictionary)
+signal transmit_audio_packet(opuspacket : PackedByteArray, opusframecount : int)
+signal transmit_audio_json_packet(audiostreampacketheader : Dictionary)
 
 const rootmeansquaremaxmeasurement = false
 
@@ -35,7 +35,7 @@ var audio_chunk_size = 882
 var frametimesecs = 0.02
 var opussamplerate = 48000
 var opuschannels = 2
-func setopusvalues(p_opussamplerate, opusframedurationms, p_channels, opusbitrate, opuscomplexity, opusoptimizeforvoice):
+func set_opus_values(p_opussamplerate, opusframedurationms, p_channels, opusbitrate, opuscomplexity, opusoptimizeforvoice):
 	processtalkstreamends(false)
 	assert (not currentlytalking)
 
@@ -97,7 +97,7 @@ func _on_vox_toggled(toggled_on):
 	pttbutton.toggle_mode = toggled_on
 	pttbutton.set_pressed(false)
 
-func initvoipmic(lmiconbutton: Button, loptioninputdevice: OptionButton, lpttbutton: Button, lvoxbutton: Button, ldenoisebutton: Button, laudiosampleframematerial: Material):
+func init_voip_mic(lmiconbutton: Button, loptioninputdevice: OptionButton, lpttbutton: Button, lvoxbutton: Button, ldenoisebutton: Button, laudiosampleframematerial: Material):
 	miconbutton = lmiconbutton
 	if miconbutton == null:
 		miconbutton = Button.new()
@@ -138,9 +138,9 @@ func initvoipmic(lmiconbutton: Button, loptioninputdevice: OptionButton, lpttbut
 func processtalkstreamends(talking: bool):
 	if talking and not currentlytalking:
 		talkingtimestart = Time.get_ticks_msec()*0.001
-		var leadframes = leadtime/frametimesecs
-		hangframes = hangtime/frametimesecs
-		print("leadframes ", leadframes)
+		var leadframes = lead_time/frametimesecs
+		hangframes = int(hang_time/frametimesecs)
+		prints("leadframes ", leadframes, "hangframes", hangframes)
 		#while leadframes > 0.0 and audioopuschunkedeffect.undrop_chunk():
 		#	leadframes -= 1
 		#	talkingtimestart -= frametimesecs
@@ -154,7 +154,7 @@ func processtalkstreamends(talking: bool):
 			"talkingtimestart":talkingtimestart
 		}
 		opusencoder.reset_opus_encoder()
-		transmitaudiojsonpacket.emit(audiostreampacketheader)
+		transmit_audio_json_packet.emit(audiostreampacketheader)
 		#get_parent().PlayerConnections.peerconnections_possiblymissingaudioheaders.clear()
 		opusframecount = 0
 		currentlytalking = true
@@ -170,13 +170,13 @@ func processtalkstreamends(talking: bool):
 			"talkingtimeend":talkingtimeend 
 		}
 		print("My voice chunktime=", talkingtimeduration/opusframecount, " over ", talkingtimeduration, " seconds")
-		transmitaudiojsonpacket.emit(audiopacketstreamfooter)
+		transmit_audio_json_packet.emit(audiopacketstreamfooter)
 		opusstreamcount += 1
 
-func set_voxthreshhold(lvoxthreshhold):
-	voxthreshhold = lvoxthreshhold
+func set_vox_threshhold(p_vox_threshhold):
+	vox_threshhold = p_vox_threshhold
 	if audiosampleframematerial:
-		audiosampleframematerial.set_shader_parameter("voxthreshhold", voxthreshhold)
+		audiosampleframematerial.set_shader_parameter("voxthreshhold", vox_threshhold)
 
 func set_gain(gain):
 	print("set microphone gain to ", gain)
@@ -188,7 +188,7 @@ func processvox(chunkmax, audio_chunk):
 			audiosampleframematerial.set_shader_parameter("speechnoiseprobability", chunkmax)
 		audiosampleframematerial.set_shader_parameter("chunkmax", chunkmax)
 
-	if chunkmax >= voxthreshhold:
+	if chunkmax >= vox_threshhold:
 		if voxbutton.button_pressed and not pttbutton.button_pressed:
 			pttbutton.button_pressed = true
 		hangframescountup = 0
@@ -221,7 +221,7 @@ func processopuschunk():
 	else:
 		assert (len(chunkprefix) == 0)
 	var opuspacket : PackedByteArray = opusencoder.encode_chunk(chunkprefix, microphone_gain)
-	transmitaudiopacket.emit(opuspacket, opusframecount)
+	transmit_audio_packet.emit(opuspacket, opusframecount)
 	opusframecount += 1
 	
 var audio_chunk = null
