@@ -4,7 +4,7 @@ func _ready():
 	$PlayerLabel.text = get_name()
 
 func RPC_incomingaudiopacket(packet):
-	$TwoVoipSpeaker.tv_incomingaudiopacket(packet)
+	$TwoVoipSpeaker.receive_audio_packet(packet)
 
 func _on_receiving_button_toggled(toggled_on):
 	get_node("../..").set_receiving(String(get_name()), toggled_on)

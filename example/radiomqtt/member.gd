@@ -14,14 +14,14 @@ func setname(lname):
 	
 func receivemqttaudiometa(msg):
 	assert (msg[0] == "{".to_ascii_buffer()[0])
-	twovoipspeaker.tv_incomingaudiopacket(msg)
+	twovoipspeaker.receive_audio_packet(msg)
 	var h = JSON.parse_string(msg.get_string_from_ascii())
 	mqttpacketencodebase64 = (h.get("mqttpacketencoding") == "base64")
 
 func receivemqttaudio(msg):
 	if mqttpacketencodebase64:
 		msg = Marshalls.base64_to_raw(msg.get_string_from_ascii())
-	twovoipspeaker.tv_incomingaudiopacket(msg)
+	twovoipspeaker.receive_audio_packet(msg)
 
 
 var timedelaytohide = 0.1

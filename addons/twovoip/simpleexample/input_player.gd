@@ -17,4 +17,4 @@ func _ready():
 
 func _on_feedback_display_gui_input(event):
 	if event is InputEventMouseButton and event.pressed:
-		$TwoVoipMic.set_voxthreshhold(event.position.x/$FeedbackDisplay.size.x)
+		$TwoVoipMic.set_vox_threshhold(event.position.x/$FeedbackDisplay.size.x)

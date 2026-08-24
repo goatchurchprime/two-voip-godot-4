@@ -173,6 +173,20 @@ func processtalkstreamends(talking: bool):
 		transmit_audio_json_packet.emit(audiopacketstreamfooter)
 		opusstreamcount += 1
 
+func request_audio_json_packet_mid_header():
+	if not currentlytalking:
+		return null
+	var audiostreampacketmidheader = { 
+			"opusframesize":opus_chunk_size, 
+			"opussamplerate":opussamplerate, 
+			"opuschannels":opuschannels,
+			"lenchunkprefix":len(chunkprefix), 
+			"opusstreamcount":opusstreamcount, 
+			"opusframecount":opusframecount-1,
+			"talkingtimestart":talkingtimestart
+		}
+	return audiostreampacketmidheader
+
 func set_vox_threshhold(p_vox_threshhold):
 	vox_threshhold = p_vox_threshhold
 	if audiosampleframematerial:
@@ -223,7 +237,9 @@ func processopuschunk():
 	var opuspacket : PackedByteArray = opusencoder.encode_chunk(chunkprefix, microphone_gain)
 	transmit_audio_packet.emit(opuspacket, opusframecount)
 	opusframecount += 1
-	
+
+
+
 var audio_chunk = null
 var last_chunkmax = 0.0
 

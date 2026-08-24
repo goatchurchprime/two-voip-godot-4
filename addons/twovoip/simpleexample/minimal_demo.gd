@@ -42,9 +42,11 @@ func on_transmit_audio_packet(packet : PackedByteArray, opusframecount : int):
 	if recorded_audio_stream_packet_header:
 		recorded_audio_stream_packet_header["opusframecount"] = opusframecount
 	if new_output_players:
-		for player in new_output_players:
-			print("** sending missing start to ", player, recorded_audio_stream_packet_header)
-			RPC_incomingaudiopacket(player, JSON.stringify(recorded_audio_stream_packet_header).to_ascii_buffer())
+		var audio_stream_packet_mid_header = $InputPlayer/TwoVoipMic.request_audio_json_packet_mid_header()
+		if audio_stream_packet_mid_header:
+			for player in new_output_players:
+				prints("** sending missing start to ", player, recorded_audio_stream_packet_header, opusframecount, recorded_audio_stream_packet_header["opusframecount"])
+				RPC_incomingaudiopacket(player, JSON.stringify(audio_stream_packet_mid_header).to_ascii_buffer())
 		new_output_players.clear()
 	for player in output_players:
 		RPC_incomingaudiopacket(player, packet)

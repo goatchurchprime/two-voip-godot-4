@@ -64,9 +64,9 @@ func unpausewhenbufferready():
 func external_end_stream():
 	if inopusstream:
 		print(":externally ending the stream at cutout")
-		tv_incomingaudiopacket(JSON.stringify({"talkingtimeend":-1}).to_ascii_buffer())
+		receive_audio_packet(JSON.stringify({"talkingtimeend":-1}).to_ascii_buffer())
 
-func tv_incomingaudiopacket(packet):
+func receive_audio_packet(packet):
 	if audiostreamopus == null:
 		return
 	if len(packet) <= 3:
@@ -200,14 +200,14 @@ func _physics_process(delta):
 
 func replayrecording(speedup, recordedheader, recordedopuspackets, recordedfooter):
 	playingrecording = true
-	tv_incomingaudiopacket(JSON.stringify(recordedheader).to_ascii_buffer())
+	receive_audio_packet(JSON.stringify(recordedheader).to_ascii_buffer())
 	setpitchscale(speedup)
 	for x in recordedopuspackets:
 		if recordedheader["opusframesize"] > audiostreamplaybackopus.available_space_frames():
 			var tmm = audiostreamplaybackopus.queue_length_frames()*0.5/audiostreamopus.opus_sample_rate
 			await get_tree().create_timer(tmm).timeout
-		tv_incomingaudiopacket(x)
-	tv_incomingaudiopacket(JSON.stringify(recordedfooter).to_ascii_buffer())
+		receive_audio_packet(x)
+	receive_audio_packet(JSON.stringify(recordedfooter).to_ascii_buffer())
 	playingrecording = false
 
 var sinewaveoutmode = false
