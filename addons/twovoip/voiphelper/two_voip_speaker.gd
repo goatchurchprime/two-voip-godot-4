@@ -156,9 +156,9 @@ func receive_audio_packet(packet):
 
 		if playbackpausedonmark:
 			unpausewhenbufferready()
-
+	
 	else:
-		prints("dropping frame with opusstream number mismatch", opusstreamcount, packet[0], packet[1])
+		prints("dropping frame with opusstream number mismatch", opusstreamcount, packet[0], packet[1], "streamcount", opusstreamcount)
 
 func setpitchscale(pitchscale):
 	if pitchscale != lastemittedaudiobufferpitchscale:

@@ -20,8 +20,8 @@ var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
 var audiosampleframematerial = null
 
-signal transmit_audio_packet(opuspacket : PackedByteArray, opusframecount : int)
 signal transmit_audio_json_packet(audiostreampacketheader : Dictionary)
+signal transmit_audio_packet(opuspacket : PackedByteArray)
 
 const rootmeansquaremaxmeasurement = false
 
@@ -235,9 +235,8 @@ func processopuschunk():
 	else:
 		assert (len(chunkprefix) == 0)
 	var opuspacket : PackedByteArray = opusencoder.encode_chunk(chunkprefix, microphone_gain)
-	transmit_audio_packet.emit(opuspacket, opusframecount)
+	transmit_audio_packet.emit(opuspacket)
 	opusframecount += 1
-
 
 
 var audio_chunk = null

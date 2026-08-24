@@ -186,10 +186,10 @@ func recordoriginalchunks(audiosamples, chunkmax, opuspacket):
 	recordedchunkmax = max(recordedchunkmax, chunkmax)
 	$VBoxPlayback/HBoxStream/ChunkMax.text = str(recordedchunkmax)
 
-func on_transmit_audio_packet(opuspacket, opusframecount):
+func on_transmit_audio_packet(opuspacket : PackedByteArray):
 	if len(recordedsamples) < maxrecordedsamples:
 		recordoriginalchunks($TwoVoipMic.audio_chunk, $TwoVoipMic.last_chunkmax, opuspacket)
-	$MQTTnetwork.transportaudiopacket(opuspacket, opusframecount, mqttpacketencodebase64, max(0, $HBoxLogging/TransmissionNoise.selected))
+	$MQTTnetwork.transportaudiopacket(opuspacket, mqttpacketencodebase64, max(0, $HBoxLogging/TransmissionNoise.selected))
 
 func on_transmit_audio_json_packet(audiostreampacketheader):
 	print(audiostreampacketheader)
