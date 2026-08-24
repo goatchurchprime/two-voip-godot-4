@@ -40,7 +40,7 @@ func _ready():
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMosquitto/base64 ]:
 		h.connect("toggled", func (_toggled_on): updatesamplerates())
 
-	$TwoVoipMic.init_voip_mic($HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMicTalk/VoxThreshold.material)
+	$TwoVoipMic.init_voip_mic(false, $HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMicTalk/VoxThreshold.material)
 	$TwoVoipMic.set_vox_threshhold(0.017)
 
 	for d in AudioServer.get_output_device_list():

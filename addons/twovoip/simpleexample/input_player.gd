@@ -2,7 +2,8 @@ extends Control
 
 func _ready():
 	# Wire up the optional controls and feedback from your UI
-	$TwoVoipMic.init_voip_mic($MicOnButton,
+	$TwoVoipMic.init_voip_mic(true,
+							  $MicOnButton,
 							  $InputOptionButton,
 							  $PTTButton,
 							  $VoxButton,
