@@ -27,18 +27,19 @@ The purpose of this demo is to test all the features so you can hear what the op
 Use the [mic_record](https://github.com/godotengine/godot-demo-projects/tree/master/audio/mic_record) demo project
 to resolve issues only to do with the microphone.
 
+#### Top panel
 
-The top panel controls the microphone and sound output device.  The microphone is working when the "Mic Enabled" button is green, and it is recording and transmitting when the "PTT" (Press to Talk) button is pressed.  The "Vox" button will make the PTT voice activated, which means it turns on when sound goes above a certain threshold, which is set by the pink area on the blue sound visualizer area.
+This controls the microphone and sound output device.  The microphone is working when the "Mic Enabled" button is green, and it is recording and transmitting when the "PTT" (Press to Talk) button is pressed.  The "Vox" button will make the PTT voice activated, which means it turns on when sound goes above a certain threshold, which is set by the pink area on the blue sound visualizer area.
 
 The "De-Noise" button enables the RNNoise filter.  You can turn it on and off and play back the same clip to hear what difference it makes.
 
-#### LibOpus compression and resampling
+#### LibOpus compression and resampling panel
 
 This section allows you to control all the parameters in that operate the Opus compression library, such as the Frame duration (settings between 2.5ms and 60ms), the Bit rate (bandwidth target), Sample rate, Compression Complexity, if it records stereo and if it is optimized for voice.
 
 Each time you change one of these values, or the toggle the De-Noise setting, the original sound recording from the microphone is reprocessed.  This lets you hear how the quality of the sound and see how band-width changes for the different settings.
 
-#### Recording playback
+#### Recording playback panel
 
 This section has the "Play" button to decode and play back the most recent recorded sample, and it displays how many packets and bytes would have been transmitted for this clip.
 
@@ -56,11 +57,18 @@ The "T" button for each user replaces the incoming audio data after it is unpack
 
 ## Using the voiphelper
 
-You are recommended to use the voiphelper module rather than implement your VoIP system directly from the
-core opus and rnnoise components as you will merely be re-implementing its functionality of
-packet reordering, jitter buffers, and dynamic lag estimation.
-It takes a lot of developer time to get all of this running smoothly and 
-taking advantage of low latency unreliable channels of some network systems.
+You are recommended to use the `voiphelper` module rather than implement your VoIP system from the
+core `opus` and `rnnoise` components because it already implements Vox gating (Voice activation), 
+jitter buffers, packet re-ordering (in case of unreliable transmition) and dynamic lag management.
+
+The speech is sent as binary streams of opus packets with a two byte header to number the packet with
+JSON encoded headers and footers to assist with reliability and debugging.
+
+The parameters of the header are `{ opusframesize, opussamplerate, opuschannels, lenchunkprefix, opusstreamcount, opusframecount, talkingtimestart }` and the parameters of the footer are `{ opusstreamcount, opusframecount, talkingtimeduration, talkingtimeend }`.
+
+As mentioned above `lenchunkprefix=2`. Also, `opusstreamcount` increments with each stream to give it a unique id,
+and `opusframecount=0` in the header.  If a player joins the network while one someone is talking mid-stream,
+then `request_audio_json_packet_mid_header()` will prove a header object with the correct value in `opusframecount`.
 
 ### simpleexample
 
@@ -68,62 +76,53 @@ This module contains the minimal wrapper for the `TwoVoipMic` and `TwoVoipSpeake
 
 #### Input player
 
-The `TwoVoipMic` module needs to be connected to the buttons `MicOn`, `PTT`, `Vox`, `Denoise` and an `InputOption` of type [OptionButton](https://docs.godotengine.org/en/stable/classes/class_optionbutton.html#optionbutton) that gets populated with the results of 
-[AudioServer.get_input_device_list()](https://docs.godotengine.org/en/stable/classes/class_audioserver.html#class-audioserver-method-get-input-device-list).  These are optional.  If you don't give it a reference to a button then that feature won't be available.
+The function `$TwoVoipMic.init_voip_mic()` takes seven parameters.  The first parameter is `json_packets_as_binary` which means that
+that the values that would have been emitted to the signal `transmit_audio_json_packet` are stringified and emitted to
+`transmit_audio_packet`.  This simplifies the library, but removes the ability to easily intercept the json headers and footers
+and use the data in them.
 
-The other parameters are set by `setopusvalues()`:
- * `opussamplerate` is chosen from [48000, 24000, 12000, 8000]
- * `opusframedurationms` which must be one of [5, 10, 20, 40, 60]
- * `channels` is 1 for mono and 2 for stereo
- * `opusbitrate` a range between 500 and 64000
- * `opuscomplexity` a number between 1 and 10
- * `opusoptimizeforvoice` a boolean value
+The next four parameters are optional buttons `MicOn`, `PTT`, `Vox`, `Denoise` that you can send in from your use interface,
+if you choose. The sixth parameter `InputOption` is of type [OptionButton](https://docs.godotengine.org/en/stable/classes/class_optionbutton.html#optionbutton) and is populated with the results of
+[AudioServer.get_input_device_list()](https://docs.godotengine.org/en/stable/classes/class_audioserver.html#class-audioserver-method-get-input-device-list).
+Finally there is the `voxshader.gdshader` material you can use to make an activity waveform.
 
-Pass in a shader material based on `voxshader.gdshader` as the final parameter to create a visual preview of the noise from
-the microphone.
+The the opus encoder itself is created by `set_opus_values(opussamplerate, opusframedurationms, channels, opusbitrate, opuscomplexity, opusoptimizeforvoice)` where `opussamplerate` is chosen from [48000, 24000, 12000, 8000],
+`opusframedurationms` which must be one of [5, 10, 20, 40, 60], `channels` is 1 for mono and 2 for stereo,
+`opusbitrate` is a range between 500 and 64000, `opuscomplexity` a number between 1 and 10
+ * `opusoptimizeforvoice` a boolean value.  These are better outlined in the [Opus Definition](https://datatracker.ietf.org/doc/html/rfc6716#section-2.1).
 
 If the `Vox` option is set, then `TwoVoipMic.set_voxthreshhold(voxthreshhold)` will set the gating threshold threshold
-(this sets the visual parameter in the shader).  Also in the module are `hangtime` the time the microphone will
-keep running after the noise has fallen below the voxthreshold, and `leadtime` the time before the theshold was 
-reached that is captured.
-
-To be implemented: microphone_gain = 1.0
+(this sets the visual parameter in the shader).  There is also `hangtime` the time the microphone will
+keep running after the noise has fallen below the voxthreshold, and `leadtime` [FIXME: not implemented]
+the amount of time that is captured from
+the buffer before the threshold was reached to avoid clipping.
 
 #### Output player
 
-The `TwoVoipSpeaker` module handles incoming voip packets in the function 
-`tv_incomingaudiopacket(packet)` and manages an `AudioStreamOpus` object the given `AudioStreamPlayer`.
+The `TwoVoipSpeaker` module handles incoming VoIP packets in the function 
+`receive_audio_packet(packet)` and manages an `AudioStreamOpus` object loaded into an `AudioStreamPlayer`.
 
-The packets are either a raw opus chunk that will be unpacked by the opus library, or a header or footer json object:
+The packets are either raw opus chunks or json-encoded header or footer.  The function `external_end_stream()`
+will auto-generate an end stream if one is missing because the network has been interrupted so that it doesn't
+try to retain the buffers.
 
-Header parameters:
+The `TwoVoipSpeaker` has two important settings, `audio_buffer_lag_time_target` and `audio_buffer_lag_time_target_tolerance`
+that set a target buffer size in seconds and is responsible for the audio delay
+that makes sure there are no gaps in the playback when packets get delayed by up to the lag time target.
+The buffer is maintained by pausing the playback until the target is reached,
+of speeding up the playback when the lag buffer has increased by more than the tolerance, which
+can happen if an individual packet is held back a long time and not skipped or the game stalls, such as when
+it is compiling shaders.
 
- * opusframesize  
- * opussamplerate 
- * opuschannels
- * lenchunkprefix is usually 2 bytes for a counter used to detect missing or out of order packets if transmitted unreliably 
- * opusstreamcount 
- * opusframecount
- * talkingtimestart
-
-Footer parameters:
- * opusstreamcount
- * opusframecount
- * talkingtimeduration
- * talkingtimeend
+Obviously the system needs to know when a stream has ended (a footer has been received) so it can consume the buffer down to zero.
 
 #### Networking layer
 
-The `TwoVoipMic` module outputs its data via two signals:
+In the `transmit_audio_json_packet=true` mode the `TwoVoipMic` module outputs all its data via the signal
+`transmit_audio_packet(opuspacket)` which needs to be sent to the `receive_audio_packet(packet)` for each player.
 
- * transmitaudiojsonpacket - a JSON header or footer
- * transmitaudiopacket - a packed opus packet
-
-Both sets of data (the former stringified into the latter) need to be sent to the `TwoVoipSpeaker.tv_incomingaudiopacket(packet)`
-function for each of the networked players.
-
-The reason for the implementation by two functions is so that the network layer can insert an intermediate header 
-for the middle of a stream for when a new player joins when one of the players is talking.
+When a player joins mid-stream use `TwoVoipMic.request_audio_json_packet_mid_header()` to create an intermediate
+header for them so that they know how to decode the opus packets.
 
 ## Building the addon
 
@@ -141,20 +140,12 @@ returns 20 to 30 bytes of compressed data for that chunk.
 code in its external/rnnoise directory with the all important `CMakeLists.txt` file that makes it possible 
 to compile it on all the diffeerent platforms
 
-The sequence of commands to build the system locally
+The sequence of commands to build the system locally on NixOS are:
 ```bash
-nix-shell -p scons cmake ninja autoreconfHook # if you are on nix
+nix-shell -p scons cmake ninja autoreconfHook
 scons apply_patches  # optional
 scons build_opus     # build opus using cmake
 scons build_rnnoise  # build opus using cmake
 scons                # build this library
 cp addons/twovoip/libs/*.so example/addons/twovoip/libs/
-```
-
-To compile for another platform like web, the commands are
-```bash
-scons apply_patches
-scons platform=web target=template_release build_opus
-scons platform=web target=template_release build_rnnoise
-scons platform=web target=template_release
 ```
