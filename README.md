@@ -1,11 +1,11 @@
 ## Description
 
-Welcome to the GodotEngine GDExtension [twovoip](https://store.godotengine.org/asset/goatchurch/twovoip/) designed 
+Welcome to the GodotEngine GDExtension [TwovVoip](https://store.godotengine.org/asset/goatchurch/twovoip/) designed 
 to cater to all your VoIP (Voice Over IP) needs when building networked games in Godot.
 
-This plugin uses the industry standard [xiph/opus](https://github.com/xiph/opus) compression library 
-and the [xiph/rnnoise](https://github.com/xiph/rnnoise) de-noiser all wrapped in an easy-to-integrate voiphelper 
-component to enable you to get your game players speaking to one another over the network in minutes.
+This plugin uses the industry standard [Xiph/Opus](https://github.com/xiph/opus) compression library 
+and the [Xiph/RNNoise](https://github.com/xiph/rnnoise) de-noiser all wrapped in an easy-to-integrate voiphelper 
+component to help you get your game players speaking to one another over the network in minutes.
 
 Thanks to [@ajlennon](https://github.com/ajlennon) and [@DmitriySalnikov](https://github.com/DmitriySalnikov) 
 for work on the github actions that are successfully building this plugin across 
@@ -29,7 +29,7 @@ to resolve issues only to do with the microphone.
 
 #### Top panel
 
-This controls the microphone and sound output device.  The microphone is working when the "Mic Enabled" button is green, and it is recording and transmitting when the "PTT" (Press to Talk) button is pressed.  The "Vox" button will make the PTT voice activated, which means it turns on when sound goes above a certain threshold, which is set by the pink area on the blue sound visualizer area.
+This controls the microphone and sound output device.  The microphone is working when the "Mic Enabled" button is green, and it is recording and transmitting when the "PTT" (Press to Talk) button is pressed.  The "Vox" button will make the PTT voice activated, which means it turns on when sound goes above a certain threshold controlled by the size of the pink area on the blue sound visualizer area.
 
 The "De-Noise" button enables the RNNoise filter.  You can turn it on and off and play back the same clip to hear what difference it makes.
 
@@ -37,7 +37,7 @@ The "De-Noise" button enables the RNNoise filter.  You can turn it on and off an
 
 This section allows you to control all the parameters in that operate the Opus compression library, such as the Frame duration (settings between 2.5ms and 60ms), the Bit rate (bandwidth target), Sample rate, Compression Complexity, if it records stereo and if it is optimized for voice.
 
-Each time you change one of these values, or the toggle the De-Noise setting, the original sound recording from the microphone is reprocessed.  This lets you hear how the quality of the sound and see how band-width changes for the different settings.
+Each time you change one of these values, or toggle the De-Noise setting, the original sound recording from the microphone is reprocessed.  This lets you experience how the quality of the sound and band-width changes for the different settings.
 
 #### Recording playback panel
 
@@ -45,7 +45,7 @@ This section has the "Play" button to decode and play back the most recent recor
 
 #### MQTT transmission
 
-Finally, there is an MQTT transmission section to push audio packets over the network via a broker on a topic.  Click the \[Connect\] button to go online while a friend does the same on another computer and you should be able to talk to one another over the internet (don't forget to use the PTT button).  Several presets are given for convenience, and it will automatically use websockets if you are operating from HTML5.
+Finally, there is an MQTT transmission section to push audio packets over the network via a broker on a topic.  Click the \[Connect\] button to go online while a friend does the same on another computer and you should be able to talk to one another over the internet (don't forget to use the PTT button or enable VoX).  Several presets are given for convenience, and it will automatically use websockets if you are operating from HTML5.
 
 MQTT is a lightweight protocol implemented in another GodotEngine GDExtension [https://godotengine.org/asset-library/asset/1993](godot-mqtt) and described [here](https://github.com/goatchurchprime/godot-mqtt/?tab=readme-ov-file#mqtt). Its publish, subscribe, retained and last will messaging system provides an effective framework for tracking the joining state of each player.  There is a line of text beginning with `mosquitto_sub` command that you can copy into your terminal window to watch the data fly by. 
 
@@ -58,7 +58,7 @@ The "T" button for each user replaces the incoming audio data after it is unpack
 ## Using the voiphelper
 
 You are recommended to use the `voiphelper` module rather than implement your VoIP system from the
-core `opus` and `rnnoise` components because it already implements Vox gating (Voice activation), 
+core `opus` and `rnnoise` components because it has the necessary features of Vox gating (Voice activation), 
 jitter buffers, packet re-ordering (in case of unreliable transmition) and dynamic lag management.
 
 The speech is sent as binary streams of opus packets with a two byte header to number the packet with
@@ -81,8 +81,8 @@ that the values that would have been emitted to the signal `transmit_audio_json_
 `transmit_audio_packet`.  This simplifies the library, but removes the ability to easily intercept the json headers and footers
 and use the data in them.
 
-The next four parameters are optional buttons `MicOn`, `PTT`, `Vox`, `Denoise` that you can send in from your use interface,
-if you choose. The sixth parameter `InputOption` is of type [OptionButton](https://docs.godotengine.org/en/stable/classes/class_optionbutton.html#optionbutton) and is populated with the results of
+The next four parameters are optional buttons `MicOn`, `PTT`, `Vox`, `Denoise` that you can choose to share from the user interface in your game.
+The sixth parameter `InputOption` is of type [OptionButton](https://docs.godotengine.org/en/stable/classes/class_optionbutton.html#optionbutton) and is populated with the results of
 [AudioServer.get_input_device_list()](https://docs.godotengine.org/en/stable/classes/class_audioserver.html#class-audioserver-method-get-input-device-list).
 Finally there is the `voxshader.gdshader` material you can use to make an activity waveform.
 
