@@ -88,8 +88,7 @@ Finally there is the `voxshader.gdshader` material you can use to make an activi
 
 The the opus encoder itself is created by `set_opus_values(opussamplerate, opusframedurationms, channels, opusbitrate, opuscomplexity, opusoptimizeforvoice)` where `opussamplerate` is chosen from [48000, 24000, 12000, 8000],
 `opusframedurationms` which must be one of [5, 10, 20, 40, 60], `channels` is 1 for mono and 2 for stereo,
-`opusbitrate` is a range between 500 and 64000, `opuscomplexity` a number between 1 and 10
- * `opusoptimizeforvoice` a boolean value.  These are better outlined in the [Opus Definition](https://datatracker.ietf.org/doc/html/rfc6716#section-2.1).
+`opusbitrate` is a range between 500 and 64000, `opuscomplexity` a number between 1 and 10, `opusoptimizeforvoice` a boolean value.  These are better outlined in the [Opus Definition](https://datatracker.ietf.org/doc/html/rfc6716#section-2.1).
 
 If the `Vox` option is set, then `TwoVoipMic.set_voxthreshhold(voxthreshhold)` will set the gating threshold threshold
 (this sets the visual parameter in the shader).  There is also `hangtime` the time the microphone will
@@ -115,6 +114,11 @@ can happen if an individual packet is held back a long time and not skipped or t
 it is compiling shaders.
 
 Obviously the system needs to know when a stream has ended (a footer has been received) so it can consume the buffer down to zero.
+
+The `set_sinewave_out()` setting replaces the audio as it is decoded with a 440Hz tone so it's possible
+to tell the difference between choppy transmission and playing and a choppy microphone data.
+Use `get_chunk_max()` to get an indicator of the audio coming from a particular player, which helps
+to tell the difference between whether they are muted, or your playback volume has been turned down.
 
 #### Networking layer
 
