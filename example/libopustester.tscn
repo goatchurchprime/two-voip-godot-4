@@ -1,6 +1,6 @@
-[gd_scene format=3 uid="uid://4f4ke3n38jan"]
+[gd_scene format=3 uid="uid://b1tbdieeq1bv5"]
 
-[ext_resource type="Script" uid="uid://cv46gix55rom8" path="res://libopustester.gd" id="1_mogti"]
+[ext_resource type="Script" path="res://libopustester.gd" id="1_mogti"]
 
 [sub_resource type="AudioStreamOpus" id="AudioStreamOpus_mogti"]
 

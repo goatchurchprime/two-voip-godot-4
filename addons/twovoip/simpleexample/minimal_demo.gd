@@ -1,8 +1,7 @@
 extends Control
 
 func _ready():
-	$InputPlayer/TwoVoipMic.connect("transmitaudiojsonpacket", on_transmitaudiojsonpacket)
-	$InputPlayer/TwoVoipMic.connect("transmitaudiopacket", on_transmitaudiopacket)
+	$InputPlayer/TwoVoipMic.connect("transmit_audio_packet", on_transmit_audio_packet)
 
 func set_receiving(playername, toggled_on):
 	if toggled_on:
@@ -10,48 +9,28 @@ func set_receiving(playername, toggled_on):
 	else:
 		remove_receiving_player(playername)
 
-# Handle data transmission to other players
-# Each voice stream has a header and footer in json form
-# The complexity is to handle someone joining mid-stream who needs a valid header to be sent 
+# When a player talks they send a stream of audio packets
+# with a JSON encoded header and footer to bookend the stream.
+# The new_output_players is the list of players who might 
+# have joined mid-stream and require a mid-stream header pick up
+# and decode the audio stream that is active.
 
-var outputplayers : Array[String]
-var new_outputplayers : Array[String]
-var removed_outputplayers : Array[String]
-var recorded_audiostreampacketheader = null
+var output_players : Array[String]
 
 func add_receiving_player(playername):
-	outputplayers.append(playername)
-	new_outputplayers.append(playername)
+	output_players.append(playername)
+	var audio_stream_packet_mid_header = $InputPlayer/TwoVoipMic.request_audio_json_packet_mid_header()
+	if audio_stream_packet_mid_header:
+		RPC_incomingaudiopacket(playername, audio_stream_packet_mid_header)
 
 func remove_receiving_player(playername):
-	assert (outputplayers.has(playername))
-	outputplayers.erase(playername)
-	new_outputplayers.erase(playername)
+	output_players.erase(playername)
 
-func on_transmitaudiojsonpacket(jsonpacket : Dictionary):
-	if jsonpacket.has("talkingtimestart"):
-		recorded_audiostreampacketheader = jsonpacket
-		new_outputplayers.clear()
-	var opusframecount = recorded_audiostreampacketheader["opusframecount"]
-	if jsonpacket.has("talkingtimeend"):
-		opusframecount += 1
-		recorded_audiostreampacketheader = null
-	on_transmitaudiopacket(JSON.stringify(jsonpacket).to_ascii_buffer(), opusframecount)
-
-func on_transmitaudiopacket(packet : PackedByteArray, opusframecount : int):
-	if recorded_audiostreampacketheader:
-		recorded_audiostreampacketheader["opusframecount"] = opusframecount
-	if new_outputplayers:
-		for player in new_outputplayers:
-			print("** sending missing start to ", player, recorded_audiostreampacketheader)
-			RPC_incomingaudiopacket(player, JSON.stringify(recorded_audiostreampacketheader).to_ascii_buffer())
-		new_outputplayers.clear()
-	for player in outputplayers:
+func on_transmit_audio_packet(packet : PackedByteArray):
+	for player in output_players:
 		RPC_incomingaudiopacket(player, packet)
 
 func RPC_incomingaudiopacket(playername, packet):
 	var player = $OutputPlayers.get_node_or_null(playername)
 	if player:
 		player.RPC_incomingaudiopacket(packet)
-	else:
-		print("missing output player")

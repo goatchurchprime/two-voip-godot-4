@@ -14,23 +14,23 @@ func setname(lname):
 	
 func receivemqttaudiometa(msg):
 	assert (msg[0] == "{".to_ascii_buffer()[0])
-	twovoipspeaker.tv_incomingaudiopacket(msg)
+	twovoipspeaker.receive_audio_packet(msg)
 	var h = JSON.parse_string(msg.get_string_from_ascii())
 	mqttpacketencodebase64 = (h.get("mqttpacketencoding") == "base64")
 
 func receivemqttaudio(msg):
 	if mqttpacketencodebase64:
 		msg = Marshalls.base64_to_raw(msg.get_string_from_ascii())
-	twovoipspeaker.tv_incomingaudiopacket(msg)
+	twovoipspeaker.receive_audio_packet(msg)
 
 
 var timedelaytohide = 0.1
 var prevopusframecount = -1
 func _process(delta):
-	if twovoipspeaker.audiostreamplaybackopus:
-		$Node/ColorRectBufferQueue.size.x = min(1.0, twovoipspeaker.audiostreamplaybackopus.queue_length_frames()/$AudioStreamPlayer.stream.opus_sample_rate/$AudioStreamPlayer.stream.buffer_length)*size.x
+	if twovoipspeaker.audio_stream_playback_opus:
+		$Node/ColorRectBufferQueue.size.x = min(1.0, twovoipspeaker.audio_stream_playback_opus.queue_length_frames()/$AudioStreamPlayer.stream.opus_sample_rate/$AudioStreamPlayer.stream.buffer_length)*size.x
 		$AudioStreamPlayer.volume_db = $Node/Volume.value
-		var chunkv1 = twovoipspeaker.audiostreamplaybackopus.get_chunk_max()
+		var chunkv1 = twovoipspeaker.audio_stream_playback_opus.get_chunk_max()
 		if chunkv1 != 0.0:
 			chunkv1 = min(chunkv1*10, 1.0)
 			$Node/ColorRectLoudness.size.x = chunkv1*size.x
