@@ -7,7 +7,7 @@ extends Node
 
 var opusencoder : TwovoipOpusEncoder
 var audiostreamopus : AudioStreamOpus
-var audiostreamplaybackopus : AudioStreamPlaybackOpus
+var audio_stream_playback_opus : AudioStreamPlaybackOpus
 var prepend = PackedByteArray()
 var opuspacketsbuffer = [ ]
 
@@ -15,8 +15,8 @@ func _ready():
 	opusencoder = TwovoipOpusEncoder.new()
 	audiostreamopus = $AudioStreamPlayer.stream
 	$AudioStreamPlayer.play()
-	audiostreamplaybackopus = $AudioStreamPlayer.get_stream_playback()
-	audiostreamplaybackopus.mark_end_opus_stream(true)
+	audio_stream_playback_opus = $AudioStreamPlayer.get_stream_playback()
+	audio_stream_playback_opus.mark_end_opus_stream(true)
 
 	AudioServer.set_input_device_active(true)
 	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false)
@@ -48,8 +48,8 @@ func _process_record():
 			chunkmax = 0.0
 	
 func _process_playback():
-	while opus_chunk_size < audiostreamplaybackopus.available_space_frames() and len(opuspacketsbuffer) != 0:
-		audiostreamplaybackopus.push_opus_packet(opuspacketsbuffer.pop_front(), 0, 0)
+	while opus_chunk_size < audio_stream_playback_opus.available_space_frames() and len(opuspacketsbuffer) != 0:
+		audio_stream_playback_opus.push_opus_packet(opuspacketsbuffer.pop_front(), 0, 0)
 
 var opusaudiodata = [
 	[72, 11, 228, 193, 34, 35, 97, 240],

@@ -36,17 +36,17 @@ var audio_chunk_size = 882
 var frametimesecs = 0.02
 var opussamplerate = 48000
 var opuschannels = 2
-func set_opus_values(p_opussamplerate, opusframedurationms, p_channels, opusbitrate, opuscomplexity, opusoptimizeforvoice):
+func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice):
 	processtalkstreamends(false)
 	assert (not currentlytalking)
 
 	opussamplerate = p_opussamplerate
 	opuschannels = p_channels
 	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoisebutton.button_pressed)
-	opusencoder.create_opus_encoder(opusbitrate, opuscomplexity, opusoptimizeforvoice)
-	opus_chunk_size = int(opussamplerate*opusframedurationms/1000.0)
+	opusencoder.create_opus_encoder(p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice)
+	opus_chunk_size = int(opussamplerate*p_opusframedurationms/1000.0)
 	audio_chunk_size = opusencoder.calc_audio_chunk_size(opus_chunk_size)
-	frametimesecs = opusframedurationms/1000.0
+	frametimesecs = p_opusframedurationms/1000.0
 	if audiosampleframematerial:
 		var audiosampleframedata = PackedVector2Array()
 		audiosampleframedata.resize(audio_chunk_size)
