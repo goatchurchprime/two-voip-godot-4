@@ -30,8 +30,12 @@ var pause_reached := false
 
 func _ready() -> void:
 	assert(
-			audio_player_opus is AudioStreamPlayer or audio_player_opus is AudioStreamPlayer2D
-					or audio_player_opus is AudioStreamPlayer3D
+		(
+			audio_player_opus != null and audio_player_opus.has_method(&"set_stream")
+			and audio_player_opus.has_method(&"get_stream_playback")
+			and audio_player_opus.has_method(&"play") and audio_player_opus.playing is bool
+		),
+		"audio_player_opus must not be null; have methods 'set_stream', 'get_stream_playback', and 'play'; and have bool property 'playing'",
 	)
 
 	audio_stream_opus = AudioStreamOpus.new()
@@ -64,32 +68,34 @@ func unpause_when_buffer_ready() -> void:
 
 func external_end_stream() -> void:
 	if in_opus_stream:
-		receive_audio_packet(AutoVoip.to_ascii_buffer({ AutoVoip.PARAM_TALKING_TIME_END: -1 }))
+		receive_metadata_packet(AutoVoip.to_ascii_buffer({ AutoVoip.PARAM_TALKING_TIME_END: -1 }))
 
 
-func receive_audio_packet(packet: PackedByteArray) -> void:
+func receive_metadata_packet(packet: PackedByteArray) -> void:
 	if audio_stream_opus == null:
 		return
-	if len(packet) <= 3:
+	if packet.size() <= 3:
 		if OS.has_feature(&"debug"):
 			push_error("Bad packet, too short")
 		return
 
-	# JSON header or footer
-	if packet[0] == ASCII_OPEN_BRACE and packet[-1] == ASCII_CLOSE_BRACE:
-		var dictionary = AutoVoip.from_ascii_buffer(packet)
-		if dictionary == null or dictionary is not Dictionary:
-			return
+	# Process header
+	if packet.decode_s8(0) == AutoVoip.HEADER_SIGNATURE:
+		_process_header(packet)
+		return
 
-		# Process header
-		if dictionary.has(AutoVoip.PARAM_TALKING_TIME_START):
-			_process_header(dictionary)
-			return
+	# Process footer
+	if packet.decode_s8(0) == AutoVoip.FOOTER_SIGNATURE:
+		_process_footer(packet)
+		return
 
-		# Process footer
-		if dictionary.has(AutoVoip.PARAM_TALKING_TIME_END):
-			_process_footer(dictionary)
-			return
+
+func receive_opus_packet(packet: PackedByteArray) -> void:
+	if audio_stream_opus == null:
+		return
+	if packet.size() <= 3:
+		if OS.has_feature(&"debug"):
+			push_error("Bad packet, too short")
 		return
 
 	if len_chunk_prefix == -1:
@@ -115,10 +121,10 @@ func receive_audio_packet(packet: PackedByteArray) -> void:
 			while opus_frame_count_r >= N_OUT_OF_ORDER_QUEUE:
 				if out_of_order_chunk_queue[0] != null:
 					audio_stream_playback_opus.push_opus_packet(
-							out_of_order_chunk_queue[0],
-							len_chunk_prefix,
-							0,
-							)
+						out_of_order_chunk_queue[0],
+						len_chunk_prefix,
+						0,
+					)
 					opus_frame_queue_count -= 1
 				else:
 					var next_valid_packet_for_fec: PackedByteArray = packet
@@ -127,10 +133,10 @@ func receive_audio_packet(packet: PackedByteArray) -> void:
 							next_valid_packet_for_fec = out_of_order_chunk_queue[i]
 							break
 					audio_stream_playback_opus.push_opus_packet(
-							next_valid_packet_for_fec,
-							len_chunk_prefix,
-							1,
-							)
+						next_valid_packet_for_fec,
+						len_chunk_prefix,
+						1,
+					)
 				out_of_order_chunk_queue.pop_front()
 				out_of_order_chunk_queue.push_back(null)
 				opus_frame_count_r -= 1
@@ -140,16 +146,16 @@ func receive_audio_packet(packet: PackedByteArray) -> void:
 			out_of_order_chunk_queue[opus_frame_count_r] = packet
 			opus_frame_queue_count += 1
 			while (
-					out_of_order_chunk_queue[0] != null
-					and opus_frame_count + opus_frame_queue_count >= N_PACKET_INITIAL_BATCHING
+				out_of_order_chunk_queue[0] != null
+				and opus_frame_count + opus_frame_queue_count >= N_PACKET_INITIAL_BATCHING
 			):
 				if opus_frame_size > audio_stream_playback_opus.available_space_frames():
 					break
 				audio_stream_playback_opus.push_opus_packet(
-						out_of_order_chunk_queue.pop_front(),
-						len_chunk_prefix,
-						0,
-						)
+					out_of_order_chunk_queue.pop_front(),
+					len_chunk_prefix,
+					0,
+				)
 				out_of_order_chunk_queue.push_back(null)
 				opus_frame_count += 1
 				opus_frame_queue_count -= 1
@@ -162,8 +168,8 @@ func receive_audio_packet(packet: PackedByteArray) -> void:
 
 func set_rec_opus_values(opus_sample_rate: int, opus_channels: int) -> void:
 	if (
-			not audio_player_opus.playing or audio_stream_opus.opus_sample_rate != opus_sample_rate
-			or audio_stream_opus.opus_channels != opus_channels
+		not audio_player_opus.playing or audio_stream_opus.opus_sample_rate != opus_sample_rate
+		or audio_stream_opus.opus_channels != opus_channels
 	):
 		audio_stream_opus.opus_sample_rate = opus_sample_rate
 		audio_stream_opus.opus_channels = opus_channels
@@ -175,88 +181,40 @@ func set_rec_opus_values(opus_sample_rate: int, opus_channels: int) -> void:
 		pause_reached = false
 
 
-func _process_header(header: Dictionary) -> void:
+func _process_header(header: PackedByteArray) -> void:
 	# Ensure header is properly formatted, even if not all values are needed
-	if (
-			not header.has(AutoVoip.PARAM_TALKING_TIME_START)
-			or header.get(AutoVoip.PARAM_TALKING_TIME_START) is not float
-	):
+	if header.size() != AutoVoip.HEADER_BYTE_LENGTH:
 		return
+	var talking_time_start: float = header.decode_double(AutoVoip.HEADER_PARAM_TALKING_TIME_START)
+	var opus_sample_rate: int = header.decode_u64(AutoVoip.HEADER_PARAM_OPUS_SAMPLE_RATE)
+	var opus_channels: int = header.decode_u64(AutoVoip.HEADER_PARAM_OPUS_CHANNELS)
 
-	if (
-			not header.has(AutoVoip.PARAM_OPUS_FRAME_SIZE)
-			or header.get(AutoVoip.PARAM_OPUS_FRAME_SIZE) is not float
-	):
-		return
-	if (
-			not header.has(AutoVoip.PARAM_OPUS_SAMPLE_RATE)
-			or header.get(AutoVoip.PARAM_OPUS_SAMPLE_RATE) is not float
-	):
-		return
-	if (
-			not header.has(AutoVoip.PARAM_OPUS_CHANNELS)
-			or header.get(AutoVoip.PARAM_OPUS_CHANNELS) is not float
-	):
-		return
-	if (
-			not header.has(AutoVoip.PARAM_LEN_CHUNK_PREFIX)
-			or header.get(AutoVoip.PARAM_LEN_CHUNK_PREFIX) is not float
-	):
-		return
-	if (
-			not header.has(AutoVoip.PARAM_OPUS_STREAM_COUNT)
-			or header.get(AutoVoip.PARAM_OPUS_STREAM_COUNT) is not float
-	):
-		return
-	if (
-			not header.has(AutoVoip.PARAM_OPUS_FRAME_COUNT)
-			or header.get(AutoVoip.PARAM_OPUS_FRAME_COUNT) is not float
-	):
-		return
+	opus_frame_size = header.decode_u64(AutoVoip.HEADER_PARAM_OPUS_CHUNK_SIZE)
+	len_chunk_prefix = header.decode_u64(AutoVoip.HEADER_PARAM_LEN_CHUNK_PREFIX)
+	opus_stream_count = header.decode_u64(AutoVoip.HEADER_PARAM_OPUS_STREAM_COUNT)
+	opus_frame_count = header.decode_u64(AutoVoip.HEADER_PARAM_OPUS_FRAME_COUNT)
+	opus_frame_count = (opus_frame_count + 1) if opus_frame_count > 0 else 0
 
-	set_rec_opus_values(
-			header[AutoVoip.PARAM_OPUS_SAMPLE_RATE],
-			header.get(AutoVoip.PARAM_OPUS_CHANNELS, 2),
-			)
+	set_rec_opus_values(opus_sample_rate, opus_channels)
 
 	in_opus_stream = true
 
-	len_chunk_prefix = int(header[AutoVoip.PARAM_LEN_CHUNK_PREFIX])
-	opus_stream_count = int(header[AutoVoip.PARAM_OPUS_STREAM_COUNT])
-	opus_frame_size = int(header[AutoVoip.PARAM_OPUS_FRAME_SIZE])
-
-	opus_frame_count = 0
-	if header.get(AutoVoip.PARAM_OPUS_FRAME_COUNT, 0) > 0:
-		opus_frame_count = int(header[AutoVoip.PARAM_OPUS_FRAME_COUNT]) + 1
-
 	out_of_order_chunk_queue.clear()
-	out_of_order_chunk_queue.resize(AutoVoipSpeaker.N_OUT_OF_ORDER_QUEUE)
+	out_of_order_chunk_queue.resize(N_OUT_OF_ORDER_QUEUE)
 	opus_frame_queue_count = 0
 
 
-func _process_footer(footer: Dictionary) -> void:
+func _process_footer(footer: PackedByteArray) -> void:
 	# Ensure footer is properly formatted, even if not all values are needed
-	if (
-			not footer.has(AutoVoip.PARAM_TALKING_TIME_END)
-			or footer.get(AutoVoip.PARAM_TALKING_TIME_END) is not float
-	):
+	if footer.size() != AutoVoip.FOOTER_BYTE_LENGTH:
 		return
 
-	if (
-			not footer.has(AutoVoip.PARAM_OPUS_STREAM_COUNT)
-			or footer.get(AutoVoip.PARAM_OPUS_STREAM_COUNT) is not float
-	):
-		return
-	if (
-			not footer.has(AutoVoip.PARAM_OPUS_FRAME_COUNT)
-			or footer.get(AutoVoip.PARAM_OPUS_FRAME_COUNT) is not float
-	):
-		return
-	if (
-			not footer.has(AutoVoip.PARAM_TALKING_TIME_DURATION)
-			or footer.get(AutoVoip.PARAM_TALKING_TIME_DURATION) is not float
-	):
-		return
+	var _talking_time_end: float = footer.decode_double(AutoVoip.FOOTER_PARAM_TALKING_TIME_END)
+	var _talking_time_duration: float = footer.decode_double(
+		AutoVoip.FOOTER_PARAM_TALKING_TIME_DURATION
+	)
+	var _opus_stream_count: int = footer.decode_u64(AutoVoip.FOOTER_PARAM_OPUS_STREAM_COUNT)
+	var _opus_frame_count: int = footer.decode_u64(AutoVoip.FOOTER_PARAM_OPUS_FRAME_COUNT)
 
 	in_opus_stream = false
 
