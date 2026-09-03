@@ -19,7 +19,6 @@ EnsurePythonVersion(3, 8)  # type: ignore
 project_name = "TwoVoIP"
 lib_name = "twovoip"
 default_output_dir = os.path.join("addons", "twovoip", "libs")
-default_output_lipsync_dir = os.path.join("addons", "twovoip_lipsync", "libs")
 src_folder = "src"
 
 # If necessary, add patches from the code
@@ -47,9 +46,6 @@ def setup_options(env: SConsEnvironment, arguments):
 
     # It must be here for lib_utils.py
     opts.Add(PathVariable("addon_output_dir", "Path to the output directory", default_output_dir, PathVariable.PathIsDirCreate))
-    opts.Add(PathVariable("ovrlipsync_dir", "Path to the OVRLipSyncNative directory", os.path.join(os.path.dirname(default_output_lipsync_dir), "OVRLipSyncNative"), PathVariable.PathIsDirCreate))
-
-    opts.Add(BoolVariable("lipsync", "Enable lipsync support", False))
     opts.Add(BoolVariable("rnnoise", "Enable rnnoise support", True))
 
     opts.Update(env)
@@ -79,35 +75,6 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out: list):
                    LIBS=["RnNoise"],
                    LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "noise-suppression-for-voice/external/rnnoise")],
                    CPPDEFINES=["RNNOISE"])
-
-    if env["lipsync"]:
-        lipsync_lib_path = ""
-        ovrlipsync_dir = env["ovrlipsync_dir"]
-
-        if env["platform"] == "windows":
-            lipsync_lib_path = os.path.join(ovrlipsync_dir, "Lib", "Win64")
-        elif env["platform"] == "macos" and env["arch"] == "x86_64":
-            lipsync_lib_path = os.path.join(ovrlipsync_dir, "Lib", "MacOS")
-        elif env["platform"] == "android":
-            if env["arch"] == "arm32":
-                lipsync_lib_path = os.path.join(ovrlipsync_dir, "Lib", "Android32")
-            elif env["arch"] == "arm64":
-                lipsync_lib_path = os.path.join(ovrlipsync_dir, "Lib", "Android64")
-            else:
-                print("Lipsync is supported only on arm32 and arm64.")
-                env.Exit(1)
-        elif env["platform"] == "linux":
-            pass # disregard library on linux, but pretend it is there to make android deployment possible
-        else:
-            print(f'Lipsync is not supported by the {env["platform"]}:{env["arch"]} platform.')
-            env.Exit(1)
-
-        if env["platform"] != "linux":
-            dbg_suffix = "d" if env["dev_build"] else ""
-            env.Append(CPPPATH=os.path.join(ovrlipsync_dir, "Include"),
-                        LIBS=["OVRLipSyncShim" + dbg_suffix],
-                        LIBPATH=[lipsync_lib_path],
-                        CPPDEFINES=["OVR_LIP_SYNC"])
 
     if env.get("is_msvc", False):
         env.Append(CCFLAGS=["/GF"])  # Eliminate Duplicate Strings
@@ -179,9 +146,6 @@ setup_defines_and_flags(env, additional_src)
 extra_tags = ""
 
 output_path = env["addon_output_dir"]
-if output_path == default_output_dir:
-    if env["lipsync"]:
-        output_path = default_output_lipsync_dir
 
 lib_utils.get_library_object(env, project_name, lib_name, extra_tags, output_path, src_folder, additional_src)
 

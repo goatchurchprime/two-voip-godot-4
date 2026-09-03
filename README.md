@@ -135,6 +135,11 @@ There are three submodules in this repository.
 **godot-cpp** is contains the header files and class definitions required to build a compiled 
 [GDExtension](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/what_is_gdextension.html) object that can 
 dynamically link to the GodotEngine at runtime.
+TwoVoip 6.1 pins the submodule to the official `godot-cpp` `10.0.0-rc1`
+release (`58d1de720b8ffe9f8ffcdfe3a85148582cfd2e74`), whose generated API is
+Godot `4.6-stable`. The godot-cpp project changed its release numbering after
+its `godot-4.5-stable` release, so the `10.0.0-rc1` name refers to the binding
+library version rather than a Godot 4.6 release candidate.
 
 **opus** is the opus voice compression and decompression library from [xiph.org](https://xiph.org/) that 
 generally takes an array of 960 pairs of floats representing 20ms of stereo audio samples at 48kHz and 

@@ -46,13 +46,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes", "gain"), &TwovoipOpusEncoder::encode_chunk, DEFVAL(PackedByteArray()), DEFVAL(1.0));
 }
 
-TwovoipOpusEncoder::TwovoipOpusEncoder() {
-    visemes.resize(ovrLipSyncViseme_Count + 3);  // we append laughterscore, framedelay and framenumber to this list
-    ovrlipsyncframe.visemes = visemes.ptrw();
-    ovrlipsyncframe.visemesLength = ovrLipSyncViseme_Count;
-    ovrlipsyncframe.laughterCategories = NULL;
-    ovrlipsyncframe.laughterCategoriesLength = 0;
-}
+TwovoipOpusEncoder::TwovoipOpusEncoder() {}
 
 bool TwovoipOpusEncoder::create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, bool use_rnnoise) {
     input_mix_rate = p_input_mix_rate;
@@ -244,7 +238,6 @@ TwovoipOpusEncoder::~TwovoipOpusEncoder() {
         opus_encoder = NULL;
     }
 }
-
 
 
 
