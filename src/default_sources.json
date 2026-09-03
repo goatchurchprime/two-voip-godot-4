@@ -3,6 +3,6 @@
   "audio_stream_opus.cpp",
   "audio_effect_fft_block.cpp",
   "register_types.cpp",
-  "speex_resampler/resample.c",
+  "../speexdsp/libspeexdsp/resample.c",
   "utils.cpp"
 ]

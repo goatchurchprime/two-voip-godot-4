@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.3.0 - development
+
+- replaced the copied Speex resampler sources with the official SpeexDSP
+  submodule pinned to release `SpeexDSP-1.2.1`, preserving the same resampler
+  implementation and public TwoVoIP API.
+
 ## 6.2.0 - 2026-09-03
 
 - replaced the `noise-suppression-for-voice` wrapper with a direct Xiph

@@ -130,7 +130,7 @@ header for them so that they know how to decode the opus packets.
 
 ## Building the addon
 
-There are three submodules in this repository.  
+There are four submodules in this repository.
 
 **godot-cpp** is contains the header files and class definitions required to build a compiled 
 [GDExtension](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/what_is_gdextension.html) object that can 
@@ -144,6 +144,14 @@ library version rather than a Godot 4.6 release candidate.
 **opus** is the opus voice compression and decompression library from [xiph.org](https://xiph.org/) that 
 generally takes an array of 960 pairs of floats representing 20ms of stereo audio samples at 48kHz and 
 returns 20 to 30 bytes of compressed data for that chunk.
+
+**speexdsp** is a direct submodule of the official
+[Xiph SpeexDSP repository](https://github.com/xiph/speexdsp), pinned to the
+signed `SpeexDSP-1.2.1` release at commit
+`1b28a0f61bc31162979e1f26f3981fc3637095c8`. TwoVoIP compiles the resampler
+source directly into the extension. This is the same upstream resampler
+revision that was previously copied into `src`, with its floating-point mode
+selected explicitly by the build.
 
 **rnnoise** is a direct submodule of the official
 [Xiph RNNoise repository](https://github.com/xiph/rnnoise), pinned to commit

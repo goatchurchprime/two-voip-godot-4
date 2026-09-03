@@ -45,7 +45,7 @@
 #include <godot_cpp/classes/audio_stream_playback_resampled.hpp>
 
 #include "opus.h"
-#include "speex_resampler/speex_resampler.h"
+#include "speex/speex_resampler.h"
 
 
 #ifdef RNNOISE
