@@ -60,25 +60,25 @@ void AudioStreamPlaybackOpus::_bind_methods() {
 }
 
 Ref<AudioStreamPlayback> AudioStreamOpus::_instantiate_playback() const {
-    godot::UtilityFunctions::prints("ref AudioStreamPlaybackOpus");
+    godot::UtilityFunctions::print_verbose("ref AudioStreamPlaybackOpus");
     Ref<AudioStreamPlaybackOpus> playback;
-    godot::UtilityFunctions::prints("instantiate AudioStreamPlaybackOpus");
+    godot::UtilityFunctions::print_verbose("instantiate AudioStreamPlaybackOpus");
     playback.instantiate();
     playback->initialize(this); 
     return playback;
 }
 
 AudioStreamPlaybackOpus::AudioStreamPlaybackOpus() {
-    godot::UtilityFunctions::print("construct AudioStreamPlaybackOpus"); 
+    godot::UtilityFunctions::print_verbose("construct AudioStreamPlaybackOpus");
 }
 
 void AudioStreamPlaybackOpus::initialize(const AudioStreamOpus* pbase) {
-    godot::UtilityFunctions::print("initialize AudioStreamPlaybackOpus"); 
+    godot::UtilityFunctions::print_verbose("initialize AudioStreamPlaybackOpus");
     base = Ref<AudioStreamOpus>(pbase);
     int opuserror = 0;
-    godot::UtilityFunctions::print("opus_decoder_create "); 
+    godot::UtilityFunctions::print_verbose("opus_decoder_create ");
     opusdecoder = opus_decoder_create(base->opus_sample_rate, base->opus_channels, &opuserror);
-    godot::UtilityFunctions::print("opus_decoder_created "); 
+    godot::UtilityFunctions::print_verbose("opus_decoder_created ");
     if (opuserror == 0) {
         audiounpackedbuffer.resize(48000*60/1000*2); // max opus chunk size is 60ms x 48000Hz x 2channels 
         int audiosamplebuffersize = (int)(base->buffer_len*base->opus_sample_rate);
@@ -101,7 +101,7 @@ void AudioStreamPlaybackOpus::initialize(const AudioStreamOpus* pbase) {
 AudioStreamPlaybackOpus::~AudioStreamPlaybackOpus() {
     if (opusdecoder != NULL) {
         opus_decoder_destroy(opusdecoder);
-        godot::UtilityFunctions::print("opus_decoder_destroy "); 
+        godot::UtilityFunctions::print_verbose("opus_decoder_destroy ");
         opusdecoder = NULL; 
     }
 }
@@ -117,7 +117,7 @@ void AudioStreamPlaybackOpus::mark_end_opus_stream(bool clearmark) {
         bufferstreamend = buffertail; // this sets the pause point
             // as we reach this marker we should fade out as if for AudioStreamPlaybackListNode::FADE_OUT_TO_PAUSE
     }
-    godot::UtilityFunctions::prints("bufferstreamend set to", bufferstreamend);
+    godot::UtilityFunctions::print_verbose("bufferstreamend set to ", bufferstreamend);
 }
 
 int AudioStreamPlaybackOpus::get_skips(bool overflow) {
@@ -191,7 +191,7 @@ void AudioStreamPlaybackOpus::set_sinewave_frames(int sinewaveframes, float volu
     Dsinewaveframes = sinewaveframes;
     Dsinewavephase = 0;
     Dsinewavevolume = volume;
-    godot::UtilityFunctions::prints("Sinewave frames set to", Dsinewaveframes, "volume", Dsinewavevolume);
+    godot::UtilityFunctions::print_verbose("Sinewave frames set to ", Dsinewaveframes, " volume ", Dsinewavevolume);
 }
 
 int32_t AudioStreamPlaybackOpus::_mix_resampled(AudioFrame *buffer, int32_t frames) {

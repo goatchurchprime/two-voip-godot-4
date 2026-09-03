@@ -81,7 +81,7 @@ bool TwovoipOpusEncoder::create_sampler(int p_input_mix_rate, int p_opus_sample_
             if (rnnoise_st != NULL) {
                 rnnoise_in.resize(rnnoise_get_frame_size());
                 rnnoise_out.resize(rnnoise_get_frame_size());
-                godot::UtilityFunctions::print("rnnoise sample_rate=48000 frame_size=", rnnoise_get_frame_size()); // expected 480/10ms
+                godot::UtilityFunctions::print_verbose("rnnoise sample_rate=48000 frame_size=", rnnoise_get_frame_size()); // expected 480/10ms
             }
         } else {
             godot::UtilityFunctions::printerr("rnnoise only works for sample_rate=48000"); 
