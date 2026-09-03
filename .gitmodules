@@ -7,3 +7,6 @@
 [submodule "rnnoise"]
 	path = rnnoise
 	url = https://github.com/xiph/rnnoise.git
+[submodule "speexdsp"]
+	path = speexdsp
+	url = https://github.com/xiph/speexdsp.git

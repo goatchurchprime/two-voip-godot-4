@@ -56,6 +56,11 @@ def setup_options(env: SConsEnvironment, arguments):
 def setup_defines_and_flags(env: SConsEnvironment, src_out: list):
     # Add more sources to `src_out` if needed
 
+    env.Append(
+        CPPPATH=["speexdsp/include", "thirdparty/speexdsp/include/speex"],
+        CPPDEFINES=["FLOATING_POINT", ("EXPORT", "")],
+    )
+
     if env.get("lto") != "none":
         if env.get("is_msvc", False):
             env.AppendUnique(CCFLAGS=["/GL"],

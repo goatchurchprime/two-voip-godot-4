@@ -46,7 +46,7 @@
 #include <godot_cpp/classes/image_texture.hpp>
 
 
-#include "speex_resampler/speex_resampler.h"
+#include "speex/speex_resampler.h"
 
 namespace godot {
     
