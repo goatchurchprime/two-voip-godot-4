@@ -48,12 +48,6 @@
 #include "speex_resampler/speex_resampler.h"
 
 
-#ifdef OVR_LIP_SYNC
-    #include "OVRLipSync.h"
-#else
-    #include "OVRLipSync_Stub.h"
-#endif
-
 #ifdef RNNOISE
     #include "rnnoise.h"
 #else
@@ -63,26 +57,6 @@
 
 namespace godot {
     
-
-typedef enum {
-    DGovrLipSyncUninitialized,
-    DGovrLipSyncValid,
-    DGovrLipSyncUnavailable,
-} DGovrLipSyncStatus;
-
-// This AudioEffect records 44.1kHz samples from the microphone into a ring buffer.
-// If there are enough samples to make up a chunk (usually 20ms), chunk_available() returns true.
-// An available chunk can be resampled up to 48kHz in a second ringbuffer by resampled_current_chunk()
-// A resampled 48kHz chunk can be denoised into a third ringbuffer by denoise_resampled_chunk()
-// read_chunk() will return a chunk from either of these three buffers depending on progress through the above two functions.
-
-// chunk_to_lipsync() and read_opus() will apply to the same chunk as read_chunk(), so keep it consistent, 
-//   This design is so we can defer calling either of these functions until we are sure it's a speaking episode
-// drop_chunk() advances to next chunk, undrop_chunk() rolls back the buffer it so we can run the deferred functions
-// and avoid pre-clipping of the spoken episode.
-
-// we are putting all the state into the AudioEffect instead of the AudioEffectInstance 
-// because it simplifies the coding here.
 
 class TwovoipOpusEncoder : public RefCounted {
     GDCLASS(TwovoipOpusEncoder, RefCounted)
@@ -101,12 +75,6 @@ class TwovoipOpusEncoder : public RefCounted {
     PackedFloat32Array rnnoise_out;
     PackedByteArray opus_byte_buffer;
     
-    DGovrLipSyncStatus govrlipsyncstatus = DGovrLipSyncUninitialized;
-    bool resampledlipsync;
-    PackedFloat32Array visemes; 
-    ovrLipSyncFrame ovrlipsyncframe;
-    ovrLipSyncContext ovrlipsyncctx = 0;
-
 protected:
     static void _bind_methods();
     

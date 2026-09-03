@@ -80,12 +80,6 @@ runs:
       run: |
         brew install ninja
 
-    - name: Setup OVRLipSync
-      uses: ./.github/actions/setup_ovrlipsync
-      if: contains(inputs.additional, 'lipsync=yes')
-      with:
-        extract_directory: "addons/${{env.LIBRARY_NAME}}_lipsync"
-
     - name: Build godot-cpp
       shell: bash
       run: |
