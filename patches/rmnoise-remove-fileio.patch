@@ -1,6 +1,6 @@
-diff -ur noise-suppression-for-voice.org/external/rnnoise/include/rnnoise.h noise-suppression-for-voice/external/rnnoise/include/rnnoise.h
---- noise-suppression-for-voice.org/external/rnnoise/include/rnnoise.h	2024-08-18 14:19:35.586959928 +0100
-+++ noise-suppression-for-voice/external/rnnoise/include/rnnoise.h	2024-08-18 16:31:43.741188889 +0100
+diff -ur rnnoise.org/include/rnnoise.h rnnoise/include/rnnoise.h
+--- rnnoise.org/include/rnnoise.h	2024-08-18 14:19:35.586959928 +0100
++++ rnnoise/include/rnnoise.h	2024-08-18 16:31:43.741188889 +0100
 @@ -101,6 +101,7 @@
   */
  RNNOISE_EXPORT RNNModel *rnnoise_model_from_buffer(const void *ptr, int len);
@@ -18,9 +18,9 @@ diff -ur noise-suppression-for-voice.org/external/rnnoise/include/rnnoise.h nois
  /**
   * Free a custom model
   *
-diff -ur noise-suppression-for-voice.org/external/rnnoise/src/denoise.c noise-suppression-for-voice/external/rnnoise/src/denoise.c
---- noise-suppression-for-voice.org/external/rnnoise/src/denoise.c	2024-08-18 14:19:35.586959928 +0100
-+++ noise-suppression-for-voice/external/rnnoise/src/denoise.c	2024-08-18 16:29:47.014027163 +0100
+diff -ur rnnoise.org/src/denoise.c rnnoise/src/denoise.c
+--- rnnoise.org/src/denoise.c	2024-08-18 14:19:35.586959928 +0100
++++ rnnoise/src/denoise.c	2024-08-18 16:29:47.014027163 +0100
 @@ -229,7 +229,7 @@
    const void *const_blob;
    void *blob;

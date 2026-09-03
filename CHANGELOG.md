@@ -1,5 +1,12 @@
 # Changelog
 
+## 6.2.0 - development
+
+- replaced the `noise-suppression-for-voice` wrapper with a direct Xiph
+  RNNoise submodule pinned to the same upstream source revision;
+- added a minimal cross-platform CMake adapter which retrieves the matching
+  Xiph default model and verifies its SHA-256 checksum.
+
 ## 6.1.0 - 2026-09-03
 
 - removed the obsolete proprietary OVRLipSync integration, alternate addon and
