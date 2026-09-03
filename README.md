@@ -145,16 +145,20 @@ library version rather than a Godot 4.6 release candidate.
 generally takes an array of 960 pairs of floats representing 20ms of stereo audio samples at 48kHz and 
 returns 20 to 30 bytes of compressed data for that chunk.
 
-**noise-suppression-for-voice** contains a copy of the [xiph/rnnoise](https://github.com/xiph/rnnoise) 
-code in its external/rnnoise directory with the all important `CMakeLists.txt` file that makes it possible 
-to compile it on all the diffeerent platforms
+**rnnoise** is a direct submodule of the official
+[Xiph RNNoise repository](https://github.com/xiph/rnnoise), pinned to commit
+`372f7b4b76cde4ca1ec4605353dd17898a99de38`. Xiph does not provide CMake build
+files at that revision, so TwoVoIP supplies a small CMake adapter in
+`thirdparty/rnnoise`. RNNoise also keeps its large default model outside Git;
+the adapter downloads model revision `0b50c45` from Xiph and verifies its
+SHA-256 checksum before compiling it.
 
 The sequence of commands to build the system locally on NixOS are:
 ```bash
 nix-shell -p scons cmake ninja autoreconfHook
-scons apply_patches  # optional
+scons apply_patches  # apply the pinned portability and size patches
 scons build_opus     # build opus using cmake
-scons build_rnnoise  # build opus using cmake
+scons build_rnnoise  # build RNNoise using cmake
 scons                # build this library
 cp addons/twovoip/libs/*.so example/addons/twovoip/libs/
 ```

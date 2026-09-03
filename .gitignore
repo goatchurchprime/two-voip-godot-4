@@ -21,3 +21,4 @@ addons/twovoip_lipsync/OVRLipSyncNative/*
 example/addons/twovoip*
 example/android/*
 cmake_build_out/*
+thirdparty/rnnoise/cmake_build_out/

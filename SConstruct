@@ -71,9 +71,9 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out: list):
     env.Append(CPPPATH="opus/include", LIBS=["opus"], LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "opus")])
 
     if env["rnnoise"]:
-        env.Append(CPPPATH="noise-suppression-for-voice/external/rnnoise/include",
+        env.Append(CPPPATH="rnnoise/include",
                    LIBS=["RnNoise"],
-                   LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "noise-suppression-for-voice/external/rnnoise")],
+                   LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "thirdparty/rnnoise")],
                    CPPDEFINES=["RNNOISE"])
 
     if env.get("is_msvc", False):
@@ -97,7 +97,7 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out: list):
 
 
 def apply_patches(target, source, env: SConsEnvironment):
-    rc = lib_utils_external.apply_git_patches(env, patches_to_apply_rmnoise, "noise-suppression-for-voice")
+    rc = lib_utils_external.apply_git_patches(env, patches_to_apply_rmnoise, "rnnoise")
     if rc:
       return rc
     return lib_utils_external.apply_git_patches(env, patches_to_apply_godot, "godot-cpp")
@@ -133,7 +133,7 @@ def build_rnnoise(target, source, env: SConsEnvironment):
     if env["platform"] in ["android"]:
         extra_flags += [f"-DCMAKE_TOOLCHAIN_FILE={get_android_toolchain()}"]
 
-    return lib_utils_external.cmake_build_project(env, "noise-suppression-for-voice/external/rnnoise", extra_flags)
+    return lib_utils_external.cmake_build_project(env, "thirdparty/rnnoise", extra_flags)
 
 env: SConsEnvironment = SConscript("godot-cpp/SConstruct")
 env = env.Clone()
