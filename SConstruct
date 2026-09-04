@@ -2,7 +2,7 @@
 
 from SCons.Script import SConscript
 from SCons.Script.SConscript import SConsEnvironment
-from SCons.Script import ARGLIST, ARGUMENTS, BUILD_TARGETS, COMMAND_LINE_TARGETS, DEFAULT_TARGETS
+from SCons.Script import ARGLIST, ARGUMENTS, BUILD_TARGETS, COMMAND_LINE_TARGETS, DEFAULT_TARGETS, Glob
 
 import SCons, SCons.Script
 import sys, os, platform
@@ -147,6 +147,7 @@ args = ARGUMENTS
 additional_src = []
 setup_options(env, args)
 setup_defines_and_flags(env, additional_src)
+env.GodotCPPDocData("src/gen/doc_data.gen.cpp", source=Glob("doc_classes/*.xml"))
 
 extra_tags = ""
 

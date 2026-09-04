@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioEffectFFTBlock" inherits="AudioEffect" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Captures audio blocks and updates an FFT texture.
+	</brief_description>
+	<description>
+		An audio-bus effect used by the diagnostic spectrum and waveform displays.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_fftirow">
+			<return type="int" />
+			<description>Returns the texture row most recently written.</description>
+		</method>
+		<method name="get_audiosamplerate">
+			<return type="int" />
+			<description>Returns the captured audio sample rate.</description>
+		</method>
+		<method name="get_audiosamplesize">
+			<return type="int" />
+			<description>Returns the captured frames per block.</description>
+		</method>
+		<method name="get_opusframesize">
+			<return type="int" />
+			<description>Returns the resampled frames per block.</description>
+		</method>
+		<method name="get_opussamplerate">
+			<return type="int" />
+			<description>Returns the resampled output rate.</description>
+		</method>
+		<method name="push_chunk">
+			<return type="void" />
+			<param index="0" name="audiosamples" type="PackedVector2Array" />
+			<description>Pushes stereo frames into the analysis buffer.</description>
+		</method>
+		<method name="set_images">
+			<return type="void" />
+			<param index="0" name="audiosampleframetextureimage" type="Image" />
+			<param index="1" name="audiosampleframetexture" type="ImageTexture" />
+			<param index="2" name="windowarray" type="PackedFloat32Array" />
+			<description>Sets the image, texture, and FFT analysis window to update.</description>
+		</method>
+		<method name="set_audiosamplerate">
+			<return type="void" />
+			<param index="0" name="audiosamplerate" type="int" />
+			<description>Sets the captured audio sample rate.</description>
+		</method>
+		<method name="set_audiosamplesize">
+			<return type="void" />
+			<param index="0" name="audiosamplesize" type="int" />
+			<description>Sets the captured frames per block.</description>
+		</method>
+		<method name="set_opusframesize">
+			<return type="void" />
+			<param index="0" name="opusframesize" type="int" />
+			<description>Sets the resampled frames per block.</description>
+		</method>
+		<method name="set_opussamplerate">
+			<return type="void" />
+			<param index="0" name="opussamplerate" type="int" />
+			<description>Sets the resampled output rate.</description>
+		</method>
+	</methods>
+	<members>
+		<member name="audiosamplerate" type="int" setter="set_audiosamplerate" getter="get_audiosamplerate" default="44100">Captured audio sample rate.</member>
+		<member name="audiosamplesize" type="int" setter="set_audiosamplesize" getter="get_audiosamplesize" default="882">Captured input frames per block.</member>
+		<member name="opusframesize" type="int" setter="set_opusframesize" getter="get_opusframesize" default="960">Resampled output frames per block.</member>
+		<member name="opussamplerate" type="int" setter="set_opussamplerate" getter="get_opussamplerate" default="48000">Resampled output rate.</member>
+	</members>
+</class>

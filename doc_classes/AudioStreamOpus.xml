@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioStreamOpus" inherits="AudioStream" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A streaming Opus decoder for an AudioStreamPlayer.
+	</brief_description>
+	<description>
+		Creates AudioStreamPlaybackOpus instances which decode queued Opus packets.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_buffer_length" qualifiers="const">
+			<return type="float" />
+			<description>Returns the buffer capacity in seconds.</description>
+		</method>
+		<method name="get_opus_channels" qualifiers="const">
+			<return type="int" />
+			<description>Returns the decoded channel count.</description>
+		</method>
+		<method name="get_opus_sample_rate" qualifiers="const">
+			<return type="float" />
+			<description>Returns the Opus decoding sample rate.</description>
+		</method>
+		<method name="set_buffer_length">
+			<return type="void" />
+			<param index="0" name="seconds" type="float" />
+			<description>Sets the buffer capacity in seconds.</description>
+		</method>
+		<method name="set_opus_channels">
+			<return type="void" />
+			<param index="0" name="opus_sample_rate" type="int" />
+			<description>Sets the decoded channel count to mono or stereo.</description>
+		</method>
+		<method name="set_opus_sample_rate">
+			<return type="void" />
+			<param index="0" name="opus_sample_rate" type="float" />
+			<description>Sets the Opus decoding sample rate.</description>
+		</method>
+	</methods>
+	<members>
+		<member name="buffer_length" type="float" setter="set_buffer_length" getter="get_buffer_length" default="2.0">Ring-buffer capacity in seconds.</member>
+		<member name="opus_channels" type="int" setter="set_opus_channels" getter="get_opus_channels" default="2">Decoded channel count: 1 or 2.</member>
+		<member name="opus_sample_rate" type="float" setter="set_opus_sample_rate" getter="get_opus_sample_rate" default="48000.0">Opus decoding sample rate.</member>
+	</members>
+</class>

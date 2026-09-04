@@ -3,6 +3,7 @@
   "audio_stream_opus.cpp",
   "audio_effect_fft_block.cpp",
   "register_types.cpp",
+  "gen/doc_data.gen.cpp",
   "../speexdsp/libspeexdsp/resample.c",
   "../speexdsp/libspeexdsp/preprocess.c",
   "../speexdsp/libspeexdsp/mdf.c",

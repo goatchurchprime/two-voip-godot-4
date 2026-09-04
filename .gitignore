@@ -13,6 +13,7 @@ obj/
 *.obj
 *.lib
 *.pdb
+*.gen.*
 .sconsign.dblite
 
 addons/twovoip/libs/*

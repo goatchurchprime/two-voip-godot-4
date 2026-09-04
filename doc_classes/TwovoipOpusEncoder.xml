@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TwovoipOpusEncoder" inherits="RefCounted" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Prepares and encodes microphone chunks as Opus packets.
+	</brief_description>
+	<description>
+		Resamples mono or stereo input, optionally applies RNNoise and gain, measures the result, and encodes it with Opus.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="calc_audio_chunk_size" deprecated="Use set_output_chunk_size() and get_required_input_chunk_size().">
+			<return type="int" />
+			<param index="0" name="opus_chunk_size" type="int" />
+			<description>Returns the legacy input requirement for an output chunk.</description>
+		</method>
+		<method name="create_opus_encoder">
+			<return type="bool" />
+			<param index="0" name="bit_rate" type="int" />
+			<param index="1" name="complexity" type="int" />
+			<param index="2" name="voice_optimal" type="bool" />
+			<description>Creates the Opus encoder with the configured rate and channels.</description>
+		</method>
+		<method name="create_sampler">
+			<return type="bool" />
+			<param index="0" name="p_input_mix_rate" type="int" />
+			<param index="1" name="p_opus_sample_rate" type="int" />
+			<param index="2" name="p_channels" type="int" />
+			<param index="3" name="use_rnnoise" type="bool" />
+			<description>Configures input/output rates, mono or stereo output, and RNNoise.</description>
+		</method>
+		<method name="encode_chunk">
+			<return type="PackedByteArray" />
+			<param index="0" name="prefix_bytes" type="PackedByteArray" default="PackedByteArray()" />
+			<description>Encodes the most recently processed chunk, prepending optional bytes.</description>
+		</method>
+		<method name="get_gain" qualifiers="const">
+			<return type="float" />
+			<description>Returns the linear gain currently applied during processing.</description>
+		</method>
+		<method name="get_peak" qualifiers="const">
+			<return type="float" />
+			<description>Returns the peak magnitude of the last processed chunk.</description>
+		</method>
+		<method name="get_required_input_chunk_size" qualifiers="const">
+			<return type="int" />
+			<description>Returns the minimum safe input allocation for each processing call.</description>
+		</method>
+		<method name="get_rms" qualifiers="const">
+			<return type="float" />
+			<description>Returns the RMS level of the last processed chunk.</description>
+		</method>
+		<method name="get_speech_probability" qualifiers="const">
+			<return type="float" />
+			<description>Returns RNNoise speech probability for the last processed chunk.</description>
+		</method>
+		<method name="process_chunk">
+			<return type="int" />
+			<param index="0" name="audio_frames" type="PackedVector2Array" />
+			<description>Processes one chunk and returns the number of input frames consumed, or a negative error.</description>
+		</method>
+		<method name="process_pre_encoded_chunk" deprecated="Use process_chunk() and the measurement getters.">
+			<return type="float" />
+			<param index="0" name="audio_frames" type="PackedVector2Array" />
+			<param index="1" name="opus_chunk_size" type="int" />
+			<param index="2" name="speech_probability" type="bool" />
+			<param index="3" name="rms" type="bool" />
+			<description>Processes a chunk and returns the selected legacy measurement.</description>
+		</method>
+		<method name="reset_opus_encoder">
+			<return type="void" />
+			<description>Resets Opus state before beginning an unrelated stream.</description>
+		</method>
+		<method name="set_automatic_gain">
+			<return type="bool" />
+			<param index="0" name="enabled" type="bool" />
+			<description>Enables linked SpeexDSP automatic gain when the frame size permits it.</description>
+		</method>
+		<method name="set_gain">
+			<return type="void" />
+			<param index="0" name="gain" type="float" />
+			<description>Selects manual gain and sets its constant linear multiplier.</description>
+		</method>
+		<method name="set_output_chunk_size">
+			<return type="bool" />
+			<param index="0" name="output_chunk_size" type="int" />
+			<description>Sets the number of output frames produced by each processing call.</description>
+		</method>
+	</methods>
+</class>
