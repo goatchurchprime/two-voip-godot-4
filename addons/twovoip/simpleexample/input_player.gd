@@ -1,5 +1,6 @@
 extends Control
 
+@export var speech_mode := true
 func _ready():
 	# Wire up the optional controls and feedback from your UI
 	$TwoVoipMic.init_voip_mic(true,
@@ -7,11 +8,19 @@ func _ready():
 							  $InputOptionButton,
 							  $PTTButton,
 							  $VoxButton,
-							  $DenoiseButton,
 							  $FeedbackDisplay.material)
 
 	# Set up the opus compression library
-	$TwoVoipMic.set_opus_values(48000, 20, 2, 12000, 5, true)
+	if speech_mode:
+		$StereoButton.button_pressed = false
+		$AGCButton.button_pressed = true
+		$DenoiseButton.button_pressed = true
+		$TwoVoipMic.set_opus_values(48000, 20, 1, 12000, 5, true, TwovoipOpusEncoder.DENOISER_RNNOISE, TwovoipOpusEncoder.AGC_APPLIED)
+	else:
+		$StereoButton.button_pressed = true
+		$AGCButton.button_pressed = false
+		$DenoiseButton.button_pressed = false
+		$TwoVoipMic.set_opus_values(48000, 20, 2, 12000, 5, true, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED)
 
 	# Set the threshold for voice activation
 	$TwoVoipMic.set_vox_threshhold(0.02)
@@ -20,15 +29,6 @@ func _on_feedback_display_gui_input(event):
 	if event is InputEventMouseButton and event.pressed:
 		$TwoVoipMic.set_vox_threshhold(event.position.x/$FeedbackDisplay.size.x)
 
-func _on_agc_button_toggled(toggled_on):
-	$TwoVoipMic.set_automatic_gain(toggled_on)
-	if not toggled_on:
-		$TwoVoipMic.set_gain($HSliderAGC.value)
-
 func _process(_delta):
-	if $AGCButton.button_pressed:
-		$HSliderAGC.value = $TwoVoipMic.get_gain()
-
-func _on_h_slider_agc_value_changed(value):
-	if not $AGCButton.button_pressed:
-		$TwoVoipMic.set_gain($HSliderAGC.value)
+	if speech_mode:
+		$HSliderAGC.value = $TwoVoipMic.get_agc_gain()

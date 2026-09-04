@@ -86,9 +86,9 @@ The sixth parameter `InputOption` is of type [OptionButton](https://docs.godoten
 [AudioServer.get_input_device_list()](https://docs.godotengine.org/en/stable/classes/class_audioserver.html#class-audioserver-method-get-input-device-list).
 Finally there is the `voxshader.gdshader` material you can use to make an activity waveform.
 
-The the opus encoder itself is created by `set_opus_values(opussamplerate, opusframedurationms, channels, opusbitrate, opuscomplexity, opusoptimizeforvoice)` where `opussamplerate` is chosen from [48000, 24000, 12000, 8000],
+The Opus encoder itself is created by `set_opus_values(opussamplerate, opusframedurationms, channels, opusbitrate, opuscomplexity, opusoptimizeforvoice, denoiser, agc_mode)` where `opussamplerate` is chosen from [48000, 24000, 12000, 8000],
 `opusframedurationms` which must be one of [5, 10, 20, 40, 60], `channels` is 1 for mono and 2 for stereo,
-`opusbitrate` is a range between 500 and 64000, `opuscomplexity` a number between 1 and 10, `opusoptimizeforvoice` a boolean value.  These are better outlined in the [Opus Definition](https://datatracker.ietf.org/doc/html/rfc6716#section-2.1).
+`opusbitrate` is a range between 500 and 64000, `opuscomplexity` a number between 1 and 10, and `opusoptimizeforvoice` is a boolean value. `denoiser` and `agc_mode` are fixed for that sampler configuration. These are better outlined in the [Opus Definition](https://datatracker.ietf.org/doc/html/rfc6716#section-2.1).
 
 If the `Vox` option is set, then `TwoVoipMic.set_voxthreshhold(voxthreshhold)` will set the gating threshold threshold
 (this sets the visual parameter in the shader).  There is also `hangtime` the time the microphone will
@@ -128,7 +128,15 @@ at 48 kHz:
 
 ```gdscript
 var encoder := TwovoipOpusEncoder.new()
-encoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false, 960)
+var error := encoder.create_sampler(
+    AudioServer.get_input_mix_rate(),
+    48000,
+    2,
+    TwovoipOpusEncoder.DENOISER_DISABLED,
+    TwovoipOpusEncoder.AGC_DISABLED,
+    960,
+)
+assert(error == OK)
 encoder.create_opus_encoder(12000, 5, true)
 
 var required := encoder.get_required_input_chunk_size()
@@ -140,6 +148,13 @@ if consumed >= 0:
     var packet := encoder.encode_chunk()
 ```
 
+After a successful `process_chunk()`, `get_current_chunk_16khz()` returns the
+same processed time interval as mono 16 kHz floating-point PCM. It branches
+after denoising, applied AGC and manual gain but before Opus encoding, making it
+suitable for an external speech or viseme analyser. A 20 ms chunk contains 320
+samples. The array is replaced on each call and is empty before processing or
+after a failed call; TwoVoIP does not queue these samples or interpret them.
+
 `get_required_input_chunk_size()` is constant until the sampler is reconfigured.
 It is the ceiling of the input/output sample ratio, and is
 therefore conservative for fractional combinations. `process_chunk()` rejects
@@ -149,13 +164,34 @@ occasionally leave additional frames unconsumed, particularly on the first
 call for some rate and long-frame combinations. The caller must retain
 `frames.size() - consumed` frames; TwoVoIP does not buffer or discard them.
 
-Gain is a linear amplitude multiplier. `set_gain()` controls it while automatic
-gain is disabled and warns without changing anything while automatic gain is
-enabled. SpeexDSP does not expose a way to set its internal AGC gain, so enabling
-automatic gain starts a fresh analysis at `1.0`. `get_gain()` reports the gain
-currently being applied. Automatic gain uses 10 or 20 ms internal analysis
-frames, so output chunks must divide into one of those durations. Shorter Opus
-frames remain available with manual gain.
+`set_gain()` and `get_gain()` control a manual linear amplitude multiplier. It
+is applied after voice preprocessing and remains independent of automatic gain.
+For mono voice, pass `AGC_APPLIED` to `create_sampler()`; Speex then performs
+its native in-place AGC. `get_agc_gain()` reports Speex's
+latest gain for diagnostics, but TwoVoIP does not attempt to set or reproduce
+Speex's internal gain behavior.
+
+`AGC_MONITOR` runs native Speex AGC on a separate copy and discards its audio
+output. This leaves the real signal under manual gain while allowing
+`get_agc_gain()` to report what Speex would currently apply. With Speex
+denoising selected, the monitor observes the denoised signal.
+
+`get_speech_probability()` is normalized to the range 0–1. RNNoise supplies a
+floating-point probability directly; Speex supplies an integer percentage via
+`SPEEX_PREPROCESS_GET_PROB`, which TwoVoIP divides by 100. These are useful for
+comparing changes from each denoiser but are not identically calibrated scores.
+
+The denoiser is selected in `create_sampler()`. Speex denoise
+works through the same mono preprocessor state as AGC. RNNoise requires mono
+48 kHz audio and chunks divisible by its 480-sample (10 ms) frame. A core-only
+build returns `ERR_UNAVAILABLE` when RNNoise is selected; it never pretends that
+noise suppression succeeded. Stereo is left as a manual-gain music path. Voice
+preprocessing modes are immutable sampler configuration. Call
+`create_sampler()` again to begin a stream with different settings.
+
+Speex preprocessing uses 10 or 20 ms internal frames, so the output chunk must
+divide into one of those durations. Shorter Opus frames remain available when
+voice preprocessing is disabled.
 
 The older `set_output_chunk_size()`, `calc_audio_chunk_size()`, and
 `process_pre_encoded_chunk()` calls are

@@ -1,5 +1,28 @@
 # Changelog
 
+## 6.5.0 - 2026-09-04
+
+- separated manual gain from Speex automatic gain and exposed the latter as a
+  read-only diagnostic value;
+- replaced TwoVoIP's simulated AGC multiplier with SpeexDSP's native in-place
+  preprocessing output;
+- added explicit disabled, Speex and RNNoise denoiser modes for mono voice;
+- reject unsupported RNNoise, stereo voice processing and processing-mode
+  changes after a stream has started instead of silently degrading the signal;
+- made RNNoise genuinely optional at compile time without a pass-through stub.
+- made denoiser and AGC modes required `create_sampler()` configuration and
+  changed its result to an `Error`, removing the unusable runtime mode setters.
+- added an AGC monitor mode using a separate native Speex state whose processed
+  output is discarded rather than simulated or applied.
+- moved denoiser and AGC selection into `TwoVoipMic.set_opus_values()` and kept
+  stream shutdown or reconfiguration policy outside the helper.
+- normalized SpeexDSP's dedicated 0–100 speech probability to 0–1 instead of
+  incorrectly treating `speex_preprocess_run()`'s VAD Boolean as a probability.
+- kept the radio's last completed-sample AGC gain at the PTT falling edge and
+  used it with manual gain when reprocessing the stored raw recording.
+- added `get_current_chunk_16khz()` as a bufferless hook exposing each
+  post-processing chunk to external speech and viseme analysers.
+
 ## 6.4.0 - 2026-09-04
 
 - configured the output chunk size with `create_sampler()` and added a

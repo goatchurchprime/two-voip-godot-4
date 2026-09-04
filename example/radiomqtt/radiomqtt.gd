@@ -33,14 +33,14 @@ func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 
-	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxAudioFrame/SampleRate, $VBoxFrameLength/HBoxOpusFrame/OptionChannels ]:
+	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxAudioFrame/SampleRate, $VBoxFrameLength/HBoxOpusFrame/OptionChannels, $HBoxBigButtons/VBoxPTT/Denoise ]:
 		h.connect("item_selected", func (_item_selected): updatesamplerates())
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusExtra/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
 		h.connect("value_changed", func (_value): updatesamplerates())
-	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMosquitto/base64 ]:
+	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxMosquitto/base64, $VBoxFrameLength/HBoxOpusFrame/AutoGainControl ]:
 		h.connect("toggled", func (_toggled_on): updatesamplerates())
 
-	$TwoVoipMic.init_voip_mic(false, $HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxBigButtons/VBoxPTT/Denoise, $HBoxMicTalk/VoxThreshold.material)
+	$TwoVoipMic.init_voip_mic(false, $HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxMicTalk/VoxThreshold.material)
 	$TwoVoipMic.set_vox_threshhold(0.017)
 
 	for d in AudioServer.get_output_device_list():
@@ -55,7 +55,7 @@ func _ready():
 	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
 		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
 	if $VBoxFrameLength/HBoxOpusFrame/OptionChannels.selected == -1:
-		$VBoxFrameLength/HBoxOpusFrame/OptionChannels.select(1)
+		$VBoxFrameLength/HBoxOpusFrame/OptionChannels.select(0)
 	if $VBoxFrameLength/HBoxAudioFrame/SampleRate.selected == -1:
 		$VBoxFrameLength/HBoxAudioFrame/SampleRate.select(4)
 
@@ -113,16 +113,25 @@ func rechunkrecordedchunks(orgsamples, newsamplesize):
 			res.append(currentsample.slice(0, newsamplesize))
 			currentsample = currentsample.slice(newsamplesize)
 	return res
-			
+
+var last_agc_gain := 1.0
+var previous_ptt := false
+
 func updatesamplerates():
+	$TwoVoipMic.processtalkstreamends(false)
 	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_input_mix_rate()
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
+	var denoiser_mode = $HBoxBigButtons/VBoxPTT/Denoise.selected
+	var agc_mode = TwovoipOpusEncoder.AGC_APPLIED if $VBoxFrameLength/HBoxOpusFrame/AutoGainControl.button_pressed else TwovoipOpusEncoder.AGC_DISABLED
+
 	$TwoVoipMic.set_opus_values(opussamplerate, frametimems, 
 			int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text),
 			int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), 
-			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), 
-			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
+			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value),
+			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed,
+			denoiser_mode, agc_mode)
+
 	$HBoxBigButtons/VBoxPTT/Denoise.disabled = not (opussamplerate == 48000)
 	$TwoVoipMic.lead_time = $HBoxBigButtons/VBoxVox/Leadtime.value
 	$TwoVoipMic.hang_time = $HBoxBigButtons/VBoxVox/Hangtime.value
@@ -131,7 +140,9 @@ func updatesamplerates():
 func reprocessoriginalchunks():
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
 	var opuschannels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
-	opusencoder_forreprocessing.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed, $TwoVoipMic.opus_chunk_size)
+	var denoiser = $HBoxBigButtons/VBoxPTT/Denoise.selected
+	opusencoder_forreprocessing.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoiser, TwovoipOpusEncoder.AGC_DISABLED, $TwoVoipMic.opus_chunk_size)
+	opusencoder_forreprocessing.set_gain($VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox.value * last_agc_gain)
 	opusencoder_forreprocessing.create_opus_encoder(int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
 	opusencoder_forreprocessing.reset_opus_encoder()
 	recordedheader["opusframesize"] = $TwoVoipMic.opus_chunk_size
@@ -156,8 +167,6 @@ func reprocessoriginalchunks():
 	recordedopuspackets = [ ]
 	#opusencoder_forreprocessing.resetencoder(true)
 	var resampledopusframecount = 0
-	var gain = $VBoxFrameLength/HBoxOpusFrame/GainSpinBox.value
-	opusencoder_forreprocessing.set_gain(gain)
 	for s in recordedsamples:
 		if opusencoder_forreprocessing.process_chunk(s) < 0:
 			break
@@ -255,13 +264,14 @@ func _on_sav_options_item_selected(index):
 		f.close()
 	$VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions.select(0)
 
-func _on_volume_db_spin_box_value_changed(value):
+func _process(delta):
+	var ptt = $HBoxBigButtons/VBoxPTT/PTT.button_pressed
+	if previous_ptt and not ptt:
+		last_agc_gain = $TwoVoipMic.get_agc_gain()
+	previous_ptt = ptt
+	if $TwoVoipMic.agc_mode == TwovoipOpusEncoder.AGC_APPLIED:
+		$VBoxFrameLength/HBoxOpusFrame/GainSpinBox.set_value_no_signal($TwoVoipMic.get_agc_gain())
+
+func _on_gain_manual_spin_box_value_changed(value):
 	$TwoVoipMic.set_gain(value)
 	reprocessoriginalchunks()
-
-func _on_auto_gain_control_toggled(toggled_on):
-	$TwoVoipMic.set_automatic_gain(toggled_on)
-
-func _process(delta):
-	if $TwoVoipMic.automatic_gain:
-		$VBoxFrameLength/HBoxOpusFrame/GainSpinBox.set_value_no_signal($TwoVoipMic.get_gain())

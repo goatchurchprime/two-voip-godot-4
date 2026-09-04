@@ -27,7 +27,7 @@ const rootmeansquaremaxmeasurement = false
 var microphoneaudiosamplescountSeconds = 0.0
 var microphoneaudiosamplescount = 0
 var microphoneaudiosamplescountSecondsSampleWindow = 10.0
-var automatic_gain = false
+var agc_mode = TwovoipOpusEncoder.AGC_DISABLED
 
 var talkingtimestart = 0
 var opus_chunk_size = 960
@@ -35,14 +35,17 @@ var audio_chunk_size = 882
 var frametimesecs = 0.02
 var opussamplerate = 48000
 var opuschannels = 2
-func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice):
-	processtalkstreamends(false)
-	assert (not currentlytalking)
-
+var denoiser = TwovoipOpusEncoder.DENOISER_DISABLED
+func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_denoiser, p_agc_mode):
 	opussamplerate = p_opussamplerate
 	opuschannels = p_channels
+	denoiser = p_denoiser
+	agc_mode = p_agc_mode
 	opus_chunk_size = int(opussamplerate*p_opusframedurationms/1000.0)
-	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoisebutton.button_pressed, opus_chunk_size)
+	var sampler_error = opusencoder.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoiser, agc_mode, opus_chunk_size)
+	if sampler_error != OK:
+		push_error("TwoVoIP sampler configuration failed: %s" % error_string(sampler_error))
+		return false
 	opusencoder.create_opus_encoder(p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice)
 	audio_chunk_size = opusencoder.get_required_input_chunk_size()
 	frametimesecs = p_opusframedurationms/1000.0
@@ -54,12 +57,12 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 		audiosampleframetextureimage = Image.create_from_data(audio_chunk_size, 1, false, Image.FORMAT_RGF, audiosampleframedata.to_byte_array())
 		audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
 		audiosampleframematerial.set_shader_parameter("chunktexture", audiosampleframetexture)
+	return true
 
 var miconbutton: Button = null
 var optioninputdevice: OptionButton = null
 var pttbutton: Button = null
 var voxbutton: Button = null
-var denoisebutton: Button = null
 
 func _ready():
 	set_process(false)
@@ -102,7 +105,6 @@ func init_voip_mic(p_json_packets_as_binary: bool,
 				   p_optioninputdevice: OptionButton, 
 				   p_pttbutton: Button,
 				   p_voxbutton: Button, 
-				   p_denoisebutton: Button, 
 				   p_audiosampleframematerial: Material):
 	json_packets_as_binary = p_json_packets_as_binary
 	miconbutton = p_miconbutton
@@ -124,12 +126,6 @@ func init_voip_mic(p_json_packets_as_binary: bool,
 	assert(voxbutton.toggle_mode, "Vox must be a toggle button")
 	voxbutton.connect("toggled", _on_vox_toggled)
 	_on_vox_toggled(voxbutton.button_pressed)
-
-	denoisebutton = p_denoisebutton
-	if denoisebutton == null:
-		denoisebutton = Button.new()
-		denoisebutton.toggle_mode = true
-	assert(denoisebutton.toggle_mode, "Denoise must be a toggle button")
 
 	audiosampleframematerial = p_audiosampleframematerial
 	
@@ -214,15 +210,12 @@ func set_gain(gain):
 func get_gain():
 	return opusencoder.get_gain()
 
-func set_automatic_gain(enabled):
-	var error = opusencoder.set_automatic_gain(enabled)
-	automatic_gain = opusencoder.get_automatic_gain()
-	return error
+func get_agc_gain():
+	return opusencoder.get_agc_gain()
 
-func processvox(chunkmax, audio_chunk):
+func processvox(chunkmax, speechnoiseprobability, audio_chunk):
 	if audiosampleframematerial:
-		if denoisebutton.button_pressed:
-			audiosampleframematerial.set_shader_parameter("speechnoiseprobability", chunkmax)
+		audiosampleframematerial.set_shader_parameter("speechnoiseprobability", speechnoiseprobability)
 		audiosampleframematerial.set_shader_parameter("chunkmax", chunkmax)
 
 	if chunkmax >= vox_threshhold:
@@ -264,6 +257,7 @@ func processopuschunk():
 
 var audio_chunk = null
 var last_chunkmax = 0.0
+var speechnoiseprobability = 0.0
 
 func _process(delta):
 	microphoneaudiosamplescountSeconds += delta
@@ -274,9 +268,12 @@ func _process(delta):
 			break
 		if opusencoder.process_chunk(audio_chunk) < 0:
 			break
-		if denoisebutton.button_pressed:
-			last_chunkmax = opusencoder.get_speech_probability()
-		elif rootmeansquaremaxmeasurement:
+			
+		if denoiser != TwovoipOpusEncoder.DENOISER_DISABLED:
+			speechnoiseprobability = opusencoder.get_speech_probability()
+		else:
+			speechnoiseprobability = 0.0
+		if rootmeansquaremaxmeasurement:
 			last_chunkmax = opusencoder.get_rms()
 		else:
 			last_chunkmax = opusencoder.get_peak()
@@ -286,7 +283,7 @@ func _process(delta):
 			microphoneaudiosamplescount = 0
 			microphoneaudiosamplescountSeconds = 0.0
 			microphoneaudiosamplescountSecondsSampleWindow *= 1.5
-		processvox(last_chunkmax, audio_chunk)
+		processvox(last_chunkmax, speechnoiseprobability, audio_chunk)
 		if currentlytalking:
 			processopuschunk()
 	audio_chunk = null

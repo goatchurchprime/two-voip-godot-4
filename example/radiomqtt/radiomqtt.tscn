@@ -20,9 +20,6 @@ corner_radius_bottom_left = 20
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_30le3"]
 bg_color = Color(0.909804, 0.392157, 0.435294, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ak08f"]
-bg_color = Color(0.814464, 0.272608, 0.419173, 1)
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_k6a7f"]
 bg_color = Color(0.6, 0.6, 0.0470588, 1)
 
@@ -130,11 +127,17 @@ text = "PTT"
 [node name="HSeparator" type="HSeparator" parent="HBoxBigButtons/VBoxPTT" unique_id=1237214197]
 layout_mode = 2
 
-[node name="Denoise" type="Button" parent="HBoxBigButtons/VBoxPTT" unique_id=243030164]
+[node name="Denoise" type="OptionButton" parent="HBoxBigButtons/VBoxPTT" unique_id=2060518890]
 layout_mode = 2
-theme_override_styles/pressed = SubResource("StyleBoxFlat_ak08f")
-toggle_mode = true
-text = "De-Noise"
+alignment = 1
+selected = 0
+item_count = 3
+popup/item_0/text = "DENOISER_DISABLED"
+popup/item_0/id = 0
+popup/item_1/text = "DENOISER_SPEEX"
+popup/item_1/id = 1
+popup/item_2/text = "DENOISER_RNNOISE"
+popup/item_2/id = 2
 
 [node name="VSeparator" type="VSeparator" parent="HBoxBigButtons" unique_id=1574942623]
 custom_minimum_size = Vector2(20, 0)
@@ -242,7 +245,7 @@ size_flags_horizontal = 0
 
 [node name="LabFrameDuration" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1051907019]
 layout_mode = 2
-text = "Frame duration"
+text = "Duration"
 
 [node name="FrameDuration" type="OptionButton" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=533184879]
 layout_mode = 2
@@ -260,17 +263,6 @@ popup/item_4/id = 4
 popup/item_5/text = "60ms"
 popup/item_5/id = 5
 
-[node name="LabelGain" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=560405035]
-layout_mode = 2
-text = "Gain"
-
-[node name="GainSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=250327984]
-layout_mode = 2
-min_value = 0.1
-max_value = 50.0
-step = 0.1
-value = 1.0
-
 [node name="LabChannels" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1456455889]
 layout_mode = 2
 text = "Channels:"
@@ -286,7 +278,27 @@ popup/item_1/id = 1
 [node name="AutoGainControl" type="CheckButton" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1563638136]
 layout_mode = 2
 tooltip_text = "Not implemented"
-text = "Auto gain"
+text = "Gain auto"
+
+[node name="LabelGain" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=560405035]
+visible = false
+layout_mode = 2
+text = "Gain"
+
+[node name="GainSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=250327984]
+layout_mode = 2
+max_value = 50.0
+step = 0.001
+value = 1.0
+editable = false
+
+[node name="GainManualSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=236570719]
+layout_mode = 2
+tooltip_text = "Manual gain"
+min_value = 0.1
+max_value = 50.0
+step = 0.1
+value = 1.0
 
 [node name="HBoxAudioFrame" type="HBoxContainer" parent="VBoxFrameLength" unique_id=256979740]
 layout_mode = 2
@@ -681,8 +693,7 @@ text = "sil"
 
 [connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="gui_input" from="HBoxMicTalk/VoxThreshold" to="." method="_on_vox_threshold_gui_input"]
-[connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/GainSpinBox" to="." method="_on_volume_db_spin_box_value_changed"]
-[connection signal="toggled" from="VBoxFrameLength/HBoxOpusFrame/AutoGainControl" to="." method="_on_auto_gain_control_toggled"]
+[connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox" to="." method="_on_gain_manual_spin_box_value_changed"]
 [connection signal="pressed" from="VBoxPlayback/HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 [connection signal="item_selected" from="VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions" to="." method="_on_sav_options_item_selected"]
 [connection signal="broker_connection_failed" from="MQTTnetwork/MQTT" to="MQTTnetwork" method="_on_mqtt_broker_connection_failed"]
