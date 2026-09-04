@@ -362,9 +362,12 @@ void TwovoipOpusEncoder::process_voice() {
                 float sample = std::clamp(pre_encoded_chunk[offset + frame], -1.0F, 1.0F);
                 speex_frame[frame] = static_cast<spx_int16_t>(std::round(sample * 32767.0F));
             }
-            int speech = speex_preprocess_run(speex_preprocessor, speex_frame.data());
-            if (denoiser == DENOISER_SPEEX)
-                last_speech_probability = std::max(last_speech_probability, static_cast<float>(speech));
+            speex_preprocess_run(speex_preprocessor, speex_frame.data());
+            if (denoiser == DENOISER_SPEEX) {
+                spx_int32_t speech_percent = 0;
+                speex_preprocess_ctl(speex_preprocessor, SPEEX_PREPROCESS_GET_PROB, &speech_percent);
+                last_speech_probability = std::max(last_speech_probability, speech_percent / 100.0F);
+            }
             for (int frame = 0; frame < preprocess_frame_size; frame++)
                 pre_encoded_chunk[offset + frame] = speex_frame[frame] / 32768.0F;
         }

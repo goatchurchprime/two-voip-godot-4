@@ -70,7 +70,7 @@
 		</method>
 		<method name="get_speech_probability" qualifiers="const">
 			<return type="float" />
-			<description>Returns RNNoise speech probability for the last processed chunk.</description>
+			<description>Returns the active denoiser's speech score normalized to 0–1 for the last chunk.</description>
 		</method>
 		<method name="process_chunk">
 			<return type="int" />
@@ -109,7 +109,7 @@
 		<member name="peak" type="float" setter="" getter="get_peak">Peak magnitude of the last chunk.</member>
 		<member name="required_input_chunk_size" type="int" setter="" getter="get_required_input_chunk_size">Required input frames per call.</member>
 		<member name="rms" type="float" setter="" getter="get_rms">RMS level of the last chunk.</member>
-		<member name="speech_probability" type="float" setter="" getter="get_speech_probability">RNNoise speech probability.</member>
+		<member name="speech_probability" type="float" setter="" getter="get_speech_probability">Active denoiser speech score normalized to 0–1.</member>
 	</members>
 	<constants>
 		<constant name="DENOISER_DISABLED" value="0" enum="Denoiser">No denoising.</constant>

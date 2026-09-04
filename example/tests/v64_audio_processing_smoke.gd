@@ -56,6 +56,7 @@ func _initialize() -> void:
 	assert(voice.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_SPEEX, TwovoipOpusEncoder.AGC_APPLIED, 960) == OK)
 	voice.set_gain(0.75)
 	assert(voice.process_chunk(make_stereo(960)) == 960)
+	assert(voice.get_speech_probability() >= 0.0 and voice.get_speech_probability() <= 1.0)
 	assert(voice.get_agc_gain() > 0.0)
 	assert(abs(voice.get_gain() - 0.75) < 0.0001)
 
@@ -78,6 +79,7 @@ func _initialize() -> void:
 	assert(rnnoise_voice.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_RNNOISE, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
 	assert(rnnoise_voice.get_denoiser() == TwovoipOpusEncoder.DENOISER_RNNOISE)
 	assert(rnnoise_voice.process_chunk(make_stereo(960)) == 960)
+	assert(rnnoise_voice.get_speech_probability() >= 0.0 and rnnoise_voice.get_speech_probability() <= 1.0)
 	var invalid_rnnoise := TwovoipOpusEncoder.new()
 	assert(invalid_rnnoise.create_sampler(48000, 48000, 2, TwovoipOpusEncoder.DENOISER_RNNOISE, TwovoipOpusEncoder.AGC_DISABLED, 960) != OK)
 

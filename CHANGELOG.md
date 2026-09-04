@@ -16,6 +16,8 @@
   output is discarded rather than simulated or applied.
 - moved denoiser and AGC selection into `TwoVoipMic.set_opus_values()` and kept
   stream shutdown or reconfiguration policy outside the helper.
+- normalized SpeexDSP's dedicated 0–100 speech probability to 0–1 instead of
+  incorrectly treating `speex_preprocess_run()`'s VAD Boolean as a probability.
 
 ## 6.4.0 - 2026-09-04
 

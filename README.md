@@ -169,6 +169,11 @@ output. This leaves the real signal under manual gain while allowing
 `get_agc_gain()` to report what Speex would currently apply. With Speex
 denoising selected, the monitor observes the denoised signal.
 
+`get_speech_probability()` is normalized to the range 0–1. RNNoise supplies a
+floating-point probability directly; Speex supplies an integer percentage via
+`SPEEX_PREPROCESS_GET_PROB`, which TwoVoIP divides by 100. These are useful for
+comparing changes from each denoiser but are not identically calibrated scores.
+
 The denoiser is selected in `create_sampler()`. Speex denoise
 works through the same mono preprocessor state as AGC. RNNoise requires mono
 48 kHz audio and chunks divisible by its 480-sample (10 ms) frame. A core-only
