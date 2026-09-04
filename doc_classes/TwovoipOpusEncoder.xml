@@ -4,7 +4,7 @@
 		Prepares and encodes microphone chunks as Opus packets.
 	</brief_description>
 	<description>
-		Resamples mono or stereo input, optionally applies RNNoise and gain, measures the result, and encodes it with Opus.
+		Resamples mono or stereo input, optionally preprocesses mono voice, applies manual gain, measures the result, and encodes it with Opus.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -39,9 +39,17 @@
 			<return type="float" />
 			<description>Returns the linear gain currently applied during processing.</description>
 		</method>
-		<method name="get_automatic_gain" qualifiers="const">
-			<return type="bool" />
-			<description>Returns whether automatic gain is active.</description>
+		<method name="get_agc_gain" qualifiers="const">
+			<return type="float" />
+			<description>Returns the latest linear gain reported by Speex AGC.</description>
+		</method>
+		<method name="get_agc_mode" qualifiers="const">
+			<return type="int" enum="TwovoipOpusEncoder.AgcMode" />
+			<description>Returns the configured AGC mode.</description>
+		</method>
+		<method name="get_denoiser" qualifiers="const">
+			<return type="int" enum="TwovoipOpusEncoder.Denoiser" />
+			<description>Returns the configured denoiser.</description>
 		</method>
 		<method name="get_output_chunk_size" qualifiers="const">
 			<return type="int" />
@@ -80,15 +88,20 @@
 			<return type="void" />
 			<description>Resets Opus state before beginning an unrelated stream.</description>
 		</method>
-		<method name="set_automatic_gain">
+		<method name="set_agc_mode">
 			<return type="Error" />
-			<param index="0" name="enabled" type="bool" />
-			<description>Changes automatic gain mode and returns an Error code.</description>
+			<param index="0" name="mode" type="int" enum="TwovoipOpusEncoder.AgcMode" />
+			<description>Configures native Speex AGC before processing starts.</description>
+		</method>
+		<method name="set_denoiser">
+			<return type="Error" />
+			<param index="0" name="denoiser" type="int" enum="TwovoipOpusEncoder.Denoiser" />
+			<description>Chooses the mono voice denoiser before processing starts.</description>
 		</method>
 		<method name="set_gain">
 			<return type="void" />
 			<param index="0" name="gain" type="float" />
-			<description>Sets linear gain, or warns and does nothing while AGC is enabled.</description>
+			<description>Sets the manual linear gain applied after voice preprocessing.</description>
 		</method>
 		<method name="set_output_chunk_size" deprecated="Pass output_chunk_size to create_sampler().">
 			<return type="bool" />
@@ -97,12 +110,21 @@
 		</method>
 	</methods>
 	<members>
-		<member name="automatic_gain" type="bool" setter="" getter="get_automatic_gain">Whether automatic gain is active.</member>
-		<member name="gain" type="float" setter="" getter="get_gain">Current linear gain.</member>
+		<member name="agc_gain" type="float" setter="" getter="get_agc_gain">Latest linear gain reported by Speex AGC.</member>
+		<member name="agc_mode" type="int" setter="" getter="get_agc_mode" enum="TwovoipOpusEncoder.AgcMode">Configured AGC mode.</member>
+		<member name="denoiser" type="int" setter="" getter="get_denoiser" enum="TwovoipOpusEncoder.Denoiser">Configured denoiser.</member>
+		<member name="gain" type="float" setter="" getter="get_gain">Manual linear gain.</member>
 		<member name="output_chunk_size" type="int" setter="" getter="get_output_chunk_size">Output frames per chunk.</member>
 		<member name="peak" type="float" setter="" getter="get_peak">Peak magnitude of the last chunk.</member>
 		<member name="required_input_chunk_size" type="int" setter="" getter="get_required_input_chunk_size">Required input frames per call.</member>
 		<member name="rms" type="float" setter="" getter="get_rms">RMS level of the last chunk.</member>
 		<member name="speech_probability" type="float" setter="" getter="get_speech_probability">RNNoise speech probability.</member>
 	</members>
+	<constants>
+		<constant name="DENOISER_DISABLED" value="0" enum="Denoiser">No denoising.</constant>
+		<constant name="DENOISER_SPEEX" value="1" enum="Denoiser">Speex mono denoising.</constant>
+		<constant name="DENOISER_RNNOISE" value="2" enum="Denoiser">RNNoise at mono 48 kHz.</constant>
+		<constant name="AGC_DISABLED" value="0" enum="AgcMode">No automatic gain.</constant>
+		<constant name="AGC_APPLIED" value="1" enum="AgcMode">Apply native Speex automatic gain.</constant>
+	</constants>
 </class>

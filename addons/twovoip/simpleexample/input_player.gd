@@ -21,7 +21,7 @@ func _on_feedback_display_gui_input(event):
 		$TwoVoipMic.set_vox_threshhold(event.position.x/$FeedbackDisplay.size.x)
 
 func _on_agc_button_toggled(toggled_on):
-	$TwoVoipMic.set_automatic_gain(toggled_on)
+	$TwoVoipMic.set_agc_mode(TwovoipOpusEncoder.AGC_APPLIED if toggled_on else TwovoipOpusEncoder.AGC_DISABLED)
 	if not toggled_on:
 		$TwoVoipMic.set_gain($HSliderAGC.value)
 

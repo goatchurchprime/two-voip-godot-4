@@ -53,8 +53,6 @@
 
 #ifdef RNNOISE
     #include "rnnoise.h"
-#else
-    #include "rnnoise_stub.h"
 #endif
 
 
@@ -63,38 +61,60 @@ namespace godot {
 
 class TwovoipOpusEncoder : public RefCounted {
     GDCLASS(TwovoipOpusEncoder, RefCounted)
+
+public:
+    enum Denoiser {
+        DENOISER_DISABLED,
+        DENOISER_SPEEX,
+        DENOISER_RNNOISE,
+    };
+
+    enum AgcMode {
+        AGC_DISABLED,
+        AGC_APPLIED,
+    };
+
+private:
     
     int input_mix_rate = 44100;   // AudioServer.get_input_mixrate()
     int opus_sample_rate = 48000; // AudioServer.get_input_mixrate()
     int channels = 2;
     
     SpeexResamplerState* speex_resampler = NULL;
-    SpeexPreprocessState* speex_agc = NULL;
+    SpeexPreprocessState* speex_preprocessor = NULL;
+#ifdef RNNOISE
     DenoiseState* rnnoise_st = NULL;
+#endif
     OpusEncoder* opus_encoder = NULL;
 
     PackedFloat32Array mono_audio_frames; 
     PackedFloat32Array pre_encoded_chunk; 
+    std::vector<spx_int16_t> speex_frame;
+#ifdef RNNOISE
     PackedFloat32Array rnnoise_in;
     PackedFloat32Array rnnoise_out;
-    std::vector<spx_int16_t> agc_mono_frame;
+#endif
     PackedByteArray opus_byte_buffer;
 
     int output_chunk_size = 0;
     int required_input_chunk_size = 0;
-    int agc_frame_size = 0;
+    int preprocess_frame_size = 0;
     float last_peak = 0.0F;
     float last_rms = 0.0F;
     float last_speech_probability = 0.0F;
     float gain = 1.0F;
-    bool automatic_gain = false;
+    float agc_gain = 1.0F;
+    Denoiser denoiser = DENOISER_DISABLED;
+    AgcMode agc_mode = AGC_DISABLED;
+    bool processing_started = false;
     bool legacy_processing_warning_printed = false;
 
-    void destroy_agc();
-    Error create_agc();
+    void destroy_voice_processor();
+    Error create_voice_processor();
     bool configure_output_chunk_size(int p_output_chunk_size);
     int process_chunk_internal(const PackedVector2Array &audio_frames);
-    void apply_gain();
+    void process_voice();
+    void apply_manual_gain();
     void update_measurements();
     
 protected:
@@ -111,8 +131,11 @@ public:
     float get_speech_probability() const { return last_speech_probability; }
     void set_gain(float p_gain);
     float get_gain() const { return gain; }
-    Error set_automatic_gain(bool p_enabled);
-    bool get_automatic_gain() const { return automatic_gain; }
+    float get_agc_gain() const { return agc_gain; }
+    Error set_denoiser(Denoiser p_denoiser);
+    Denoiser get_denoiser() const { return denoiser; }
+    Error set_agc_mode(AgcMode p_mode);
+    AgcMode get_agc_mode() const { return agc_mode; }
     bool create_opus_encoder(int bit_rate, int complexity, bool voice_optimal);
     void reset_opus_encoder();
 
@@ -127,5 +150,8 @@ public:
 };
 
 }
+
+VARIANT_ENUM_CAST(godot::TwovoipOpusEncoder::Denoiser)
+VARIANT_ENUM_CAST(godot::TwovoipOpusEncoder::AgcMode)
 
 #endif // OPUS_ENCODER_OBJECT_H

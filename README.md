@@ -149,13 +149,24 @@ occasionally leave additional frames unconsumed, particularly on the first
 call for some rate and long-frame combinations. The caller must retain
 `frames.size() - consumed` frames; TwoVoIP does not buffer or discard them.
 
-Gain is a linear amplitude multiplier. `set_gain()` controls it while automatic
-gain is disabled and warns without changing anything while automatic gain is
-enabled. SpeexDSP does not expose a way to set its internal AGC gain, so enabling
-automatic gain starts a fresh analysis at `1.0`. `get_gain()` reports the gain
-currently being applied. Automatic gain uses 10 or 20 ms internal analysis
-frames, so output chunks must divide into one of those durations. Shorter Opus
-frames remain available with manual gain.
+`set_gain()` and `get_gain()` control a manual linear amplitude multiplier. It
+is applied after voice preprocessing and remains independent of automatic gain.
+For mono voice, select `AGC_APPLIED` with `set_agc_mode()` before processing;
+Speex then performs its native in-place AGC. `get_agc_gain()` reports Speex's
+latest gain for diagnostics, but TwoVoIP does not attempt to set or reproduce
+Speex's internal gain behavior.
+
+The denoiser is selected with `set_denoiser()` before processing. Speex denoise
+works through the same mono preprocessor state as AGC. RNNoise requires mono
+48 kHz audio and chunks divisible by its 480-sample (10 ms) frame. A core-only
+build returns `ERR_UNAVAILABLE` when RNNoise is selected; it never pretends that
+noise suppression succeeded. Stereo is left as a manual-gain music path. Voice
+preprocessing modes cannot change after the first processed chunk: configure a
+new sampler to begin a stream with different settings.
+
+Speex preprocessing uses 10 or 20 ms internal frames, so the output chunk must
+divide into one of those durations. Shorter Opus frames remain available when
+voice preprocessing is disabled.
 
 The older `set_output_chunk_size()`, `calc_audio_chunk_size()`, and
 `process_pre_encoded_chunk()` calls are

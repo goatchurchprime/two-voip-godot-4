@@ -260,8 +260,8 @@ func _on_volume_db_spin_box_value_changed(value):
 	reprocessoriginalchunks()
 
 func _on_auto_gain_control_toggled(toggled_on):
-	$TwoVoipMic.set_automatic_gain(toggled_on)
+	$TwoVoipMic.set_agc_mode(TwovoipOpusEncoder.AGC_APPLIED if toggled_on else TwovoipOpusEncoder.AGC_DISABLED)
 
 func _process(delta):
-	if $TwoVoipMic.automatic_gain:
+	if $TwoVoipMic.agc_mode == TwovoipOpusEncoder.AGC_APPLIED:
 		$VBoxFrameLength/HBoxOpusFrame/GainSpinBox.set_value_no_signal($TwoVoipMic.get_gain())

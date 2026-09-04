@@ -27,7 +27,7 @@ const rootmeansquaremaxmeasurement = false
 var microphoneaudiosamplescountSeconds = 0.0
 var microphoneaudiosamplescount = 0
 var microphoneaudiosamplescountSecondsSampleWindow = 10.0
-var automatic_gain = false
+var agc_mode = TwovoipOpusEncoder.AGC_DISABLED
 
 var talkingtimestart = 0
 var opus_chunk_size = 960
@@ -42,7 +42,13 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 	opussamplerate = p_opussamplerate
 	opuschannels = p_channels
 	opus_chunk_size = int(opussamplerate*p_opusframedurationms/1000.0)
-	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoisebutton.button_pressed, opus_chunk_size)
+	if not opusencoder.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoisebutton.button_pressed, opus_chunk_size):
+		push_error("TwoVoIP sampler configuration failed")
+		return false
+	var agc_error = opusencoder.set_agc_mode(agc_mode)
+	if agc_error != OK:
+		push_error("TwoVoIP AGC configuration failed: %s" % error_string(agc_error))
+		return false
 	opusencoder.create_opus_encoder(p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice)
 	audio_chunk_size = opusencoder.get_required_input_chunk_size()
 	frametimesecs = p_opusframedurationms/1000.0
@@ -54,6 +60,7 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 		audiosampleframetextureimage = Image.create_from_data(audio_chunk_size, 1, false, Image.FORMAT_RGF, audiosampleframedata.to_byte_array())
 		audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
 		audiosampleframematerial.set_shader_parameter("chunktexture", audiosampleframetexture)
+	return true
 
 var miconbutton: Button = null
 var optioninputdevice: OptionButton = null
@@ -214,10 +221,13 @@ func set_gain(gain):
 func get_gain():
 	return opusencoder.get_gain()
 
-func set_automatic_gain(enabled):
-	var error = opusencoder.set_automatic_gain(enabled)
-	automatic_gain = opusencoder.get_automatic_gain()
+func set_agc_mode(mode):
+	var error = opusencoder.set_agc_mode(mode)
+	agc_mode = opusencoder.get_agc_mode()
 	return error
+
+func set_denoiser(denoiser):
+	return opusencoder.set_denoiser(denoiser)
 
 func processvox(chunkmax, audio_chunk):
 	if audiosampleframematerial:

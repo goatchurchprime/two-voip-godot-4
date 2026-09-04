@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- separated manual gain from Speex automatic gain and exposed the latter as a
+  read-only diagnostic value;
+- replaced TwoVoIP's simulated AGC multiplier with SpeexDSP's native in-place
+  preprocessing output;
+- added explicit disabled, Speex and RNNoise denoiser modes for mono voice;
+- reject unsupported RNNoise, stereo voice processing and processing-mode
+  changes after a stream has started instead of silently degrading the signal;
+- made RNNoise genuinely optional at compile time without a pass-through stub.
+
 ## 6.4.0 - 2026-09-04
 
 - configured the output chunk size with `create_sampler()` and added a
