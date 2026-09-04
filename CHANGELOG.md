@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 6.5.0 - 2026-09-04
 
 - separated manual gain from Speex automatic gain and exposed the latter as a
   read-only diagnostic value;
@@ -20,6 +20,8 @@
   incorrectly treating `speex_preprocess_run()`'s VAD Boolean as a probability.
 - kept the radio's last completed-sample AGC gain at the PTT falling edge and
   used it with manual gain when reprocessing the stored raw recording.
+- added `get_current_chunk_16khz()` as a bufferless hook exposing each
+  post-processing chunk to external speech and viseme analysers.
 
 ## 6.4.0 - 2026-09-04
 

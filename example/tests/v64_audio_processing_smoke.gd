@@ -11,10 +11,19 @@ func make_stereo(count: int, amplitude: float = 0.1) -> PackedVector2Array:
 	return frames
 
 
+func make_constant(count: int, amplitude: float) -> PackedVector2Array:
+	var frames := PackedVector2Array()
+	frames.resize(count)
+	for i in range(count):
+		frames[i] = Vector2(amplitude, amplitude)
+	return frames
+
+
 func _initialize() -> void:
 	var encoder := TwovoipOpusEncoder.new()
 	assert(encoder.create_sampler(44100, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
 	assert(encoder.get_required_input_chunk_size() == 882)
+	assert(encoder.get_current_chunk_16khz().is_empty())
 	assert(not encoder.has_method("fetch_pre_encoded_chunk"))
 	for property_name in ["output_chunk_size", "required_input_chunk_size", "gain", "agc_gain", "agc_mode", "denoiser", "peak", "rms", "speech_probability"]:
 		var property = encoder.get_property_list().filter(func(item): return item.name == property_name)
@@ -27,6 +36,7 @@ func _initialize() -> void:
 	assert(abs(encoder.get_gain() - 0.5) < 0.0001)
 	assert(encoder.get_peak() > 0.0)
 	assert(encoder.get_rms() > 0.0)
+	assert(encoder.get_current_chunk_16khz().size() == 320)
 
 	var short_frames := make_stereo(881)
 	assert(encoder.process_chunk(short_frames) == -1)
@@ -42,6 +52,12 @@ func _initialize() -> void:
 	assert(mono.get_required_input_chunk_size() == 960)
 	assert(mono.process_chunk(make_stereo(960)) == 960)
 
+	var direct_16khz := TwovoipOpusEncoder.new()
+	assert(direct_16khz.create_sampler(16000, 16000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 320) == OK)
+	direct_16khz.set_gain(0.5)
+	assert(direct_16khz.process_chunk(make_constant(320, 0.25)) == 320)
+	assert(abs(direct_16khz.get_current_chunk_16khz()[100] - 0.125) < 0.000001)
+
 	for output_rate in [8000, 12000, 16000, 24000, 48000]:
 		for duration_ms in [10, 20, 40, 60]:
 			var standard := TwovoipOpusEncoder.new()
@@ -51,6 +67,7 @@ func _initialize() -> void:
 			var standard_required: int = standard.get_required_input_chunk_size()
 			var standard_consumed: int = standard.process_chunk(make_stereo(standard_required))
 			assert(standard_consumed > 0 and standard_consumed <= standard_required)
+			assert(standard.get_current_chunk_16khz().size() == duration_ms * 16)
 
 	var voice := TwovoipOpusEncoder.new()
 	assert(voice.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_SPEEX, TwovoipOpusEncoder.AGC_APPLIED, 960) == OK)

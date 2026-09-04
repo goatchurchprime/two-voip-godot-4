@@ -48,6 +48,10 @@
 			<return type="int" enum="TwovoipOpusEncoder.AgcMode" />
 			<description>Returns the configured AGC mode.</description>
 		</method>
+		<method name="get_current_chunk_16khz" qualifiers="const">
+			<return type="PackedFloat32Array" />
+			<description>Returns the last successfully processed chunk as post-processing mono 16 kHz PCM.</description>
+		</method>
 		<method name="get_denoiser" qualifiers="const">
 			<return type="int" enum="TwovoipOpusEncoder.Denoiser" />
 			<description>Returns the configured denoiser.</description>
@@ -103,6 +107,7 @@
 	<members>
 		<member name="agc_gain" type="float" setter="" getter="get_agc_gain">Latest linear gain reported by Speex AGC.</member>
 		<member name="agc_mode" type="int" setter="" getter="get_agc_mode" enum="TwovoipOpusEncoder.AgcMode">Configured AGC mode.</member>
+		<member name="current_chunk_16khz" type="PackedFloat32Array" setter="" getter="get_current_chunk_16khz">Last processed post-processing mono 16 kHz PCM chunk.</member>
 		<member name="denoiser" type="int" setter="" getter="get_denoiser" enum="TwovoipOpusEncoder.Denoiser">Configured denoiser.</member>
 		<member name="gain" type="float" setter="" getter="get_gain">Manual linear gain.</member>
 		<member name="output_chunk_size" type="int" setter="" getter="get_output_chunk_size">Output frames per chunk.</member>

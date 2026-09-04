@@ -148,6 +148,13 @@ if consumed >= 0:
     var packet := encoder.encode_chunk()
 ```
 
+After a successful `process_chunk()`, `get_current_chunk_16khz()` returns the
+same processed time interval as mono 16 kHz floating-point PCM. It branches
+after denoising, applied AGC and manual gain but before Opus encoding, making it
+suitable for an external speech or viseme analyser. A 20 ms chunk contains 320
+samples. The array is replaced on each call and is empty before processing or
+after a failed call; TwoVoIP does not queue these samples or interpret them.
+
 `get_required_input_chunk_size()` is constant until the sampler is reconfigured.
 It is the ceiling of the input/output sample ratio, and is
 therefore conservative for fractional combinations. `process_chunk()` rejects
