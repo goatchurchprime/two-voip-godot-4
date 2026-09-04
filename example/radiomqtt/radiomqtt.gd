@@ -115,14 +115,18 @@ func rechunkrecordedchunks(orgsamples, newsamplesize):
 	return res
 			
 func updatesamplerates():
+	$TwoVoipMic.processtalkstreamends(false)
 	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_input_mix_rate()
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
+	var denoiser = TwovoipOpusEncoder.DENOISER_RNNOISE if $HBoxBigButtons/VBoxPTT/Denoise.button_pressed else TwovoipOpusEncoder.DENOISER_DISABLED
+	var agc_mode = TwovoipOpusEncoder.AGC_APPLIED if $VBoxFrameLength/HBoxOpusFrame/AutoGainControl.button_pressed else TwovoipOpusEncoder.AGC_DISABLED
 	$TwoVoipMic.set_opus_values(opussamplerate, frametimems, 
 			int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text),
 			int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), 
-			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), 
-			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
+			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value),
+			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed,
+			denoiser, agc_mode)
 	$HBoxBigButtons/VBoxPTT/Denoise.disabled = not (opussamplerate == 48000)
 	$TwoVoipMic.lead_time = $HBoxBigButtons/VBoxVox/Leadtime.value
 	$TwoVoipMic.hang_time = $HBoxBigButtons/VBoxVox/Hangtime.value
@@ -261,7 +265,7 @@ func _on_volume_db_spin_box_value_changed(value):
 	reprocessoriginalchunks()
 
 func _on_auto_gain_control_toggled(toggled_on):
-	$TwoVoipMic.set_agc_mode(TwovoipOpusEncoder.AGC_APPLIED if toggled_on else TwovoipOpusEncoder.AGC_DISABLED)
+	updatesamplerates()
 
 func _process(delta):
 	if $TwoVoipMic.agc_mode == TwovoipOpusEncoder.AGC_APPLIED:

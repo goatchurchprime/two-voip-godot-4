@@ -14,6 +14,8 @@
   changed its result to an `Error`, removing the unusable runtime mode setters.
 - added an AGC monitor mode using a separate native Speex state whose processed
   output is discarded rather than simulated or applied.
+- moved denoiser and AGC selection into `TwoVoipMic.set_opus_values()` and kept
+  stream shutdown or reconfiguration policy outside the helper.
 
 ## 6.4.0 - 2026-09-04
 

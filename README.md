@@ -86,9 +86,9 @@ The sixth parameter `InputOption` is of type [OptionButton](https://docs.godoten
 [AudioServer.get_input_device_list()](https://docs.godotengine.org/en/stable/classes/class_audioserver.html#class-audioserver-method-get-input-device-list).
 Finally there is the `voxshader.gdshader` material you can use to make an activity waveform.
 
-The the opus encoder itself is created by `set_opus_values(opussamplerate, opusframedurationms, channels, opusbitrate, opuscomplexity, opusoptimizeforvoice)` where `opussamplerate` is chosen from [48000, 24000, 12000, 8000],
+The Opus encoder itself is created by `set_opus_values(opussamplerate, opusframedurationms, channels, opusbitrate, opuscomplexity, opusoptimizeforvoice, denoiser, agc_mode)` where `opussamplerate` is chosen from [48000, 24000, 12000, 8000],
 `opusframedurationms` which must be one of [5, 10, 20, 40, 60], `channels` is 1 for mono and 2 for stereo,
-`opusbitrate` is a range between 500 and 64000, `opuscomplexity` a number between 1 and 10, `opusoptimizeforvoice` a boolean value.  These are better outlined in the [Opus Definition](https://datatracker.ietf.org/doc/html/rfc6716#section-2.1).
+`opusbitrate` is a range between 500 and 64000, `opuscomplexity` a number between 1 and 10, and `opusoptimizeforvoice` is a boolean value. `denoiser` and `agc_mode` are fixed for that sampler configuration. These are better outlined in the [Opus Definition](https://datatracker.ietf.org/doc/html/rfc6716#section-2.1).
 
 If the `Vox` option is set, then `TwoVoipMic.set_voxthreshhold(voxthreshhold)` will set the gating threshold threshold
 (this sets the visual parameter in the shader).  There is also `hangtime` the time the microphone will

@@ -161,7 +161,6 @@ offset_right = 90.0
 offset_bottom = 117.0
 
 [connection signal="gui_input" from="InputPlayer/FeedbackDisplay" to="InputPlayer" method="_on_feedback_display_gui_input"]
-[connection signal="toggled" from="InputPlayer/AGCButton" to="InputPlayer" method="_on_agc_button_toggled"]
 [connection signal="value_changed" from="InputPlayer/HSliderAGC" to="InputPlayer" method="_on_h_slider_agc_value_changed"]
 
 [editable path="OutputPlayers/OutputPlayer"]
