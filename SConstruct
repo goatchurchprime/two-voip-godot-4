@@ -47,6 +47,8 @@ def setup_options(env: SConsEnvironment, arguments):
     # It must be here for lib_utils.py
     opts.Add(PathVariable("addon_output_dir", "Path to the output directory", default_output_dir, PathVariable.PathIsDirCreate))
     opts.Add(BoolVariable("rnnoise", "Enable rnnoise support", True))
+    opts.Add(BoolVariable("ovrlipsync", "Enable the experimental OVRLipSync backend", False))
+    opts.Add("ovrlipsync_dir", "Path to the extracted OVRLipSyncNative SDK", "")
 
     opts.Update(env)
     env.Help(opts.GenerateHelpText(env))
@@ -80,6 +82,21 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out: list):
                    LIBS=["RnNoise"],
                    LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "thirdparty/rnnoise")],
                    CPPDEFINES=["RNNOISE"])
+
+    if env["ovrlipsync"]:
+        if env["platform"] != "windows":
+            print("OVRLipSync is supported by this experiment only on Windows.")
+            env.Exit(1)
+        if not env["ovrlipsync_dir"]:
+            print("ovrlipsync_dir must point to the extracted OVRLipSyncNative SDK.")
+            env.Exit(1)
+        ovrlipsync_dir = env["ovrlipsync_dir"]
+        env.Append(
+            CPPPATH=[os.path.join(ovrlipsync_dir, "Include")],
+            LIBS=["OVRLipSyncShim"],
+            LIBPATH=[os.path.join(ovrlipsync_dir, "Lib", "Win64")],
+            CPPDEFINES=["OVR_LIP_SYNC"],
+        )
 
     if env.get("is_msvc", False):
         env.Append(CCFLAGS=["/GF"])  # Eliminate Duplicate Strings

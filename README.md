@@ -255,3 +255,20 @@ scons build_rnnoise  # build RNNoise using cmake
 scons                # build this library
 cp addons/twovoip/libs/*.so example/addons/twovoip/libs/
 ```
+
+### Experimental OVRLipSync comparison
+
+The `experiment/ovrlipsync-backend` branch can expose the proprietary
+OVRLipSync 1.61 SDK as a deliberately small optional backend on Windows. The
+SDK and its license are not distributed by this repository. After obtaining
+and extracting `OVRLipSyncNative`, build with:
+
+```powershell
+scons platform=windows target=template_debug ovrlipsync=yes ovrlipsync_dir=C:\path\to\OVRLipSyncNative
+```
+
+Copy `OVRLipSyncNative\Lib\Win64\OVRLipSync.dll` beside the built TwoVoIP DLL.
+`OvrLipSyncBackend` accepts exactly one configured 20 ms PCM frame at a time
+and returns the standard 15 OVR viseme weights. Capture, conditioning,
+resampling, timing, silence gating and animation remain outside this class so
+the experimental backend can be compared with the Mel/ONNX path fairly.
