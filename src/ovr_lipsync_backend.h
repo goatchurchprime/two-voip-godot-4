@@ -29,7 +29,7 @@ public:
     OvrLipSyncBackend();
     ~OvrLipSyncBackend();
 
-    Error configure(int p_sample_rate, int p_frame_size, int p_provider = 2, bool p_acceleration = true);
+    Error configure(int p_sample_rate, int p_frame_size, const String &p_library_dir = "", int p_provider = 2, bool p_acceleration = true);
     bool push_pcm(const PackedFloat32Array &p_mono_pcm);
     bool push_stereo_pcm(const PackedVector2Array &p_stereo_pcm);
     void reset();
