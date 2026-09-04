@@ -1,7 +1,7 @@
 #pragma once
 
 #define TWOVOIP_MAJOR 6
-#define TWOVOIP_MINOR 3
+#define TWOVOIP_MINOR 4
 #define TWOVOIP_PATCH 0
 #define TWOVOIP_VERSION ((TWOVOIP_MAJOR << (8 * 3)) + (TWOVOIP_MINOR << (8 * 2)) + (TWOVOIP_PATCH << (8 * 1)))
 

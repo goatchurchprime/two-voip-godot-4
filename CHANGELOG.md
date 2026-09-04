@@ -1,5 +1,19 @@
 # Changelog
 
+## 6.4.0 - Unreleased
+
+- added persistent output chunk configuration and a parameter-free
+  `process_chunk()` path which reports the number of input frames consumed;
+- added manual gain and linked mono/stereo SpeexDSP automatic gain, with the
+  currently applied gain available to the caller;
+- added peak, RMS and speech-probability result accessors so processing options
+  no longer need to be passed for each chunk;
+- retained `process_pre_encoded_chunk()` and `calc_audio_chunk_size()` as
+  compatibility interfaces;
+- removed the unused `fetch_pre_encoded_chunk()` method, whose implementation
+  always returned an empty array;
+- left the existing microphone oscilloscope connected to raw captured samples.
+
 ## 6.3.0 - 2026-09-03
 
 - replaced the copied Speex resampler sources with the official SpeexDSP

@@ -120,6 +120,46 @@ to tell the difference between choppy transmission and playing and a choppy micr
 Use `get_chunk_max()` to get an indicator of the audio coming from a particular player, which helps
 to tell the difference between whether they are muted, or your playback volume has been turned down.
 
+### Low-level encoder processing
+
+The low-level encoder can keep its output frame size as configuration, leaving
+the per-frame processing call concerned only with audio. For a 20 ms Opus frame
+at 48 kHz:
+
+```gdscript
+var encoder := TwovoipOpusEncoder.new()
+encoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false)
+encoder.set_output_chunk_size(960)
+encoder.create_opus_encoder(12000, 5, true)
+
+var required := encoder.get_required_input_chunk_size()
+var frames := AudioServer.get_input_frames(required)
+var consumed := encoder.process_chunk(frames)
+if consumed >= 0:
+    var peak := encoder.get_peak()
+    var rms := encoder.get_rms()
+    var packet := encoder.encode_chunk()
+```
+
+`get_required_input_chunk_size()` is constant until the sampler or output chunk
+is reconfigured. It is the ceiling of the input/output sample ratio, and is
+therefore conservative for fractional combinations. `process_chunk()` rejects
+a shorter array without advancing processing state and returns the number of
+input frames actually consumed. The Speex filter state and output capacity can
+occasionally leave additional frames unconsumed, particularly on the first
+call for some rate and long-frame combinations. The caller must retain
+`frames.size() - consumed` frames; TwoVoIP does not buffer or discard them.
+
+Gain is a linear amplitude multiplier. Manual gain is selected by calling
+`set_gain()`; `set_automatic_gain(true)` instead lets the SpeexDSP preprocessor
+control one linked gain for both stereo channels. `get_gain()` reports the
+gain currently being applied. Automatic gain uses 10 or 20 ms internal analysis
+frames, so output chunks must divide into one of those durations. Shorter Opus
+frames remain available with manual gain.
+
+The older `calc_audio_chunk_size()` and `process_pre_encoded_chunk()` calls are
+retained for compatibility and use the same processing implementation.
+
 #### Networking layer
 
 In the `transmit_audio_json_packet=true` mode the `TwoVoipMic` module outputs all its data via the signal
@@ -148,8 +188,8 @@ returns 20 to 30 bytes of compressed data for that chunk.
 **speexdsp** is a direct submodule of the official
 [Xiph SpeexDSP repository](https://github.com/xiph/speexdsp), pinned to the
 signed `SpeexDSP-1.2.1` release at commit
-`1b28a0f61bc31162979e1f26f3981fc3637095c8`. TwoVoIP compiles the resampler
-source directly into the extension. This is the same upstream resampler
+`1b28a0f61bc31162979e1f26f3981fc3637095c8`. TwoVoIP compiles the resampler and
+preprocessor sources directly into the extension. This is the same upstream resampler
 revision that was previously copied into `src`, with its floating-point mode
 selected explicitly by the build.
 

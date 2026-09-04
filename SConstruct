@@ -58,7 +58,7 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out: list):
 
     env.Append(
         CPPPATH=["speexdsp/include", "thirdparty/speexdsp/include/speex"],
-        CPPDEFINES=["FLOATING_POINT", ("EXPORT", "")],
+        CPPDEFINES=["FLOATING_POINT", "USE_KISS_FFT", ("EXPORT", "")],
     )
 
     if env.get("lto") != "none":
