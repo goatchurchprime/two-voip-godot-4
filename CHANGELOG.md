@@ -1,5 +1,30 @@
 # Changelog
 
+## 6.4.0 - 2026-09-04
+
+- configured the output chunk size with `create_sampler()` and added a
+  parameter-free `process_chunk()` path which reports consumed input frames;
+- added manual gain and linked mono/stereo SpeexDSP automatic gain, with the
+  currently applied gain available to the caller;
+- made AGC start explicitly at SpeexDSP's fixed gain of 1.0, reject manual gain
+  changes while active, and return configuration failures as errors;
+- exposed gain, AGC state, chunk sizes and measurements as read-only Inspector
+  properties;
+- added peak, RMS and speech-probability result accessors so processing options
+  no longer need to be passed for each chunk;
+- deprecated `process_pre_encoded_chunk()` and `calc_audio_chunk_size()` while
+  retaining them as warning-once compatibility interfaces;
+- removed the unused `fetch_pre_encoded_chunk()` method, whose implementation
+  always returned an empty array;
+- removed the optional gain argument from `encode_chunk()` so all gain is
+  configured and applied during audio processing rather than during encoding;
+- left the existing microphone oscilloscope connected to raw captured samples.
+
+Development disclosure: this release was prepared with assistance from OpenAI
+Codex, an AI coding agent based on GPT-5. Codex assisted with API analysis,
+implementation, documentation, builds, runtime testing and SpeexDSP behaviour
+verification. The work was directed and reviewed by Julian Todd.
+
 ## 6.3.0 - 2026-09-03
 
 - replaced the copied Speex resampler sources with the official SpeexDSP

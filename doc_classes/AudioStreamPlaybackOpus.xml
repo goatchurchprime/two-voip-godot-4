@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioStreamPlaybackOpus" inherits="AudioStreamPlaybackResampled" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Decodes queued Opus packets for playback.
+	</brief_description>
+	<description>
+		The playback object returned by AudioStreamOpus through AudioStreamPlayer.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="available_space_frames">
+			<return type="int" />
+			<description>Returns unused capacity in decoded audio frames.</description>
+		</method>
+		<method name="get_chunk_max">
+			<return type="float" />
+			<description>Returns the recent decoded peak magnitude.</description>
+		</method>
+		<method name="get_skips">
+			<return type="int" />
+			<param index="0" name="overflow" type="bool" />
+			<description>Returns underflow skips, or overflow skips when requested.</description>
+		</method>
+		<method name="mark_end_opus_stream">
+			<return type="void" />
+			<param index="0" name="clear_mark" type="bool" />
+			<description>Marks the queued stream end, or clears the previous mark.</description>
+		</method>
+		<method name="push_opus_packet">
+			<return type="void" />
+			<param index="0" name="opusbytepacket" type="PackedByteArray" />
+			<param index="1" name="begin" type="int" />
+			<param index="2" name="decode_fec" type="int" />
+			<description>Decodes one packet from begin, optionally using forward error correction.</description>
+		</method>
+		<method name="queue_length_frames">
+			<return type="int" />
+			<description>Returns the number of decoded frames waiting for playback.</description>
+		</method>
+		<method name="set_sinewave_frames">
+			<return type="void" />
+			<param index="0" name="sinewaveframes" type="int" />
+			<param index="1" name="volume" type="float" />
+			<description>Replaces decoded audio with a test sine wave for the given frames.</description>
+		</method>
+	</methods>
+</class>

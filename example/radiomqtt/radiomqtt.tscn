@@ -267,7 +267,7 @@ text = "Gain"
 [node name="GainSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=250327984]
 layout_mode = 2
 min_value = 0.1
-max_value = 10.0
+max_value = 50.0
 step = 0.1
 value = 1.0
 
@@ -286,7 +286,6 @@ popup/item_1/id = 1
 [node name="AutoGainControl" type="CheckButton" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1563638136]
 layout_mode = 2
 tooltip_text = "Not implemented"
-disabled = true
 text = "Auto gain"
 
 [node name="HBoxAudioFrame" type="HBoxContainer" parent="VBoxFrameLength" unique_id=256979740]
@@ -683,6 +682,7 @@ text = "sil"
 [connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="gui_input" from="HBoxMicTalk/VoxThreshold" to="." method="_on_vox_threshold_gui_input"]
 [connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/GainSpinBox" to="." method="_on_volume_db_spin_box_value_changed"]
+[connection signal="toggled" from="VBoxFrameLength/HBoxOpusFrame/AutoGainControl" to="." method="_on_auto_gain_control_toggled"]
 [connection signal="pressed" from="VBoxPlayback/HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 [connection signal="item_selected" from="VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions" to="." method="_on_sav_options_item_selected"]
 [connection signal="broker_connection_failed" from="MQTTnetwork/MQTT" to="MQTTnetwork" method="_on_mqtt_broker_connection_failed"]

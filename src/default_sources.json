@@ -1,8 +1,14 @@
 [
   "opus_encoder_object.cpp",
   "audio_stream_opus.cpp",
-  "audio_effect_fft_block.cpp",
   "register_types.cpp",
+  "gen/doc_data.gen.cpp",
   "../speexdsp/libspeexdsp/resample.c",
+  "../speexdsp/libspeexdsp/preprocess.c",
+  "../speexdsp/libspeexdsp/mdf.c",
+  "../speexdsp/libspeexdsp/fftwrap.c",
+  "../speexdsp/libspeexdsp/filterbank.c",
+  "../speexdsp/libspeexdsp/kiss_fft.c",
+  "../speexdsp/libspeexdsp/kiss_fftr.c",
   "utils.cpp"
 ]

@@ -44,7 +44,10 @@
 #include <godot_cpp/classes/audio_frame.hpp>
 #include <godot_cpp/classes/audio_stream_playback_resampled.hpp>
 
+#include <vector>
+
 #include "opus.h"
+#include "speex/speex_preprocess.h"
 #include "speex/speex_resampler.h"
 
 
@@ -66,6 +69,7 @@ class TwovoipOpusEncoder : public RefCounted {
     int channels = 2;
     
     SpeexResamplerState* speex_resampler = NULL;
+    SpeexPreprocessState* speex_agc = NULL;
     DenoiseState* rnnoise_st = NULL;
     OpusEncoder* opus_encoder = NULL;
 
@@ -73,20 +77,50 @@ class TwovoipOpusEncoder : public RefCounted {
     PackedFloat32Array pre_encoded_chunk; 
     PackedFloat32Array rnnoise_in;
     PackedFloat32Array rnnoise_out;
+    std::vector<spx_int16_t> agc_mono_frame;
     PackedByteArray opus_byte_buffer;
+
+    int output_chunk_size = 0;
+    int required_input_chunk_size = 0;
+    int agc_frame_size = 0;
+    float last_peak = 0.0F;
+    float last_rms = 0.0F;
+    float last_speech_probability = 0.0F;
+    float gain = 1.0F;
+    bool automatic_gain = false;
+    bool legacy_processing_warning_printed = false;
+
+    void destroy_agc();
+    Error create_agc();
+    bool configure_output_chunk_size(int p_output_chunk_size);
+    int process_chunk_internal(const PackedVector2Array &audio_frames);
+    void apply_gain();
+    void update_measurements();
     
 protected:
     static void _bind_methods();
     
 public:
-    bool create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, bool use_rnnoise);
+    bool create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, bool use_rnnoise, int p_output_chunk_size = 0);
+    bool set_output_chunk_size(int p_output_chunk_size);
+    int get_output_chunk_size() const { return output_chunk_size; }
+    int get_required_input_chunk_size() const { return required_input_chunk_size; }
+    int process_chunk(const PackedVector2Array &audio_frames);
+    float get_peak() const { return last_peak; }
+    float get_rms() const { return last_rms; }
+    float get_speech_probability() const { return last_speech_probability; }
+    void set_gain(float p_gain);
+    float get_gain() const { return gain; }
+    Error set_automatic_gain(bool p_enabled);
+    bool get_automatic_gain() const { return automatic_gain; }
     bool create_opus_encoder(int bit_rate, int complexity, bool voice_optimal);
     void reset_opus_encoder();
 
+    /** @deprecated Configure the output size once and call get_required_input_chunk_size(). */
     int calc_audio_chunk_size(int opus_chunk_size);
+    /** @deprecated Use process_chunk() followed by the measurement getters. */
     float process_pre_encoded_chunk(PackedVector2Array audio_frames, int opus_chunk_size, bool speech_probability, bool rms);
-    PackedVector2Array fetch_pre_encoded_chunk() { return PackedVector2Array(); pre_encoded_chunk; }
-    PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes, float gain=1.0);
+    PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes=PackedByteArray());
 
     TwovoipOpusEncoder();
     ~TwovoipOpusEncoder();

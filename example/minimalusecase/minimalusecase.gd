@@ -19,7 +19,7 @@ func _ready():
 	audio_stream_playback_opus.mark_end_opus_stream(true)
 
 	AudioServer.set_input_device_active(true)
-	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false)
+	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false, opus_chunk_size)
 	opusencoder.create_opus_encoder(12000, 5, true)
 
 	# Voice says: "Listen to me"
@@ -36,12 +36,12 @@ var chunkmax = 0.0
 var opus_chunk_size = 960
 func _process_record():
 	while true:
-		var frames = AudioServer.get_input_frames(opusencoder.calc_audio_chunk_size(opus_chunk_size))
-		var lchunkmax = opusencoder.process_pre_encoded_chunk(frames, opus_chunk_size, false, false)
-		if lchunkmax == -1.0:
+		var frames = AudioServer.get_input_frames(opusencoder.get_required_input_chunk_size())
+		var consumed = opusencoder.process_chunk(frames)
+		if consumed < 0:
 			break
 		chunkcount += 1
-		chunkmax = max(chunkmax, lchunkmax)
+		chunkmax = max(chunkmax, opusencoder.get_peak())
 		var opusdata : PackedByteArray = opusencoder.encode_chunk(prepend);
 		if (chunkcount % 50) == 0:
 			prints("audiomax: %.3f  data[%d]: %s" % [chunkmax, opusdata.size(), opusdata.slice(0,5)])
