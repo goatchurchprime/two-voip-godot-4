@@ -63,7 +63,6 @@ var miconbutton: Button = null
 var optioninputdevice: OptionButton = null
 var pttbutton: Button = null
 var voxbutton: Button = null
-var denoisebutton: Button = null
 
 func _ready():
 	set_process(false)
@@ -106,7 +105,6 @@ func init_voip_mic(p_json_packets_as_binary: bool,
 				   p_optioninputdevice: OptionButton, 
 				   p_pttbutton: Button,
 				   p_voxbutton: Button, 
-				   p_denoisebutton: Button, 
 				   p_audiosampleframematerial: Material):
 	json_packets_as_binary = p_json_packets_as_binary
 	miconbutton = p_miconbutton
@@ -128,12 +126,6 @@ func init_voip_mic(p_json_packets_as_binary: bool,
 	assert(voxbutton.toggle_mode, "Vox must be a toggle button")
 	voxbutton.connect("toggled", _on_vox_toggled)
 	_on_vox_toggled(voxbutton.button_pressed)
-
-	denoisebutton = p_denoisebutton
-	if denoisebutton == null:
-		denoisebutton = Button.new()
-		denoisebutton.toggle_mode = true
-	assert(denoisebutton.toggle_mode, "Denoise must be a toggle button")
 
 	audiosampleframematerial = p_audiosampleframematerial
 	
