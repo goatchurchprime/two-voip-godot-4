@@ -245,7 +245,7 @@ size_flags_horizontal = 0
 
 [node name="LabFrameDuration" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1051907019]
 layout_mode = 2
-text = "Frame duration"
+text = "Duration"
 
 [node name="FrameDuration" type="OptionButton" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=533184879]
 layout_mode = 2
@@ -281,11 +281,20 @@ tooltip_text = "Not implemented"
 text = "Gain auto"
 
 [node name="LabelGain" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=560405035]
+visible = false
 layout_mode = 2
 text = "Gain"
 
 [node name="GainSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=250327984]
 layout_mode = 2
+max_value = 50.0
+step = 0.001
+value = 1.0
+editable = false
+
+[node name="GainManualSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=236570719]
+layout_mode = 2
+tooltip_text = "Manual gain"
 min_value = 0.1
 max_value = 50.0
 step = 0.1
@@ -684,7 +693,7 @@ text = "sil"
 
 [connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="gui_input" from="HBoxMicTalk/VoxThreshold" to="." method="_on_vox_threshold_gui_input"]
-[connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/GainSpinBox" to="." method="_on_volume_db_spin_box_value_changed"]
+[connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox" to="." method="_on_gain_manual_spin_box_value_changed"]
 [connection signal="pressed" from="VBoxPlayback/HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 [connection signal="item_selected" from="VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions" to="." method="_on_sav_options_item_selected"]
 [connection signal="broker_connection_failed" from="MQTTnetwork/MQTT" to="MQTTnetwork" method="_on_mqtt_broker_connection_failed"]

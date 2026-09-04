@@ -213,10 +213,9 @@ func get_gain():
 func get_agc_gain():
 	return opusencoder.get_agc_gain()
 
-func processvox(chunkmax, audio_chunk):
+func processvox(chunkmax, speechnoiseprobability, audio_chunk):
 	if audiosampleframematerial:
-		if denoiser != TwovoipOpusEncoder.DENOISER_DISABLED:
-			audiosampleframematerial.set_shader_parameter("speechnoiseprobability", chunkmax)
+		audiosampleframematerial.set_shader_parameter("speechnoiseprobability", speechnoiseprobability)
 		audiosampleframematerial.set_shader_parameter("chunkmax", chunkmax)
 
 	if chunkmax >= vox_threshhold:
@@ -258,6 +257,7 @@ func processopuschunk():
 
 var audio_chunk = null
 var last_chunkmax = 0.0
+var speechnoiseprobability = 0.0
 
 func _process(delta):
 	microphoneaudiosamplescountSeconds += delta
@@ -268,9 +268,12 @@ func _process(delta):
 			break
 		if opusencoder.process_chunk(audio_chunk) < 0:
 			break
+			
 		if denoiser != TwovoipOpusEncoder.DENOISER_DISABLED:
-			last_chunkmax = opusencoder.get_speech_probability()
-		elif rootmeansquaremaxmeasurement:
+			speechnoiseprobability = opusencoder.get_speech_probability()
+		else:
+			speechnoiseprobability = 0.0
+		if rootmeansquaremaxmeasurement:
 			last_chunkmax = opusencoder.get_rms()
 		else:
 			last_chunkmax = opusencoder.get_peak()
@@ -280,7 +283,7 @@ func _process(delta):
 			microphoneaudiosamplescount = 0
 			microphoneaudiosamplescountSeconds = 0.0
 			microphoneaudiosamplescountSecondsSampleWindow *= 1.5
-		processvox(last_chunkmax, audio_chunk)
+		processvox(last_chunkmax, speechnoiseprobability, audio_chunk)
 		if currentlytalking:
 			processopuschunk()
 	audio_chunk = null
