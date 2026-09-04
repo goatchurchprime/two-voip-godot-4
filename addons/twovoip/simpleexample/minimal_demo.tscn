@@ -111,6 +111,25 @@ offset_top = 153.0
 offset_right = 432.0
 offset_bottom = 173.0
 
+[node name="AGCButton" type="Button" parent="InputPlayer" unique_id=710796326]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 212.0
+offset_right = 71.0
+offset_bottom = 243.0
+toggle_mode = true
+text = "AGC"
+
+[node name="HSliderAGC" type="HSlider" parent="InputPlayer" unique_id=699010031]
+layout_mode = 0
+offset_left = 101.0
+offset_top = 214.0
+offset_right = 382.0
+offset_bottom = 239.0
+max_value = 40.0
+step = 0.001
+value = 1.0
+
 [node name="OutputPlayersLabel" type="Label" parent="." unique_id=1586952382]
 layout_mode = 0
 offset_left = 17.0
@@ -142,5 +161,7 @@ offset_right = 90.0
 offset_bottom = 117.0
 
 [connection signal="gui_input" from="InputPlayer/FeedbackDisplay" to="InputPlayer" method="_on_feedback_display_gui_input"]
+[connection signal="toggled" from="InputPlayer/AGCButton" to="InputPlayer" method="_on_agc_button_toggled"]
+[connection signal="value_changed" from="InputPlayer/HSliderAGC" to="InputPlayer" method="_on_h_slider_agc_value_changed"]
 
 [editable path="OutputPlayers/OutputPlayer"]
