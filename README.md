@@ -128,8 +128,7 @@ at 48 kHz:
 
 ```gdscript
 var encoder := TwovoipOpusEncoder.new()
-encoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false)
-encoder.set_output_chunk_size(960)
+encoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false, 960)
 encoder.create_opus_encoder(12000, 5, true)
 
 var required := encoder.get_required_input_chunk_size()
@@ -141,8 +140,8 @@ if consumed >= 0:
     var packet := encoder.encode_chunk()
 ```
 
-`get_required_input_chunk_size()` is constant until the sampler or output chunk
-is reconfigured. It is the ceiling of the input/output sample ratio, and is
+`get_required_input_chunk_size()` is constant until the sampler is reconfigured.
+It is the ceiling of the input/output sample ratio, and is
 therefore conservative for fractional combinations. `process_chunk()` rejects
 a shorter array without advancing processing state and returns the number of
 input frames actually consumed. The Speex filter state and output capacity can
@@ -150,14 +149,15 @@ occasionally leave additional frames unconsumed, particularly on the first
 call for some rate and long-frame combinations. The caller must retain
 `frames.size() - consumed` frames; TwoVoIP does not buffer or discard them.
 
-Gain is a linear amplitude multiplier. Manual gain is selected by calling
-`set_gain()`; `set_automatic_gain(true)` instead lets the SpeexDSP preprocessor
-control one linked gain for both stereo channels. `get_gain()` reports the
-gain currently being applied. Automatic gain uses 10 or 20 ms internal analysis
+Gain is a linear amplitude multiplier. `set_gain()` selects manual control and
+sets the same value that automatic gain updates. Disabling automatic gain keeps
+its last value, and re-enabling it preserves its analysis state. `get_gain()`
+reports the gain currently being applied. Automatic gain uses 10 or 20 ms internal analysis
 frames, so output chunks must divide into one of those durations. Shorter Opus
 frames remain available with manual gain.
 
-The older `calc_audio_chunk_size()` and `process_pre_encoded_chunk()` calls are
+The older `set_output_chunk_size()`, `calc_audio_chunk_size()`, and
+`process_pre_encoded_chunk()` calls are
 deprecated but retained for compatibility. They issue one warning per encoder
 object and use the same processing implementation.
 

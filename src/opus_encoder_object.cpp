@@ -40,8 +40,9 @@
 using namespace godot;
 
 void TwovoipOpusEncoder::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("create_sampler", "p_input_mix_rate", "p_opus_sample_rate", "p_channels", "use_rnnoise"), &TwovoipOpusEncoder::create_sampler);
+    ClassDB::bind_method(D_METHOD("create_sampler", "p_input_mix_rate", "p_opus_sample_rate", "p_channels", "use_rnnoise", "output_chunk_size"), &TwovoipOpusEncoder::create_sampler, DEFVAL(0));
     ClassDB::bind_method(D_METHOD("set_output_chunk_size", "output_chunk_size"), &TwovoipOpusEncoder::set_output_chunk_size);
+    ClassDB::bind_method(D_METHOD("get_output_chunk_size"), &TwovoipOpusEncoder::get_output_chunk_size);
     ClassDB::bind_method(D_METHOD("get_required_input_chunk_size"), &TwovoipOpusEncoder::get_required_input_chunk_size);
     ClassDB::bind_method(D_METHOD("process_chunk", "audio_frames"), &TwovoipOpusEncoder::process_chunk);
     ClassDB::bind_method(D_METHOD("get_peak"), &TwovoipOpusEncoder::get_peak);
@@ -50,11 +51,21 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_gain", "gain"), &TwovoipOpusEncoder::set_gain);
     ClassDB::bind_method(D_METHOD("get_gain"), &TwovoipOpusEncoder::get_gain);
     ClassDB::bind_method(D_METHOD("set_automatic_gain", "enabled"), &TwovoipOpusEncoder::set_automatic_gain);
+    ClassDB::bind_method(D_METHOD("get_automatic_gain"), &TwovoipOpusEncoder::get_automatic_gain);
     ClassDB::bind_method(D_METHOD("create_opus_encoder", "bit_rate", "complexity", "voice_optimal"), &TwovoipOpusEncoder::create_opus_encoder);
     ClassDB::bind_method(D_METHOD("reset_opus_encoder"), &TwovoipOpusEncoder::reset_opus_encoder);
     ClassDB::bind_method(D_METHOD("calc_audio_chunk_size", "opus_chunk_size"), &TwovoipOpusEncoder::calc_audio_chunk_size);
     ClassDB::bind_method(D_METHOD("process_pre_encoded_chunk", "audio_frames", "opus_chunk_size", "speech_probability", "rms"), &TwovoipOpusEncoder::process_pre_encoded_chunk);
     ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes"), &TwovoipOpusEncoder::encode_chunk, DEFVAL(PackedByteArray()));
+
+    uint32_t read_only = PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY;
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "output_chunk_size", PROPERTY_HINT_NONE, "", read_only), "", "get_output_chunk_size");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "required_input_chunk_size", PROPERTY_HINT_NONE, "", read_only), "", "get_required_input_chunk_size");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gain", PROPERTY_HINT_NONE, "", read_only), "", "get_gain");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "automatic_gain", PROPERTY_HINT_NONE, "", read_only), "", "get_automatic_gain");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "peak", PROPERTY_HINT_NONE, "", read_only), "", "get_peak");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rms", PROPERTY_HINT_NONE, "", read_only), "", "get_rms");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "speech_probability", PROPERTY_HINT_NONE, "", read_only), "", "get_speech_probability");
 }
 
 TwovoipOpusEncoder::TwovoipOpusEncoder() {}
@@ -65,13 +76,14 @@ void TwovoipOpusEncoder::destroy_agc() {
         speex_agc = NULL;
     }
     agc_frame_size = 0;
+    agc_warmup_frames = 0;
     agc_mono_frame.clear();
 }
 
-bool TwovoipOpusEncoder::create_agc() {
+Error TwovoipOpusEncoder::create_agc() {
     destroy_agc();
-    if (!automatic_gain || output_chunk_size <= 0 || opus_sample_rate <= 0)
-        return !automatic_gain;
+    if (output_chunk_size <= 0 || opus_sample_rate <= 0)
+        return ERR_UNCONFIGURED;
 
     int frame_20ms = opus_sample_rate / 50;
     int frame_10ms = opus_sample_rate / 100;
@@ -81,24 +93,25 @@ bool TwovoipOpusEncoder::create_agc() {
         agc_frame_size = frame_10ms;
     else {
         UtilityFunctions::printerr("Automatic gain requires an output chunk divisible into 10 ms or 20 ms analysis frames");
-        return false;
+        return ERR_INVALID_PARAMETER;
     }
 
     speex_agc = speex_preprocess_state_init(agc_frame_size, opus_sample_rate);
     if (speex_agc == NULL) {
         UtilityFunctions::printerr("Speex automatic gain initialization failed");
         agc_frame_size = 0;
-        return false;
+        return ERR_CANT_CREATE;
     }
     spx_int32_t enabled = 1;
     spx_int32_t disabled = 0;
     speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_SET_DENOISE, &disabled);
     speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_SET_AGC, &enabled);
     agc_mono_frame.resize(agc_frame_size);
-    return true;
+    agc_warmup_frames = 21;
+    return OK;
 }
 
-bool TwovoipOpusEncoder::create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, bool use_rnnoise) {
+bool TwovoipOpusEncoder::create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, bool use_rnnoise, int p_output_chunk_size) {
     if (p_input_mix_rate <= 0 || p_opus_sample_rate <= 0 || (p_channels != 1 && p_channels != 2)) {
         UtilityFunctions::printerr("Invalid sampler configuration");
         return false;
@@ -138,10 +151,13 @@ bool TwovoipOpusEncoder::create_sampler(int p_input_mix_rate, int p_opus_sample_
             godot::UtilityFunctions::printerr("rnnoise only works for sample_rate=48000"); 
         }            
     }
-    return (((input_mix_rate == opus_sample_rate) || (speex_resampler != NULL)) && (!use_rnnoise || (rnnoise_st != NULL)));
+    bool configured = ((input_mix_rate == opus_sample_rate) || (speex_resampler != NULL)) && (!use_rnnoise || (rnnoise_st != NULL));
+    if (configured && p_output_chunk_size > 0)
+        configured = configure_output_chunk_size(p_output_chunk_size);
+    return configured;
 }
 
-bool TwovoipOpusEncoder::set_output_chunk_size(int p_output_chunk_size) {
+bool TwovoipOpusEncoder::configure_output_chunk_size(int p_output_chunk_size) {
     if (p_output_chunk_size <= 0 || input_mix_rate <= 0 || opus_sample_rate <= 0) {
         UtilityFunctions::printerr("Output chunk size and sample rates must be positive");
         return false;
@@ -152,11 +168,16 @@ bool TwovoipOpusEncoder::set_output_chunk_size(int p_output_chunk_size) {
     output_chunk_size = p_output_chunk_size;
     required_input_chunk_size = static_cast<int>((static_cast<int64_t>(output_chunk_size) * input_mix_rate + opus_sample_rate - 1) / opus_sample_rate);
     pre_encoded_chunk.resize(output_chunk_size * channels);
-    if (automatic_gain && !create_agc()) {
+    if (automatic_gain && create_agc() != OK) {
         automatic_gain = false;
         return false;
     }
     return true;
+}
+
+bool TwovoipOpusEncoder::set_output_chunk_size(int p_output_chunk_size) {
+    UtilityFunctions::push_warning("set_output_chunk_size() is deprecated; pass output_chunk_size to create_sampler()");
+    return configure_output_chunk_size(p_output_chunk_size);
 }
 
 void TwovoipOpusEncoder::set_gain(float p_gain) {
@@ -165,24 +186,23 @@ void TwovoipOpusEncoder::set_gain(float p_gain) {
         return;
     }
     automatic_gain = false;
-    destroy_agc();
-    manual_gain = p_gain;
-    current_gain = p_gain;
+    gain = p_gain;
 }
 
-bool TwovoipOpusEncoder::set_automatic_gain(bool p_enabled) {
+Error TwovoipOpusEncoder::set_automatic_gain(bool p_enabled) {
+    if (p_enabled == automatic_gain)
+        return OK;
     if (!p_enabled) {
         automatic_gain = false;
-        destroy_agc();
-        current_gain = manual_gain;
-        return true;
+        return OK;
     }
     automatic_gain = true;
-    if (!create_agc()) {
+    Error error = speex_agc == NULL ? create_agc() : OK;
+    if (error != OK) {
         automatic_gain = false;
-        return false;
+        return error;
     }
-    return true;
+    return OK;
 }
 
 
@@ -238,7 +258,7 @@ int TwovoipOpusEncoder::process_chunk_internal(const PackedVector2Array &audio_f
     last_rms = 0.0F;
     last_speech_probability = 0.0F;
     if (output_chunk_size <= 0 || required_input_chunk_size <= 0) {
-        UtilityFunctions::printerr("Call set_output_chunk_size() before process_chunk()");
+        UtilityFunctions::printerr("Pass output_chunk_size to create_sampler() before process_chunk()");
         return -1;
     }
     if (audio_frames.size() < required_input_chunk_size) {
@@ -308,7 +328,7 @@ int TwovoipOpusEncoder::process_chunk_internal(const PackedVector2Array &audio_f
 void TwovoipOpusEncoder::apply_gain() {
     if (!automatic_gain) {
         for (int i = 0; i < pre_encoded_chunk.size(); i++)
-            pre_encoded_chunk[i] *= manual_gain;
+            pre_encoded_chunk[i] *= gain;
         return;
     }
 
@@ -322,17 +342,22 @@ void TwovoipOpusEncoder::apply_gain() {
             agc_mono_frame[frame] = static_cast<spx_int16_t>(std::round(mono * 32767.0F));
         }
         speex_preprocess_run(speex_agc, agc_mono_frame.data());
-        spx_int32_t gain_db = 0;
-        speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_GET_AGC_GAIN, &gain_db);
-        float target_gain = std::pow(10.0F, static_cast<float>(gain_db) / 20.0F);
-        float starting_gain = current_gain;
+        float target_gain = gain;
+        if (agc_warmup_frames > 0) {
+            agc_warmup_frames--;
+        } else {
+            spx_int32_t gain_db = 0;
+            speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_GET_AGC_GAIN, &gain_db);
+            target_gain = std::pow(10.0F, static_cast<float>(gain_db) / 20.0F);
+        }
+        float starting_gain = gain;
         for (int frame = 0; frame < agc_frame_size; frame++) {
             float t = static_cast<float>(frame + 1) / agc_frame_size;
-            float gain = starting_gain + (target_gain - starting_gain) * t;
+            float frame_gain = starting_gain + (target_gain - starting_gain) * t;
             for (int channel = 0; channel < channels; channel++)
-                pre_encoded_chunk[(offset + frame) * channels + channel] *= gain;
+                pre_encoded_chunk[(offset + frame) * channels + channel] *= frame_gain;
         }
-        current_gain = target_gain;
+        gain = target_gain;
     }
 }
 
@@ -355,7 +380,7 @@ float TwovoipOpusEncoder::process_pre_encoded_chunk(PackedVector2Array audio_fra
         UtilityFunctions::push_warning("process_pre_encoded_chunk() is deprecated; use process_chunk() followed by get_peak(), get_rms(), or get_speech_probability()");
         legacy_processing_warning_printed = true;
     }
-    if (!set_output_chunk_size(opus_chunk_size))
+    if (!configure_output_chunk_size(opus_chunk_size))
         return -1.0F;
     if (process_chunk_internal(audio_frames) < 0)
         return -1.0F;

@@ -19,8 +19,7 @@ func _ready():
 	audio_stream_playback_opus.mark_end_opus_stream(true)
 
 	AudioServer.set_input_device_active(true)
-	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false)
-	opusencoder.set_output_chunk_size(opus_chunk_size)
+	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false, opus_chunk_size)
 	opusencoder.create_opus_encoder(12000, 5, true)
 
 	# Voice says: "Listen to me"

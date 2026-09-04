@@ -86,13 +86,14 @@ class TwovoipOpusEncoder : public RefCounted {
     float last_peak = 0.0F;
     float last_rms = 0.0F;
     float last_speech_probability = 0.0F;
-    float manual_gain = 1.0F;
-    float current_gain = 1.0F;
+    float gain = 1.0F;
     bool automatic_gain = false;
+    int agc_warmup_frames = 0;
     bool legacy_processing_warning_printed = false;
 
     void destroy_agc();
-    bool create_agc();
+    Error create_agc();
+    bool configure_output_chunk_size(int p_output_chunk_size);
     int process_chunk_internal(const PackedVector2Array &audio_frames);
     void apply_gain();
     void update_measurements();
@@ -101,16 +102,18 @@ protected:
     static void _bind_methods();
     
 public:
-    bool create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, bool use_rnnoise);
+    bool create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, bool use_rnnoise, int p_output_chunk_size = 0);
     bool set_output_chunk_size(int p_output_chunk_size);
+    int get_output_chunk_size() const { return output_chunk_size; }
     int get_required_input_chunk_size() const { return required_input_chunk_size; }
     int process_chunk(const PackedVector2Array &audio_frames);
     float get_peak() const { return last_peak; }
     float get_rms() const { return last_rms; }
     float get_speech_probability() const { return last_speech_probability; }
     void set_gain(float p_gain);
-    float get_gain() const { return current_gain; }
-    bool set_automatic_gain(bool p_enabled);
+    float get_gain() const { return gain; }
+    Error set_automatic_gain(bool p_enabled);
+    bool get_automatic_gain() const { return automatic_gain; }
     bool create_opus_encoder(int bit_rate, int complexity, bool voice_optimal);
     void reset_opus_encoder();
 

@@ -9,7 +9,7 @@
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="calc_audio_chunk_size" deprecated="Use set_output_chunk_size() and get_required_input_chunk_size().">
+		<method name="calc_audio_chunk_size" deprecated="Use create_sampler() and get_required_input_chunk_size().">
 			<return type="int" />
 			<param index="0" name="opus_chunk_size" type="int" />
 			<description>Returns the legacy input requirement for an output chunk.</description>
@@ -27,7 +27,8 @@
 			<param index="1" name="p_opus_sample_rate" type="int" />
 			<param index="2" name="p_channels" type="int" />
 			<param index="3" name="use_rnnoise" type="bool" />
-			<description>Configures input/output rates, mono or stereo output, and RNNoise.</description>
+			<param index="4" name="output_chunk_size" type="int" default="0" />
+			<description>Configures rates, channels, noise suppression, and output chunk size.</description>
 		</method>
 		<method name="encode_chunk">
 			<return type="PackedByteArray" />
@@ -37,6 +38,14 @@
 		<method name="get_gain" qualifiers="const">
 			<return type="float" />
 			<description>Returns the linear gain currently applied during processing.</description>
+		</method>
+		<method name="get_automatic_gain" qualifiers="const">
+			<return type="bool" />
+			<description>Returns whether automatic gain is active.</description>
+		</method>
+		<method name="get_output_chunk_size" qualifiers="const">
+			<return type="int" />
+			<description>Returns the configured output frames per chunk.</description>
 		</method>
 		<method name="get_peak" qualifiers="const">
 			<return type="float" />
@@ -72,19 +81,28 @@
 			<description>Resets Opus state before beginning an unrelated stream.</description>
 		</method>
 		<method name="set_automatic_gain">
-			<return type="bool" />
+			<return type="Error" />
 			<param index="0" name="enabled" type="bool" />
-			<description>Enables linked SpeexDSP automatic gain when the frame size permits it.</description>
+			<description>Changes automatic gain mode and returns an Error code.</description>
 		</method>
 		<method name="set_gain">
 			<return type="void" />
 			<param index="0" name="gain" type="float" />
 			<description>Selects manual gain and sets its constant linear multiplier.</description>
 		</method>
-		<method name="set_output_chunk_size">
+		<method name="set_output_chunk_size" deprecated="Pass output_chunk_size to create_sampler().">
 			<return type="bool" />
 			<param index="0" name="output_chunk_size" type="int" />
 			<description>Sets the number of output frames produced by each processing call.</description>
 		</method>
 	</methods>
+	<members>
+		<member name="automatic_gain" type="bool" setter="" getter="get_automatic_gain">Whether automatic gain is active.</member>
+		<member name="gain" type="float" setter="" getter="get_gain">Current linear gain.</member>
+		<member name="output_chunk_size" type="int" setter="" getter="get_output_chunk_size">Output frames per chunk.</member>
+		<member name="peak" type="float" setter="" getter="get_peak">Peak magnitude of the last chunk.</member>
+		<member name="required_input_chunk_size" type="int" setter="" getter="get_required_input_chunk_size">Required input frames per call.</member>
+		<member name="rms" type="float" setter="" getter="get_rms">RMS level of the last chunk.</member>
+		<member name="speech_probability" type="float" setter="" getter="get_speech_probability">RNNoise speech probability.</member>
+	</members>
 </class>

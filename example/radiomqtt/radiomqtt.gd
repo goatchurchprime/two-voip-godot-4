@@ -131,8 +131,7 @@ func updatesamplerates():
 func reprocessoriginalchunks():
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
 	var opuschannels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
-	opusencoder_forreprocessing.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed)
-	opusencoder_forreprocessing.set_output_chunk_size($TwoVoipMic.opus_chunk_size)
+	opusencoder_forreprocessing.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed, $TwoVoipMic.opus_chunk_size)
 	opusencoder_forreprocessing.create_opus_encoder(int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
 	opusencoder_forreprocessing.reset_opus_encoder()
 	recordedheader["opusframesize"] = $TwoVoipMic.opus_chunk_size

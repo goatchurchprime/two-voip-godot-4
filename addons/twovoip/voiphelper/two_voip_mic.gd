@@ -41,10 +41,9 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 
 	opussamplerate = p_opussamplerate
 	opuschannels = p_channels
-	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoisebutton.button_pressed)
-	opusencoder.create_opus_encoder(p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice)
 	opus_chunk_size = int(opussamplerate*p_opusframedurationms/1000.0)
-	opusencoder.set_output_chunk_size(opus_chunk_size)
+	opusencoder.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoisebutton.button_pressed, opus_chunk_size)
+	opusencoder.create_opus_encoder(p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice)
 	audio_chunk_size = opusencoder.get_required_input_chunk_size()
 	frametimesecs = p_opusframedurationms/1000.0
 	if audiosampleframematerial:
@@ -216,7 +215,9 @@ func get_gain():
 	return opusencoder.get_gain()
 
 func set_automatic_gain(enabled):
-	automatic_gain = opusencoder.set_automatic_gain(enabled) and enabled
+	var error = opusencoder.set_automatic_gain(enabled)
+	automatic_gain = opusencoder.get_automatic_gain()
+	return error
 
 func processvox(chunkmax, audio_chunk):
 	if audiosampleframematerial:
