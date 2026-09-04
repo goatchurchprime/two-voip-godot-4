@@ -27,6 +27,7 @@ const rootmeansquaremaxmeasurement = false
 var microphoneaudiosamplescountSeconds = 0.0
 var microphoneaudiosamplescount = 0
 var microphoneaudiosamplescountSecondsSampleWindow = 10.0
+var automatic_gain = false
 
 var talkingtimestart = 0
 var opus_chunk_size = 960
@@ -209,8 +210,13 @@ func set_vox_threshhold(p_vox_threshhold):
 		audiosampleframematerial.set_shader_parameter("voxthreshhold", vox_threshhold)
 
 func set_gain(gain):
-	print("set microphone gain to ", gain)
 	opusencoder.set_gain(gain)
+
+func get_gain():
+	return opusencoder.get_gain()
+
+func set_automatic_gain(enabled):
+	automatic_gain = opusencoder.set_automatic_gain(enabled) and enabled
 
 func processvox(chunkmax, audio_chunk):
 	if audiosampleframematerial:

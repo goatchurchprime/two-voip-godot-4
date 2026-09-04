@@ -257,5 +257,13 @@ func _on_sav_options_item_selected(index):
 	$VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions.select(0)
 
 func _on_volume_db_spin_box_value_changed(value):
-	$TwoVoipMic.set_gain(value)
-	reprocessoriginalchunks()
+	if not $TwoVoipMic.automatic_gain:
+		$TwoVoipMic.set_gain(value)
+		reprocessoriginalchunks()
+
+func _on_auto_gain_control_toggled(toggled_on):
+	$TwoVoipMic.set_automatic_gain(toggled_on)
+
+func _process(delta):
+	if $TwoVoipMic.automatic_gain:
+		$VBoxFrameLength/HBoxOpusFrame/GainSpinBox.value = $TwoVoipMic.get_gain()

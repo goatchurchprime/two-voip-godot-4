@@ -21,14 +21,14 @@ func _on_feedback_display_gui_input(event):
 		$TwoVoipMic.set_vox_threshhold(event.position.x/$FeedbackDisplay.size.x)
 
 func _on_agc_button_toggled(toggled_on):
-	$TwoVoipMic.opusencoder.set_automatic_gain(toggled_on)
+	$TwoVoipMic.set_automatic_gain(toggled_on)
 	if not toggled_on:
-		$TwoVoipMic.opusencoder.set_gain($HSliderAGC.value)
+		$TwoVoipMic.set_gain($HSliderAGC.value)
 
 func _process(_delta):
 	if $AGCButton.button_pressed:
-		$HSliderAGC.value = $TwoVoipMic.opusencoder.get_gain()
+		$HSliderAGC.value = $TwoVoipMic.get_gain()
 
 func _on_h_slider_agc_value_changed(value):
 	if not $AGCButton.button_pressed:
-		$TwoVoipMic.opusencoder.set_gain($HSliderAGC.value)
+		$TwoVoipMic.set_gain($HSliderAGC.value)
