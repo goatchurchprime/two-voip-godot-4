@@ -1,4 +1,5 @@
 #include "ovr_lipsync_backend.h"
+#include "utils.h"
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/classes/time.hpp>
@@ -12,7 +13,7 @@
 using namespace godot;
 
 void OvrLipSyncBackend::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("configure", "sample_rate", "frame_size", "provider", "acceleration"), &OvrLipSyncBackend::configure, DEFVAL(2), DEFVAL(true));
+    ClassDB::bind_method(D_METHOD("configure", "sample_rate", "frame_size", "library_dir", "provider", "acceleration"), &OvrLipSyncBackend::configure, DEFVAL(""), DEFVAL(2), DEFVAL(true));
     ClassDB::bind_method(D_METHOD("push_pcm", "mono_pcm"), &OvrLipSyncBackend::push_pcm);
     ClassDB::bind_method(D_METHOD("push_stereo_pcm", "stereo_pcm"), &OvrLipSyncBackend::push_stereo_pcm);
     ClassDB::bind_method(D_METHOD("reset"), &OvrLipSyncBackend::reset);
@@ -37,7 +38,7 @@ OvrLipSyncBackend::~OvrLipSyncBackend() {
     reset();
 }
 
-Error OvrLipSyncBackend::configure(int p_sample_rate, int p_frame_size, int p_provider, bool p_acceleration) {
+Error OvrLipSyncBackend::configure(int p_sample_rate, int p_frame_size, const String &p_library_dir, int p_provider, bool p_acceleration) {
     reset();
 #ifndef OVR_LIP_SYNC
     status = "OVRLipSync support was not compiled into this build";
@@ -47,7 +48,9 @@ Error OvrLipSyncBackend::configure(int p_sample_rate, int p_frame_size, int p_pr
         status = "invalid configuration";
         return ERR_INVALID_PARAMETER;
     }
-    ovrLipSyncResult result = ovrLipSync_Initialize(p_sample_rate, p_frame_size);
+    ovrLipSyncResult result = p_library_dir.is_empty()
+        ? ovrLipSync_Initialize(p_sample_rate, p_frame_size)
+        : ovrLipSync_InitializeEx(p_sample_rate, p_frame_size, Utils::utf8toMbcs(p_library_dir.utf8().get_data()));
     if (result != ovrLipSyncSuccess) {
         status = String("OVRLipSync initialization failed: ") + String::num_int64(result);
         return ERR_CANT_CREATE;

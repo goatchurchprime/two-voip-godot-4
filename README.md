@@ -268,6 +268,8 @@ scons platform=windows target=template_debug ovrlipsync=yes ovrlipsync_dir=C:\pa
 ```
 
 Copy `OVRLipSyncNative\Lib\Win64\OVRLipSync.dll` beside the built TwoVoIP DLL.
+Pass that directory as the third argument to `configure()` so the SDK shim uses
+its supported explicit search path rather than the process working directory.
 `OvrLipSyncBackend` accepts exactly one configured 20 ms PCM frame at a time
 and returns the standard 15 OVR viseme weights. Capture, conditioning,
 resampling, timing, silence gating and animation remain outside this class so
