@@ -22,13 +22,14 @@
 			<description>Creates the Opus encoder with the configured rate and channels.</description>
 		</method>
 		<method name="create_sampler">
-			<return type="bool" />
-			<param index="0" name="p_input_mix_rate" type="int" />
-			<param index="1" name="p_opus_sample_rate" type="int" />
-			<param index="2" name="p_channels" type="int" />
-			<param index="3" name="use_rnnoise" type="bool" />
-			<param index="4" name="output_chunk_size" type="int" default="0" />
-			<description>Configures rates, channels, noise suppression, and output chunk size.</description>
+			<return type="Error" />
+			<param index="0" name="input_mix_rate" type="int" />
+			<param index="1" name="opus_sample_rate" type="int" />
+			<param index="2" name="channels" type="int" />
+			<param index="3" name="denoiser" type="int" enum="TwovoipOpusEncoder.Denoiser" />
+			<param index="4" name="agc_mode" type="int" enum="TwovoipOpusEncoder.AgcMode" />
+			<param index="5" name="output_chunk_size" type="int" />
+			<description>Creates the complete, immutable sample-processing configuration.</description>
 		</method>
 		<method name="encode_chunk">
 			<return type="PackedByteArray" />
@@ -87,16 +88,6 @@
 		<method name="reset_opus_encoder">
 			<return type="void" />
 			<description>Resets Opus state before beginning an unrelated stream.</description>
-		</method>
-		<method name="set_agc_mode">
-			<return type="Error" />
-			<param index="0" name="mode" type="int" enum="TwovoipOpusEncoder.AgcMode" />
-			<description>Configures native Speex AGC before processing starts.</description>
-		</method>
-		<method name="set_denoiser">
-			<return type="Error" />
-			<param index="0" name="denoiser" type="int" enum="TwovoipOpusEncoder.Denoiser" />
-			<description>Chooses the mono voice denoiser before processing starts.</description>
 		</method>
 		<method name="set_gain">
 			<return type="void" />

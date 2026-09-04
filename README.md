@@ -128,7 +128,15 @@ at 48 kHz:
 
 ```gdscript
 var encoder := TwovoipOpusEncoder.new()
-encoder.create_sampler(AudioServer.get_input_mix_rate(), 48000, 2, false, 960)
+var error := encoder.create_sampler(
+    AudioServer.get_input_mix_rate(),
+    48000,
+    2,
+    TwovoipOpusEncoder.DENOISER_DISABLED,
+    TwovoipOpusEncoder.AGC_DISABLED,
+    960,
+)
+assert(error == OK)
 encoder.create_opus_encoder(12000, 5, true)
 
 var required := encoder.get_required_input_chunk_size()
@@ -151,18 +159,18 @@ call for some rate and long-frame combinations. The caller must retain
 
 `set_gain()` and `get_gain()` control a manual linear amplitude multiplier. It
 is applied after voice preprocessing and remains independent of automatic gain.
-For mono voice, select `AGC_APPLIED` with `set_agc_mode()` before processing;
-Speex then performs its native in-place AGC. `get_agc_gain()` reports Speex's
+For mono voice, pass `AGC_APPLIED` to `create_sampler()`; Speex then performs
+its native in-place AGC. `get_agc_gain()` reports Speex's
 latest gain for diagnostics, but TwoVoIP does not attempt to set or reproduce
 Speex's internal gain behavior.
 
-The denoiser is selected with `set_denoiser()` before processing. Speex denoise
+The denoiser is selected in `create_sampler()`. Speex denoise
 works through the same mono preprocessor state as AGC. RNNoise requires mono
 48 kHz audio and chunks divisible by its 480-sample (10 ms) frame. A core-only
 build returns `ERR_UNAVAILABLE` when RNNoise is selected; it never pretends that
 noise suppression succeeded. Stereo is left as a manual-gain music path. Voice
-preprocessing modes cannot change after the first processed chunk: configure a
-new sampler to begin a stream with different settings.
+preprocessing modes are immutable sampler configuration. Call
+`create_sampler()` again to begin a stream with different settings.
 
 Speex preprocessing uses 10 or 20 ms internal frames, so the output chunk must
 divide into one of those durations. Shorter Opus frames remain available when

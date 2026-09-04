@@ -40,7 +40,7 @@
 using namespace godot;
 
 void TwovoipOpusEncoder::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("create_sampler", "p_input_mix_rate", "p_opus_sample_rate", "p_channels", "use_rnnoise", "output_chunk_size"), &TwovoipOpusEncoder::create_sampler, DEFVAL(0));
+    ClassDB::bind_method(D_METHOD("create_sampler", "input_mix_rate", "opus_sample_rate", "channels", "denoiser", "agc_mode", "output_chunk_size"), &TwovoipOpusEncoder::create_sampler);
     ClassDB::bind_method(D_METHOD("set_output_chunk_size", "output_chunk_size"), &TwovoipOpusEncoder::set_output_chunk_size);
     ClassDB::bind_method(D_METHOD("get_output_chunk_size"), &TwovoipOpusEncoder::get_output_chunk_size);
     ClassDB::bind_method(D_METHOD("get_required_input_chunk_size"), &TwovoipOpusEncoder::get_required_input_chunk_size);
@@ -51,9 +51,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_gain", "gain"), &TwovoipOpusEncoder::set_gain);
     ClassDB::bind_method(D_METHOD("get_gain"), &TwovoipOpusEncoder::get_gain);
     ClassDB::bind_method(D_METHOD("get_agc_gain"), &TwovoipOpusEncoder::get_agc_gain);
-    ClassDB::bind_method(D_METHOD("set_denoiser", "denoiser"), &TwovoipOpusEncoder::set_denoiser);
     ClassDB::bind_method(D_METHOD("get_denoiser"), &TwovoipOpusEncoder::get_denoiser);
-    ClassDB::bind_method(D_METHOD("set_agc_mode", "mode"), &TwovoipOpusEncoder::set_agc_mode);
     ClassDB::bind_method(D_METHOD("get_agc_mode"), &TwovoipOpusEncoder::get_agc_mode);
     ClassDB::bind_method(D_METHOD("create_opus_encoder", "bit_rate", "complexity", "voice_optimal"), &TwovoipOpusEncoder::create_opus_encoder);
     ClassDB::bind_method(D_METHOD("reset_opus_encoder"), &TwovoipOpusEncoder::reset_opus_encoder);
@@ -155,10 +153,12 @@ Error TwovoipOpusEncoder::create_voice_processor() {
     return OK;
 }
 
-bool TwovoipOpusEncoder::create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, bool use_rnnoise, int p_output_chunk_size) {
-    if (p_input_mix_rate <= 0 || p_opus_sample_rate <= 0 || (p_channels != 1 && p_channels != 2)) {
+Error TwovoipOpusEncoder::create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, Denoiser p_denoiser, AgcMode p_agc_mode, int p_output_chunk_size) {
+    if (p_input_mix_rate <= 0 || p_opus_sample_rate <= 0 || (p_channels != 1 && p_channels != 2) ||
+            p_denoiser < DENOISER_DISABLED || p_denoiser > DENOISER_RNNOISE ||
+            p_agc_mode < AGC_DISABLED || p_agc_mode > AGC_APPLIED) {
         UtilityFunctions::printerr("Invalid sampler configuration");
-        return false;
+        return ERR_INVALID_PARAMETER;
     }
     destroy_voice_processor();
     output_chunk_size = 0;
@@ -166,9 +166,8 @@ bool TwovoipOpusEncoder::create_sampler(int p_input_mix_rate, int p_opus_sample_
     input_mix_rate = p_input_mix_rate;
     opus_sample_rate = p_opus_sample_rate;
     channels = p_channels;
-    denoiser = use_rnnoise ? DENOISER_RNNOISE : DENOISER_DISABLED;
-    agc_mode = AGC_DISABLED;
-    processing_started = false;
+    denoiser = p_denoiser;
+    agc_mode = p_agc_mode;
     if (speex_resampler != NULL) {
         speex_resampler_destroy(speex_resampler);
         speex_resampler = NULL;
@@ -179,39 +178,38 @@ bool TwovoipOpusEncoder::create_sampler(int p_input_mix_rate, int p_opus_sample_
         speex_resampler = speex_resampler_init(channels, input_mix_rate, opus_sample_rate, resamplingquality, &speexerror);
         if (speex_resampler == NULL) {
             godot::UtilityFunctions::printerr("Speex resampler init failed code ", speexerror); 
+            return ERR_CANT_CREATE;
         }
     }
-    bool configured = (input_mix_rate == opus_sample_rate) || (speex_resampler != NULL);
-    if (configured && p_output_chunk_size > 0)
-        configured = configure_output_chunk_size(p_output_chunk_size);
-    return configured;
+    return configure_output_chunk_size(p_output_chunk_size);
 }
 
-bool TwovoipOpusEncoder::configure_output_chunk_size(int p_output_chunk_size) {
+Error TwovoipOpusEncoder::configure_output_chunk_size(int p_output_chunk_size) {
     if (p_output_chunk_size <= 0 || input_mix_rate <= 0 || opus_sample_rate <= 0) {
         UtilityFunctions::printerr("Output chunk size and sample rates must be positive");
-        return false;
+        return ERR_INVALID_PARAMETER;
     }
     if (output_chunk_size == p_output_chunk_size)
-        return true;
+        return OK;
     int previous_output_chunk_size = output_chunk_size;
     int previous_required_input_chunk_size = required_input_chunk_size;
     output_chunk_size = p_output_chunk_size;
     required_input_chunk_size = static_cast<int>((static_cast<int64_t>(output_chunk_size) * input_mix_rate + opus_sample_rate - 1) / opus_sample_rate);
     pre_encoded_chunk.resize(output_chunk_size * channels);
-    if (create_voice_processor() != OK) {
+    Error error = create_voice_processor();
+    if (error != OK) {
         output_chunk_size = previous_output_chunk_size;
         required_input_chunk_size = previous_required_input_chunk_size;
         pre_encoded_chunk.resize(output_chunk_size * channels);
         create_voice_processor();
-        return false;
+        return error;
     }
-    return true;
+    return OK;
 }
 
 bool TwovoipOpusEncoder::set_output_chunk_size(int p_output_chunk_size) {
     UtilityFunctions::push_warning("set_output_chunk_size() is deprecated; pass output_chunk_size to create_sampler()");
-    return configure_output_chunk_size(p_output_chunk_size);
+    return configure_output_chunk_size(p_output_chunk_size) == OK;
 }
 
 void TwovoipOpusEncoder::set_gain(float p_gain) {
@@ -220,46 +218,6 @@ void TwovoipOpusEncoder::set_gain(float p_gain) {
         return;
     }
     gain = p_gain;
-}
-
-Error TwovoipOpusEncoder::set_denoiser(Denoiser p_denoiser) {
-    if (p_denoiser < DENOISER_DISABLED || p_denoiser > DENOISER_RNNOISE)
-        return ERR_INVALID_PARAMETER;
-    if (p_denoiser == denoiser)
-        return OK;
-    if (processing_started) {
-        UtilityFunctions::printerr("Denoiser mode cannot be changed after audio processing has started");
-        return ERR_ALREADY_IN_USE;
-    }
-    Denoiser previous = denoiser;
-    denoiser = p_denoiser;
-    Error error = create_voice_processor();
-    if (error != OK) {
-        denoiser = previous;
-        create_voice_processor();
-        return error;
-    }
-    return OK;
-}
-
-Error TwovoipOpusEncoder::set_agc_mode(AgcMode p_mode) {
-    if (p_mode < AGC_DISABLED || p_mode > AGC_APPLIED)
-        return ERR_INVALID_PARAMETER;
-    if (p_mode == agc_mode)
-        return OK;
-    if (processing_started) {
-        UtilityFunctions::printerr("AGC mode cannot be changed after audio processing has started");
-        return ERR_ALREADY_IN_USE;
-    }
-    AgcMode previous = agc_mode;
-    agc_mode = p_mode;
-    Error error = create_voice_processor();
-    if (error != OK) {
-        agc_mode = previous;
-        create_voice_processor();
-        return error;
-    }
-    return OK;
 }
 
 bool TwovoipOpusEncoder::create_opus_encoder(int bit_rate, int complexity, bool voice_optimal) {
@@ -352,7 +310,6 @@ int TwovoipOpusEncoder::process_chunk_internal(const PackedVector2Array &audio_f
         return -2;
     }
     
-    processing_started = true;
     process_voice();
     apply_manual_gain();
     update_measurements();
@@ -423,7 +380,7 @@ float TwovoipOpusEncoder::process_pre_encoded_chunk(PackedVector2Array audio_fra
         UtilityFunctions::push_warning("process_pre_encoded_chunk() is deprecated; use process_chunk() followed by get_peak(), get_rms(), or get_speech_probability()");
         legacy_processing_warning_printed = true;
     }
-    if (!configure_output_chunk_size(opus_chunk_size))
+    if (configure_output_chunk_size(opus_chunk_size) != OK)
         return -1.0F;
     if (process_chunk_internal(audio_frames) < 0)
         return -1.0F;

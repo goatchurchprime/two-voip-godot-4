@@ -10,6 +10,8 @@
 - reject unsupported RNNoise, stereo voice processing and processing-mode
   changes after a stream has started instead of silently degrading the signal;
 - made RNNoise genuinely optional at compile time without a pass-through stub.
+- made denoiser and AGC modes required `create_sampler()` configuration and
+  changed its result to an `Error`, removing the unusable runtime mode setters.
 
 ## 6.4.0 - 2026-09-04
 

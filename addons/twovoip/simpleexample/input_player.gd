@@ -27,7 +27,7 @@ func _on_agc_button_toggled(toggled_on):
 
 func _process(_delta):
 	if $AGCButton.button_pressed:
-		$HSliderAGC.value = $TwoVoipMic.get_gain()
+		$HSliderAGC.value = $TwoVoipMic.get_agc_gain()
 
 func _on_h_slider_agc_value_changed(value):
 	if not $AGCButton.button_pressed:

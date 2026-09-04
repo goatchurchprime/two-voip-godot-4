@@ -106,12 +106,11 @@ private:
     float agc_gain = 1.0F;
     Denoiser denoiser = DENOISER_DISABLED;
     AgcMode agc_mode = AGC_DISABLED;
-    bool processing_started = false;
     bool legacy_processing_warning_printed = false;
 
     void destroy_voice_processor();
     Error create_voice_processor();
-    bool configure_output_chunk_size(int p_output_chunk_size);
+    Error configure_output_chunk_size(int p_output_chunk_size);
     int process_chunk_internal(const PackedVector2Array &audio_frames);
     void process_voice();
     void apply_manual_gain();
@@ -121,7 +120,7 @@ protected:
     static void _bind_methods();
     
 public:
-    bool create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, bool use_rnnoise, int p_output_chunk_size = 0);
+    Error create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, Denoiser p_denoiser, AgcMode p_agc_mode, int p_output_chunk_size);
     bool set_output_chunk_size(int p_output_chunk_size);
     int get_output_chunk_size() const { return output_chunk_size; }
     int get_required_input_chunk_size() const { return required_input_chunk_size; }
@@ -132,9 +131,7 @@ public:
     void set_gain(float p_gain);
     float get_gain() const { return gain; }
     float get_agc_gain() const { return agc_gain; }
-    Error set_denoiser(Denoiser p_denoiser);
     Denoiser get_denoiser() const { return denoiser; }
-    Error set_agc_mode(AgcMode p_mode);
     AgcMode get_agc_mode() const { return agc_mode; }
     bool create_opus_encoder(int bit_rate, int complexity, bool voice_optimal);
     void reset_opus_encoder();
