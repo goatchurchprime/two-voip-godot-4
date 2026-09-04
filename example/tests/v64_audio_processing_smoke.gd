@@ -25,12 +25,15 @@ func _initialize() -> void:
 	assert(encoder.get_required_input_chunk_size() == 882)
 	assert(encoder.get_current_chunk_16khz().is_empty())
 	assert(not encoder.has_method("fetch_pre_encoded_chunk"))
-	for property_name in ["output_chunk_size", "required_input_chunk_size", "gain", "agc_gain", "agc_mode", "denoiser", "peak", "rms", "speech_probability"]:
+	for property_name in ["output_chunk_size", "required_input_chunk_size", "agc_gain", "agc_mode", "denoiser", "peak", "rms", "speech_probability"]:
 		var property = encoder.get_property_list().filter(func(item): return item.name == property_name)
 		assert(property.size() == 1)
 		assert(property[0].usage & PROPERTY_USAGE_READ_ONLY)
+	var gain_property = encoder.get_property_list().filter(func(item): return item.name == "gain")
+	assert(gain_property.size() == 1)
+	assert(not (gain_property[0].usage & PROPERTY_USAGE_READ_ONLY))
 
-	encoder.set_gain(0.5)
+	encoder.gain = 0.5
 	var frames := make_stereo(882)
 	assert(encoder.process_chunk(frames) == 882)
 	assert(abs(encoder.get_gain() - 0.5) < 0.0001)
