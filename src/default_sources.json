@@ -1,7 +1,6 @@
 [
   "opus_encoder_object.cpp",
   "audio_stream_opus.cpp",
-  "audio_effect_fft_block.cpp",
   "register_types.cpp",
   "gen/doc_data.gen.cpp",
   "../speexdsp/libspeexdsp/resample.c",
