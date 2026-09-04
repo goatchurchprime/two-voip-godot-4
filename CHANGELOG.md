@@ -8,10 +8,12 @@
   currently applied gain available to the caller;
 - added peak, RMS and speech-probability result accessors so processing options
   no longer need to be passed for each chunk;
-- retained `process_pre_encoded_chunk()` and `calc_audio_chunk_size()` as
-  compatibility interfaces;
+- deprecated `process_pre_encoded_chunk()` and `calc_audio_chunk_size()` while
+  retaining them as warning-once compatibility interfaces;
 - removed the unused `fetch_pre_encoded_chunk()` method, whose implementation
   always returned an empty array;
+- removed the optional gain argument from `encode_chunk()` so all gain is
+  configured and applied during audio processing rather than during encoding;
 - left the existing microphone oscilloscope connected to raw captured samples.
 
 ## 6.3.0 - 2026-09-03

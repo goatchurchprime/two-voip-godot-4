@@ -132,6 +132,7 @@ func reprocessoriginalchunks():
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
 	var opuschannels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
 	opusencoder_forreprocessing.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, $HBoxBigButtons/VBoxPTT/Denoise.button_pressed)
+	opusencoder_forreprocessing.set_output_chunk_size($TwoVoipMic.opus_chunk_size)
 	opusencoder_forreprocessing.create_opus_encoder(int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
 	opusencoder_forreprocessing.reset_opus_encoder()
 	recordedheader["opusframesize"] = $TwoVoipMic.opus_chunk_size
@@ -157,12 +158,15 @@ func reprocessoriginalchunks():
 	#opusencoder_forreprocessing.resetencoder(true)
 	var resampledopusframecount = 0
 	var gain = $VBoxFrameLength/HBoxOpusFrame/GainSpinBox.value
+	opusencoder_forreprocessing.set_gain(gain)
 	for s in recordedsamples:
-		var chunkmax = opusencoder_forreprocessing.process_pre_encoded_chunk(s, $TwoVoipMic.opus_chunk_size, false, false)
+		if opusencoder_forreprocessing.process_chunk(s) < 0:
+			break
+		var chunkmax = opusencoder_forreprocessing.get_peak()
 		recordedchunkmax = max(recordedchunkmax, chunkmax)
 		resampledchunkprefix.set(0, (resampledopusframecount%256))  # 32768 frames is 10 minutes
 		resampledchunkprefix.set(1, (int(resampledopusframecount/256)&127) + (recordedheader["opusstreamcount"]%2)*128)
-		var opuspacket : PackedByteArray = opusencoder_forreprocessing.encode_chunk(resampledchunkprefix, gain)
+		var opuspacket : PackedByteArray = opusencoder_forreprocessing.encode_chunk(resampledchunkprefix)
 		recordedopuspackets.append(opuspacket)
 		resampledopusframecount += 1
 		recordedopuspacketsMemSize += opuspacket.size() 

@@ -158,7 +158,8 @@ frames, so output chunks must divide into one of those durations. Shorter Opus
 frames remain available with manual gain.
 
 The older `calc_audio_chunk_size()` and `process_pre_encoded_chunk()` calls are
-retained for compatibility and use the same processing implementation.
+deprecated but retained for compatibility. They issue one warning per encoder
+object and use the same processing implementation.
 
 #### Networking layer
 

@@ -54,7 +54,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("reset_opus_encoder"), &TwovoipOpusEncoder::reset_opus_encoder);
     ClassDB::bind_method(D_METHOD("calc_audio_chunk_size", "opus_chunk_size"), &TwovoipOpusEncoder::calc_audio_chunk_size);
     ClassDB::bind_method(D_METHOD("process_pre_encoded_chunk", "audio_frames", "opus_chunk_size", "speech_probability", "rms"), &TwovoipOpusEncoder::process_pre_encoded_chunk);
-    ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes", "gain"), &TwovoipOpusEncoder::encode_chunk, DEFVAL(PackedByteArray()), DEFVAL(1.0));
+    ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes"), &TwovoipOpusEncoder::encode_chunk, DEFVAL(PackedByteArray()));
 }
 
 TwovoipOpusEncoder::TwovoipOpusEncoder() {}
@@ -223,6 +223,10 @@ void TwovoipOpusEncoder::reset_opus_encoder() {
 }
 
 int TwovoipOpusEncoder::calc_audio_chunk_size(int opus_chunk_size) {
+    if (!legacy_processing_warning_printed) {
+        UtilityFunctions::push_warning("calc_audio_chunk_size() and process_pre_encoded_chunk() are deprecated; configure the output chunk once and use get_required_input_chunk_size() with process_chunk()");
+        legacy_processing_warning_printed = true;
+    }
     if (opus_chunk_size <= 0 || input_mix_rate <= 0 || opus_sample_rate <= 0)
         return 0;
     return static_cast<int>((static_cast<int64_t>(opus_chunk_size) * input_mix_rate + opus_sample_rate - 1) / opus_sample_rate);
@@ -347,6 +351,10 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
 }
 
 float TwovoipOpusEncoder::process_pre_encoded_chunk(PackedVector2Array audio_frames, int opus_chunk_size, bool speech_probability, bool rms) {
+    if (!legacy_processing_warning_printed) {
+        UtilityFunctions::push_warning("process_pre_encoded_chunk() is deprecated; use process_chunk() followed by get_peak(), get_rms(), or get_speech_probability()");
+        legacy_processing_warning_printed = true;
+    }
     if (!set_output_chunk_size(opus_chunk_size))
         return -1.0F;
     if (process_chunk_internal(audio_frames) < 0)
@@ -356,15 +364,10 @@ float TwovoipOpusEncoder::process_pre_encoded_chunk(PackedVector2Array audio_fra
     return rms ? last_rms : last_peak;
 }
 
-PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_bytes, float gain) {
+PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_bytes) {
     if (opus_encoder == NULL) {
         godot::UtilityFunctions::printerr("Error: opusencoder is null");
         return PackedByteArray();
-    }
-    if (gain != 1.0) {
-        for (int i = 0; i < pre_encoded_chunk.size(); i++) {
-            pre_encoded_chunk[i] *= gain;   // okay to rewrite as not going to use buffer again
-        }
     }
     int max_opus_byte_buffer = prefix_bytes.size() + 4*pre_encoded_chunk.size();
     if (max_opus_byte_buffer > opus_byte_buffer.size())

@@ -89,6 +89,7 @@ class TwovoipOpusEncoder : public RefCounted {
     float manual_gain = 1.0F;
     float current_gain = 1.0F;
     bool automatic_gain = false;
+    bool legacy_processing_warning_printed = false;
 
     void destroy_agc();
     bool create_agc();
@@ -113,9 +114,11 @@ public:
     bool create_opus_encoder(int bit_rate, int complexity, bool voice_optimal);
     void reset_opus_encoder();
 
+    /** @deprecated Configure the output size once and call get_required_input_chunk_size(). */
     int calc_audio_chunk_size(int opus_chunk_size);
+    /** @deprecated Use process_chunk() followed by the measurement getters. */
     float process_pre_encoded_chunk(PackedVector2Array audio_frames, int opus_chunk_size, bool speech_probability, bool rms);
-    PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes, float gain=1.0);
+    PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes=PackedByteArray());
 
     TwovoipOpusEncoder();
     ~TwovoipOpusEncoder();
