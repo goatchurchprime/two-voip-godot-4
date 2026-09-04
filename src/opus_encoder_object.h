@@ -72,6 +72,7 @@ public:
     enum AgcMode {
         AGC_DISABLED,
         AGC_APPLIED,
+        AGC_MONITOR,
     };
 
 private:
@@ -82,6 +83,7 @@ private:
     
     SpeexResamplerState* speex_resampler = NULL;
     SpeexPreprocessState* speex_preprocessor = NULL;
+    SpeexPreprocessState* speex_agc_monitor = NULL;
 #ifdef RNNOISE
     DenoiseState* rnnoise_st = NULL;
 #endif

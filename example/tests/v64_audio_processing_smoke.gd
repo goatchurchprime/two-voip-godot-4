@@ -59,6 +59,21 @@ func _initialize() -> void:
 	assert(voice.get_agc_gain() > 0.0)
 	assert(abs(voice.get_gain() - 0.75) < 0.0001)
 
+	var unprocessed := TwovoipOpusEncoder.new()
+	assert(unprocessed.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	var monitor := TwovoipOpusEncoder.new()
+	assert(monitor.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_MONITOR, 960) == OK)
+	var monitor_frames := make_stereo(960)
+	assert(unprocessed.process_chunk(monitor_frames) == 960)
+	assert(monitor.process_chunk(monitor_frames) == 960)
+	assert(abs(monitor.get_peak() - unprocessed.get_peak()) < 0.000001)
+	assert(monitor.get_agc_gain() > 0.0)
+
+	var denoised_monitor := TwovoipOpusEncoder.new()
+	assert(denoised_monitor.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_SPEEX, TwovoipOpusEncoder.AGC_MONITOR, 960) == OK)
+	assert(denoised_monitor.process_chunk(monitor_frames) == 960)
+	assert(denoised_monitor.get_agc_gain() > 0.0)
+
 	var rnnoise_voice := TwovoipOpusEncoder.new()
 	assert(rnnoise_voice.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_RNNOISE, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
 	assert(rnnoise_voice.get_denoiser() == TwovoipOpusEncoder.DENOISER_RNNOISE)

@@ -12,6 +12,8 @@
 - made RNNoise genuinely optional at compile time without a pass-through stub.
 - made denoiser and AGC modes required `create_sampler()` configuration and
   changed its result to an `Error`, removing the unusable runtime mode setters.
+- added an AGC monitor mode using a separate native Speex state whose processed
+  output is discarded rather than simulated or applied.
 
 ## 6.4.0 - 2026-09-04
 

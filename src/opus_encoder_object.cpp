@@ -65,7 +65,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gain", PROPERTY_HINT_NONE, "", read_only), "", "get_gain");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "agc_gain", PROPERTY_HINT_NONE, "", read_only), "", "get_agc_gain");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "denoiser", PROPERTY_HINT_ENUM, "Disabled,Speex,RNNoise", read_only), "", "get_denoiser");
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "agc_mode", PROPERTY_HINT_ENUM, "Disabled,Applied", read_only), "", "get_agc_mode");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "agc_mode", PROPERTY_HINT_ENUM, "Disabled,Applied,Monitor", read_only), "", "get_agc_mode");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "peak", PROPERTY_HINT_NONE, "", read_only), "", "get_peak");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rms", PROPERTY_HINT_NONE, "", read_only), "", "get_rms");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "speech_probability", PROPERTY_HINT_NONE, "", read_only), "", "get_speech_probability");
@@ -75,6 +75,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     BIND_ENUM_CONSTANT(DENOISER_RNNOISE);
     BIND_ENUM_CONSTANT(AGC_DISABLED);
     BIND_ENUM_CONSTANT(AGC_APPLIED);
+    BIND_ENUM_CONSTANT(AGC_MONITOR);
 }
 
 TwovoipOpusEncoder::TwovoipOpusEncoder() {}
@@ -83,6 +84,10 @@ void TwovoipOpusEncoder::destroy_voice_processor() {
     if (speex_preprocessor != NULL) {
         speex_preprocess_state_destroy(speex_preprocessor);
         speex_preprocessor = NULL;
+    }
+    if (speex_agc_monitor != NULL) {
+        speex_preprocess_state_destroy(speex_agc_monitor);
+        speex_agc_monitor = NULL;
     }
 #ifdef RNNOISE
     if (rnnoise_st != NULL) {
@@ -126,7 +131,7 @@ Error TwovoipOpusEncoder::create_voice_processor() {
 #endif
     }
 
-    if (denoiser != DENOISER_SPEEX && agc_mode != AGC_APPLIED)
+    if (denoiser != DENOISER_SPEEX && agc_mode == AGC_DISABLED)
         return OK;
 
     int frame_20ms = opus_sample_rate / 50;
@@ -140,15 +145,28 @@ Error TwovoipOpusEncoder::create_voice_processor() {
         return ERR_INVALID_PARAMETER;
     }
 
-    speex_preprocessor = speex_preprocess_state_init(preprocess_frame_size, opus_sample_rate);
-    if (speex_preprocessor == NULL) {
-        preprocess_frame_size = 0;
-        return ERR_CANT_CREATE;
+    if (denoiser == DENOISER_SPEEX || agc_mode == AGC_APPLIED) {
+        speex_preprocessor = speex_preprocess_state_init(preprocess_frame_size, opus_sample_rate);
+        if (speex_preprocessor == NULL) {
+            preprocess_frame_size = 0;
+            return ERR_CANT_CREATE;
+        }
+        spx_int32_t denoise_enabled = denoiser == DENOISER_SPEEX;
+        spx_int32_t agc_enabled = agc_mode == AGC_APPLIED;
+        speex_preprocess_ctl(speex_preprocessor, SPEEX_PREPROCESS_SET_DENOISE, &denoise_enabled);
+        speex_preprocess_ctl(speex_preprocessor, SPEEX_PREPROCESS_SET_AGC, &agc_enabled);
     }
-    spx_int32_t denoise_enabled = denoiser == DENOISER_SPEEX;
-    spx_int32_t agc_enabled = agc_mode == AGC_APPLIED;
-    speex_preprocess_ctl(speex_preprocessor, SPEEX_PREPROCESS_SET_DENOISE, &denoise_enabled);
-    speex_preprocess_ctl(speex_preprocessor, SPEEX_PREPROCESS_SET_AGC, &agc_enabled);
+    if (agc_mode == AGC_MONITOR) {
+        speex_agc_monitor = speex_preprocess_state_init(preprocess_frame_size, opus_sample_rate);
+        if (speex_agc_monitor == NULL) {
+            destroy_voice_processor();
+            return ERR_CANT_CREATE;
+        }
+        spx_int32_t disabled = 0;
+        spx_int32_t enabled = 1;
+        speex_preprocess_ctl(speex_agc_monitor, SPEEX_PREPROCESS_SET_DENOISE, &disabled);
+        speex_preprocess_ctl(speex_agc_monitor, SPEEX_PREPROCESS_SET_AGC, &enabled);
+    }
     speex_frame.resize(preprocess_frame_size);
     return OK;
 }
@@ -156,7 +174,7 @@ Error TwovoipOpusEncoder::create_voice_processor() {
 Error TwovoipOpusEncoder::create_sampler(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, Denoiser p_denoiser, AgcMode p_agc_mode, int p_output_chunk_size) {
     if (p_input_mix_rate <= 0 || p_opus_sample_rate <= 0 || (p_channels != 1 && p_channels != 2) ||
             p_denoiser < DENOISER_DISABLED || p_denoiser > DENOISER_RNNOISE ||
-            p_agc_mode < AGC_DISABLED || p_agc_mode > AGC_APPLIED) {
+            p_agc_mode < AGC_DISABLED || p_agc_mode > AGC_MONITOR) {
         UtilityFunctions::printerr("Invalid sampler configuration");
         return ERR_INVALID_PARAMETER;
     }
@@ -335,22 +353,32 @@ void TwovoipOpusEncoder::process_voice() {
     }
 #endif
 
-    if (speex_preprocessor == NULL)
+    if (speex_preprocessor == NULL && speex_agc_monitor == NULL)
         return;
 
     for (int offset = 0; offset < output_chunk_size; offset += preprocess_frame_size) {
-        for (int frame = 0; frame < preprocess_frame_size; frame++) {
-            float sample = std::clamp(pre_encoded_chunk[offset + frame], -1.0F, 1.0F);
-            speex_frame[frame] = static_cast<spx_int16_t>(std::round(sample * 32767.0F));
+        if (speex_preprocessor != NULL) {
+            for (int frame = 0; frame < preprocess_frame_size; frame++) {
+                float sample = std::clamp(pre_encoded_chunk[offset + frame], -1.0F, 1.0F);
+                speex_frame[frame] = static_cast<spx_int16_t>(std::round(sample * 32767.0F));
+            }
+            int speech = speex_preprocess_run(speex_preprocessor, speex_frame.data());
+            if (denoiser == DENOISER_SPEEX)
+                last_speech_probability = std::max(last_speech_probability, static_cast<float>(speech));
+            for (int frame = 0; frame < preprocess_frame_size; frame++)
+                pre_encoded_chunk[offset + frame] = speex_frame[frame] / 32768.0F;
         }
-        int speech = speex_preprocess_run(speex_preprocessor, speex_frame.data());
-        if (denoiser == DENOISER_SPEEX)
-            last_speech_probability = std::max(last_speech_probability, static_cast<float>(speech));
-        for (int frame = 0; frame < preprocess_frame_size; frame++)
-            pre_encoded_chunk[offset + frame] = speex_frame[frame] / 32768.0F;
-        if (agc_mode == AGC_APPLIED) {
+        if (speex_agc_monitor != NULL) {
+            for (int frame = 0; frame < preprocess_frame_size; frame++) {
+                float sample = std::clamp(pre_encoded_chunk[offset + frame], -1.0F, 1.0F);
+                speex_frame[frame] = static_cast<spx_int16_t>(std::round(sample * 32767.0F));
+            }
+            speex_preprocess_run(speex_agc_monitor, speex_frame.data());
+        }
+        if (agc_mode != AGC_DISABLED) {
             spx_int32_t gain_db = 0;
-            speex_preprocess_ctl(speex_preprocessor, SPEEX_PREPROCESS_GET_AGC_GAIN, &gain_db);
+            SpeexPreprocessState* agc_state = agc_mode == AGC_APPLIED ? speex_preprocessor : speex_agc_monitor;
+            speex_preprocess_ctl(agc_state, SPEEX_PREPROCESS_GET_AGC_GAIN, &gain_db);
             agc_gain = std::pow(10.0F, static_cast<float>(gain_db) / 20.0F);
         }
     }

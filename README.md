@@ -164,6 +164,11 @@ its native in-place AGC. `get_agc_gain()` reports Speex's
 latest gain for diagnostics, but TwoVoIP does not attempt to set or reproduce
 Speex's internal gain behavior.
 
+`AGC_MONITOR` runs native Speex AGC on a separate copy and discards its audio
+output. This leaves the real signal under manual gain while allowing
+`get_agc_gain()` to report what Speex would currently apply. With Speex
+denoising selected, the monitor observes the denoised signal.
+
 The denoiser is selected in `create_sampler()`. Speex denoise
 works through the same mono preprocessor state as AGC. RNNoise requires mono
 48 kHz audio and chunks divisible by its 480-sample (10 ms) frame. A core-only
