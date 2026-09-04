@@ -18,6 +18,8 @@
   stream shutdown or reconfiguration policy outside the helper.
 - normalized SpeexDSP's dedicated 0–100 speech probability to 0–1 instead of
   incorrectly treating `speex_preprocess_run()`'s VAD Boolean as a probability.
+- kept the radio's last completed-sample AGC gain at the PTT falling edge and
+  used it with manual gain when reprocessing the stored raw recording.
 
 ## 6.4.0 - 2026-09-04
 

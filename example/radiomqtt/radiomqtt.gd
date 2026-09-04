@@ -114,7 +114,9 @@ func rechunkrecordedchunks(orgsamples, newsamplesize):
 			currentsample = currentsample.slice(newsamplesize)
 	return res
 
-@onready var previous_agc = $VBoxFrameLength/HBoxOpusFrame/AutoGainControl.button_pressed
+var last_agc_gain := 1.0
+var previous_ptt := false
+
 func updatesamplerates():
 	$TwoVoipMic.processtalkstreamends(false)
 	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_input_mix_rate()
@@ -122,10 +124,6 @@ func updatesamplerates():
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
 	var denoiser_mode = $HBoxBigButtons/VBoxPTT/Denoise.selected
 	var agc_mode = TwovoipOpusEncoder.AGC_APPLIED if $VBoxFrameLength/HBoxOpusFrame/AutoGainControl.button_pressed else TwovoipOpusEncoder.AGC_DISABLED
-
-	if $VBoxFrameLength/HBoxOpusFrame/AutoGainControl.button_pressed != previous_agc:
-		previous_agc = $VBoxFrameLength/HBoxOpusFrame/AutoGainControl.button_pressed
-		$VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox.value = 1.0 if previous_agc else $VBoxFrameLength/HBoxOpusFrame/GainSpinBox.value
 
 	$TwoVoipMic.set_opus_values(opussamplerate, frametimems, 
 			int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text),
@@ -144,7 +142,7 @@ func reprocessoriginalchunks():
 	var opuschannels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
 	var denoiser = $HBoxBigButtons/VBoxPTT/Denoise.selected
 	opusencoder_forreprocessing.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoiser, TwovoipOpusEncoder.AGC_DISABLED, $TwoVoipMic.opus_chunk_size)
-	opusencoder_forreprocessing.set_gain($VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox.value)
+	opusencoder_forreprocessing.set_gain($VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox.value * last_agc_gain)
 	opusencoder_forreprocessing.create_opus_encoder(int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
 	opusencoder_forreprocessing.reset_opus_encoder()
 	recordedheader["opusframesize"] = $TwoVoipMic.opus_chunk_size
@@ -267,6 +265,10 @@ func _on_sav_options_item_selected(index):
 	$VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions.select(0)
 
 func _process(delta):
+	var ptt = $HBoxBigButtons/VBoxPTT/PTT.button_pressed
+	if previous_ptt and not ptt:
+		last_agc_gain = $TwoVoipMic.get_agc_gain()
+	previous_ptt = ptt
 	if $TwoVoipMic.agc_mode == TwovoipOpusEncoder.AGC_APPLIED:
 		$VBoxFrameLength/HBoxOpusFrame/GainSpinBox.set_value_no_signal($TwoVoipMic.get_agc_gain())
 
