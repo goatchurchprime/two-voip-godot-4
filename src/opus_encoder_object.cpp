@@ -73,8 +73,8 @@ bool TwovoipOpusEncoder::create_agc() {
     if (!automatic_gain || output_chunk_size <= 0 || opus_sample_rate <= 0)
         return !automatic_gain;
 
-    const int frame_20ms = opus_sample_rate / 50;
-    const int frame_10ms = opus_sample_rate / 100;
+    int frame_20ms = opus_sample_rate / 50;
+    int frame_10ms = opus_sample_rate / 100;
     if ((opus_sample_rate % 50) == 0 && frame_20ms > 0 && output_chunk_size >= frame_20ms && (output_chunk_size % frame_20ms) == 0)
         agc_frame_size = frame_20ms;
     else if ((opus_sample_rate % 100) == 0 && frame_10ms > 0 && output_chunk_size >= frame_10ms && (output_chunk_size % frame_10ms) == 0)
@@ -314,7 +314,7 @@ void TwovoipOpusEncoder::apply_gain() {
 
     for (int offset = 0; offset < output_chunk_size; offset += agc_frame_size) {
         for (int frame = 0; frame < agc_frame_size; frame++) {
-            const int index = (offset + frame) * channels;
+            int index = (offset + frame) * channels;
             float mono = pre_encoded_chunk[index];
             if (channels == 2)
                 mono = (mono + pre_encoded_chunk[index + 1]) * 0.5F;
@@ -324,11 +324,11 @@ void TwovoipOpusEncoder::apply_gain() {
         speex_preprocess_run(speex_agc, agc_mono_frame.data());
         spx_int32_t gain_db = 0;
         speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_GET_AGC_GAIN, &gain_db);
-        const float target_gain = std::pow(10.0F, static_cast<float>(gain_db) / 20.0F);
-        const float starting_gain = current_gain;
+        float target_gain = std::pow(10.0F, static_cast<float>(gain_db) / 20.0F);
+        float starting_gain = current_gain;
         for (int frame = 0; frame < agc_frame_size; frame++) {
-            const float t = static_cast<float>(frame + 1) / agc_frame_size;
-            const float gain = starting_gain + (target_gain - starting_gain) * t;
+            float t = static_cast<float>(frame + 1) / agc_frame_size;
+            float gain = starting_gain + (target_gain - starting_gain) * t;
             for (int channel = 0; channel < channels; channel++)
                 pre_encoded_chunk[(offset + frame) * channels + channel] *= gain;
         }
@@ -339,7 +339,7 @@ void TwovoipOpusEncoder::apply_gain() {
 void TwovoipOpusEncoder::update_measurements() {
     float sum_squares = 0.0F;
     for (int i = 0; i < pre_encoded_chunk.size(); i++) {
-        const float sample = pre_encoded_chunk[i];
+        float sample = pre_encoded_chunk[i];
         last_peak = std::max(last_peak, std::abs(sample));
         sum_squares += sample * sample;
     }
