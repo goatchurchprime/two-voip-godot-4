@@ -145,8 +145,15 @@ var consumed := encoder.process_chunk(frames)
 if consumed >= 0:
     var peak := encoder.get_peak()
     var rms := encoder.get_rms()
+    var conditioned_pcm := encoder.get_current_chunk()
     var packet := encoder.encode_chunk()
 ```
+
+`get_current_chunk()` returns the processed output-rate PCM before Opus
+encoding as `PackedVector2Array` stereo frames. Mono processing is duplicated
+into both components so the result can be passed directly to a Godot audio
+stream. TwoVoIP does not retain a queue; callers that need delayed monitoring
+or non-network playback own that buffering.
 
 After a successful `process_chunk()`, `get_current_chunk_16khz()` returns the
 same processed time interval as mono 16 kHz floating-point PCM. It branches

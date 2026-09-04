@@ -136,6 +136,7 @@ public:
     float get_peak() const { return last_peak; }
     float get_rms() const { return last_rms; }
     float get_speech_probability() const { return last_speech_probability; }
+    PackedVector2Array get_current_chunk() const;
     PackedFloat32Array get_current_chunk_16khz() const { return current_chunk_16khz; }
     void set_gain(float p_gain);
     float get_gain() const { return gain; }
