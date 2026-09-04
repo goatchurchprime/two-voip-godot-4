@@ -1,6 +1,6 @@
 # Changelog
 
-## 6.4.0 - Unreleased
+## 6.4.0 - 2026-09-04
 
 - configured the output chunk size with `create_sampler()` and added a
   parameter-free `process_chunk()` path which reports consumed input frames;
@@ -19,6 +19,11 @@
 - removed the optional gain argument from `encode_chunk()` so all gain is
   configured and applied during audio processing rather than during encoding;
 - left the existing microphone oscilloscope connected to raw captured samples.
+
+Development disclosure: this release was prepared with assistance from OpenAI
+Codex, an AI coding agent based on GPT-5. Codex assisted with API analysis,
+implementation, documentation, builds, runtime testing and SpeexDSP behaviour
+verification. The work was directed and reviewed by Julian Todd.
 
 ## 6.3.0 - 2026-09-03
 
