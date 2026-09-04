@@ -1,5 +1,6 @@
 [
   "opus_encoder_object.cpp",
+  "ovr_lipsync_backend.cpp",
   "audio_stream_opus.cpp",
   "register_types.cpp",
   "gen/doc_data.gen.cpp",
