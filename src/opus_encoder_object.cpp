@@ -63,7 +63,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     uint32_t read_only = PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY;
     ADD_PROPERTY(PropertyInfo(Variant::INT, "output_chunk_size", PROPERTY_HINT_NONE, "", read_only), "", "get_output_chunk_size");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "required_input_chunk_size", PROPERTY_HINT_NONE, "", read_only), "", "get_required_input_chunk_size");
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gain", PROPERTY_HINT_NONE, "", read_only), "", "get_gain");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gain"), "set_gain", "get_gain");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "agc_gain", PROPERTY_HINT_NONE, "", read_only), "", "get_agc_gain");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "denoiser", PROPERTY_HINT_ENUM, "Disabled,Speex,RNNoise", read_only), "", "get_denoiser");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "agc_mode", PROPERTY_HINT_ENUM, "Disabled,Applied,Monitor", read_only), "", "get_agc_mode");
