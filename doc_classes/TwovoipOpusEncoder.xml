@@ -88,7 +88,7 @@
 		<method name="set_gain">
 			<return type="void" />
 			<param index="0" name="gain" type="float" />
-			<description>Selects manual gain and sets its constant linear multiplier.</description>
+			<description>Sets linear gain, or warns and does nothing while AGC is enabled.</description>
 		</method>
 		<method name="set_output_chunk_size" deprecated="Pass output_chunk_size to create_sampler().">
 			<return type="bool" />

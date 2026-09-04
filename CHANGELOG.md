@@ -6,8 +6,8 @@
   parameter-free `process_chunk()` path which reports consumed input frames;
 - added manual gain and linked mono/stereo SpeexDSP automatic gain, with the
   currently applied gain available to the caller;
-- preserved one shared gain and the Speex analysis state when switching between
-  manual and automatic control, with configuration failures returned as errors;
+- made AGC start explicitly at SpeexDSP's fixed gain of 1.0, reject manual gain
+  changes while active, and return configuration failures as errors;
 - exposed gain, AGC state, chunk sizes and measurements as read-only Inspector
   properties;
 - added peak, RMS and speech-probability result accessors so processing options

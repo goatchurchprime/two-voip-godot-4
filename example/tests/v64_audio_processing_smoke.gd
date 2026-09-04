@@ -33,10 +33,11 @@ func _initialize() -> void:
 
 	assert(encoder.set_automatic_gain(true) == OK)
 	assert(encoder.get_automatic_gain())
+	assert(abs(encoder.get_gain() - 1.0) < 0.0001)
 	assert(encoder.set_automatic_gain(true) == OK)
-	assert(abs(encoder.get_gain() - 0.5) < 0.0001)
+	encoder.set_gain(4.0)
+	assert(abs(encoder.get_gain() - 1.0) < 0.0001)
 	assert(encoder.process_chunk(frames) == 882)
-	assert(abs(encoder.get_gain() - 0.5) < 0.0001)
 	for i in range(24):
 		assert(encoder.process_chunk(frames) == 882)
 	assert(encoder.get_gain() > 0.0)
@@ -44,6 +45,10 @@ func _initialize() -> void:
 	assert(encoder.set_automatic_gain(false) == OK)
 	assert(not encoder.get_automatic_gain())
 	assert(abs(encoder.get_gain() - automatic_gain) < 0.0001)
+	encoder.set_gain(0.75)
+	assert(abs(encoder.get_gain() - 0.75) < 0.0001)
+	assert(encoder.set_automatic_gain(true) == OK)
+	assert(abs(encoder.get_gain() - 1.0) < 0.0001)
 
 	var fractional := TwovoipOpusEncoder.new()
 	assert(fractional.create_sampler(44117, 48000, 2, false, 960))

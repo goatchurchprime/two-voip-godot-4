@@ -149,10 +149,11 @@ occasionally leave additional frames unconsumed, particularly on the first
 call for some rate and long-frame combinations. The caller must retain
 `frames.size() - consumed` frames; TwoVoIP does not buffer or discard them.
 
-Gain is a linear amplitude multiplier. `set_gain()` selects manual control and
-sets the same value that automatic gain updates. Disabling automatic gain keeps
-its last value, and re-enabling it preserves its analysis state. `get_gain()`
-reports the gain currently being applied. Automatic gain uses 10 or 20 ms internal analysis
+Gain is a linear amplitude multiplier. `set_gain()` controls it while automatic
+gain is disabled and warns without changing anything while automatic gain is
+enabled. SpeexDSP does not expose a way to set its internal AGC gain, so enabling
+automatic gain starts a fresh analysis at `1.0`. `get_gain()` reports the gain
+currently being applied. Automatic gain uses 10 or 20 ms internal analysis
 frames, so output chunks must divide into one of those durations. Shorter Opus
 frames remain available with manual gain.
 

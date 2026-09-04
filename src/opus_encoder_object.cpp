@@ -76,7 +76,6 @@ void TwovoipOpusEncoder::destroy_agc() {
         speex_agc = NULL;
     }
     agc_frame_size = 0;
-    agc_warmup_frames = 0;
     agc_mono_frame.clear();
 }
 
@@ -107,7 +106,7 @@ Error TwovoipOpusEncoder::create_agc() {
     speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_SET_DENOISE, &disabled);
     speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_SET_AGC, &enabled);
     agc_mono_frame.resize(agc_frame_size);
-    agc_warmup_frames = 21;
+    gain = 1.0F;
     return OK;
 }
 
@@ -185,7 +184,10 @@ void TwovoipOpusEncoder::set_gain(float p_gain) {
         UtilityFunctions::printerr("Gain must be a finite value greater than or equal to zero");
         return;
     }
-    automatic_gain = false;
+    if (automatic_gain) {
+        UtilityFunctions::push_warning("set_gain() is ignored while automatic gain is enabled; SpeexDSP does not provide an AGC gain setter");
+        return;
+    }
     gain = p_gain;
 }
 
@@ -194,10 +196,11 @@ Error TwovoipOpusEncoder::set_automatic_gain(bool p_enabled) {
         return OK;
     if (!p_enabled) {
         automatic_gain = false;
+        destroy_agc();
         return OK;
     }
     automatic_gain = true;
-    Error error = speex_agc == NULL ? create_agc() : OK;
+    Error error = create_agc();
     if (error != OK) {
         automatic_gain = false;
         return error;
@@ -342,14 +345,9 @@ void TwovoipOpusEncoder::apply_gain() {
             agc_mono_frame[frame] = static_cast<spx_int16_t>(std::round(mono * 32767.0F));
         }
         speex_preprocess_run(speex_agc, agc_mono_frame.data());
-        float target_gain = gain;
-        if (agc_warmup_frames > 0) {
-            agc_warmup_frames--;
-        } else {
-            spx_int32_t gain_db = 0;
-            speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_GET_AGC_GAIN, &gain_db);
-            target_gain = std::pow(10.0F, static_cast<float>(gain_db) / 20.0F);
-        }
+        spx_int32_t gain_db = 0;
+        speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_GET_AGC_GAIN, &gain_db);
+        float target_gain = std::pow(10.0F, static_cast<float>(gain_db) / 20.0F);
         float starting_gain = gain;
         for (int frame = 0; frame < agc_frame_size; frame++) {
             float t = static_cast<float>(frame + 1) / agc_frame_size;

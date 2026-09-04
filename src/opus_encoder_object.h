@@ -88,7 +88,6 @@ class TwovoipOpusEncoder : public RefCounted {
     float last_speech_probability = 0.0F;
     float gain = 1.0F;
     bool automatic_gain = false;
-    int agc_warmup_frames = 0;
     bool legacy_processing_warning_printed = false;
 
     void destroy_agc();
