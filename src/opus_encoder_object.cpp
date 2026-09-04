@@ -48,6 +48,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_peak"), &TwovoipOpusEncoder::get_peak);
     ClassDB::bind_method(D_METHOD("get_rms"), &TwovoipOpusEncoder::get_rms);
     ClassDB::bind_method(D_METHOD("get_speech_probability"), &TwovoipOpusEncoder::get_speech_probability);
+    ClassDB::bind_method(D_METHOD("get_current_chunk"), &TwovoipOpusEncoder::get_current_chunk);
     ClassDB::bind_method(D_METHOD("get_current_chunk_16khz"), &TwovoipOpusEncoder::get_current_chunk_16khz);
     ClassDB::bind_method(D_METHOD("set_gain", "gain"), &TwovoipOpusEncoder::set_gain);
     ClassDB::bind_method(D_METHOD("get_gain"), &TwovoipOpusEncoder::get_gain);
@@ -70,6 +71,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "peak", PROPERTY_HINT_NONE, "", read_only), "", "get_peak");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rms", PROPERTY_HINT_NONE, "", read_only), "", "get_rms");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "speech_probability", PROPERTY_HINT_NONE, "", read_only), "", "get_speech_probability");
+    ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "current_chunk", PROPERTY_HINT_NONE, "", read_only), "", "get_current_chunk");
     ADD_PROPERTY(PropertyInfo(Variant::PACKED_FLOAT32_ARRAY, "current_chunk_16khz", PROPERTY_HINT_NONE, "", read_only), "", "get_current_chunk_16khz");
 
     BIND_ENUM_CONSTANT(DENOISER_DISABLED);
@@ -468,6 +470,21 @@ void TwovoipOpusEncoder::update_measurements() {
 
 int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
     return process_chunk_internal(audio_frames);
+}
+
+PackedVector2Array TwovoipOpusEncoder::get_current_chunk() const {
+    PackedVector2Array frames;
+    frames.resize(output_chunk_size);
+    for (int frame = 0; frame < output_chunk_size; frame++) {
+        if (channels == 1) {
+            float sample = pre_encoded_chunk[frame];
+            frames.set(frame, Vector2(sample, sample));
+        } else {
+            int index = frame * 2;
+            frames.set(frame, Vector2(pre_encoded_chunk[index], pre_encoded_chunk[index + 1]));
+        }
+    }
+    return frames;
 }
 
 float TwovoipOpusEncoder::process_pre_encoded_chunk(PackedVector2Array audio_frames, int opus_chunk_size, bool speech_probability, bool rms) {
