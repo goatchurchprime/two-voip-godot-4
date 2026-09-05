@@ -16,6 +16,7 @@ void OvrLipSyncBackend::_bind_methods() {
     ClassDB::bind_method(D_METHOD("configure", "sample_rate", "frame_size", "library_dir", "provider", "acceleration"), &OvrLipSyncBackend::configure, DEFVAL(""), DEFVAL(2), DEFVAL(true));
     ClassDB::bind_method(D_METHOD("push_pcm", "mono_pcm"), &OvrLipSyncBackend::push_pcm);
     ClassDB::bind_method(D_METHOD("push_stereo_pcm", "stereo_pcm"), &OvrLipSyncBackend::push_stereo_pcm);
+    ClassDB::bind_method(D_METHOD("set_smoothing", "amount"), &OvrLipSyncBackend::set_smoothing);
     ClassDB::bind_method(D_METHOD("reset"), &OvrLipSyncBackend::reset);
     ClassDB::bind_method(D_METHOD("is_available"), &OvrLipSyncBackend::is_available);
     ClassDB::bind_method(D_METHOD("is_ready"), &OvrLipSyncBackend::is_ready);
@@ -23,6 +24,7 @@ void OvrLipSyncBackend::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_status"), &OvrLipSyncBackend::get_status);
     ClassDB::bind_method(D_METHOD("get_frame_delay_ms"), &OvrLipSyncBackend::get_frame_delay_ms);
     ClassDB::bind_method(D_METHOD("get_laughter_score"), &OvrLipSyncBackend::get_laughter_score);
+    ClassDB::bind_method(D_METHOD("get_smoothing"), &OvrLipSyncBackend::get_smoothing);
     ClassDB::bind_method(D_METHOD("get_run_count"), &OvrLipSyncBackend::get_run_count);
     ClassDB::bind_method(D_METHOD("get_average_run_ms"), &OvrLipSyncBackend::get_average_run_ms);
     ClassDB::bind_method(D_METHOD("get_maximum_run_ms"), &OvrLipSyncBackend::get_maximum_run_ms);
@@ -145,6 +147,33 @@ bool OvrLipSyncBackend::push_stereo_pcm(const PackedVector2Array &p_stereo_pcm) 
 #endif
 }
 
+Error OvrLipSyncBackend::set_smoothing(int p_amount) {
+#ifndef OVR_LIP_SYNC
+    return ERR_UNAVAILABLE;
+#else
+    if (!initialized || context == 0) {
+        status = "not configured";
+        return ERR_UNCONFIGURED;
+    }
+    if (p_amount < 1 || p_amount > 100) {
+        status = "smoothing must be between 1 and 100";
+        return ERR_INVALID_PARAMETER;
+    }
+    ovrLipSyncResult result = ovrLipSync_SendSignal(
+        static_cast<ovrLipSyncContext>(context),
+        ovrLipSyncSignals_VisemeSmoothing,
+        p_amount,
+        0
+    );
+    if (result != ovrLipSyncSuccess) {
+        status = String("OVRLipSync smoothing failed: ") + String::num_int64(result);
+        return FAILED;
+    }
+    smoothing = p_amount;
+    return OK;
+#endif
+}
+
 void OvrLipSyncBackend::reset() {
 #ifdef OVR_LIP_SYNC
     if (context != 0) {
@@ -160,6 +189,7 @@ void OvrLipSyncBackend::reset() {
     frame_size = 0;
     frame_delay_ms = 0;
     laughter_score = 0.0f;
+    smoothing = -1;
     run_count = 0;
     total_run_usec = 0;
     maximum_run_usec = 0;
@@ -179,6 +209,7 @@ PackedFloat32Array OvrLipSyncBackend::get_levels() const { return levels; }
 String OvrLipSyncBackend::get_status() const { return status; }
 int OvrLipSyncBackend::get_frame_delay_ms() const { return frame_delay_ms; }
 float OvrLipSyncBackend::get_laughter_score() const { return laughter_score; }
+int OvrLipSyncBackend::get_smoothing() const { return smoothing; }
 int OvrLipSyncBackend::get_run_count() const { return run_count; }
 double OvrLipSyncBackend::get_average_run_ms() const { return run_count == 0 ? 0.0 : static_cast<double>(total_run_usec) / run_count / 1000.0; }
 double OvrLipSyncBackend::get_maximum_run_ms() const { return static_cast<double>(maximum_run_usec) / 1000.0; }

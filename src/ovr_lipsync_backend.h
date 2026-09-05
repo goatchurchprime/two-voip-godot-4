@@ -20,6 +20,7 @@ class OvrLipSyncBackend : public RefCounted {
     int64_t total_run_usec = 0;
     int64_t maximum_run_usec = 0;
     float laughter_score = 0.0f;
+    int smoothing = -1;
     bool initialized = false;
 
 protected:
@@ -32,6 +33,7 @@ public:
     Error configure(int p_sample_rate, int p_frame_size, const String &p_library_dir = "", int p_provider = 2, bool p_acceleration = true);
     bool push_pcm(const PackedFloat32Array &p_mono_pcm);
     bool push_stereo_pcm(const PackedVector2Array &p_stereo_pcm);
+    Error set_smoothing(int p_amount);
     void reset();
 
     bool is_available() const;
@@ -40,6 +42,7 @@ public:
     String get_status() const;
     int get_frame_delay_ms() const;
     float get_laughter_score() const;
+    int get_smoothing() const;
     int get_run_count() const;
     double get_average_run_ms() const;
     double get_maximum_run_ms() const;
