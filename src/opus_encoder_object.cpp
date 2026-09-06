@@ -160,14 +160,14 @@ Error TwovoipOpusEncoder::create_voice_processor() {
         return ERR_INVALID_PARAMETER;
     }
 
-    if (denoiser_mode == DENOISER_SPEEX || agc_mode == AGC_APPLIED) {
+    if ((denoiser_mode == DENOISER_SPEEX) || (agc_mode == AGC_APPLIED)) {
         speex_preprocessor = speex_preprocess_state_init(preprocess_frame_size, opus_sample_rate);
         if (speex_preprocessor == NULL) {
             preprocess_frame_size = 0;
             return ERR_CANT_CREATE;
         }
-        spx_int32_t denoise_enabled = denoiser_mode == DENOISER_SPEEX;
-        spx_int32_t agc_enabled = agc_mode == AGC_APPLIED;
+        spx_int32_t denoise_enabled = (denoiser_mode == DENOISER_SPEEX);
+        spx_int32_t agc_enabled = (agc_mode == AGC_APPLIED);
         speex_preprocess_ctl(speex_preprocessor, SPEEX_PREPROCESS_SET_DENOISE, &denoise_enabled);
         speex_preprocess_ctl(speex_preprocessor, SPEEX_PREPROCESS_SET_AGC, &agc_enabled);
     }
@@ -367,7 +367,10 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
     }
     
     process_voice();
-    apply_manual_gain();
+
+    for (int i = 0; i < pre_encoded_chunk.size(); i++)
+        pre_encoded_chunk[i] *= gain;
+
     if (update_current_chunk_16khz() != OK)
         return -3;
     update_measurements();
@@ -427,10 +430,6 @@ void TwovoipOpusEncoder::process_voice() {
     }
 }
 
-void TwovoipOpusEncoder::apply_manual_gain() {
-    for (int i = 0; i < pre_encoded_chunk.size(); i++)
-        pre_encoded_chunk[i] *= gain;
-}
 
 Error TwovoipOpusEncoder::update_current_chunk_16khz() {
     current_chunk_16khz.resize(chunk_size_16khz);

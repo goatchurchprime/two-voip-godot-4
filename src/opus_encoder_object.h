@@ -120,7 +120,6 @@ private:
     Error configure_output_chunk_size(int p_output_chunk_size);
     Error configure_16khz_output();
     void process_voice();
-    void apply_manual_gain();
     Error update_current_chunk_16khz();
     void update_measurements();
     
