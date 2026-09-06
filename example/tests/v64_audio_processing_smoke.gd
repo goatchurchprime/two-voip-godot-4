@@ -39,6 +39,8 @@ func _initialize() -> void:
 	assert(abs(encoder.get_gain() - 0.5) < 0.0001)
 	assert(encoder.get_peak() > 0.0)
 	assert(encoder.get_rms() > 0.0)
+	assert(encoder.get_current_chunk().size() == 960)
+	assert(encoder.get_current_chunk()[100].x != encoder.get_current_chunk()[100].y)
 	assert(encoder.get_current_chunk_16khz().size() == 320)
 
 	var short_frames := make_stereo(881)
@@ -59,6 +61,9 @@ func _initialize() -> void:
 	assert(direct_16khz.create_sampler(16000, 16000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 320) == OK)
 	direct_16khz.set_gain(0.5)
 	assert(direct_16khz.process_chunk(make_constant(320, 0.25)) == 320)
+	assert(direct_16khz.get_current_chunk().size() == 320)
+	assert(abs(direct_16khz.get_current_chunk()[100].x - 0.125) < 0.000001)
+	assert(abs(direct_16khz.get_current_chunk()[100].y - 0.125) < 0.000001)
 	assert(abs(direct_16khz.get_current_chunk_16khz()[100] - 0.125) < 0.000001)
 
 	for output_rate in [8000, 12000, 16000, 24000, 48000]:
