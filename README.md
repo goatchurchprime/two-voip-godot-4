@@ -128,7 +128,7 @@ at 48 kHz:
 
 ```gdscript
 var encoder := TwovoipOpusEncoder.new()
-var error := encoder.create_sampler(
+var error := encoder.initialize(
     AudioServer.get_input_mix_rate(),
     48000,
     2,
@@ -162,7 +162,7 @@ suitable for an external speech or viseme analyser. A 20 ms chunk contains 320
 samples. The array is replaced on each call and is empty before processing or
 after a failed call; TwoVoIP does not queue these samples or interpret them.
 
-`get_required_input_chunk_size()` is constant until the sampler is reconfigured.
+`get_required_input_chunk_size()` is constant for the initialized object's lifetime.
 It is the ceiling of the input/output sample ratio, and is
 therefore conservative for fractional combinations. `process_chunk()` rejects
 a shorter array without advancing processing state and returns the number of
@@ -173,7 +173,7 @@ call for some rate and long-frame combinations. The caller must retain
 
 `set_gain()` and `get_gain()` control a manual linear amplitude multiplier. It
 is applied after voice preprocessing and remains independent of automatic gain.
-For mono voice, pass `AGC_APPLIED` to `create_sampler()`; Speex then performs
+For mono voice, pass `AGC_APPLIED` to `initialize()`; Speex then performs
 its native in-place AGC. `get_agc_gain()` reports Speex's
 latest gain for diagnostics, but TwoVoIP does not attempt to set or reproduce
 Speex's internal gain behavior.
@@ -188,22 +188,20 @@ floating-point probability directly; Speex supplies an integer percentage via
 `SPEEX_PREPROCESS_GET_PROB`, which TwoVoIP divides by 100. These are useful for
 comparing changes from each denoiser but are not identically calibrated scores.
 
-The denoiser is selected in `create_sampler()`. Speex denoise
+The denoiser mode is selected in `initialize()`. Speex denoise
 works through the same mono preprocessor state as AGC. RNNoise requires mono
 48 kHz audio and chunks divisible by its 480-sample (10 ms) frame. A core-only
 build returns `ERR_UNAVAILABLE` when RNNoise is selected; it never pretends that
 noise suppression succeeded. Stereo is left as a manual-gain music path. Voice
-preprocessing modes are immutable sampler configuration. Call
-`create_sampler()` again to begin a stream with different settings.
+preprocessing modes are immutable audio-pipeline configuration. `initialize()`
+may succeed only once on an encoder object so that warmed denoiser and AGC state
+cannot be discarded accidentally. Create a new `TwovoipOpusEncoder` to begin an
+unrelated stream with different settings. A failed initialization leaves the
+object uninitialized and may be retried.
 
 Speex preprocessing uses 10 or 20 ms internal frames, so the output chunk must
 divide into one of those durations. Shorter Opus frames remain available when
 voice preprocessing is disabled.
-
-The older `set_output_chunk_size()`, `calc_audio_chunk_size()`, and
-`process_pre_encoded_chunk()` calls are
-deprecated but retained for compatibility. They issue one warning per encoder
-object and use the same processing implementation.
 
 #### Networking layer
 
