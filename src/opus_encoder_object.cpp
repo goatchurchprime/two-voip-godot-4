@@ -321,18 +321,18 @@ void TwovoipOpusEncoder::reset_opus_encoder() {
         opus_encoder_ctl(opus_encoder, OPUS_RESET_STATE);
 }
 
-int TwovoipOpusEncoder::process_chunk_internal(const PackedVector2Array &audio_frames) {
+int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
     int consumed_input_frames = 0;
     last_peak = 0.0F;
     last_rms = 0.0F;
     last_speech_probability = 0.0F;
     current_chunk_16khz.resize(0);
     if (!initialized) {
-        UtilityFunctions::printerr("Initialize the audio pipeline before processing audio");
+        UtilityFunctions::printerr("TwovoipOpusEncoder not initialized");
         return -1;
     }
     if (audio_frames.size() < required_input_chunk_size) {
-        UtilityFunctions::printerr("Audio chunk is too short: expected at least ", required_input_chunk_size, ", got ", audio_frames.size());
+        UtilityFunctions::printerr("Process_chunk audio_frames is too short: expected at least ", required_input_chunk_size, ", got ", audio_frames.size());
         return -1;
     }
     
@@ -465,10 +465,6 @@ void TwovoipOpusEncoder::update_measurements() {
         sum_squares += sample * sample;
     }
     last_rms = std::sqrt(sum_squares / output_chunk_size);
-}
-
-int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
-    return process_chunk_internal(audio_frames);
 }
 
 PackedVector2Array TwovoipOpusEncoder::get_current_chunk() const {

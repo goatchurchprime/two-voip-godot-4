@@ -1,6 +1,6 @@
 extends Node
 
-var opusencoder : TwovoipOpusEncoder = TwovoipOpusEncoder.new()
+var opusencoder : TwovoipOpusEncoder
 var chunkprefix : PackedByteArray = PackedByteArray([0,0]) 
 
 var lead_time : float = 0.15
@@ -30,31 +30,40 @@ var microphoneaudiosamplescountSecondsSampleWindow = 10.0
 var agc_mode = TwovoipOpusEncoder.AGC_DISABLED
 
 var talkingtimestart = 0
-var opus_chunk_size = 960
-var audio_chunk_size = 882
+
 var frametimesecs = 0.02
+var opusframedurationms = 20
+var input_mix_rate = 44100
+var audio_chunk_size = 882
 var opussamplerate = 48000
+var opus_chunk_size = 960
 var opuschannels = 2
-var denoiser = TwovoipOpusEncoder.DENOISER_DISABLED
-func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_denoiser, p_agc_mode):
-	opussamplerate = p_opussamplerate
-	opuschannels = p_channels
-	denoiser = p_denoiser
-	agc_mode = p_agc_mode
-	opus_chunk_size = int(opussamplerate*p_opusframedurationms/1000.0)
-	var sampler_error = opusencoder.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoiser, agc_mode, opus_chunk_size)
-	if sampler_error != OK:
-		push_error("TwoVoIP sampler configuration failed: %s" % error_string(sampler_error))
-		return false
+var denoiser_mode = TwovoipOpusEncoder.DENOISER_DISABLED
+
+func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_denoiser_mode, p_agc_mode):
+	input_mix_rate = AudioServer.get_input_mix_rate()
+	if opusencoder == null or opussamplerate != p_opussamplerate or opuschannels != p_channels or denoiser_mode != p_denoiser_mode or agc_mode != p_agc_mode or opusframedurationms != p_opusframedurationms:
+		opusencoder = TwovoipOpusEncoder.new()
+		opusframedurationms = p_opusframedurationms
+		opussamplerate = p_opussamplerate
+		opuschannels = p_channels
+		denoiser_mode = p_denoiser_mode
+		agc_mode = p_agc_mode
+		opus_chunk_size = int(opussamplerate*p_opusframedurationms/1000.0)
+		var sampler_error = opusencoder.initialize(input_mix_rate, opussamplerate, opuschannels, denoiser_mode, agc_mode, opus_chunk_size)
+		if sampler_error != OK:
+			push_error("TwoVoIP sampler configuration failed: %s" % error_string(sampler_error))
+			return false
 	opusencoder.create_opus_encoder(p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice)
 	audio_chunk_size = opusencoder.get_required_input_chunk_size()
+	assert(audio_chunk_size == int(input_mix_rate*p_opusframedurationms/1000.0))
 	frametimesecs = p_opusframedurationms/1000.0
 	if audiosampleframematerial:
 		var audiosampleframedata = PackedVector2Array()
-		audiosampleframedata.resize(audio_chunk_size)
-		for j in range(audio_chunk_size):
+		audiosampleframedata.resize(opus_chunk_size)
+		for j in range(opus_chunk_size):
 			audiosampleframedata.set(j, Vector2(-0.5,0.9) if (j%10)<5 else Vector2(0.6,0.1))
-		audiosampleframetextureimage = Image.create_from_data(audio_chunk_size, 1, false, Image.FORMAT_RGF, audiosampleframedata.to_byte_array())
+		audiosampleframetextureimage = Image.create_from_data(opus_chunk_size, 1, false, Image.FORMAT_RGF, audiosampleframedata.to_byte_array())
 		audiosampleframetexture = ImageTexture.create_from_image(audiosampleframetextureimage)
 		audiosampleframematerial.set_shader_parameter("chunktexture", audiosampleframetexture)
 	return true
@@ -213,7 +222,7 @@ func get_gain():
 func get_agc_gain():
 	return opusencoder.get_agc_gain()
 
-func processvox(chunkmax, speechnoiseprobability, audio_chunk):
+func processvox(chunkmax, speechnoiseprobability, resampled_chunk):
 	if audiosampleframematerial:
 		audiosampleframematerial.set_shader_parameter("speechnoiseprobability", speechnoiseprobability)
 		audiosampleframematerial.set_shader_parameter("chunkmax", chunkmax)
@@ -238,7 +247,8 @@ func processvox(chunkmax, speechnoiseprobability, audio_chunk):
 	if audiosampleframematerial:
 		if pttbutton.button_pressed:
 			audiosampleframematerial.set_shader_parameter("chunktexenabled", true)
-			audiosampleframetextureimage.set_data(audio_chunk_size, 1, false, Image.FORMAT_RGF, audio_chunk.to_byte_array())
+			assert (len(resampled_chunk) == opus_chunk_size)
+			audiosampleframetextureimage.set_data(opus_chunk_size, 1, false, Image.FORMAT_RGF, resampled_chunk.to_byte_array())
 			audiosampleframetexture.update(audiosampleframetextureimage)
 		else:
 			audiosampleframematerial.set_shader_parameter("chunktexenabled", false)
@@ -269,7 +279,7 @@ func _process(delta):
 		if opusencoder.process_chunk(audio_chunk) < 0:
 			break
 			
-		if denoiser != TwovoipOpusEncoder.DENOISER_DISABLED:
+		if denoiser_mode != TwovoipOpusEncoder.DENOISER_DISABLED:
 			speechnoiseprobability = opusencoder.get_speech_probability()
 		else:
 			speechnoiseprobability = 0.0
@@ -283,7 +293,7 @@ func _process(delta):
 			microphoneaudiosamplescount = 0
 			microphoneaudiosamplescountSeconds = 0.0
 			microphoneaudiosamplescountSecondsSampleWindow *= 1.5
-		processvox(last_chunkmax, speechnoiseprobability, audio_chunk)
+		processvox(last_chunkmax, speechnoiseprobability, opusencoder.get_current_chunk())
 		if currentlytalking:
 			processopuschunk()
 	audio_chunk = null

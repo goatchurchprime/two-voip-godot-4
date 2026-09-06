@@ -32,3 +32,7 @@ func _on_feedback_display_gui_input(event):
 func _process(_delta):
 	if speech_mode:
 		$HSliderAGC.value = $TwoVoipMic.get_agc_gain()
+		$SpinBoxAGC.value = $TwoVoipMic.get_agc_gain()
+
+func _on_h_slider_man_gain_value_changed(value):
+	$TwoVoipMic.set_gain(value)

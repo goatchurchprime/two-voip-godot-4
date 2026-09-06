@@ -78,7 +78,7 @@ public:
 private:
     
     int input_mix_rate = 44100;   // AudioServer.get_input_mixrate()
-    int opus_sample_rate = 48000; // AudioServer.get_input_mixrate()
+    int opus_sample_rate = 48000; 
     int channels = 2;
     
     SpeexResamplerState* speex_resampler = NULL;
@@ -119,7 +119,6 @@ private:
     Error create_voice_processor();
     Error configure_output_chunk_size(int p_output_chunk_size);
     Error configure_16khz_output();
-    int process_chunk_internal(const PackedVector2Array &audio_frames);
     void process_voice();
     void apply_manual_gain();
     Error update_current_chunk_16khz();

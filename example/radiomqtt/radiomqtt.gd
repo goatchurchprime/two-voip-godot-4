@@ -6,7 +6,6 @@ extends Control
 
 var audioeffectpitchshift : AudioEffectPitchShift = null
 var audioeffectpitchshiftidx = 0
-var opusencoder_forreprocessing : TwovoipOpusEncoder = TwovoipOpusEncoder.new()
 
 var resampledchunkprefix = PackedByteArray([2,3])
 var mqttpacketencodebase64 : bool = false
@@ -124,15 +123,23 @@ func updatesamplerates():
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
 	var denoiser_mode = $HBoxBigButtons/VBoxPTT/Denoise.selected
 	var agc_mode = TwovoipOpusEncoder.AGC_APPLIED if $VBoxFrameLength/HBoxOpusFrame/AutoGainControl.button_pressed else TwovoipOpusEncoder.AGC_DISABLED
+	var channels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
 
-	$TwoVoipMic.set_opus_values(opussamplerate, frametimems, 
-			int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text),
+	assert ((channels == 1) or (denoiser_mode == TwovoipOpusEncoder.DENOISER_DISABLED))
+	assert ((channels == 1) or (agc_mode == TwovoipOpusEncoder.AGC_DISABLED))
+	assert ((opussamplerate == 48000) or (denoiser_mode != TwovoipOpusEncoder.DENOISER_RNNOISE))
+	$HBoxBigButtons/VBoxPTT/Denoise.disabled = (channels != 1)
+	$HBoxBigButtons/VBoxPTT/Denoise.set_item_disabled(2, (opussamplerate != 48000))
+	$VBoxFrameLength/HBoxOpusFrame/AutoGainControl.disabled = (channels != 1)
+	$VBoxFrameLength/HBoxOpusFrame/OptionChannels.disabled = ((denoiser_mode != TwovoipOpusEncoder.DENOISER_DISABLED) or (agc_mode != TwovoipOpusEncoder.AGC_DISABLED))
+	$VBoxFrameLength/HBoxAudioFrame/SampleRate.disabled = (denoiser_mode == TwovoipOpusEncoder.DENOISER_RNNOISE)
+
+	$TwoVoipMic.set_opus_values(opussamplerate, frametimems, channels,
 			int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), 
 			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value),
 			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed,
 			denoiser_mode, agc_mode)
 
-	$HBoxBigButtons/VBoxPTT/Denoise.disabled = not (opussamplerate == 48000)
 	$TwoVoipMic.lead_time = $HBoxBigButtons/VBoxVox/Leadtime.value
 	$TwoVoipMic.hang_time = $HBoxBigButtons/VBoxVox/Hangtime.value
 	reprocessoriginalchunks()
@@ -141,7 +148,8 @@ func reprocessoriginalchunks():
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
 	var opuschannels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
 	var denoiser = $HBoxBigButtons/VBoxPTT/Denoise.selected
-	opusencoder_forreprocessing.create_sampler(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoiser, TwovoipOpusEncoder.AGC_DISABLED, $TwoVoipMic.opus_chunk_size)
+	var opusencoder_forreprocessing : TwovoipOpusEncoder = TwovoipOpusEncoder.new()
+	opusencoder_forreprocessing.initialize(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoiser, TwovoipOpusEncoder.AGC_DISABLED, $TwoVoipMic.opus_chunk_size)
 	opusencoder_forreprocessing.set_gain($VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox.value * last_agc_gain)
 	opusencoder_forreprocessing.create_opus_encoder(int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value), $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed)
 	opusencoder_forreprocessing.reset_opus_encoder()
