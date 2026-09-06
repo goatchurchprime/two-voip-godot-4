@@ -155,12 +155,15 @@ into both components so the result can be passed directly to a Godot audio
 stream. TwoVoIP does not retain a queue; callers that need delayed monitoring
 or non-network playback own that buffering.
 
-After a successful `process_chunk()`, `get_current_chunk_16khz()` returns the
-same processed time interval as mono 16 kHz floating-point PCM. It branches
-after denoising, applied AGC and manual gain but before Opus encoding, making it
-suitable for an external speech or viseme analyser. A 20 ms chunk contains 320
-samples. The array is replaced on each call and is empty before processing or
-after a failed call; TwoVoIP does not queue these samples or interpret them.
+`get_current_chunk_16khz(reset_sampler)` is an experimental, optional adapter
+for external speech and viseme analysers. It lazily downmixes and resamples the
+current conditioned chunk only when called; no 16 kHz work occurs in
+`process_chunk()`. A 20 ms chunk contains 320 samples. The caller must invoke it
+at most once for each processed chunk because its private Speex resampler keeps
+streaming history. Pass `true` after deliberately skipping one or more chunks
+(for example, while the microphone is silent) so stale resampler history is
+discarded before converting the next chunk. This API may ultimately move into
+the Vizemes integration rather than remain part of TwoVoIP.
 
 `get_required_input_chunk_size()` is constant for the initialized object's lifetime.
 It is the ceiling of the input/output sample ratio, and is

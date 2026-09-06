@@ -47,7 +47,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_rms"), &TwovoipOpusEncoder::get_rms);
     ClassDB::bind_method(D_METHOD("get_speech_probability"), &TwovoipOpusEncoder::get_speech_probability);
     ClassDB::bind_method(D_METHOD("get_current_chunk"), &TwovoipOpusEncoder::get_current_chunk);
-    ClassDB::bind_method(D_METHOD("get_current_chunk_16khz"), &TwovoipOpusEncoder::get_current_chunk_16khz);
+    ClassDB::bind_method(D_METHOD("get_current_chunk_16khz", "reset_sampler"), &TwovoipOpusEncoder::get_current_chunk_16khz);
     ClassDB::bind_method(D_METHOD("set_gain", "gain"), &TwovoipOpusEncoder::set_gain);
     ClassDB::bind_method(D_METHOD("get_gain"), &TwovoipOpusEncoder::get_gain);
     ClassDB::bind_method(D_METHOD("get_agc_gain"), &TwovoipOpusEncoder::get_agc_gain);
@@ -63,7 +63,6 @@ void TwovoipOpusEncoder::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rms", PROPERTY_HINT_NONE, "", read_only), "", "get_rms");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "speech_probability", PROPERTY_HINT_NONE, "", read_only), "", "get_speech_probability");
     ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "current_chunk", PROPERTY_HINT_NONE, "", read_only), "", "get_current_chunk");
-    ADD_PROPERTY(PropertyInfo(Variant::PACKED_FLOAT32_ARRAY, "current_chunk_16khz", PROPERTY_HINT_NONE, "", read_only), "", "get_current_chunk_16khz");
 
     BIND_ENUM_CONSTANT(DENOISER_DISABLED);
     BIND_ENUM_CONSTANT(DENOISER_SPEEX);
@@ -87,11 +86,8 @@ void TwovoipOpusEncoder::destroy_audio_pipeline() {
     }
     mono_audio_frames.resize(0);
     pre_encoded_chunk.resize(0);
-    mono_output_chunk.resize(0);
-    current_chunk_16khz.resize(0);
     output_chunk_size = 0;
     required_input_chunk_size = 0;
-    chunk_size_16khz = 0;
     initialized = false;
 }
 
@@ -227,49 +223,12 @@ Error TwovoipOpusEncoder::configure_output_chunk_size(int p_output_chunk_size) {
         UtilityFunctions::printerr("Output chunk size and sample rates must be positive");
         return ERR_INVALID_PARAMETER;
     }
-    if (output_chunk_size == p_output_chunk_size)
-        return OK;
-    int previous_output_chunk_size = output_chunk_size;
-    int previous_required_input_chunk_size = required_input_chunk_size;
     output_chunk_size = p_output_chunk_size;
     required_input_chunk_size = static_cast<int>((static_cast<int64_t>(output_chunk_size) * input_mix_rate + opus_sample_rate - 1) / opus_sample_rate);
     pre_encoded_chunk.resize(output_chunk_size * channels);
     Error error = create_voice_processor();
-    if (error != OK) {
-        output_chunk_size = previous_output_chunk_size;
-        required_input_chunk_size = previous_required_input_chunk_size;
-        pre_encoded_chunk.resize(output_chunk_size * channels);
-        create_voice_processor();
-        return error;
-    }
-    error = configure_16khz_output();
     if (error != OK)
         return error;
-    return OK;
-}
-
-Error TwovoipOpusEncoder::configure_16khz_output() {
-    if (resampler_16khz != NULL) {
-        speex_resampler_destroy(resampler_16khz);
-        resampler_16khz = NULL;
-    }
-    current_chunk_16khz.resize(0);
-    chunk_size_16khz = 0;
-    if ((static_cast<int64_t>(output_chunk_size) * 16000) % opus_sample_rate != 0) {
-        UtilityFunctions::printerr("The configured chunk duration does not contain a whole number of 16 kHz samples");
-        return ERR_INVALID_PARAMETER;
-    }
-    chunk_size_16khz = static_cast<int>(static_cast<int64_t>(output_chunk_size) * 16000 / opus_sample_rate);
-    mono_output_chunk.resize(output_chunk_size);
-    if (opus_sample_rate == 16000)
-        return OK;
-    int speexerror = 0;
-    resampler_16khz = speex_resampler_init(1, opus_sample_rate, 16000, 10, &speexerror);
-    if (resampler_16khz == NULL) {
-        UtilityFunctions::printerr("16 kHz Speex resampler init failed code ", speexerror);
-        chunk_size_16khz = 0;
-        return ERR_CANT_CREATE;
-    }
     return OK;
 }
 
@@ -326,7 +285,6 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
     last_peak = 0.0F;
     last_rms = 0.0F;
     last_speech_probability = 0.0F;
-    current_chunk_16khz.resize(0);
     if (!initialized) {
         UtilityFunctions::printerr("TwovoipOpusEncoder not initialized");
         return -1;
@@ -371,8 +329,6 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
     for (int i = 0; i < pre_encoded_chunk.size(); i++)
         pre_encoded_chunk[i] *= gain;
 
-    if (update_current_chunk_16khz() != OK)
-        return -3;
     update_measurements();
     return consumed_input_frames;
 }
@@ -431,31 +387,6 @@ void TwovoipOpusEncoder::process_voice() {
 }
 
 
-Error TwovoipOpusEncoder::update_current_chunk_16khz() {
-    current_chunk_16khz.resize(chunk_size_16khz);
-    for (int frame = 0; frame < output_chunk_size; frame++) {
-        int index = frame * channels;
-        mono_output_chunk[frame] = channels == 1 ? pre_encoded_chunk[index] :
-                (pre_encoded_chunk[index] + pre_encoded_chunk[index + 1]) * 0.5F;
-    }
-    if (resampler_16khz == NULL) {
-        memcpy(current_chunk_16khz.ptrw(), mono_output_chunk.ptr(), output_chunk_size * sizeof(float));
-        return OK;
-    }
-    unsigned int input_frames = output_chunk_size;
-    unsigned int output_frames = current_chunk_16khz.size();
-    int error = speex_resampler_process_float(resampler_16khz, 0,
-            mono_output_chunk.ptr(), &input_frames, current_chunk_16khz.ptrw(), &output_frames);
-    if (error != RESAMPLER_ERR_SUCCESS || input_frames != static_cast<unsigned int>(output_chunk_size) ||
-            output_frames != static_cast<unsigned int>(current_chunk_16khz.size())) {
-        UtilityFunctions::printerr("16 kHz resampling failed: error ", error, ", consumed ", input_frames,
-                " of ", output_chunk_size, ", produced ", output_frames, " of ", current_chunk_16khz.size());
-        current_chunk_16khz.resize(0);
-        return ERR_CANT_CREATE;
-    }
-    return OK;
-}
-
 void TwovoipOpusEncoder::update_measurements() {
     float sum_squares = 0.0F;
     for (int i = 0; i < pre_encoded_chunk.size(); i++) {
@@ -479,6 +410,57 @@ PackedVector2Array TwovoipOpusEncoder::get_current_chunk() const {
         }
     }
     return frames;
+}
+
+PackedFloat32Array TwovoipOpusEncoder::get_current_chunk_16khz(bool p_reset_sampler) {
+    PackedFloat32Array output_16khz;
+    if (!initialized) {
+        UtilityFunctions::printerr("TwovoipOpusEncoder not initialized");
+        return output_16khz;
+    }
+
+    int64_t output_size_numerator = static_cast<int64_t>(output_chunk_size) * 16000;
+    if (output_size_numerator % opus_sample_rate != 0) {
+        UtilityFunctions::printerr("The current chunk duration does not contain a whole number of 16 kHz samples");
+        return output_16khz;
+    }
+
+    PackedVector2Array current_chunk = get_current_chunk();
+    PackedFloat32Array mono_chunk;
+    mono_chunk.resize(current_chunk.size());
+    for (int frame = 0; frame < current_chunk.size(); frame++)
+        mono_chunk[frame] = (current_chunk[frame].x + current_chunk[frame].y) * 0.5F;
+
+    int output_size = static_cast<int>(output_size_numerator / opus_sample_rate);
+    output_16khz.resize(output_size);
+    if (opus_sample_rate == 16000) {
+        memcpy(output_16khz.ptrw(), mono_chunk.ptr(), output_size * sizeof(float));
+        return output_16khz;
+    }
+
+    if (resampler_16khz == NULL) {
+        int speexerror = 0;
+        resampler_16khz = speex_resampler_init(1, opus_sample_rate, 16000, 10, &speexerror);
+        if (resampler_16khz == NULL) {
+            UtilityFunctions::printerr("16 kHz Speex resampler init failed code ", speexerror);
+            output_16khz.resize(0);
+            return output_16khz;
+        }
+    } else if (p_reset_sampler) {
+        speex_resampler_reset_mem(resampler_16khz);
+    }
+
+    unsigned int input_frames = mono_chunk.size();
+    unsigned int output_frames = output_16khz.size();
+    int error = speex_resampler_process_float(resampler_16khz, 0,
+            mono_chunk.ptr(), &input_frames, output_16khz.ptrw(), &output_frames);
+    if (error != RESAMPLER_ERR_SUCCESS || input_frames != static_cast<unsigned int>(mono_chunk.size()) ||
+            output_frames != static_cast<unsigned int>(output_16khz.size())) {
+        UtilityFunctions::printerr("16 kHz resampling failed: error ", error, ", consumed ", input_frames,
+                " of ", mono_chunk.size(), ", produced ", output_frames, " of ", output_16khz.size());
+        output_16khz.resize(0);
+    }
+    return output_16khz;
 }
 
 PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_bytes) {

@@ -92,8 +92,6 @@ private:
 
     PackedFloat32Array mono_audio_frames; 
     PackedFloat32Array pre_encoded_chunk; 
-    PackedFloat32Array mono_output_chunk;
-    PackedFloat32Array current_chunk_16khz;
     std::vector<spx_int16_t> speex_frame;
 #ifdef RNNOISE
     PackedFloat32Array rnnoise_in;
@@ -104,7 +102,6 @@ private:
     int output_chunk_size = 0;
     int required_input_chunk_size = 0;
     int preprocess_frame_size = 0;
-    int chunk_size_16khz = 0;
     float last_peak = 0.0F;
     float last_rms = 0.0F;
     float last_speech_probability = 0.0F;
@@ -118,9 +115,7 @@ private:
     void destroy_voice_processor();
     Error create_voice_processor();
     Error configure_output_chunk_size(int p_output_chunk_size);
-    Error configure_16khz_output();
     void process_voice();
-    Error update_current_chunk_16khz();
     void update_measurements();
     
 protected:
@@ -134,7 +129,7 @@ public:
     float get_rms() const { return last_rms; }
     float get_speech_probability() const { return last_speech_probability; }
     PackedVector2Array get_current_chunk() const;
-    PackedFloat32Array get_current_chunk_16khz() const { return current_chunk_16khz; }
+    PackedFloat32Array get_current_chunk_16khz(bool p_reset_sampler);
     void set_gain(float p_gain);
     float get_gain() const { return gain; }
     float get_agc_gain() const { return agc_gain; }

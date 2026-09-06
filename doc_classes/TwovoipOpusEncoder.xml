@@ -39,9 +39,10 @@
 			<return type="float" />
 			<description>Returns the latest linear gain reported by Speex AGC.</description>
 		</method>
-		<method name="get_current_chunk_16khz" qualifiers="const">
+		<method name="get_current_chunk_16khz">
 			<return type="PackedFloat32Array" />
-			<description>Returns the last successfully processed chunk as post-processing mono 16 kHz PCM.</description>
+			<param index="0" name="reset_sampler" type="bool" />
+			<description>Experimental. Lazily converts the current conditioned chunk to mono 16 kHz PCM. Pass true after any skipped source chunks to discard resampler history. The caller must invoke this at most once for each processed chunk.</description>
 		</method>
 		<method name="get_current_chunk" qualifiers="const">
 			<return type="PackedVector2Array" />
@@ -80,7 +81,6 @@
 	</methods>
 	<members>
 		<member name="agc_gain" type="float" setter="" getter="get_agc_gain">Latest linear gain reported by Speex AGC.</member>
-		<member name="current_chunk_16khz" type="PackedFloat32Array" setter="" getter="get_current_chunk_16khz">Last processed post-processing mono 16 kHz PCM chunk.</member>
 		<member name="current_chunk" type="PackedVector2Array" setter="" getter="get_current_chunk">Last processed output-rate PCM chunk as stereo frames.</member>
 		<member name="gain" type="float" setter="" getter="get_gain">Manual linear gain.</member>
 		<member name="peak" type="float" setter="" getter="get_peak">Peak magnitude of the last chunk.</member>

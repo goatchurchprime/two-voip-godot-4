@@ -24,7 +24,6 @@ func _initialize() -> void:
 	assert(encoder.initialize(44100, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
 	assert(encoder.initialize(44100, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == ERR_ALREADY_IN_USE)
 	assert(encoder.get_required_input_chunk_size() == 882)
-	assert(encoder.get_current_chunk_16khz().is_empty())
 	assert(not encoder.has_method("fetch_pre_encoded_chunk"))
 	for removed_method in ["create_sampler", "set_output_chunk_size", "get_output_chunk_size", "calc_audio_chunk_size", "process_pre_encoded_chunk", "get_denoiser", "get_agc_mode"]:
 		assert(not encoder.has_method(removed_method))
@@ -44,7 +43,7 @@ func _initialize() -> void:
 	assert(encoder.get_rms() > 0.0)
 	assert(encoder.get_current_chunk().size() == 960)
 	assert(encoder.get_current_chunk()[100].x != encoder.get_current_chunk()[100].y)
-	assert(encoder.get_current_chunk_16khz().size() == 320)
+	assert(encoder.get_current_chunk_16khz(false).size() == 320)
 
 	var short_frames := make_stereo(881)
 	assert(encoder.process_chunk(short_frames) == -1)
@@ -67,7 +66,7 @@ func _initialize() -> void:
 	assert(direct_16khz.get_current_chunk().size() == 320)
 	assert(abs(direct_16khz.get_current_chunk()[100].x - 0.125) < 0.000001)
 	assert(abs(direct_16khz.get_current_chunk()[100].y - 0.125) < 0.000001)
-	assert(abs(direct_16khz.get_current_chunk_16khz()[100] - 0.125) < 0.000001)
+	assert(abs(direct_16khz.get_current_chunk_16khz(true)[100] - 0.125) < 0.000001)
 
 	for output_rate in [8000, 12000, 16000, 24000, 48000]:
 		for duration_ms in [10, 20, 40, 60]:
@@ -78,7 +77,7 @@ func _initialize() -> void:
 			var standard_required: int = standard.get_required_input_chunk_size()
 			var standard_consumed: int = standard.process_chunk(make_stereo(standard_required))
 			assert(standard_consumed > 0 and standard_consumed <= standard_required)
-			assert(standard.get_current_chunk_16khz().size() == duration_ms * 16)
+			assert(standard.get_current_chunk_16khz(true).size() == duration_ms * 16)
 
 	var voice := TwovoipOpusEncoder.new()
 	assert(voice.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_SPEEX, TwovoipOpusEncoder.AGC_APPLIED, 960) == OK)

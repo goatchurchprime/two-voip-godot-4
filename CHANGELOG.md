@@ -21,8 +21,9 @@
   incorrectly treating `speex_preprocess_run()`'s VAD Boolean as a probability.
 - kept the radio's last completed-sample AGC gain at the PTT falling edge and
   used it with manual gain when reprocessing the stored raw recording.
-- added `get_current_chunk_16khz()` as a bufferless hook exposing each
-  post-processing chunk to external speech and viseme analysers.
+- added experimental `get_current_chunk_16khz(reset_sampler)` as a lazy,
+  caller-managed adapter for external speech and viseme analysers; it performs
+  no work in the main processing loop and can reset history after skipped chunks.
 - removed immutable-configuration getters and the legacy chunk-size and
   reprocessing methods; retained only the derived input-size requirement,
   mutable gain, and per-chunk processing results.
