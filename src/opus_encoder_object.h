@@ -78,7 +78,7 @@ public:
 private:
     
     int input_mix_rate = 44100;   // AudioServer.get_input_mixrate()
-    int opus_sample_rate = 48000; 
+    int opus_sample_rate = 48000;
     int channels = 2;
     
     SpeexResamplerState* speex_resampler = NULL;

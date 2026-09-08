@@ -278,7 +278,7 @@ func _process(delta):
 			break
 		if opusencoder.process_chunk(audio_chunk) < 0:
 			break
-			
+
 		if denoiser_mode != TwovoipOpusEncoder.DENOISER_DISABLED:
 			speechnoiseprobability = opusencoder.get_speech_probability()
 		else:
