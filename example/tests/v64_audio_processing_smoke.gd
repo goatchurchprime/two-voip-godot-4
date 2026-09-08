@@ -21,56 +21,66 @@ func make_constant(count: int, amplitude: float) -> PackedVector2Array:
 
 func _initialize() -> void:
 	var encoder := TwovoipOpusEncoder.new()
-	assert(encoder.create_sampler(44100, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	assert(encoder.initialize(44100, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	assert(encoder.initialize(44100, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == ERR_ALREADY_IN_USE)
 	assert(encoder.get_required_input_chunk_size() == 882)
-	assert(encoder.get_current_chunk_16khz().is_empty())
 	assert(not encoder.has_method("fetch_pre_encoded_chunk"))
-	for property_name in ["output_chunk_size", "required_input_chunk_size", "gain", "agc_gain", "agc_mode", "denoiser", "peak", "rms", "speech_probability"]:
+	for removed_method in ["create_sampler", "set_output_chunk_size", "get_output_chunk_size", "calc_audio_chunk_size", "process_pre_encoded_chunk", "get_denoiser", "get_agc_mode"]:
+		assert(not encoder.has_method(removed_method))
+	for property_name in ["required_input_chunk_size", "agc_gain", "peak", "rms", "speech_probability"]:
 		var property = encoder.get_property_list().filter(func(item): return item.name == property_name)
 		assert(property.size() == 1)
 		assert(property[0].usage & PROPERTY_USAGE_READ_ONLY)
+	var gain_property = encoder.get_property_list().filter(func(item): return item.name == "gain")
+	assert(gain_property.size() == 1)
+	assert(not (gain_property[0].usage & PROPERTY_USAGE_READ_ONLY))
 
-	encoder.set_gain(0.5)
+	encoder.gain = 0.5
 	var frames := make_stereo(882)
 	assert(encoder.process_chunk(frames) == 882)
 	assert(abs(encoder.get_gain() - 0.5) < 0.0001)
 	assert(encoder.get_peak() > 0.0)
 	assert(encoder.get_rms() > 0.0)
-	assert(encoder.get_current_chunk_16khz().size() == 320)
+	assert(encoder.get_current_chunk().size() == 960)
+	assert(encoder.get_current_chunk()[100].x != encoder.get_current_chunk()[100].y)
+	assert(encoder.get_current_chunk_16khz(false).size() == 320)
 
 	var short_frames := make_stereo(881)
 	assert(encoder.process_chunk(short_frames) == -1)
 
 	var fractional := TwovoipOpusEncoder.new()
-	assert(fractional.create_sampler(44117, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	assert(fractional.initialize(44117, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
 	assert(fractional.get_required_input_chunk_size() == 883)
 	var consumed := fractional.process_chunk(make_stereo(883))
 	assert(consumed == 882 or consumed == 883)
 
 	var mono := TwovoipOpusEncoder.new()
-	assert(mono.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	assert(mono.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
 	assert(mono.get_required_input_chunk_size() == 960)
 	assert(mono.process_chunk(make_stereo(960)) == 960)
 
 	var direct_16khz := TwovoipOpusEncoder.new()
-	assert(direct_16khz.create_sampler(16000, 16000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 320) == OK)
+	assert(direct_16khz.initialize(16000, 16000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 320) == OK)
 	direct_16khz.set_gain(0.5)
 	assert(direct_16khz.process_chunk(make_constant(320, 0.25)) == 320)
-	assert(abs(direct_16khz.get_current_chunk_16khz()[100] - 0.125) < 0.000001)
+	assert(direct_16khz.get_current_chunk().size() == 320)
+	assert(abs(direct_16khz.get_current_chunk()[100].x - 0.125) < 0.000001)
+	assert(abs(direct_16khz.get_current_chunk()[100].y - 0.125) < 0.000001)
+	assert(abs(direct_16khz.get_current_chunk_16khz(true)[100] - 0.125) < 0.000001)
 
 	for output_rate in [8000, 12000, 16000, 24000, 48000]:
 		for duration_ms in [10, 20, 40, 60]:
 			var standard := TwovoipOpusEncoder.new()
 			var output_frames: int = output_rate * duration_ms / 1000
-			assert(standard.create_sampler(44100, output_rate, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, output_frames) == OK)
+			assert(standard.initialize(44100, output_rate, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, output_frames) == OK)
 			assert(standard.get_required_input_chunk_size() == 44100 * duration_ms / 1000)
 			var standard_required: int = standard.get_required_input_chunk_size()
 			var standard_consumed: int = standard.process_chunk(make_stereo(standard_required))
 			assert(standard_consumed > 0 and standard_consumed <= standard_required)
-			assert(standard.get_current_chunk_16khz().size() == duration_ms * 16)
+			assert(standard.get_current_chunk_16khz(true).size() == duration_ms * 16)
 
 	var voice := TwovoipOpusEncoder.new()
-	assert(voice.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_SPEEX, TwovoipOpusEncoder.AGC_APPLIED, 960) == OK)
+	assert(voice.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_SPEEX, TwovoipOpusEncoder.AGC_APPLIED, 960) == OK)
 	voice.set_gain(0.75)
 	assert(voice.process_chunk(make_stereo(960)) == 960)
 	assert(voice.get_speech_probability() >= 0.0 and voice.get_speech_probability() <= 1.0)
@@ -78,9 +88,9 @@ func _initialize() -> void:
 	assert(abs(voice.get_gain() - 0.75) < 0.0001)
 
 	var unprocessed := TwovoipOpusEncoder.new()
-	assert(unprocessed.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	assert(unprocessed.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
 	var monitor := TwovoipOpusEncoder.new()
-	assert(monitor.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_MONITOR, 960) == OK)
+	assert(monitor.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_MONITOR, 960) == OK)
 	var monitor_frames := make_stereo(960)
 	assert(unprocessed.process_chunk(monitor_frames) == 960)
 	assert(monitor.process_chunk(monitor_frames) == 960)
@@ -88,23 +98,20 @@ func _initialize() -> void:
 	assert(monitor.get_agc_gain() > 0.0)
 
 	var denoised_monitor := TwovoipOpusEncoder.new()
-	assert(denoised_monitor.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_SPEEX, TwovoipOpusEncoder.AGC_MONITOR, 960) == OK)
+	assert(denoised_monitor.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_SPEEX, TwovoipOpusEncoder.AGC_MONITOR, 960) == OK)
 	assert(denoised_monitor.process_chunk(monitor_frames) == 960)
 	assert(denoised_monitor.get_agc_gain() > 0.0)
 
 	var rnnoise_voice := TwovoipOpusEncoder.new()
-	assert(rnnoise_voice.create_sampler(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_RNNOISE, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
-	assert(rnnoise_voice.get_denoiser() == TwovoipOpusEncoder.DENOISER_RNNOISE)
+	assert(rnnoise_voice.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_RNNOISE, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
 	assert(rnnoise_voice.process_chunk(make_stereo(960)) == 960)
 	assert(rnnoise_voice.get_speech_probability() >= 0.0 and rnnoise_voice.get_speech_probability() <= 1.0)
 	var invalid_rnnoise := TwovoipOpusEncoder.new()
-	assert(invalid_rnnoise.create_sampler(48000, 48000, 2, TwovoipOpusEncoder.DENOISER_RNNOISE, TwovoipOpusEncoder.AGC_DISABLED, 960) != OK)
+	assert(invalid_rnnoise.initialize(48000, 48000, 2, TwovoipOpusEncoder.DENOISER_RNNOISE, TwovoipOpusEncoder.AGC_DISABLED, 960) != OK)
+	assert(invalid_rnnoise.initialize(48000, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
 
-	var legacy := TwovoipOpusEncoder.new()
-	assert(legacy.create_sampler(44100, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
-	assert(legacy.create_opus_encoder(12000, 5, true))
-	assert(legacy.process_pre_encoded_chunk(make_stereo(882), 960, false, false) > 0.0)
-	assert(not legacy.encode_chunk().is_empty())
+	assert(encoder.create_opus_encoder(12000, 5, true))
+	assert(not encoder.encode_chunk().is_empty())
 
 	print("audio processing smoke passed: native voice processing, gain, rates, frames, stereo and mono")
 	quit()

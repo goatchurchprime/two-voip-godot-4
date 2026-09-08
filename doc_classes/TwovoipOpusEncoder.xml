@@ -9,11 +9,6 @@
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="calc_audio_chunk_size" deprecated="Use create_sampler() and get_required_input_chunk_size().">
-			<return type="int" />
-			<param index="0" name="opus_chunk_size" type="int" />
-			<description>Returns the legacy input requirement for an output chunk.</description>
-		</method>
 		<method name="create_opus_encoder">
 			<return type="bool" />
 			<param index="0" name="bit_rate" type="int" />
@@ -21,15 +16,15 @@
 			<param index="2" name="voice_optimal" type="bool" />
 			<description>Creates the Opus encoder with the configured rate and channels.</description>
 		</method>
-		<method name="create_sampler">
+		<method name="initialize">
 			<return type="Error" />
 			<param index="0" name="input_mix_rate" type="int" />
 			<param index="1" name="opus_sample_rate" type="int" />
 			<param index="2" name="channels" type="int" />
-			<param index="3" name="denoiser" type="int" enum="TwovoipOpusEncoder.Denoiser" />
+			<param index="3" name="denoiser_mode" type="int" enum="TwovoipOpusEncoder.Denoiser" />
 			<param index="4" name="agc_mode" type="int" enum="TwovoipOpusEncoder.AgcMode" />
 			<param index="5" name="output_chunk_size" type="int" />
-			<description>Creates the complete, immutable sample-processing configuration.</description>
+			<description>Initializes the immutable audio-processing pipeline. It may succeed only once; a failed initialization leaves the object uninitialized and may be retried.</description>
 		</method>
 		<method name="encode_chunk">
 			<return type="PackedByteArray" />
@@ -44,21 +39,14 @@
 			<return type="float" />
 			<description>Returns the latest linear gain reported by Speex AGC.</description>
 		</method>
-		<method name="get_agc_mode" qualifiers="const">
-			<return type="int" enum="TwovoipOpusEncoder.AgcMode" />
-			<description>Returns the configured AGC mode.</description>
-		</method>
-		<method name="get_current_chunk_16khz" qualifiers="const">
+		<method name="get_current_chunk_16khz">
 			<return type="PackedFloat32Array" />
-			<description>Returns the last successfully processed chunk as post-processing mono 16 kHz PCM.</description>
+			<param index="0" name="reset_sampler" type="bool" />
+			<description>Experimental. Lazily converts the current conditioned chunk to mono 16 kHz PCM. Pass true after any skipped source chunks to discard resampler history. The caller must invoke this at most once for each processed chunk.</description>
 		</method>
-		<method name="get_denoiser" qualifiers="const">
-			<return type="int" enum="TwovoipOpusEncoder.Denoiser" />
-			<description>Returns the configured denoiser.</description>
-		</method>
-		<method name="get_output_chunk_size" qualifiers="const">
-			<return type="int" />
-			<description>Returns the configured output frames per chunk.</description>
+		<method name="get_current_chunk" qualifiers="const">
+			<return type="PackedVector2Array" />
+			<description>Returns the last processed output-rate PCM chunk as stereo frames, before Opus encoding.</description>
 		</method>
 		<method name="get_peak" qualifiers="const">
 			<return type="float" />
@@ -81,14 +69,6 @@
 			<param index="0" name="audio_frames" type="PackedVector2Array" />
 			<description>Processes one chunk and returns the number of input frames consumed, or a negative error.</description>
 		</method>
-		<method name="process_pre_encoded_chunk" deprecated="Use process_chunk() and the measurement getters.">
-			<return type="float" />
-			<param index="0" name="audio_frames" type="PackedVector2Array" />
-			<param index="1" name="opus_chunk_size" type="int" />
-			<param index="2" name="speech_probability" type="bool" />
-			<param index="3" name="rms" type="bool" />
-			<description>Processes a chunk and returns the selected legacy measurement.</description>
-		</method>
 		<method name="reset_opus_encoder">
 			<return type="void" />
 			<description>Resets Opus state before beginning an unrelated stream.</description>
@@ -98,19 +78,11 @@
 			<param index="0" name="gain" type="float" />
 			<description>Sets the manual linear gain applied after voice preprocessing.</description>
 		</method>
-		<method name="set_output_chunk_size" deprecated="Pass output_chunk_size to create_sampler().">
-			<return type="bool" />
-			<param index="0" name="output_chunk_size" type="int" />
-			<description>Sets the number of output frames produced by each processing call.</description>
-		</method>
 	</methods>
 	<members>
 		<member name="agc_gain" type="float" setter="" getter="get_agc_gain">Latest linear gain reported by Speex AGC.</member>
-		<member name="agc_mode" type="int" setter="" getter="get_agc_mode" enum="TwovoipOpusEncoder.AgcMode">Configured AGC mode.</member>
-		<member name="current_chunk_16khz" type="PackedFloat32Array" setter="" getter="get_current_chunk_16khz">Last processed post-processing mono 16 kHz PCM chunk.</member>
-		<member name="denoiser" type="int" setter="" getter="get_denoiser" enum="TwovoipOpusEncoder.Denoiser">Configured denoiser.</member>
+		<member name="current_chunk" type="PackedVector2Array" setter="" getter="get_current_chunk">Last processed output-rate PCM chunk as stereo frames.</member>
 		<member name="gain" type="float" setter="" getter="get_gain">Manual linear gain.</member>
-		<member name="output_chunk_size" type="int" setter="" getter="get_output_chunk_size">Output frames per chunk.</member>
 		<member name="peak" type="float" setter="" getter="get_peak">Peak magnitude of the last chunk.</member>
 		<member name="required_input_chunk_size" type="int" setter="" getter="get_required_input_chunk_size">Required input frames per call.</member>
 		<member name="rms" type="float" setter="" getter="get_rms">RMS level of the last chunk.</member>

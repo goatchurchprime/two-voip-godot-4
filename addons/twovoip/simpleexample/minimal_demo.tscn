@@ -58,10 +58,10 @@ text = "Basic microphone controls"
 
 [node name="MicOnButton" type="Button" parent="InputPlayer" unique_id=1703122268]
 layout_mode = 0
-offset_left = 47.0
-offset_top = 72.0
-offset_right = 110.0
-offset_bottom = 103.0
+offset_left = 33.0
+offset_top = 69.0
+offset_right = 96.0
+offset_bottom = 100.0
 toggle_mode = true
 button_pressed = true
 text = "Mic On"
@@ -122,39 +122,67 @@ text = "Stereo"
 
 [node name="AGCButton" type="CheckButton" parent="InputPlayer" unique_id=439888634]
 layout_mode = 0
-offset_left = 6.0
-offset_top = 203.0
-offset_right = 87.0
-offset_bottom = 234.0
+offset_left = -18.0
+offset_top = 198.0
+offset_right = 150.0
+offset_bottom = 229.0
 disabled = true
-text = "AGC"
+text = "Automatic Gain"
 
 [node name="HSliderAGC" type="HSlider" parent="InputPlayer" unique_id=699010031]
 layout_mode = 0
-offset_left = 112.0
-offset_top = 211.0
-offset_right = 393.0
-offset_bottom = 236.0
+offset_left = 245.0
+offset_top = 202.0
+offset_right = 526.0
+offset_bottom = 227.0
 max_value = 40.0
 step = 0.001
 value = 1.0
 editable = false
 
+[node name="SpinBoxAGC" type="SpinBox" parent="InputPlayer" unique_id=273020368]
+layout_mode = 0
+offset_left = 153.0
+offset_top = 196.0
+offset_right = 239.5
+offset_bottom = 227.0
+max_value = 40.0
+step = 0.001
+
+[node name="HSliderManGain" type="HSlider" parent="InputPlayer" unique_id=986234416]
+layout_mode = 0
+offset_left = 154.0
+offset_top = 233.0
+offset_right = 416.0
+offset_bottom = 273.0
+max_value = 20.0
+step = 0.01
+value = 1.0
+tick_count = 7
+
+[node name="LabelManualGain" type="Label" parent="InputPlayer" unique_id=1668220317]
+layout_mode = 0
+offset_left = 2.0
+offset_top = 242.0
+offset_right = 122.0
+offset_bottom = 275.0
+text = "Additional Gain"
+
 [node name="OutputPlayersLabel" type="Label" parent="." unique_id=1586952382]
 layout_mode = 0
-offset_left = 17.0
-offset_top = 299.0
-offset_right = 144.0
-offset_bottom = 322.0
+offset_left = 30.0
+offset_top = 330.0
+offset_right = 161.0
+offset_bottom = 353.0
 text = "OutputPlayers"
 uppercase = true
 
 [node name="OutputPlayers" type="Control" parent="." unique_id=1669634504]
 anchors_preset = 0
-offset_left = 32.0
-offset_top = 299.0
-offset_right = 189.0
-offset_bottom = 456.0
+offset_left = 31.0
+offset_top = 320.0
+offset_right = 188.0
+offset_bottom = 477.0
 
 [node name="OutputPlayer" parent="OutputPlayers" unique_id=1416507291 instance=ExtResource("5_kb0gc")]
 layout_mode = 0
@@ -171,5 +199,6 @@ offset_right = 90.0
 offset_bottom = 117.0
 
 [connection signal="gui_input" from="InputPlayer/FeedbackDisplay" to="InputPlayer" method="_on_feedback_display_gui_input"]
+[connection signal="value_changed" from="InputPlayer/HSliderManGain" to="InputPlayer" method="_on_h_slider_man_gain_value_changed"]
 
 [editable path="OutputPlayers/OutputPlayer"]

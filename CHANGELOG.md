@@ -10,8 +10,9 @@
 - reject unsupported RNNoise, stereo voice processing and processing-mode
   changes after a stream has started instead of silently degrading the signal;
 - made RNNoise genuinely optional at compile time without a pass-through stub.
-- made denoiser and AGC modes required `create_sampler()` configuration and
-  changed its result to an `Error`, removing the unusable runtime mode setters.
+- made denoiser and AGC modes required one-shot `initialize()` configuration;
+  failed initialization can be retried, while successful initialization keeps
+  warmed voice-processing state for the object's lifetime.
 - added an AGC monitor mode using a separate native Speex state whose processed
   output is discarded rather than simulated or applied.
 - moved denoiser and AGC selection into `TwoVoipMic.set_opus_values()` and kept
@@ -20,8 +21,12 @@
   incorrectly treating `speex_preprocess_run()`'s VAD Boolean as a probability.
 - kept the radio's last completed-sample AGC gain at the PTT falling edge and
   used it with manual gain when reprocessing the stored raw recording.
-- added `get_current_chunk_16khz()` as a bufferless hook exposing each
-  post-processing chunk to external speech and viseme analysers.
+- added experimental `get_current_chunk_16khz(reset_sampler)` as a lazy,
+  caller-managed adapter for external speech and viseme analysers; it performs
+  no work in the main processing loop and can reset history after skipped chunks.
+- removed immutable-configuration getters and the legacy chunk-size and
+  reprocessing methods; retained only the derived input-size requirement,
+  mutable gain, and per-chunk processing results.
 
 ## 6.4.0 - 2026-09-04
 
