@@ -1,5 +1,6 @@
 [
   "opus_encoder_object.cpp",
+  "opus_decoder_object.cpp",
   "audio_stream_opus.cpp",
   "register_types.cpp",
   "gen/doc_data.gen.cpp",
