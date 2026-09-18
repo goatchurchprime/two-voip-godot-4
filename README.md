@@ -174,6 +174,11 @@ occasionally leave additional frames unconsumed, particularly on the first
 call for some rate and long-frame combinations. The caller must retain
 `frames.size() - consumed` frames; TwoVoIP does not buffer or discard them.
 
+The Opus output rate must be one of 8, 12, 16, 24 or 48 kHz, and the output
+chunk must represent a legal Opus duration of 2.5, 5, 10, 20, 40 or 60 ms.
+`create_opus_encoder()` returns `false` and leaves no encoder active if Opus
+rejects any encoder option. `encode_chunk()` returns an empty array on failure.
+
 `set_gain()` and `get_gain()` control a manual linear amplitude multiplier. It
 is applied after voice preprocessing and remains independent of automatic gain.
 For mono voice, pass `AGC_APPLIED` to `initialize()`; Speex then performs

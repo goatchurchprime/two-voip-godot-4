@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- validate Opus sample rates and frame durations when initializing the encoder;
+- fail encoder creation atomically when Opus rejects an option, and return an
+  empty packet instead of slicing the output buffer when encoding fails;
+- propagate encoder-creation failures through `TwoVoipMic.set_opus_values()`;
+- use the encoder's conservative input-frame requirement for 5 ms frames at
+  fractional input/output ratios instead of asserting a truncated value;
+- report stereo RMS per sample rather than scaling it by the channel count;
+- remove the incorrect claim that the Opus VOIP application mode enables
+  in-band FEC by itself.
+
 ## 6.5.0 - 2026-09-04
 
 - separated manual gain from Speex automatic gain and exposed the latter as a

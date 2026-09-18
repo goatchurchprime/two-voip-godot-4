@@ -39,6 +39,24 @@
 
 using namespace godot;
 
+namespace {
+
+bool is_valid_opus_sample_rate(int p_sample_rate) {
+    return p_sample_rate == 8000 || p_sample_rate == 12000 || p_sample_rate == 16000 ||
+            p_sample_rate == 24000 || p_sample_rate == 48000;
+}
+
+bool is_valid_opus_frame_size(int p_sample_rate, int p_frame_size) {
+    return p_frame_size == p_sample_rate / 400 || // 2.5 ms
+            p_frame_size == p_sample_rate / 200 || // 5 ms
+            p_frame_size == p_sample_rate / 100 || // 10 ms
+            p_frame_size == p_sample_rate / 50 || // 20 ms
+            p_frame_size == p_sample_rate / 25 || // 40 ms
+            p_frame_size == p_sample_rate * 3 / 50; // 60 ms
+}
+
+} // namespace
+
 void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("initialize", "input_mix_rate", "opus_sample_rate", "channels", "denoiser_mode", "agc_mode", "output_chunk_size"), &TwovoipOpusEncoder::initialize);
     ClassDB::bind_method(D_METHOD("get_required_input_chunk_size"), &TwovoipOpusEncoder::get_required_input_chunk_size);
@@ -187,9 +205,11 @@ Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rat
         UtilityFunctions::printerr("TwovoipOpusEncoder is already initialized");
         return ERR_ALREADY_IN_USE;
     }
-    if (p_input_mix_rate <= 0 || p_opus_sample_rate <= 0 || (p_channels != 1 && p_channels != 2) ||
+    if (p_input_mix_rate <= 0 || !is_valid_opus_sample_rate(p_opus_sample_rate) ||
+            !is_valid_opus_frame_size(p_opus_sample_rate, p_output_chunk_size) ||
+            (p_channels != 1 && p_channels != 2) ||
             p_denoiser_mode < DENOISER_DISABLED || p_denoiser_mode > DENOISER_RNNOISE ||
-            p_agc_mode < AGC_DISABLED || p_agc_mode > AGC_MONITOR || p_output_chunk_size <= 0) {
+            p_agc_mode < AGC_DISABLED || p_agc_mode > AGC_MONITOR) {
         UtilityFunctions::printerr("Invalid audio pipeline configuration");
         return ERR_INVALID_PARAMETER;
     }
@@ -250,7 +270,7 @@ bool TwovoipOpusEncoder::create_opus_encoder(int bit_rate, int complexity, bool 
         opus_encoder = NULL;
     }
 
-    int opus_application = OPUS_APPLICATION_VOIP; // this option includes in-band forward error correction
+    int opus_application = OPUS_APPLICATION_VOIP;
     int signal_type = (voice_optimal ? OPUS_SIGNAL_VOICE : OPUS_SIGNAL_MUSIC);
     int opuserror = 0;
     // opussamplerate is one of 8000,12000,16000,24000,48000
@@ -263,14 +283,23 @@ bool TwovoipOpusEncoder::create_opus_encoder(int bit_rate, int complexity, bool 
     opuserror = opus_encoder_ctl(opus_encoder, OPUS_SET_SIGNAL(signal_type));
     if (opuserror != 0) {
         godot::UtilityFunctions::printerr("opus_encoder_ctl signal_type error ", opuserror);
+        opus_encoder_destroy(opus_encoder);
+        opus_encoder = NULL;
+        return false;
     }
     opuserror = opus_encoder_ctl(opus_encoder, OPUS_SET_BITRATE(bit_rate));
     if (opuserror != 0) {
         godot::UtilityFunctions::printerr("opus_encoder_ctl bit_rate error ", opuserror);
+        opus_encoder_destroy(opus_encoder);
+        opus_encoder = NULL;
+        return false;
     }
     opuserror = opus_encoder_ctl(opus_encoder, OPUS_SET_COMPLEXITY(complexity));
     if (opuserror != 0) {
         godot::UtilityFunctions::printerr("opus_encoder_ctl complexity error ", opuserror);
+        opus_encoder_destroy(opus_encoder);
+        opus_encoder = NULL;
+        return false;
     }
     return true;
 }
@@ -394,7 +423,7 @@ void TwovoipOpusEncoder::update_measurements() {
         last_peak = std::max(last_peak, std::abs(sample));
         sum_squares += sample * sample;
     }
-    last_rms = std::sqrt(sum_squares / output_chunk_size);
+    last_rms = std::sqrt(sum_squares / pre_encoded_chunk.size());
 }
 
 PackedVector2Array TwovoipOpusEncoder::get_current_chunk() const {
@@ -478,6 +507,10 @@ PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_b
         memcpy(popus_bytes, prefix_bytes.ptr(), nprefbytes); 
     int bytepacketsize = opus_encode_float(opus_encoder, (const float*)pre_encoded_chunk.ptr(), pre_encoded_chunk.size()/channels, 
                                            opus_byte_buffer.ptrw() + nprefbytes, max_opus_byte_buffer - nprefbytes);
+    if (bytepacketsize < 0) {
+        UtilityFunctions::printerr("Opus encoding failed: ", opus_strerror(bytepacketsize), " (", bytepacketsize, ")");
+        return PackedByteArray();
+    }
     return opus_byte_buffer.slice(0, nprefbytes + bytepacketsize);
 }
     

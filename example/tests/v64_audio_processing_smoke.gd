@@ -45,6 +45,11 @@ func _initialize() -> void:
 	assert(encoder.get_current_chunk()[100].x != encoder.get_current_chunk()[100].y)
 	assert(encoder.get_current_chunk_16khz(false).size() == 320)
 
+	var stereo_rms := TwovoipOpusEncoder.new()
+	assert(stereo_rms.initialize(48000, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	assert(stereo_rms.process_chunk(make_constant(960, 0.25)) == 960)
+	assert(abs(stereo_rms.get_rms() - 0.25) < 0.000001)
+
 	var short_frames := make_stereo(881)
 	assert(encoder.process_chunk(short_frames) == -1)
 
@@ -69,15 +74,20 @@ func _initialize() -> void:
 	assert(abs(direct_16khz.get_current_chunk_16khz(true)[100] - 0.125) < 0.000001)
 
 	for output_rate in [8000, 12000, 16000, 24000, 48000]:
-		for duration_ms in [10, 20, 40, 60]:
+		for duration_ms in [5, 10, 20, 40, 60]:
 			var standard := TwovoipOpusEncoder.new()
 			var output_frames: int = output_rate * duration_ms / 1000
 			assert(standard.initialize(44100, output_rate, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, output_frames) == OK)
-			assert(standard.get_required_input_chunk_size() == 44100 * duration_ms / 1000)
+			assert(standard.get_required_input_chunk_size() == ceili(44100 * duration_ms / 1000.0))
 			var standard_required: int = standard.get_required_input_chunk_size()
 			var standard_consumed: int = standard.process_chunk(make_stereo(standard_required))
 			assert(standard_consumed > 0 and standard_consumed <= standard_required)
 			assert(standard.get_current_chunk_16khz(true).size() == duration_ms * 16)
+	var shortest := TwovoipOpusEncoder.new()
+	assert(shortest.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 120) == OK)
+	assert(shortest.process_chunk(make_constant(120, 0.25)) == 120)
+	assert(shortest.create_opus_encoder(12000, 5, true))
+	assert(not shortest.encode_chunk().is_empty())
 
 	var voice := TwovoipOpusEncoder.new()
 	assert(voice.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_SPEEX, TwovoipOpusEncoder.AGC_APPLIED, 960) == OK)
@@ -109,6 +119,13 @@ func _initialize() -> void:
 	var invalid_rnnoise := TwovoipOpusEncoder.new()
 	assert(invalid_rnnoise.initialize(48000, 48000, 2, TwovoipOpusEncoder.DENOISER_RNNOISE, TwovoipOpusEncoder.AGC_DISABLED, 960) != OK)
 	assert(invalid_rnnoise.initialize(48000, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	var invalid_opus_configuration := TwovoipOpusEncoder.new()
+	assert(invalid_opus_configuration.initialize(48000, 44100, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 882) == ERR_INVALID_PARAMETER)
+	assert(invalid_opus_configuration.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 959) == ERR_INVALID_PARAMETER)
+	assert(invalid_opus_configuration.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	assert(not invalid_opus_configuration.create_opus_encoder(12000, 11, true))
+	assert(invalid_opus_configuration.encode_chunk().is_empty())
+	assert(invalid_opus_configuration.create_opus_encoder(12000, 5, true))
 
 	assert(encoder.create_opus_encoder(12000, 5, true))
 	assert(not encoder.encode_chunk().is_empty())
