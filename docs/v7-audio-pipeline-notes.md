@@ -158,6 +158,102 @@ and use an explicit late-data policy. Independently chasing a generic queue
 target with `AudioStreamPlayer.pitch_scale` cannot guarantee song or viseme
 alignment.
 
+## Reference clocks and cross-machine capture
+
+Every captured sample has an exact position in its source device's media
+clock. It does not automatically have an exact UTC capture time. The device
+oscillator runs independently of the operating-system clock, its nominal
+48 kHz is not exact, and an application may only learn that a block was
+captured after driver and input-buffer delay.
+
+NTP does estimate a computer's offset from a shared reference clock while
+accounting for round-trip network delay. This is sufficient to give machines a
+common, approximate timebase, but asymmetric network paths and software/device
+latency leave uncertainty. Ordinary Internet NTP must therefore not be treated
+as sample-accurate capture timing. PTP with hardware timestamping can be much
+more accurate on a controlled LAN, but cannot be assumed for normal TwoVoIP
+users.
+
+UTC itself is optional. All participants only need a common session reference.
+A session host can periodically exchange four timestamps with each client to
+estimate offset, round-trip time, drift and uncertainty. Wall time should be an
+anchor for that mapping, not the clock used directly inside the audio callback:
+system time may be corrected, whereas the callback needs a monotonic timeline.
+
+For each source, retain a monotonic capture-frame counter and estimate an
+affine mapping such as:
+
+```
+session_time = source_time_offset + source_frame / observed_source_rate
+```
+
+Periodically refreshed timestamp pairs estimate both the offset and the real
+device rate. Packets carry the source frame position (or a compact delta from
+it), while less frequent control packets carry its mapping to session time and
+an uncertainty estimate. This follows the same broad model as RTP timestamps
+paired with NTP-format time in RTCP Sender Reports. A capture-time extension
+can make the first sample's reference time explicit.
+
+This can align two remote sources to a useful tolerance and schedule both for
+the same future presentation deadline. It cannot by itself remove different
+microphone-driver capture latencies, sound propagation time, or destination
+output latency. Closely colocated microphones recording the same sound can use
+cross-correlation as an optional calibration/measurement of their remaining
+offset. A future Godot audio-driver change may be needed for trustworthy
+hardware capture timestamps; the C++ microphone owner can meanwhile maintain
+the frame counter and best available monotonic-clock correlation.
+
+Relevant standards are [NTPv4 (RFC 5905)](https://www.rfc-editor.org/rfc/rfc5905),
+[RTP/RTCP (RFC 3550)](https://www.rfc-editor.org/rfc/rfc3550), and
+[RTP clock source signalling (RFC 7273)](https://www.rfc-editor.org/rfc/rfc7273).
+
+## Scheduled pre-roll instead of pause/unpause
+
+The proposed 400 ms of zeros is a good conceptual simplification if it is a
+receiver-side playout reserve, not silence transmitted over the network. On the
+first packet of an episode, schedule its first sample for a deadline such as:
+
+```
+presentation_time = mapped_capture_time + target_playout_delay
+```
+
+Until that deadline the audio callback emits zero. Packets accumulate during
+the reserve, so playback begins with the intended amount of jitter protection.
+If the episode arrives late or catch-up policy requests it, the reserve can be
+shortened or skipped.
+
+Prefer representing this as a virtual, tagged timeline span rather than
+physically filling the decoded PCM ring with 400 ms of zeros. Physical zeros
+consume ring capacity, inflate the PCM queue metric and become indistinguishable
+from real recorded silence. A virtual span lets the mixer emit silence without
+advancing a PCM read cursor and can be discarded in constant time.
+
+At minimum, timeline spans must distinguish:
+
+- discardable playout reserve;
+- real source silence or a deliberate between-episode gap;
+- packet-loss concealment;
+- decoded source audio.
+
+Only the first category is freely skippable. Real source silence is meaningful
+for synchronization, visemes and karaoke unless an explicit speed-up policy
+chooses to remove it. Concealment needs its own diagnostics and correction
+policy.
+
+The current helper does not reliably preserve a gap between episodes. It gates
+the PCM read cursor at one `bufferstreamend`, but the next episode is decoded
+contiguously after the old one and the helper clears the gate when total queued
+PCM exceeds its lag target. Depending on timing, that either concatenates the
+episodes or creates arrival-dependent silence. It also cannot retain several
+unconsumed episode boundaries.
+
+A deadline-driven timeline makes queue length a safety diagnostic rather than
+the primary clock. The initial target should be configurable and later
+adaptive; 400 ms is a sensible experiment, not a protocol constant. Scheduling
+must subtract or otherwise account for known output latency and processing
+delay when converting the desired audible time to a destination mix frame.
+Karaoke should use the song clock as the authoritative presentation timeline.
+
 Useful playback observability will include:
 
 - current source frame and decoded ring position;
@@ -173,12 +269,15 @@ Useful playback observability will include:
 1. Add deterministic tests for two and several short episodes sharing one ring,
    including a later footer arriving before an earlier boundary is consumed.
 2. Replace the single marker with the bounded FIFO compatibility model.
-3. Add timestamped episode metadata and explicit gap policy.
-4. Replace `AudioStreamPlaybackResampled` with an owned Speex resampler whose
+3. Add tagged, virtual pre-roll and timestamped episode metadata with explicit
+   gap policy.
+4. Add a source-frame-to-session-clock estimator and schedule playback against
+   deadlines while reporting its current timing uncertainty.
+5. Replace `AudioStreamPlaybackResampled` with an owned Speex resampler whose
    normal correction is driven by the intended presentation timeline.
-5. Keep large backlog recovery, Signalsmith stretching and realtime microphone
+6. Keep large backlog recovery, Signalsmith stretching and realtime microphone
    monitoring out of this first implementation.
-6. Add a replay fixture with audio and viseme timestamps before claiming
+7. Add a replay fixture with audio and viseme timestamps before claiming
    synchronization accuracy.
-7. Add a karaoke-oriented fixture driven by an authoritative song clock before
+8. Add a karaoke-oriented fixture driven by an authoritative song clock before
    designing its final public scheduling API.
