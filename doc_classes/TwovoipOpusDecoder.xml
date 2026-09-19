@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TwovoipOpusDecoder" inherits="RefCounted" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Decodes Opus packets into floating-point PCM samples.
+	</brief_description>
+	<description>
+		Create one decoder for each Opus stream. Pass packets to it in order. Stereo samples alternate between the left and right channels.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="decode_missing">
+			<return type="PackedFloat32Array" />
+			<param index="0" name="frame_size" type="int" />
+			<description>Creates replacement audio for a missing packet. [param frame_size] is the number of samples per channel.</description>
+		</method>
+		<method name="decode_packet">
+			<return type="PackedFloat32Array" />
+			<param index="0" name="opus_packet" type="PackedByteArray" />
+			<param index="1" name="begin" type="int" default="0" />
+			<param index="2" name="decode_fec" type="bool" default="false" />
+			<param index="3" name="frame_size" type="int" default="0" />
+			<description>Decodes one packet. [param begin] skips a packet prefix. Leave [param frame_size] at zero for normal decoding. When using FEC, zero reuses the size of the last decoded frame.</description>
+		</method>
+		<method name="get_channels" qualifiers="const">
+			<return type="int" />
+			<description>Returns the number of audio channels.</description>
+		</method>
+		<method name="get_last_error" qualifiers="const">
+			<return type="int" />
+			<description>Returns zero after success or the latest negative Opus error code.</description>
+		</method>
+		<method name="get_last_error_message" qualifiers="const">
+			<return type="String" />
+			<description>Returns a message for [member last_error].</description>
+		</method>
+		<method name="get_last_frame_size" qualifiers="const">
+			<return type="int" />
+			<description>Returns the number of samples per channel from the last successful decode.</description>
+		</method>
+		<method name="get_sample_rate" qualifiers="const">
+			<return type="int" />
+			<description>Returns the sample rate.</description>
+		</method>
+		<method name="initialize">
+			<return type="Error" />
+			<param index="0" name="sample_rate" type="int" />
+			<param index="1" name="channels" type="int" />
+			<description>Starts the decoder. Use a sample rate of 8000, 12000, 16000, 24000, or 48000 Hz. Use one or two channels. You can try again if this call fails.</description>
+		</method>
+		<method name="is_initialized" qualifiers="const">
+			<return type="bool" />
+			<description>Returns whether the decoder is ready.</description>
+		</method>
+		<method name="reset">
+			<return type="void" />
+			<description>Clears stored decoder state. Call this before using the decoder for a different stream.</description>
+		</method>
+	</methods>
+	<members>
+		<member name="channels" type="int" setter="" getter="get_channels">Number of audio channels.</member>
+		<member name="initialized" type="bool" setter="" getter="is_initialized">Whether the decoder is ready.</member>
+		<member name="last_error" type="int" setter="" getter="get_last_error">Latest Opus result code.</member>
+		<member name="last_error_message" type="String" setter="" getter="get_last_error_message">Message for the latest Opus result.</member>
+		<member name="last_frame_size" type="int" setter="" getter="get_last_frame_size">Samples per channel from the last decoded frame.</member>
+		<member name="sample_rate" type="int" setter="" getter="get_sample_rate">Audio sample rate.</member>
+	</members>
+</class>

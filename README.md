@@ -211,6 +211,28 @@ Speex preprocessing uses 10 or 20 ms internal frames, so the output chunk must
 divide into one of those durations. Shorter Opus frames remain available when
 voice preprocessing is disabled.
 
+### Decode Opus to PCM
+
+Use `TwovoipOpusDecoder` when another audio system plays the decoded sound.
+Create one decoder for each Opus stream. Pass packets to it in order:
+
+```gdscript
+var decoder := TwovoipOpusDecoder.new()
+assert(decoder.initialize(48000, 1) == OK)
+
+var pcm: PackedFloat32Array = decoder.decode_packet(packet)
+if pcm.is_empty() and decoder.get_last_error() < 0:
+    push_error(decoder.get_last_error_message())
+```
+
+Stereo PCM samples alternate between the left and right channels.
+`decode_packet()` can skip a packet prefix and decode Opus FEC data.
+`decode_missing()` creates replacement audio for a missing packet. Call
+`reset()` before using the decoder for a different stream.
+
+The caller must keep packets in order, buffer network jitter, and decide when
+to use FEC or missing-packet replacement.
+
 #### Networking layer
 
 In the `transmit_audio_json_packet=true` mode the `TwoVoipMic` module outputs all its data via the signal
