@@ -31,6 +31,9 @@
 #ifndef AUDIO_STREAM_OPUS_H
 #define AUDIO_STREAM_OPUS_H
 
+#include <atomic>
+#include <cstdint>
+#include <vector>
 
 #include <godot_cpp/classes/audio_stream.hpp>
 #include <godot_cpp/classes/audio_stream_playback.hpp>
@@ -80,23 +83,29 @@ class AudioStreamPlaybackOpus : public AudioStreamPlaybackResampled {
     friend class AudioStreamOpus;
     Ref<AudioStreamOpus> base;
     
-    bool active = false;
-    float mixed = 0.0;
+    std::atomic<bool> active{ false };
+    std::atomic<int64_t> mixed_frames{ 0 };
 
     OpusDecoder* opusdecoder = NULL;
     PackedFloat32Array audiounpackedbuffer;
-    int Naudiounpackedbuffer = 6000;   //  *  If this is less than the maximum packet duration (120ms; 5760 for 48kHz), this function will    
+    int max_decoded_frames = 0;
 
-    PackedVector2Array audiosamplebuffer;  // a ringbuffer
-    int bufferbegin = 0;
-    int buffertail = 0;
-    int bufferstreamend = -1;  // paused when bufferbegin==bufferstreamend
-    int skips = 0;  // counts when we hit buffertail before bufferstreamend
-    int skips_over = 0;  // buffertail overflows the ring buffer
+    // Single-producer/single-consumer decoded PCM ring. The packet receiver is
+    // the producer and Godot's audio mixing thread is the consumer.
+    std::vector<AudioFrame> audiosamplebuffer;
+    std::atomic<int64_t> bufferbegin{ 0 };
+    std::atomic<int64_t> buffertail{ 0 };
+    static constexpr int64_t NO_STREAM_END = -1;
+    std::atomic<int64_t> bufferstreamend{ 0 }; // paused when bufferbegin == bufferstreamend
+    std::atomic<int64_t> underflow_frames{ 0 };
+    std::atomic<int64_t> overflow_frames{ 0 };
+    std::atomic<int64_t> decode_errors{ 0 };
+    std::atomic<int> last_decode_error{ OPUS_OK };
     
     int lastpacketsizeforfec = 960;
-    float chunkmax = 0.0;
-    int pop_front_frames(AudioFrame *buffer, int frames);
+    std::atomic<float> chunkmax{ 0.0f };
+    int queue_decoded_frames(const float *decoded_samples, int frame_count);
+    void update_chunk_max(float magnitude);
 
     // Used to maps a pure sound wave in place of incoming audio data to check if problems are in playback or the data
     int Dsinewaveframes = 0;
@@ -119,11 +128,15 @@ public:
     virtual void _seek(double p_time) override;
     virtual void _tag_used_streams() override;
 
-    int available_space_frames();
-    int queue_length_frames();
-    void push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
+    int available_space_frames() const;
+    int queue_length_frames() const;
+    int push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
     float get_chunk_max();
-    int get_skips(bool overflow);
+    int64_t get_skips(bool overflow) const;
+    int64_t get_underflow_frames() const;
+    int64_t get_overflow_frames() const;
+    int64_t get_decode_errors() const;
+    int get_last_decode_error() const;
     void mark_end_opus_stream(bool clearmark);
     void set_sinewave_frames(int sinewaveframes, float volume);
     AudioStreamPlaybackOpus();

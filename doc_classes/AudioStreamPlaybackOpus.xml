@@ -17,10 +17,26 @@
 			<return type="float" />
 			<description>Returns the recent decoded peak magnitude.</description>
 		</method>
+		<method name="get_decode_errors">
+			<return type="int" />
+			<description>Returns the number of Opus packets which failed to decode since playback started.</description>
+		</method>
+		<method name="get_last_decode_error">
+			<return type="int" />
+			<description>Returns [constant @GlobalScope.OK] after a successful decode, otherwise the latest negative libopus error code.</description>
+		</method>
+		<method name="get_overflow_frames">
+			<return type="int" />
+			<description>Returns the number of decoded frames dropped because the playback ring was full since playback started.</description>
+		</method>
 		<method name="get_skips">
 			<return type="int" />
 			<param index="0" name="overflow" type="bool" />
-			<description>Returns underflow skips, or overflow skips when requested.</description>
+			<description>Compatibility alias returning [method get_underflow_frames], or [method get_overflow_frames] when [param overflow] is [code]true[/code].</description>
+		</method>
+		<method name="get_underflow_frames">
+			<return type="int" />
+			<description>Returns the number of silence frames emitted because the active stream queue was empty since playback started. Silence emitted at a marked stream end is not counted.</description>
 		</method>
 		<method name="mark_end_opus_stream">
 			<return type="void" />
@@ -28,11 +44,11 @@
 			<description>Marks the queued stream end, or clears the previous mark.</description>
 		</method>
 		<method name="push_opus_packet">
-			<return type="void" />
+			<return type="int" />
 			<param index="0" name="opusbytepacket" type="PackedByteArray" />
 			<param index="1" name="begin" type="int" />
 			<param index="2" name="decode_fec" type="int" />
-			<description>Decodes one packet from begin, optionally using forward error correction.</description>
+			<description>Decodes one packet from [param begin], optionally using forward error correction. Returns the decoded frame count, or a negative libopus error code. Decoded frames which do not fit in the playback ring are counted by [method get_overflow_frames]. Call this from one producer thread only.</description>
 		</method>
 		<method name="queue_length_frames">
 			<return type="int" />

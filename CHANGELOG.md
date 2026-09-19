@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- make the decoded Opus playback ring safe between its single packet-producing
+  thread and Godot's audio mixing thread, using monotonic 64-bit positions;
+- report exact playback underflow, overflow and decoder-error diagnostics, and
+  return the decoded frame count or libopus error from `push_opus_packet()`;
+- size the Opus decode workspace correctly for packets containing up to 120 ms
+  of mono or stereo audio;
 - validate Opus sample rates and frame durations when initializing the encoder;
 - fail encoder creation atomically when Opus rejects an option, and return an
   empty packet instead of slicing the output buffer when encoding fails;
