@@ -58,7 +58,6 @@
 
 namespace godot {
     
-#define DEFAULT_RING_BUFFER_SIZE 50
 
 class TwovoipOpusEncoder : public RefCounted {
     GDCLASS(TwovoipOpusEncoder, RefCounted)
@@ -94,6 +93,7 @@ private:
     int output_chunk_size = 0;  // usually 960 = 48000 * 20ms
     int preprocess_frame_size = 0; // usually 960, factor 10ms size
 
+    const float max_lead_time = 1.0; 
     int audio_ringbuffer_size_chunks = 0; // about 50 for one clear second (over the top but good for testing)
     int audio_ringbuffer_index = 0; // goes around like a ring
     PackedFloat32Array prepared_audio_ringbuffer; // output_chunk_size*channels*audio_ringbuffer_size_chunks
@@ -105,7 +105,6 @@ private:
 #endif
 
     OpusEncoder* opus_encoder = NULL;
-
 
     PackedByteArray opus_byte_buffer;
 
@@ -144,7 +143,7 @@ public:
     float get_agc_gain() const { return agc_gain; }
     bool create_opus_encoder(int bit_rate, int complexity, bool voice_optimal);
     void reset_opus_encoder();
-    PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes=PackedByteArray());
+    PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes=PackedByteArray(), int chunk_offset_back=0);
 
     TwovoipOpusEncoder();
     ~TwovoipOpusEncoder();

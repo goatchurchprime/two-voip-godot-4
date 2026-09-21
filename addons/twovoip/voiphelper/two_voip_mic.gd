@@ -10,8 +10,8 @@ var currentlytalking = false
 var opusframecount = 0
 var opusstreamcount = 0
 
-var hangframes = 25
-var hangframescountup = 0
+var hangchunks = 25
+var hangchunkscountup = 0
 var chunkmaxpersist = 0.0
 
 var audiosampleframetextureimage : Image
@@ -151,12 +151,9 @@ func init_voip_mic(p_json_packets_as_binary: bool,
 func processtalkstreamends(talking: bool):
 	if talking and not currentlytalking:
 		talkingtimestart = Time.get_ticks_msec()*0.001
-		var leadframes = lead_time/frametimesecs
-		hangframes = int(hang_time/frametimesecs)
-		prints("leadframes ", leadframes, "hangframes", hangframes)
-		#while leadframes > 0.0 and audioopuschunkedeffect.undrop_chunk():
-		#	leadframes -= 1
-		#	talkingtimestart -= frametimesecs
+		var leadchunks = int(lead_time/frametimesecs)
+		hangchunks = int(hang_time/frametimesecs)
+		prints("leadchunks ", leadchunks, "hangchunks", hangchunks)
 		var audiostreampacketheader = { 
 			"opusframesize":opus_chunk_size, 
 			"opussamplerate":opussamplerate, 
@@ -164,16 +161,20 @@ func processtalkstreamends(talking: bool):
 			"lenchunkprefix":len(chunkprefix), 
 			"opusstreamcount":opusstreamcount, 
 			"opusframecount":0,
-			"talkingtimestart":talkingtimestart
+			"talkingtimestart":talkingtimestart - leadchunks*frametimesecs
 		}
-		opusencoder.reset_opus_encoder()
+
 		if json_packets_as_binary:
 			transmit_audio_packet.emit(JSON.stringify(audiostreampacketheader).to_ascii_buffer())
 		else:
 			transmit_audio_json_packet.emit(audiostreampacketheader)
-		#get_parent().PlayerConnections.peerconnections_possiblymissingaudioheaders.clear()
+
+		opusencoder.reset_opus_encoder()
 		opusframecount = 0
 		currentlytalking = true
+		audio_chunk = null
+		for i in range(leadchunks):
+			processopuschunk(leadchunks - i)
 
 	elif not talking and currentlytalking:
 		currentlytalking = false
@@ -231,19 +232,19 @@ func processvox(chunkmax, speechnoiseprobability, resampled_chunk):
 	if chunkmax >= vox_threshhold:
 		if voxbutton.button_pressed and not pttbutton.button_pressed:
 			pttbutton.button_pressed = true
-		hangframescountup = 0
+		hangchunkscountup = 0
 		if chunkmax > chunkmaxpersist:
 			chunkmaxpersist = chunkmax
 			if audiosampleframematerial:
 				audiosampleframematerial.set_shader_parameter("chunkmaxpersist", chunkmaxpersist)
 	else:
-		if hangframescountup == hangframes:
+		if hangchunkscountup == hangchunks:
 			if voxbutton.button_pressed:
 				pttbutton.button_pressed = false
 			chunkmaxpersist = 0.0
 			if audiosampleframematerial:
 				audiosampleframematerial.set_shader_parameter("chunkmaxpersist", chunkmaxpersist)
-		hangframescountup += 1
+		hangchunkscountup += 1
 
 	if audiosampleframematerial:
 		if pttbutton.button_pressed:
@@ -254,17 +255,16 @@ func processvox(chunkmax, speechnoiseprobability, resampled_chunk):
 		else:
 			audiosampleframematerial.set_shader_parameter("chunktexenabled", false)
 
-func processopuschunk():
+func processopuschunk(chunks_back):
 	assert(currentlytalking)
 	if len(chunkprefix) == 2:
 		chunkprefix.set(0, (opusframecount%256))  # 32768 frames is 10 minutes
 		chunkprefix.set(1, (int(opusframecount/256)&127) + (opusstreamcount%2)*128)
 	else:
 		assert (len(chunkprefix) == 0)
-	var opuspacket : PackedByteArray = opusencoder.encode_chunk(chunkprefix)
+	var opuspacket : PackedByteArray = opusencoder.encode_chunk(chunkprefix, chunks_back)
 	transmit_audio_packet.emit(opuspacket)
 	opusframecount += 1
-
 
 var audio_chunk = null
 var last_chunkmax = 0.0
@@ -296,5 +296,5 @@ func _process(delta):
 			microphoneaudiosamplescountSecondsSampleWindow *= 1.5
 		processvox(last_chunkmax, speechnoiseprobability, opusencoder.get_current_chunk())
 		if currentlytalking:
-			processopuschunk()
+			processopuschunk(0)
 	audio_chunk = null

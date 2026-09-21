@@ -182,7 +182,7 @@ func reprocessoriginalchunks():
 		recordedchunkmax = max(recordedchunkmax, chunkmax)
 		resampledchunkprefix.set(0, (resampledopusframecount%256))  # 32768 frames is 10 minutes
 		resampledchunkprefix.set(1, (int(resampledopusframecount/256)&127) + (recordedheader["opusstreamcount"]%2)*128)
-		var opuspacket : PackedByteArray = opusencoder_forreprocessing.encode_chunk(resampledchunkprefix)
+		var opuspacket : PackedByteArray = opusencoder_forreprocessing.encode_chunk(resampledchunkprefix, 0)
 		recordedopuspackets.append(opuspacket)
 		resampledopusframecount += 1
 		recordedopuspacketsMemSize += opuspacket.size() 
@@ -195,7 +195,8 @@ func reprocessoriginalchunks():
 	$VBoxPlayback/HBoxStream/ChunkMax.text = str(recordedchunkmax)
 
 func recordoriginalchunks(audiosamples, chunkmax, opuspacket):
-	recordedsamples.append(audiosamples)
+	if audiosamples != null:
+		recordedsamples.append(audiosamples)
 	recordedopuspackets.append(opuspacket)
 	$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
 	recordedopuspacketsMemSize += opuspacket.size()

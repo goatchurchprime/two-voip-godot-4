@@ -71,7 +71,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_agc_gain"), &TwovoipOpusEncoder::get_agc_gain);
     ClassDB::bind_method(D_METHOD("create_opus_encoder", "bit_rate", "complexity", "voice_optimal"), &TwovoipOpusEncoder::create_opus_encoder);
     ClassDB::bind_method(D_METHOD("reset_opus_encoder"), &TwovoipOpusEncoder::reset_opus_encoder);
-    ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes"), &TwovoipOpusEncoder::encode_chunk, DEFVAL(PackedByteArray()));
+    ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes", "chunk_offset_back"), &TwovoipOpusEncoder::encode_chunk, DEFVAL(PackedByteArray()));
 
     uint32_t read_only = PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY;
     ADD_PROPERTY(PropertyInfo(Variant::INT, "required_input_chunk_size", PROPERTY_HINT_NONE, "", read_only), "", "get_required_input_chunk_size");
@@ -231,7 +231,7 @@ Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rat
         }
     }
     
-    Error error = configure_output_chunk_size(p_output_chunk_size, DEFAULT_RING_BUFFER_SIZE);
+    Error error = configure_output_chunk_size(p_output_chunk_size, (int)ceil(max_lead_time*input_mix_rate/p_output_chunk_size) + 1);
     if (error != OK) {
         destroy_audio_pipeline();
         return error;
@@ -502,13 +502,18 @@ PackedFloat32Array TwovoipOpusEncoder::get_current_chunk_16khz(bool p_reset_samp
     return output_16khz;
 }
 
-PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_bytes) {
+PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_bytes, int chunk_offset_back) {
     if (opus_encoder == NULL) {
         godot::UtilityFunctions::printerr("Error: opusencoder is null");
         return PackedByteArray();
     }
+    if (chunk_offset_back < 0) {
+        UtilityFunctions::printerr("chunk_offset_back must be positive or zero");
+        return PackedByteArray();
+    }
     
-    float* prepared_audio_chunk = (float*)prepared_audio_ringbuffer.ptrw() + (audio_ringbuffer_index % audio_ringbuffer_size_chunks)*output_chunk_size*channels;
+    float* prepared_audio_chunk = (float*)prepared_audio_ringbuffer.ptrw() + \
+        (std::max(audio_ringbuffer_index - chunk_offset_back, 0) % audio_ringbuffer_size_chunks)*output_chunk_size*channels;
 
     int max_opus_byte_buffer = prefix_bytes.size() + 4*output_chunk_size*channels;
     if (max_opus_byte_buffer > opus_byte_buffer.size())
