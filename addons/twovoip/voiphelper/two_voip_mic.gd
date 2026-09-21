@@ -150,8 +150,8 @@ func init_voip_mic(p_json_packets_as_binary: bool,
 
 func processtalkstreamends(talking: bool):
 	if talking and not currentlytalking:
-		talkingtimestart = Time.get_ticks_msec()*0.001
 		var leadchunks = int(lead_time/frametimesecs)
+		talkingtimestart = Time.get_ticks_msec()*0.001 - leadchunks*frametimesecs
 		hangchunks = int(hang_time/frametimesecs)
 		prints("leadchunks ", leadchunks, "hangchunks", hangchunks)
 		var audiostreampacketheader = { 
@@ -161,7 +161,7 @@ func processtalkstreamends(talking: bool):
 			"lenchunkprefix":len(chunkprefix), 
 			"opusstreamcount":opusstreamcount, 
 			"opusframecount":0,
-			"talkingtimestart":talkingtimestart - leadchunks*frametimesecs
+			"talkingtimestart":talkingtimestart
 		}
 
 		if json_packets_as_binary:
@@ -173,7 +173,7 @@ func processtalkstreamends(talking: bool):
 		opusframecount = 0
 		currentlytalking = true
 		audio_chunk = null
-		for i in range(leadchunks):
+		for i in range(leadchunks + 1):
 			processopuschunk(leadchunks - i)
 
 	elif not talking and currentlytalking:
