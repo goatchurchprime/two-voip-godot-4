@@ -58,6 +58,7 @@
 
 namespace godot {
     
+#define DEFAULT_RING_BUFFER_SIZE 50
 
 class TwovoipOpusEncoder : public RefCounted {
     GDCLASS(TwovoipOpusEncoder, RefCounted)
@@ -81,27 +82,36 @@ private:
     int opus_sample_rate = 48000;
     int channels = 2;
     
-    SpeexResamplerState* speex_resampler = NULL;
-    SpeexResamplerState* resampler_16khz = NULL;
-    SpeexPreprocessState* speex_preprocessor = NULL;
-    SpeexPreprocessState* speex_agc_monitor = NULL;
-#ifdef RNNOISE
-    DenoiseState* rnnoise_st = NULL;
-#endif
-    OpusEncoder* opus_encoder = NULL;
+    int required_input_chunk_size = 0;
 
     PackedFloat32Array mono_audio_frames; 
-    PackedFloat32Array pre_encoded_chunk; 
+    SpeexResamplerState* speex_resampler = NULL;
+
     std::vector<spx_int16_t> speex_frame;
+    SpeexPreprocessState* speex_denoiser = NULL;
+    SpeexPreprocessState* speex_agc = NULL;
+
+    int output_chunk_size = 0;  // usually 960 = 48000 * 20ms
+    int preprocess_frame_size = 0; // usually 960, factor 10ms size
+
+    int audio_ringbuffer_size_chunks = 0; // about 50 for one clear second (over the top but good for testing)
+    int audio_ringbuffer_index = 0; // goes around like a ring
+    PackedFloat32Array prepared_audio_ringbuffer; // output_chunk_size*channels*audio_ringbuffer_size_chunks
+
 #ifdef RNNOISE
+    DenoiseState* rnnoise_st = NULL;
     PackedFloat32Array rnnoise_in;
     PackedFloat32Array rnnoise_out;
 #endif
+
+    OpusEncoder* opus_encoder = NULL;
+
+
     PackedByteArray opus_byte_buffer;
 
-    int output_chunk_size = 0;
-    int required_input_chunk_size = 0;
-    int preprocess_frame_size = 0;
+    SpeexResamplerState* resampler_16khz = NULL;
+
+
     float last_peak = 0.0F;
     float last_rms = 0.0F;
     float last_speech_probability = 0.0F;
@@ -114,9 +124,8 @@ private:
     void destroy_audio_pipeline();
     void destroy_voice_processor();
     Error create_voice_processor();
-    Error configure_output_chunk_size(int p_output_chunk_size);
-    void process_voice();
-    void update_measurements();
+    Error configure_output_chunk_size(int p_output_chunk_size, int p_audio_ringbuffer_size_chunks);
+    void process_denoiser(float* prepared_audio_chunk);
     
 protected:
     static void _bind_methods();

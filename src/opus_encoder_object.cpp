@@ -103,20 +103,20 @@ void TwovoipOpusEncoder::destroy_audio_pipeline() {
         resampler_16khz = NULL;
     }
     mono_audio_frames.resize(0);
-    pre_encoded_chunk.resize(0);
+    prepared_audio_ringbuffer.resize(0);
     output_chunk_size = 0;
     required_input_chunk_size = 0;
     initialized = false;
 }
 
 void TwovoipOpusEncoder::destroy_voice_processor() {
-    if (speex_preprocessor != NULL) {
-        speex_preprocess_state_destroy(speex_preprocessor);
-        speex_preprocessor = NULL;
+    if (speex_denoiser != NULL) {
+        speex_preprocess_state_destroy(speex_denoiser);
+        speex_denoiser = NULL;
     }
-    if (speex_agc_monitor != NULL) {
-        speex_preprocess_state_destroy(speex_agc_monitor);
-        speex_agc_monitor = NULL;
+    if (speex_agc != NULL) {
+        speex_preprocess_state_destroy(speex_agc);
+        speex_agc = NULL;
     }
 #ifdef RNNOISE
     if (rnnoise_st != NULL) {
@@ -174,27 +174,27 @@ Error TwovoipOpusEncoder::create_voice_processor() {
         return ERR_INVALID_PARAMETER;
     }
 
-    if ((denoiser_mode == DENOISER_SPEEX) || (agc_mode == AGC_APPLIED)) {
-        speex_preprocessor = speex_preprocess_state_init(preprocess_frame_size, opus_sample_rate);
-        if (speex_preprocessor == NULL) {
+    if (denoiser_mode == DENOISER_SPEEX) {
+        speex_denoiser = speex_preprocess_state_init(preprocess_frame_size, opus_sample_rate);
+        if (speex_denoiser == NULL) {
             preprocess_frame_size = 0;
             return ERR_CANT_CREATE;
         }
-        spx_int32_t denoise_enabled = (denoiser_mode == DENOISER_SPEEX);
-        spx_int32_t agc_enabled = (agc_mode == AGC_APPLIED);
-        speex_preprocess_ctl(speex_preprocessor, SPEEX_PREPROCESS_SET_DENOISE, &denoise_enabled);
-        speex_preprocess_ctl(speex_preprocessor, SPEEX_PREPROCESS_SET_AGC, &agc_enabled);
+        spx_int32_t enabled = 1;
+        spx_int32_t disabled = 0;
+        speex_preprocess_ctl(speex_denoiser, SPEEX_PREPROCESS_SET_DENOISE, &enabled);
+        speex_preprocess_ctl(speex_denoiser, SPEEX_PREPROCESS_SET_AGC, &disabled);
     }
-    if (agc_mode == AGC_MONITOR) {
-        speex_agc_monitor = speex_preprocess_state_init(preprocess_frame_size, opus_sample_rate);
-        if (speex_agc_monitor == NULL) {
+    if (agc_mode != AGC_DISABLED) {
+        speex_agc = speex_preprocess_state_init(preprocess_frame_size, opus_sample_rate);
+        if (speex_agc == NULL) {
             destroy_voice_processor();
             return ERR_CANT_CREATE;
         }
         spx_int32_t disabled = 0;
         spx_int32_t enabled = 1;
-        speex_preprocess_ctl(speex_agc_monitor, SPEEX_PREPROCESS_SET_DENOISE, &disabled);
-        speex_preprocess_ctl(speex_agc_monitor, SPEEX_PREPROCESS_SET_AGC, &enabled);
+        speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_SET_DENOISE, &disabled);
+        speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_SET_AGC, &enabled);
     }
     speex_frame.resize(preprocess_frame_size);
     return OK;
@@ -214,6 +214,7 @@ Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rat
         return ERR_INVALID_PARAMETER;
     }
     destroy_audio_pipeline();
+
     input_mix_rate = p_input_mix_rate;
     opus_sample_rate = p_opus_sample_rate;
     channels = p_channels;
@@ -221,7 +222,7 @@ Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rat
     agc_mode = p_agc_mode;
     if (input_mix_rate != opus_sample_rate) {
         int speexerror = 0; 
-        int resamplingquality = 10;
+        int resamplingquality = 4;
         speex_resampler = speex_resampler_init(channels, input_mix_rate, opus_sample_rate, resamplingquality, &speexerror);
         if (speex_resampler == NULL) {
             godot::UtilityFunctions::printerr("Speex resampler init failed code ", speexerror); 
@@ -229,7 +230,8 @@ Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rat
             return ERR_CANT_CREATE;
         }
     }
-    Error error = configure_output_chunk_size(p_output_chunk_size);
+    
+    Error error = configure_output_chunk_size(p_output_chunk_size, DEFAULT_RING_BUFFER_SIZE);
     if (error != OK) {
         destroy_audio_pipeline();
         return error;
@@ -238,14 +240,18 @@ Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rat
     return OK;
 }
 
-Error TwovoipOpusEncoder::configure_output_chunk_size(int p_output_chunk_size) {
-    if (p_output_chunk_size <= 0 || input_mix_rate <= 0 || opus_sample_rate <= 0) {
+Error TwovoipOpusEncoder::configure_output_chunk_size(int p_output_chunk_size, int p_audio_ringbuffer_size_chunks) {
+    if (p_output_chunk_size <= 0 || input_mix_rate <= 0 || opus_sample_rate <= 0 || p_audio_ringbuffer_size_chunks <= 0) {
         UtilityFunctions::printerr("Output chunk size and sample rates must be positive");
         return ERR_INVALID_PARAMETER;
     }
     output_chunk_size = p_output_chunk_size;
     required_input_chunk_size = static_cast<int>((static_cast<int64_t>(output_chunk_size) * input_mix_rate + opus_sample_rate - 1) / opus_sample_rate);
-    pre_encoded_chunk.resize(output_chunk_size * channels);
+
+    audio_ringbuffer_size_chunks = p_audio_ringbuffer_size_chunks;
+    audio_ringbuffer_index = 0;
+    prepared_audio_ringbuffer.resize(output_chunk_size * channels * p_audio_ringbuffer_size_chunks);
+
     Error error = create_voice_processor();
     if (error != OK)
         return error;
@@ -334,108 +340,112 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
     } else {
         speexin = (const float*)audio_frames.ptr();
     }
+    
+    audio_ringbuffer_index++;
+    float* prepared_audio_chunk = (float*)prepared_audio_ringbuffer.ptrw() + (audio_ringbuffer_index % audio_ringbuffer_size_chunks) * output_chunk_size * channels;
+
     if (speex_resampler != NULL) {
         unsigned int input_frames = required_input_chunk_size;
         unsigned int output_frames = output_chunk_size;
         int sxerr = speex_resampler_process_interleaved_float(speex_resampler, 
                                                               speexin, &input_frames,
-                                                              (float*)pre_encoded_chunk.ptrw(), &output_frames);
+                                                              prepared_audio_chunk, &output_frames);
         if (sxerr != RESAMPLER_ERR_SUCCESS || output_frames != static_cast<unsigned int>(output_chunk_size)) {
             UtilityFunctions::printerr("Speex resampling failed: error ", sxerr, ", produced ", output_frames, " of ", output_chunk_size, " frames");
             return -2;
         }
         consumed_input_frames = input_frames;
     } else if (required_input_chunk_size == output_chunk_size) {
-        memcpy((float*)pre_encoded_chunk.ptrw(), (const float*)speexin, output_chunk_size*sizeof(float)*channels);
+        memcpy(prepared_audio_chunk, (const float*)speexin, output_chunk_size*channels*sizeof(float));
         consumed_input_frames = output_chunk_size;
     } else {
         UtilityFunctions::printerr("No resampler is available for differing input and output chunk sizes");
         return -2;
     }
     
-    process_voice();
+    if (speex_agc != NULL) {
+        for (int offset = 0; offset < output_chunk_size; offset += preprocess_frame_size) {
+            for (int frame = 0; frame < preprocess_frame_size; frame++) {
+                float sample = std::clamp(prepared_audio_chunk[offset + frame], -1.0F, 1.0F);
+                speex_frame[frame] = static_cast<spx_int16_t>(std::round(sample * 32767.0F));
+            }
+            speex_preprocess_run(speex_agc, speex_frame.data());
+            if (agc_mode == AGC_APPLIED) {
+                for (int frame = 0; frame < preprocess_frame_size; frame++)
+                    prepared_audio_chunk[offset + frame] = speex_frame[frame] / 32768.0F;
+            }
+            spx_int32_t gain_db = 0;
+            speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_GET_AGC_GAIN, &gain_db);
+            agc_gain = std::pow(10.0F, static_cast<float>(gain_db) / 20.0F);
+        }
+    }
+    
+    // apply fixed gain and measure peaks
+    float sum_squares = 0.0F;
+    for (int i = 0; i < output_chunk_size*channels; i++) {
+        float sample = prepared_audio_chunk[i] * gain;
+        prepared_audio_chunk[i] = sample;
+        last_peak = std::max(last_peak, std::abs(sample));
+        sum_squares += sample * sample;
+    }
+    last_rms = std::sqrt(sum_squares / (output_chunk_size*channels));
 
-    for (int i = 0; i < pre_encoded_chunk.size(); i++)
-        pre_encoded_chunk[i] *= gain;
 
-    update_measurements();
+    process_denoiser(prepared_audio_chunk);
+
     return consumed_input_frames;
 }
 
-void TwovoipOpusEncoder::process_voice() {
+
+
+
+void TwovoipOpusEncoder::process_denoiser(float* prepared_audio_chunk) {
 #ifdef RNNOISE
     if (rnnoise_st != NULL) {
         int nnoisechunks = (int)(output_chunk_size/rnnoise_get_frame_size());
         for (int j = 0; j < nnoisechunks; j++) {
             for (int i = 0; i < rnnoise_get_frame_size(); i++) {
                 int k = j*rnnoise_get_frame_size() + i;
-                rnnoise_in[i] = pre_encoded_chunk[k]*32768.0F;
+                rnnoise_in[i] = std::clamp(prepared_audio_chunk[k], -1.0F, 1.0F)*32768.0F;
             }
             float speech_prob = rnnoise_process_frame(rnnoise_st, (float*)rnnoise_out.ptr(), (float*)rnnoise_in.ptrw());
             last_speech_probability = std::max(last_speech_probability, speech_prob);
             for (int i = 0; i < rnnoise_get_frame_size(); i++) {
                 int k = j*rnnoise_get_frame_size() + i;
-                pre_encoded_chunk[k] = rnnoise_out[i]/32768.0F;
+                prepared_audio_chunk[k] = rnnoise_out[i]/32768.0F;
             }
         }
     }
 #endif
 
-    if (speex_preprocessor == NULL && speex_agc_monitor == NULL)
+    if (speex_denoiser == NULL)
         return;
 
     for (int offset = 0; offset < output_chunk_size; offset += preprocess_frame_size) {
-        if (speex_preprocessor != NULL) {
-            for (int frame = 0; frame < preprocess_frame_size; frame++) {
-                float sample = std::clamp(pre_encoded_chunk[offset + frame], -1.0F, 1.0F);
-                speex_frame[frame] = static_cast<spx_int16_t>(std::round(sample * 32767.0F));
-            }
-            speex_preprocess_run(speex_preprocessor, speex_frame.data());
-            if (denoiser_mode == DENOISER_SPEEX) {
-                spx_int32_t speech_percent = 0;
-                speex_preprocess_ctl(speex_preprocessor, SPEEX_PREPROCESS_GET_PROB, &speech_percent);
-                last_speech_probability = std::max(last_speech_probability, speech_percent / 100.0F);
-            }
-            for (int frame = 0; frame < preprocess_frame_size; frame++)
-                pre_encoded_chunk[offset + frame] = speex_frame[frame] / 32768.0F;
+        for (int frame = 0; frame < preprocess_frame_size; frame++) {
+            float sample = std::clamp(prepared_audio_chunk[offset + frame], -1.0F, 1.0F);
+            speex_frame[frame] = static_cast<spx_int16_t>(std::round(sample * 32767.0F));
         }
-        if (speex_agc_monitor != NULL) {
-            for (int frame = 0; frame < preprocess_frame_size; frame++) {
-                float sample = std::clamp(pre_encoded_chunk[offset + frame], -1.0F, 1.0F);
-                speex_frame[frame] = static_cast<spx_int16_t>(std::round(sample * 32767.0F));
-            }
-            speex_preprocess_run(speex_agc_monitor, speex_frame.data());
-        }
-        if (agc_mode != AGC_DISABLED) {
-            spx_int32_t gain_db = 0;
-            SpeexPreprocessState* agc_state = agc_mode == AGC_APPLIED ? speex_preprocessor : speex_agc_monitor;
-            speex_preprocess_ctl(agc_state, SPEEX_PREPROCESS_GET_AGC_GAIN, &gain_db);
-            agc_gain = std::pow(10.0F, static_cast<float>(gain_db) / 20.0F);
-        }
+        speex_preprocess_run(speex_denoiser, speex_frame.data());
+        spx_int32_t speech_percent = 0;
+        speex_preprocess_ctl(speex_denoiser, SPEEX_PREPROCESS_GET_PROB, &speech_percent);
+        last_speech_probability = std::max(last_speech_probability, speech_percent / 100.0F);
+        for (int frame = 0; frame < preprocess_frame_size; frame++)
+            prepared_audio_chunk[offset + frame] = speex_frame[frame] / 32768.0F;
     }
-}
-
-
-void TwovoipOpusEncoder::update_measurements() {
-    float sum_squares = 0.0F;
-    for (int i = 0; i < pre_encoded_chunk.size(); i++) {
-        float sample = pre_encoded_chunk[i];
-        last_peak = std::max(last_peak, std::abs(sample));
-        sum_squares += sample * sample;
-    }
-    last_rms = std::sqrt(sum_squares / pre_encoded_chunk.size());
 }
 
 PackedVector2Array TwovoipOpusEncoder::get_current_chunk() const {
     PackedVector2Array frames;
+    const float* prepared_audio_chunk = (const float*)prepared_audio_ringbuffer.ptr() + (audio_ringbuffer_index % audio_ringbuffer_size_chunks) * output_chunk_size * channels;
     frames.resize(output_chunk_size);
     for (int frame = 0; frame < output_chunk_size; frame++) {
         if (channels == 1) {
-            float sample = pre_encoded_chunk[frame];
+            float sample = prepared_audio_chunk[frame];
             frames.set(frame, Vector2(sample, sample));
         } else {
             int index = frame * 2;
-            frames.set(frame, Vector2(pre_encoded_chunk[index], pre_encoded_chunk[index + 1]));
+            frames.set(frame, Vector2(prepared_audio_chunk[index], prepared_audio_chunk[index + 1]));
         }
     }
     return frames;
@@ -497,15 +507,19 @@ PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_b
         godot::UtilityFunctions::printerr("Error: opusencoder is null");
         return PackedByteArray();
     }
-    int max_opus_byte_buffer = prefix_bytes.size() + 4*pre_encoded_chunk.size();
+    
+    float* prepared_audio_chunk = (float*)prepared_audio_ringbuffer.ptrw() + (audio_ringbuffer_index % audio_ringbuffer_size_chunks)*output_chunk_size*channels;
+
+    int max_opus_byte_buffer = prefix_bytes.size() + 4*output_chunk_size*channels;
     if (max_opus_byte_buffer > opus_byte_buffer.size())
         opus_byte_buffer.resize(max_opus_byte_buffer);
     
+
     unsigned char* popus_bytes = opus_byte_buffer.ptrw();
     int nprefbytes = prefix_bytes.size();
     if (nprefbytes != 0) 
         memcpy(popus_bytes, prefix_bytes.ptr(), nprefbytes); 
-    int bytepacketsize = opus_encode_float(opus_encoder, (const float*)pre_encoded_chunk.ptr(), pre_encoded_chunk.size()/channels, 
+    int bytepacketsize = opus_encode_float(opus_encoder, (const float*)prepared_audio_chunk, output_chunk_size, 
                                            opus_byte_buffer.ptrw() + nprefbytes, max_opus_byte_buffer - nprefbytes);
     if (bytepacketsize < 0) {
         UtilityFunctions::printerr("Opus encoding failed: ", opus_strerror(bytepacketsize), " (", bytepacketsize, ")");

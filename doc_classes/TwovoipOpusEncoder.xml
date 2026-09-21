@@ -4,7 +4,7 @@
 		Prepares and encodes microphone chunks as Opus packets.
 	</brief_description>
 	<description>
-		Resamples mono or stereo input, optionally preprocesses mono voice, applies manual gain, measures the result, and encodes it with Opus.
+		Resamples mono or stereo input, optionally applies automatic gain, applies manual gain, measures the normalized signal for VOX, optionally denoises it, and encodes it with Opus.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -37,7 +37,7 @@
 		</method>
 		<method name="get_agc_gain" qualifiers="const">
 			<return type="float" />
-			<description>Returns the latest linear gain reported by Speex AGC.</description>
+			<description>Returns the latest linear gain reported by the pre-denoising Speex AGC stage.</description>
 		</method>
 		<method name="get_current_chunk_16khz">
 			<return type="PackedFloat32Array" />
@@ -50,7 +50,7 @@
 		</method>
 		<method name="get_peak" qualifiers="const">
 			<return type="float" />
-			<description>Returns the peak magnitude of the last processed chunk.</description>
+			<description>Returns the peak magnitude after automatic and manual gain but before denoising, for use by VOX.</description>
 		</method>
 		<method name="get_required_input_chunk_size" qualifiers="const">
 			<return type="int" />
@@ -58,7 +58,7 @@
 		</method>
 		<method name="get_rms" qualifiers="const">
 			<return type="float" />
-			<description>Returns the RMS level per sample across all channels of the last processed chunk.</description>
+			<description>Returns the RMS level per sample after automatic and manual gain but before denoising, for use by VOX.</description>
 		</method>
 		<method name="get_speech_probability" qualifiers="const">
 			<return type="float" />
@@ -76,16 +76,16 @@
 		<method name="set_gain">
 			<return type="void" />
 			<param index="0" name="gain" type="float" />
-			<description>Sets the manual linear gain applied after voice preprocessing.</description>
+			<description>Sets the manual linear gain applied after automatic gain and before denoising.</description>
 		</method>
 	</methods>
 	<members>
 		<member name="agc_gain" type="float" setter="" getter="get_agc_gain">Latest linear gain reported by Speex AGC.</member>
 		<member name="current_chunk" type="PackedVector2Array" setter="" getter="get_current_chunk">Last processed output-rate PCM chunk as stereo frames.</member>
 		<member name="gain" type="float" setter="" getter="get_gain">Manual linear gain.</member>
-		<member name="peak" type="float" setter="" getter="get_peak">Peak magnitude of the last chunk.</member>
+		<member name="peak" type="float" setter="" getter="get_peak">Pre-denoising peak magnitude used by VOX.</member>
 		<member name="required_input_chunk_size" type="int" setter="" getter="get_required_input_chunk_size">Required input frames per call.</member>
-		<member name="rms" type="float" setter="" getter="get_rms">RMS level of the last chunk.</member>
+		<member name="rms" type="float" setter="" getter="get_rms">Pre-denoising RMS level used by VOX.</member>
 		<member name="speech_probability" type="float" setter="" getter="get_speech_probability">Active denoiser speech score normalized to 0–1.</member>
 	</members>
 	<constants>
@@ -93,7 +93,7 @@
 		<constant name="DENOISER_SPEEX" value="1" enum="Denoiser">Speex mono denoising.</constant>
 		<constant name="DENOISER_RNNOISE" value="2" enum="Denoiser">RNNoise at mono 48 kHz.</constant>
 		<constant name="AGC_DISABLED" value="0" enum="AgcMode">No automatic gain.</constant>
-		<constant name="AGC_APPLIED" value="1" enum="AgcMode">Apply native Speex automatic gain.</constant>
-		<constant name="AGC_MONITOR" value="2" enum="AgcMode">Observe native Speex automatic gain without applying its output.</constant>
+		<constant name="AGC_APPLIED" value="1" enum="AgcMode">Apply native Speex automatic gain before manual gain and denoising.</constant>
+		<constant name="AGC_MONITOR" value="2" enum="AgcMode">Observe pre-denoising native Speex automatic gain without applying its output.</constant>
 	</constants>
 </class>

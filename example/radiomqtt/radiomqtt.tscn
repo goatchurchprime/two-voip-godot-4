@@ -161,7 +161,6 @@ tooltip_text = "Pre-trigger audio time that processing is backdated from before 
 (Not implemented)"
 max_value = 1.0
 step = 0.05
-editable = false
 update_on_text_changed = true
 prefix = "Leadtime:"
 suffix = "Seconds"
@@ -280,6 +279,7 @@ popup/item_1/id = 1
 [node name="AutoGainControl" type="CheckButton" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1563638136]
 layout_mode = 2
 tooltip_text = "Not implemented"
+button_pressed = true
 text = "Gain auto"
 
 [node name="LabelGain" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=560405035]

@@ -179,26 +179,28 @@ chunk must represent a legal Opus duration of 2.5, 5, 10, 20, 40 or 60 ms.
 `create_opus_encoder()` returns `false` and leaves no encoder active if Opus
 rejects any encoder option. `encode_chunk()` returns an empty array on failure.
 
-`set_gain()` and `get_gain()` control a manual linear amplitude multiplier. It
-is applied after voice preprocessing and remains independent of automatic gain.
-For mono voice, pass `AGC_APPLIED` to `initialize()`; Speex then performs
-its native in-place AGC. `get_agc_gain()` reports Speex's
-latest gain for diagnostics, but TwoVoIP does not attempt to set or reproduce
-Speex's internal gain behavior.
+`set_gain()` and `get_gain()` control a manual linear amplitude multiplier.
+Automatic gain is run first, then manual gain is applied. `get_peak()` and
+`get_rms()` measure that normalized signal before denoising so it can drive the
+VOX threshold and, later, be retained in the microphone rewind buffer. For mono
+voice, pass `AGC_APPLIED` to `initialize()`; Speex then performs its native
+in-place AGC. `get_agc_gain()` reports Speex's latest gain.
 
-`AGC_MONITOR` runs native Speex AGC on a separate copy and discards its audio
-output. This leaves the real signal under manual gain while allowing
-`get_agc_gain()` to report what Speex would currently apply. With Speex
-denoising selected, the monitor observes the denoised signal.
+`AGC_MONITOR` runs the same native Speex AGC stage on a separate copy and
+discards its audio output. This leaves the real signal under manual gain while
+allowing `get_agc_gain()` to report what Speex would currently apply. Both AGC
+modes observe the resampled signal before manual gain and denoising.
 
 `get_speech_probability()` is normalized to the range 0–1. RNNoise supplies a
 floating-point probability directly; Speex supplies an integer percentage via
 `SPEEX_PREPROCESS_GET_PROB`, which TwoVoIP divides by 100. These are useful for
 comparing changes from each denoiser but are not identically calibrated scores.
 
-The denoiser mode is selected in `initialize()`. Speex denoise
-works through the same mono preprocessor state as AGC. RNNoise requires mono
-48 kHz audio and chunks divisible by its 480-sample (10 ms) frame. A core-only
+The denoiser mode is selected in `initialize()`. Speex AGC and Speex denoising
+use separate preprocessor states so that AGC can remain continuously warmed
+before the future rewind-buffer boundary while denoising follows that boundary.
+RNNoise requires mono 48 kHz audio and chunks divisible by its 480-sample
+(10 ms) frame. A core-only
 build returns `ERR_UNAVAILABLE` when RNNoise is selected; it never pretends that
 noise suppression succeeded. Stereo is left as a manual-gain music path. Voice
 preprocessing modes are immutable audio-pipeline configuration. `initialize()`
