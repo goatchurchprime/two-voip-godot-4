@@ -9,13 +9,6 @@
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="create_opus_encoder">
-			<return type="bool" />
-			<param index="0" name="bit_rate" type="int" />
-			<param index="1" name="complexity" type="int" />
-			<param index="2" name="voice_optimal" type="bool" />
-			<description>Creates the Opus encoder with the configured rate and channels. Returns [code]false[/code] and leaves no encoder active if any Opus option is rejected.</description>
-		</method>
 		<method name="initialize">
 			<return type="Error" />
 			<param index="0" name="input_mix_rate" type="int" />
@@ -24,7 +17,7 @@
 			<param index="3" name="denoiser_mode" type="int" enum="TwovoipOpusEncoder.Denoiser" />
 			<param index="4" name="agc_mode" type="int" enum="TwovoipOpusEncoder.AgcMode" />
 			<param index="5" name="output_chunk_size" type="int" />
-			<description>Initializes the immutable audio-processing pipeline. The Opus sample rate must be 8, 12, 16, 24 or 48 kHz, and the output chunk must represent 2.5, 5, 10, 20, 40 or 60 ms. It may succeed only once; a failed initialization leaves the object uninitialized and may be retried.</description>
+			<description>Initializes the immutable audio-processing pipeline and its Opus encoder. The Opus sample rate must be 8, 12, 16, 24 or 48 kHz, and the output chunk must represent 2.5, 5, 10, 20, 40 or 60 ms. It may succeed only once; a failed initialization leaves the object uninitialized and may be retried.</description>
 		</method>
 		<method name="encode_chunk">
 			<return type="PackedByteArray" />
@@ -39,6 +32,14 @@
 		<method name="get_agc_gain" qualifiers="const">
 			<return type="float" />
 			<description>Returns the latest linear gain reported by the pre-denoising Speex AGC stage.</description>
+		</method>
+		<method name="get_bitrate" qualifiers="const">
+			<return type="int" />
+			<description>Returns the current Opus target bitrate in bits per second.</description>
+		</method>
+		<method name="get_complexity" qualifiers="const">
+			<return type="int" />
+			<description>Returns the current Opus encoder complexity from 0 through 10.</description>
 		</method>
 		<method name="get_current_chunk_16khz">
 			<return type="PackedFloat32Array" />
@@ -65,6 +66,10 @@
 			<return type="float" />
 			<description>Returns the active denoiser's speech score normalized to 0–1 for the last chunk.</description>
 		</method>
+		<method name="get_signal_type" qualifiers="const">
+			<return type="int" enum="TwovoipOpusEncoder.SignalType" />
+			<description>Returns the current Opus signal hint.</description>
+		</method>
 		<method name="process_chunk">
 			<return type="int" />
 			<param index="0" name="audio_frames" type="PackedVector2Array" />
@@ -79,15 +84,33 @@
 			<param index="0" name="gain" type="float" />
 			<description>Sets the manual linear gain applied after automatic gain and before denoising.</description>
 		</method>
+		<method name="set_bitrate">
+			<return type="Error" />
+			<param index="0" name="bitrate" type="int" />
+			<description>Changes the Opus target bitrate from 500 through 512000 bits per second without recreating or resetting the encoder. A rejected value leaves the previous bitrate active.</description>
+		</method>
+		<method name="set_complexity">
+			<return type="Error" />
+			<param index="0" name="complexity" type="int" />
+			<description>Changes Opus encoder complexity from 0 through 10 without recreating or resetting the encoder. A rejected value leaves the previous complexity active.</description>
+		</method>
+		<method name="set_signal_type">
+			<return type="Error" />
+			<param index="0" name="signal_type" type="int" enum="TwovoipOpusEncoder.SignalType" />
+			<description>Changes the Opus signal hint without recreating or resetting the encoder. A rejected value leaves the previous signal type active.</description>
+		</method>
 	</methods>
 	<members>
 		<member name="agc_gain" type="float" setter="" getter="get_agc_gain">Latest linear gain reported by Speex AGC.</member>
+		<member name="bitrate" type="int" setter="set_bitrate" getter="get_bitrate">Current mutable Opus target bitrate in bits per second.</member>
+		<member name="complexity" type="int" setter="set_complexity" getter="get_complexity">Current mutable Opus encoder complexity from 0 through 10.</member>
 		<member name="current_chunk" type="PackedVector2Array" setter="" getter="get_current_chunk">Last processed output-rate PCM chunk as stereo frames.</member>
 		<member name="gain" type="float" setter="" getter="get_gain">Manual linear gain.</member>
 		<member name="peak" type="float" setter="" getter="get_peak">Pre-denoising peak magnitude used by VOX.</member>
 		<member name="required_input_chunk_size" type="int" setter="" getter="get_required_input_chunk_size">Required input frames per call.</member>
 		<member name="rms" type="float" setter="" getter="get_rms">Pre-denoising RMS level used by VOX.</member>
 		<member name="speech_probability" type="float" setter="" getter="get_speech_probability">Active denoiser speech score normalized to 0–1.</member>
+		<member name="signal_type" type="int" setter="set_signal_type" getter="get_signal_type" enum="TwovoipOpusEncoder.SignalType">Current mutable Opus signal hint.</member>
 	</members>
 	<constants>
 		<constant name="DENOISER_DISABLED" value="0" enum="Denoiser">No denoising.</constant>
@@ -96,5 +119,8 @@
 		<constant name="AGC_DISABLED" value="0" enum="AgcMode">No automatic gain.</constant>
 		<constant name="AGC_APPLIED" value="1" enum="AgcMode">Apply native Speex automatic gain before manual gain and denoising.</constant>
 		<constant name="AGC_MONITOR" value="2" enum="AgcMode">Observe pre-denoising native Speex automatic gain without applying its output.</constant>
+		<constant name="SIGNAL_AUTO" value="0" enum="SignalType">Let Opus determine the signal type.</constant>
+		<constant name="SIGNAL_VOICE" value="1" enum="SignalType">Hint that the input is voice.</constant>
+		<constant name="SIGNAL_MUSIC" value="2" enum="SignalType">Hint that the input is music.</constant>
 	</constants>
 </class>

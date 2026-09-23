@@ -75,6 +75,12 @@ public:
         AGC_MONITOR,
     };
 
+    enum SignalType {
+        SIGNAL_AUTO,
+        SIGNAL_VOICE,
+        SIGNAL_MUSIC,
+    };
+
 private:
     
     int input_mix_rate = 44100;   // AudioServer.get_input_mixrate()
@@ -105,6 +111,9 @@ private:
 #endif
 
     OpusEncoder* opus_encoder = NULL;
+    int bitrate = 0;
+    int complexity = 0;
+    SignalType signal_type = SIGNAL_AUTO;
 
     PackedByteArray opus_byte_buffer;
 
@@ -122,6 +131,7 @@ private:
 
     void destroy_audio_pipeline();
     void destroy_voice_processor();
+    Error create_opus_encoder();
     Error create_voice_processor();
     Error configure_output_chunk_size(int p_output_chunk_size, int p_audio_ringbuffer_size_chunks);
     void process_denoiser(float* prepared_audio_chunk);
@@ -141,7 +151,12 @@ public:
     void set_gain(float p_gain);
     float get_gain() const { return gain; }
     float get_agc_gain() const { return agc_gain; }
-    bool create_opus_encoder(int bit_rate, int complexity, bool voice_optimal);
+    Error set_bitrate(int p_bitrate);
+    int get_bitrate() const { return bitrate; }
+    Error set_complexity(int p_complexity);
+    int get_complexity() const { return complexity; }
+    Error set_signal_type(SignalType p_signal_type);
+    SignalType get_signal_type() const { return signal_type; }
     void reset_opus_encoder();
     PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes=PackedByteArray(), int chunk_offset_back=0);
 
@@ -153,5 +168,6 @@ public:
 
 VARIANT_ENUM_CAST(godot::TwovoipOpusEncoder::Denoiser)
 VARIANT_ENUM_CAST(godot::TwovoipOpusEncoder::AgcMode)
+VARIANT_ENUM_CAST(godot::TwovoipOpusEncoder::SignalType)
 
 #endif // OPUS_ENCODER_OBJECT_H

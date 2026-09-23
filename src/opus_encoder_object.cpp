@@ -55,6 +55,18 @@ bool is_valid_opus_frame_size(int p_sample_rate, int p_frame_size) {
             p_frame_size == p_sample_rate * 3 / 50; // 60 ms
 }
 
+int get_opus_signal_type(TwovoipOpusEncoder::SignalType p_signal_type) {
+    switch (p_signal_type) {
+        case TwovoipOpusEncoder::SIGNAL_AUTO:
+            return OPUS_AUTO;
+        case TwovoipOpusEncoder::SIGNAL_VOICE:
+            return OPUS_SIGNAL_VOICE;
+        case TwovoipOpusEncoder::SIGNAL_MUSIC:
+            return OPUS_SIGNAL_MUSIC;
+    }
+    return 0;
+}
+
 } // namespace
 
 void TwovoipOpusEncoder::_bind_methods() {
@@ -69,13 +81,21 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_gain", "gain"), &TwovoipOpusEncoder::set_gain);
     ClassDB::bind_method(D_METHOD("get_gain"), &TwovoipOpusEncoder::get_gain);
     ClassDB::bind_method(D_METHOD("get_agc_gain"), &TwovoipOpusEncoder::get_agc_gain);
-    ClassDB::bind_method(D_METHOD("create_opus_encoder", "bit_rate", "complexity", "voice_optimal"), &TwovoipOpusEncoder::create_opus_encoder);
+    ClassDB::bind_method(D_METHOD("set_bitrate", "bitrate"), &TwovoipOpusEncoder::set_bitrate);
+    ClassDB::bind_method(D_METHOD("get_bitrate"), &TwovoipOpusEncoder::get_bitrate);
+    ClassDB::bind_method(D_METHOD("set_complexity", "complexity"), &TwovoipOpusEncoder::set_complexity);
+    ClassDB::bind_method(D_METHOD("get_complexity"), &TwovoipOpusEncoder::get_complexity);
+    ClassDB::bind_method(D_METHOD("set_signal_type", "signal_type"), &TwovoipOpusEncoder::set_signal_type);
+    ClassDB::bind_method(D_METHOD("get_signal_type"), &TwovoipOpusEncoder::get_signal_type);
     ClassDB::bind_method(D_METHOD("reset_opus_encoder"), &TwovoipOpusEncoder::reset_opus_encoder);
     ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes", "chunk_offset_back"), &TwovoipOpusEncoder::encode_chunk, DEFVAL(PackedByteArray()), DEFVAL(0));
 
     uint32_t read_only = PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY;
     ADD_PROPERTY(PropertyInfo(Variant::INT, "required_input_chunk_size", PROPERTY_HINT_NONE, "", read_only), "", "get_required_input_chunk_size");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gain"), "set_gain", "get_gain");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "bitrate", PROPERTY_HINT_RANGE, "500,512000,500,suffix:bps"), "set_bitrate", "get_bitrate");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "complexity", PROPERTY_HINT_RANGE, "0,10,1"), "set_complexity", "get_complexity");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "signal_type", PROPERTY_HINT_ENUM, "Auto,Voice,Music"), "set_signal_type", "get_signal_type");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "agc_gain", PROPERTY_HINT_NONE, "", read_only), "", "get_agc_gain");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "peak", PROPERTY_HINT_NONE, "", read_only), "", "get_peak");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rms", PROPERTY_HINT_NONE, "", read_only), "", "get_rms");
@@ -88,11 +108,21 @@ void TwovoipOpusEncoder::_bind_methods() {
     BIND_ENUM_CONSTANT(AGC_DISABLED);
     BIND_ENUM_CONSTANT(AGC_APPLIED);
     BIND_ENUM_CONSTANT(AGC_MONITOR);
+    BIND_ENUM_CONSTANT(SIGNAL_AUTO);
+    BIND_ENUM_CONSTANT(SIGNAL_VOICE);
+    BIND_ENUM_CONSTANT(SIGNAL_MUSIC);
 }
 
 TwovoipOpusEncoder::TwovoipOpusEncoder() {}
 
 void TwovoipOpusEncoder::destroy_audio_pipeline() {
+    if (opus_encoder != NULL) {
+        opus_encoder_destroy(opus_encoder);
+        opus_encoder = NULL;
+    }
+    bitrate = 0;
+    complexity = 0;
+    signal_type = SIGNAL_AUTO;
     destroy_voice_processor();
     if (speex_resampler != NULL) {
         speex_resampler_destroy(speex_resampler);
@@ -236,6 +266,11 @@ Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rat
         destroy_audio_pipeline();
         return error;
     }
+    error = create_opus_encoder();
+    if (error != OK) {
+        destroy_audio_pipeline();
+        return error;
+    }
     initialized = true;
     return OK;
 }
@@ -266,48 +301,85 @@ void TwovoipOpusEncoder::set_gain(float p_gain) {
     gain = p_gain;
 }
 
-bool TwovoipOpusEncoder::create_opus_encoder(int bit_rate, int complexity, bool voice_optimal) {
-    if (!initialized) {
-        UtilityFunctions::printerr("Initialize the audio pipeline before creating the Opus encoder");
-        return false;
-    }
-    if (opus_encoder != NULL) {
-        opus_encoder_destroy(opus_encoder);
-        opus_encoder = NULL;
+Error TwovoipOpusEncoder::create_opus_encoder() {
+    int opuserror = 0;
+    OpusEncoder *new_encoder = opus_encoder_create(opus_sample_rate, channels, OPUS_APPLICATION_VOIP, &opuserror);
+    if (new_encoder == NULL || opuserror != OPUS_OK) {
+        godot::UtilityFunctions::printerr("opus_encoder_create error ", opuserror);
+        return ERR_CANT_CREATE;
     }
 
-    int opus_application = OPUS_APPLICATION_VOIP;
-    int signal_type = (voice_optimal ? OPUS_SIGNAL_VOICE : OPUS_SIGNAL_MUSIC);
-    int opuserror = 0;
-    // opussamplerate is one of 8000,12000,16000,24000,48000
-    opus_encoder = opus_encoder_create(opus_sample_rate, channels, opus_application, &opuserror);
-    if (opuserror != 0) {
-        godot::UtilityFunctions::printerr("opus_encoder_create error ", opuserror);
-        opus_encoder = NULL;
-        return false;
+    int new_bitrate = 0;
+    int new_complexity = 0;
+    int new_signal_type = OPUS_AUTO;
+    opuserror = opus_encoder_ctl(new_encoder, OPUS_GET_BITRATE(&new_bitrate));
+    if (opuserror == OPUS_OK) {
+        opuserror = opus_encoder_ctl(new_encoder, OPUS_GET_COMPLEXITY(&new_complexity));
     }
-    opuserror = opus_encoder_ctl(opus_encoder, OPUS_SET_SIGNAL(signal_type));
-    if (opuserror != 0) {
-        godot::UtilityFunctions::printerr("opus_encoder_ctl signal_type error ", opuserror);
-        opus_encoder_destroy(opus_encoder);
-        opus_encoder = NULL;
-        return false;
+    if (opuserror == OPUS_OK) {
+        opuserror = opus_encoder_ctl(new_encoder, OPUS_GET_SIGNAL(&new_signal_type));
     }
-    opuserror = opus_encoder_ctl(opus_encoder, OPUS_SET_BITRATE(bit_rate));
-    if (opuserror != 0) {
-        godot::UtilityFunctions::printerr("opus_encoder_ctl bit_rate error ", opuserror);
-        opus_encoder_destroy(opus_encoder);
-        opus_encoder = NULL;
-        return false;
+    if (opuserror != OPUS_OK) {
+        godot::UtilityFunctions::printerr("Could not read initial Opus encoder settings: ", opuserror);
+        opus_encoder_destroy(new_encoder);
+        return ERR_CANT_CREATE;
     }
-    opuserror = opus_encoder_ctl(opus_encoder, OPUS_SET_COMPLEXITY(complexity));
-    if (opuserror != 0) {
-        godot::UtilityFunctions::printerr("opus_encoder_ctl complexity error ", opuserror);
-        opus_encoder_destroy(opus_encoder);
-        opus_encoder = NULL;
-        return false;
+
+    opus_encoder = new_encoder;
+    bitrate = new_bitrate;
+    complexity = new_complexity;
+    signal_type = new_signal_type == OPUS_SIGNAL_VOICE ? SIGNAL_VOICE :
+            (new_signal_type == OPUS_SIGNAL_MUSIC ? SIGNAL_MUSIC : SIGNAL_AUTO);
+    return OK;
+}
+
+Error TwovoipOpusEncoder::set_bitrate(int p_bitrate) {
+    if (!initialized || opus_encoder == NULL) {
+        return ERR_UNCONFIGURED;
     }
-    return true;
+    if (p_bitrate < 500 || p_bitrate > 512000) {
+        return ERR_INVALID_PARAMETER;
+    }
+    const int opuserror = opus_encoder_ctl(opus_encoder, OPUS_SET_BITRATE(p_bitrate));
+    if (opuserror != OPUS_OK) {
+        UtilityFunctions::printerr("opus_encoder_ctl bitrate error ", opuserror);
+        return ERR_INVALID_PARAMETER;
+    }
+    bitrate = p_bitrate;
+    return OK;
+}
+
+Error TwovoipOpusEncoder::set_complexity(int p_complexity) {
+    if (!initialized || opus_encoder == NULL) {
+        return ERR_UNCONFIGURED;
+    }
+    if (p_complexity < 0 || p_complexity > 10) {
+        return ERR_INVALID_PARAMETER;
+    }
+    const int opuserror = opus_encoder_ctl(opus_encoder, OPUS_SET_COMPLEXITY(p_complexity));
+    if (opuserror != OPUS_OK) {
+        UtilityFunctions::printerr("opus_encoder_ctl complexity error ", opuserror);
+        return ERR_INVALID_PARAMETER;
+    }
+    complexity = p_complexity;
+    return OK;
+}
+
+Error TwovoipOpusEncoder::set_signal_type(SignalType p_signal_type) {
+    if (!initialized || opus_encoder == NULL) {
+        return ERR_UNCONFIGURED;
+    }
+    const int opus_signal_type = get_opus_signal_type(p_signal_type);
+    if (opus_signal_type == 0) {
+        return ERR_INVALID_PARAMETER;
+    }
+    const int opuserror = opus_encoder_ctl(opus_encoder, OPUS_SET_SIGNAL(opus_signal_type));
+    if (opuserror != OPUS_OK) {
+        UtilityFunctions::printerr("opus_encoder_ctl signal type error ", opuserror);
+        return ERR_INVALID_PARAMETER;
+    }
+    signal_type = p_signal_type;
+    return OK;
 }
 
 void TwovoipOpusEncoder::reset_opus_encoder() {
@@ -536,8 +608,4 @@ PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_b
 
 TwovoipOpusEncoder::~TwovoipOpusEncoder() {
     destroy_audio_pipeline();
-    if (opus_encoder != NULL) {
-        opus_encoder_destroy(opus_encoder);
-        opus_encoder = NULL;
-    }
 }

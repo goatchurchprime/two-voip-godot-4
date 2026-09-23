@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- give each incoming talk episode its own independently provisioned
+  `AudioStreamPlaybackOpus`, allowing Godot player polyphony to mix overlaps;
+- replace `AudioStreamPlaybackResampled` with a playback-owned Speex resampler
+  and virtual initial playout delay;
+- create the Opus encoder during `TwovoipOpusEncoder.initialize()` and replace
+  the separate creation call with live bitrate, complexity and signal controls.
+
 ## 6.6.0 - 2026-09-23
 
 - keep up to one second of conditioned microphone chunks in a bounded ring and

@@ -35,7 +35,9 @@ func _initialize() -> void:
 func run_tests() -> void:
 	var encoder := TwovoipOpusEncoder.new()
 	assert(encoder.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
-	assert(encoder.create_opus_encoder(12000, 5, true))
+	assert(encoder.set_bitrate(12000) == OK)
+	assert(encoder.set_complexity(5) == OK)
+	assert(encoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE) == OK)
 	assert(encoder.process_chunk(make_mono(960)) == 960)
 	var packet := encoder.encode_chunk()
 	assert(not packet.is_empty())

@@ -25,7 +25,7 @@ func _initialize() -> void:
 	assert(encoder.initialize(44100, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == ERR_ALREADY_IN_USE)
 	assert(encoder.get_required_input_chunk_size() == 882)
 	assert(not encoder.has_method("fetch_pre_encoded_chunk"))
-	for removed_method in ["create_sampler", "set_output_chunk_size", "get_output_chunk_size", "calc_audio_chunk_size", "process_pre_encoded_chunk", "get_denoiser", "get_agc_mode"]:
+	for removed_method in ["create_sampler", "create_opus_encoder", "set_output_chunk_size", "get_output_chunk_size", "calc_audio_chunk_size", "process_pre_encoded_chunk", "get_denoiser", "get_agc_mode"]:
 		assert(not encoder.has_method(removed_method))
 	for property_name in ["required_input_chunk_size", "agc_gain", "peak", "rms", "speech_probability"]:
 		var property = encoder.get_property_list().filter(func(item): return item.name == property_name)
@@ -34,6 +34,16 @@ func _initialize() -> void:
 	var gain_property = encoder.get_property_list().filter(func(item): return item.name == "gain")
 	assert(gain_property.size() == 1)
 	assert(not (gain_property[0].usage & PROPERTY_USAGE_READ_ONLY))
+	for property_name in ["bitrate", "complexity", "signal_type"]:
+		var property = encoder.get_property_list().filter(func(item): return item.name == property_name)
+		assert(property.size() == 1)
+		assert(not (property[0].usage & PROPERTY_USAGE_READ_ONLY))
+	assert(encoder.set_bitrate(12000) == OK)
+	assert(encoder.set_complexity(5) == OK)
+	assert(encoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE) == OK)
+	assert(encoder.get_bitrate() == 12000)
+	assert(encoder.get_complexity() == 5)
+	assert(encoder.get_signal_type() == TwovoipOpusEncoder.SIGNAL_VOICE)
 
 	encoder.gain = 0.5
 	var frames := make_stereo(882)
@@ -86,7 +96,9 @@ func _initialize() -> void:
 	var shortest := TwovoipOpusEncoder.new()
 	assert(shortest.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 120) == OK)
 	assert(shortest.process_chunk(make_constant(120, 0.25)) == 120)
-	assert(shortest.create_opus_encoder(12000, 5, true))
+	assert(shortest.set_bitrate(12000) == OK)
+	assert(shortest.set_complexity(5) == OK)
+	assert(shortest.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE) == OK)
 	assert(not shortest.encode_chunk().is_empty())
 
 	var voice := TwovoipOpusEncoder.new()
@@ -130,11 +142,23 @@ func _initialize() -> void:
 	assert(invalid_opus_configuration.initialize(48000, 44100, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 882) == ERR_INVALID_PARAMETER)
 	assert(invalid_opus_configuration.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 959) == ERR_INVALID_PARAMETER)
 	assert(invalid_opus_configuration.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
-	assert(not invalid_opus_configuration.create_opus_encoder(12000, 11, true))
-	assert(invalid_opus_configuration.encode_chunk().is_empty())
-	assert(invalid_opus_configuration.create_opus_encoder(12000, 5, true))
+	var previous_bitrate := invalid_opus_configuration.get_bitrate()
+	var previous_complexity := invalid_opus_configuration.get_complexity()
+	var previous_signal_type := invalid_opus_configuration.get_signal_type()
+	assert(invalid_opus_configuration.set_bitrate(1) == ERR_INVALID_PARAMETER)
+	assert(invalid_opus_configuration.set_complexity(11) == ERR_INVALID_PARAMETER)
+	assert(invalid_opus_configuration.set_signal_type(99) == ERR_INVALID_PARAMETER)
+	assert(invalid_opus_configuration.get_bitrate() == previous_bitrate)
+	assert(invalid_opus_configuration.get_complexity() == previous_complexity)
+	assert(invalid_opus_configuration.get_signal_type() == previous_signal_type)
 
-	assert(encoder.create_opus_encoder(12000, 5, true))
+	assert(not encoder.encode_chunk().is_empty())
+	assert(encoder.set_bitrate(24000) == OK)
+	assert(encoder.set_complexity(10) == OK)
+	assert(encoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_MUSIC) == OK)
+	assert(encoder.get_bitrate() == 24000)
+	assert(encoder.get_complexity() == 10)
+	assert(encoder.get_signal_type() == TwovoipOpusEncoder.SIGNAL_MUSIC)
 	assert(not encoder.encode_chunk().is_empty())
 
 	print("audio processing smoke passed: native voice processing, gain, rates, frames, stereo and mono")

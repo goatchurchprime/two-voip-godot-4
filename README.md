@@ -136,7 +136,9 @@ var error := encoder.initialize(
     960,
 )
 assert(error == OK)
-encoder.create_opus_encoder(12000, 5, true)
+assert(encoder.set_bitrate(12000) == OK)
+assert(encoder.set_complexity(5) == OK)
+assert(encoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE) == OK)
 
 var required := encoder.get_required_input_chunk_size()
 var frames := AudioServer.get_input_frames(required)
@@ -175,8 +177,10 @@ call for some rate and long-frame combinations. The caller must retain
 
 The Opus output rate must be one of 8, 12, 16, 24 or 48 kHz, and the output
 chunk must represent a legal Opus duration of 2.5, 5, 10, 20, 40 or 60 ms.
-`create_opus_encoder()` returns `false` and leaves no encoder active if Opus
-rejects any encoder option. `encode_chunk()` returns an empty array on failure.
+Successful `initialize()` creates the Opus encoder. Bitrate, complexity and the
+auto/voice/music signal hint can then be changed while it is running without
+resetting its state. A rejected setter preserves the previous value and returns
+an error. `encode_chunk()` returns an empty array on failure.
 
 `set_gain()` and `get_gain()` control a manual linear amplitude multiplier.
 Automatic gain is run first, then manual gain is applied. `get_peak()` and

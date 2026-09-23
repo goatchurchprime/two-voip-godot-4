@@ -6,36 +6,31 @@ belongs in the first v7 release.
 
 ## Order of work
 
-1. Harden and understand `AudioStreamPlaybackOpus`.
-2. Give each talk episode its own playback, decoder and bounded PCM ring.
-3. Take ownership of output resampling and buffer correction.
-4. Revisit `TwovoipOpusEncoder` creation and runtime controls.
-5. Move microphone capture into C++ and evaluate the singleton/autoload shape.
+1. Completed in v6.6: harden and understand `AudioStreamPlaybackOpus`.
+2. Implemented for v7: give each talk episode its own playback, decoder and
+   bounded PCM ring.
+3. Implemented for v7: take ownership of output resampling and initial playout
+   delay.
+4. Implemented for v7: make Opus encoder bitrate, complexity and signal type
+   runtime controls.
+5. Next: move microphone capture into C++ and evaluate the singleton/autoload
+   shape.
 
 Playback comes before the encoder API refactor because it can reveal additional
 timing, packet-duration and diagnostic requirements without first breaking the
 current encoder-facing GDScript API.
 
-## Deferred encoder API work
+## Encoder runtime controls
 
-The present `create_opus_encoder(bit_rate, complexity, voice_optimal)` method
-mixes creation identity with controls which libopus permits changing while an
-encoder is running.
+Successful `TwovoipOpusEncoder.initialize()` now creates the Opus encoder.
+The input sample rate, channel count and `OPUS_APPLICATION_VOIP` application
+mode remain fixed for that encoder instance. Bitrate, complexity and the
+auto/voice/music signal hint are mutable while encoding; failed setters report
+an error and preserve the previous value. `reset_opus_encoder()` remains
+available for the start of an unrelated stream.
 
-The encoder refactor should:
+Remaining encoder cleanup should:
 
-- create the `OpusEncoder` as part of successful `initialize()`;
-- keep the Opus input sample rate and channel count fixed for that encoder
-  instance;
-- keep the Opus application mode fixed after encoding starts (initially
-  `OPUS_APPLICATION_VOIP`, unless an initialization enum is justified);
-- replace `create_opus_encoder()` with mutable bitrate, complexity and signal
-  type controls;
-- expose signal type as auto/voice/music rather than the ambiguous
-  `voice_optimal` Boolean;
-- support libopus complexity values 0 through 10;
-- make failed setters preserve the previous valid value and report the error;
-- retain `reset_opus_encoder()` for the start of an unrelated stream;
 - rename `output_chunk_size` to describe its real role, such as
   `packet_frame_size` or `processing_frame_size`;
 - make clear that this frame size is passed to each `opus_encode_float()` call
@@ -43,7 +38,6 @@ The encoder refactor should:
 - nevertheless keep frame duration fixed within a TwoVoIP stream initially,
   because the transport header, jitter policy and FEC recovery currently assume
   one duration;
-- avoid compatibility wrappers if this is released as the v7 breaking API;
 - leave the helper and demonstration GDScript migration for Julian to perform
   as an API fitness review.
 
