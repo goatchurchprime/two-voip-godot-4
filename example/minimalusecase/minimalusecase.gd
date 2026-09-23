@@ -20,7 +20,9 @@ func _ready():
 
 	AudioServer.set_input_device_active(true)
 	opusencoder.initialize(AudioServer.get_input_mix_rate(), 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, opus_chunk_size)
-	opusencoder.create_opus_encoder(12000, 5, true)
+	opusencoder.bitrate = 12000
+	opusencoder.complexity = 5
+	opusencoder.signal_type = TwovoipOpusEncoder.SIGNAL_VOICE
 
 	# Voice says: "Listen to me"
 	print("Message length (seconds): ", len(opusaudiodata)*960.0/48000.0)
