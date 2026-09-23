@@ -81,6 +81,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_gain", "gain"), &TwovoipOpusEncoder::set_gain);
     ClassDB::bind_method(D_METHOD("get_gain"), &TwovoipOpusEncoder::get_gain);
     ClassDB::bind_method(D_METHOD("get_agc_gain"), &TwovoipOpusEncoder::get_agc_gain);
+    ClassDB::bind_method(D_METHOD("target_agc_gain", "target_gain"), &TwovoipOpusEncoder::target_agc_gain);
     ClassDB::bind_method(D_METHOD("set_bitrate", "bitrate"), &TwovoipOpusEncoder::set_bitrate);
     ClassDB::bind_method(D_METHOD("get_bitrate"), &TwovoipOpusEncoder::get_bitrate);
     ClassDB::bind_method(D_METHOD("set_complexity", "complexity"), &TwovoipOpusEncoder::set_complexity);
@@ -301,6 +302,52 @@ void TwovoipOpusEncoder::set_gain(float p_gain) {
     gain = p_gain;
 }
 
+void TwovoipOpusEncoder::update_agc_gain() {
+    spx_int32_t gain_db = 0;
+    speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_GET_AGC_GAIN, &gain_db);
+    agc_gain = std::pow(10.0F, static_cast<float>(gain_db) / 20.0F);
+}
+
+Error TwovoipOpusEncoder::target_agc_gain(float p_target_gain) {
+    if (!initialized)
+        return ERR_UNCONFIGURED;
+    if (speex_agc == NULL)
+        return ERR_UNAVAILABLE;
+    if (!std::isfinite(p_target_gain) || p_target_gain < 1.0F)
+        return ERR_INVALID_PARAMETER;
+
+    spx_int32_t max_gain_db = 0;
+    speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_GET_AGC_MAX_GAIN, &max_gain_db);
+    const float max_gain = std::pow(10.0F, static_cast<float>(max_gain_db) / 20.0F);
+    if (p_target_gain > max_gain)
+        return ERR_INVALID_PARAMETER;
+
+    const double tau = 6.283185307179586;
+    const int max_frames = 10 * opus_sample_rate / preprocess_frame_size;
+    int64_t sample_index = 0;
+    for (int processed_frames = 0; agc_gain < p_target_gain && processed_frames < max_frames; processed_frames++) {
+        for (int frame = 0; frame < preprocess_frame_size; frame++, sample_index++) {
+            const double time = static_cast<double>(sample_index) / opus_sample_rate;
+            const double pitch = 105.0 + 20.0 * std::sin(tau * time / 0.3);
+            const double phase = tau * pitch * time;
+            const double voice = 0.0005 * (0.6 * std::sin(phase) + 0.3 * std::sin(2.0 * phase) + 0.1 * std::sin(3.0 * phase));
+            speex_frame[frame] = static_cast<spx_int16_t>(std::round(voice * 32767.0));
+        }
+        speex_preprocess_run(speex_agc, speex_frame.data());
+        update_agc_gain();
+    }
+    if (agc_gain < p_target_gain)
+        return ERR_TIMEOUT;
+
+    // Speex overlaps a whole preprocessing frame. Three discarded silent frames
+    // clear its saved analysis input and output tail before real microphone audio.
+    std::fill(speex_frame.begin(), speex_frame.end(), 0);
+    for (int frame = 0; frame < 3; frame++)
+        speex_preprocess_run(speex_agc, speex_frame.data());
+    update_agc_gain();
+    return OK;
+}
+
 Error TwovoipOpusEncoder::create_opus_encoder() {
     int opuserror = 0;
     OpusEncoder *new_encoder = opus_encoder_create(opus_sample_rate, channels, OPUS_APPLICATION_VOIP, &opuserror);
@@ -446,9 +493,7 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
                 for (int frame = 0; frame < preprocess_frame_size; frame++)
                     prepared_audio_chunk[offset + frame] = speex_frame[frame] / 32768.0F;
             }
-            spx_int32_t gain_db = 0;
-            speex_preprocess_ctl(speex_agc, SPEEX_PREPROCESS_GET_AGC_GAIN, &gain_db);
-            agc_gain = std::pow(10.0F, static_cast<float>(gain_db) / 20.0F);
+            update_agc_gain();
         }
     }
 

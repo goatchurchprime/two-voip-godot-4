@@ -7,7 +7,9 @@
 - replace `AudioStreamPlaybackResampled` with a playback-owned Speex resampler
   and virtual initial playout delay;
 - create the Opus encoder during `TwovoipOpusEncoder.initialize()` and replace
-  the separate creation call with live bitrate, complexity and signal controls.
+  the separate creation call with live bitrate, complexity and signal controls;
+- allow a new Speex AGC state to be warmed toward a previously observed gain
+  using a short synthetic voiced signal.
 
 ## 6.6.0 - 2026-09-23
 

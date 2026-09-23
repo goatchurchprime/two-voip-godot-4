@@ -84,6 +84,11 @@
 			<param index="0" name="gain" type="float" />
 			<description>Sets the manual linear gain applied after automatic gain and before denoising.</description>
 		</method>
+		<method name="target_agc_gain">
+			<return type="Error" />
+			<param index="0" name="target_gain" type="float" />
+			<description>Warms the Speex AGC state toward a linear gain of at least [param target_gain] by processing a quiet synthetic voiced signal, then flushes the preprocessor overlap with silence. Call this after [method initialize] and before microphone processing begins. The synthetic audio is not stored or encoded. Returns an error when AGC is unavailable, the target is outside Speex's supported range, or the target is not reached within ten seconds of simulated audio.</description>
+		</method>
 		<method name="set_bitrate">
 			<return type="Error" />
 			<param index="0" name="bitrate" type="int" />

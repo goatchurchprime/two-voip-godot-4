@@ -54,6 +54,7 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 		if sampler_error != OK:
 			push_error("TwoVoIP sampler configuration failed: %s" % error_string(sampler_error))
 			return false
+		opusencoder.target_agc_gain(5.0)
 	opusencoder.bitrate = p_opusbitrate
 	opusencoder.complexity = p_opuscomplexity
 	opusencoder.signal_type = TwovoipOpusEncoder.SIGNAL_VOICE if p_opusoptimizeforvoice else TwovoipOpusEncoder.SIGNAL_MUSIC

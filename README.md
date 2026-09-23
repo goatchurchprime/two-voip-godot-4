@@ -187,7 +187,11 @@ Automatic gain is run first, then manual gain is applied. `get_peak()` and
 `get_rms()` measure that normalized signal before denoising so it can drive the
 VOX threshold and, later, be retained in the microphone rewind buffer. For mono
 voice, pass `AGC_APPLIED` to `initialize()`; Speex then performs its native
-in-place AGC. `get_agc_gain()` reports Speex's latest gain.
+in-place AGC. `get_agc_gain()` reports Speex's latest gain. To reuse a gain
+observed for the same person and microphone, `target_agc_gain(target_gain)`
+can quickly warm a new Speex state by processing a quiet synthetic voiced
+signal without placing that signal in the microphone ring. Call it after
+`initialize()` and before microphone processing starts.
 
 `AGC_MONITOR` runs the same native Speex AGC stage on a separate copy and
 discards its audio output. This leaves the real signal under manual gain while

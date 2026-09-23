@@ -135,6 +135,7 @@ private:
     Error create_voice_processor();
     Error configure_output_chunk_size(int p_output_chunk_size, int p_audio_ringbuffer_size_chunks);
     void process_denoiser(float* prepared_audio_chunk);
+    void update_agc_gain();
     
 protected:
     static void _bind_methods();
@@ -151,6 +152,7 @@ public:
     void set_gain(float p_gain);
     float get_gain() const { return gain; }
     float get_agc_gain() const { return agc_gain; }
+    Error target_agc_gain(float p_target_gain);
     Error set_bitrate(int p_bitrate);
     int get_bitrate() const { return bitrate; }
     Error set_complexity(int p_complexity);

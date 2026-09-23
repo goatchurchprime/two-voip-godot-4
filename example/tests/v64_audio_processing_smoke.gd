@@ -103,6 +103,10 @@ func _initialize() -> void:
 
 	var voice := TwovoipOpusEncoder.new()
 	assert(voice.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_SPEEX, TwovoipOpusEncoder.AGC_APPLIED, 960) == OK)
+	assert(voice.target_agc_gain(10.0) == OK)
+	assert(voice.get_agc_gain() >= 10.0)
+	assert(voice.process_chunk(make_constant(960, 0.0)) == 960)
+	assert(voice.get_peak() < 0.000001)
 	voice.set_gain(0.75)
 	assert(voice.process_chunk(make_stereo(960)) == 960)
 	assert(voice.get_speech_probability() >= 0.0 and voice.get_speech_probability() <= 1.0)
@@ -111,6 +115,7 @@ func _initialize() -> void:
 
 	var unprocessed := TwovoipOpusEncoder.new()
 	assert(unprocessed.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	assert(unprocessed.target_agc_gain(2.0) == ERR_UNAVAILABLE)
 	var monitor := TwovoipOpusEncoder.new()
 	assert(monitor.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_MONITOR, 960) == OK)
 	var monitor_frames := make_stereo(960)
