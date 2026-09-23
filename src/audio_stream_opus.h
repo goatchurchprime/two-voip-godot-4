@@ -33,31 +33,21 @@
 
 #include <atomic>
 #include <cstdint>
-#include <vector>
 
 #include <godot_cpp/classes/audio_stream.hpp>
 #include <godot_cpp/classes/audio_stream_playback.hpp>
-#include <godot_cpp/classes/audio_stream_playback_resampled.hpp>
 #include <godot_cpp/classes/audio_frame.hpp>
 #include <godot_cpp/classes/ref.hpp>
-#include <godot_cpp/classes/ref_counted.hpp>
-#include <godot_cpp/variant/utility_functions.hpp>
-#include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/templates/local_vector.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
 
 #include "opus.h"
+#include "speex/speex_resampler.h"
 
 namespace godot {
 
-class AudioStreamOpus;
-
-
 class AudioStreamOpus : public AudioStream {
     GDCLASS(AudioStreamOpus, AudioStream)
-    friend class AudioStreamPlaybackOpus;
-
-    float opus_sample_rate = 48000.0;  // Must be one of 48000,24000,16000,12000,8000.
-    int opus_channels = 2;  // Must be 1 or 2.
-    float buffer_len = 2.0; // In seconds, and only matters when AudioStreamPlaybackOpus::initialize() is called.
 
 protected:
     static void _bind_methods();
@@ -66,37 +56,48 @@ public:
     virtual Ref<AudioStreamPlayback> _instantiate_playback() const override;
     virtual String _get_stream_name() const override { return "Opus Peer"; }
     virtual double _get_length() const override { return 0; }
-    virtual bool _is_monophonic() const override { return true; }
+    virtual bool _is_monophonic() const override { return false; }
     virtual double _get_bpm() const override { return 0.0; }
     virtual int32_t _get_beat_count() const override { return 0; }
-    
-    void set_opus_sample_rate(int p_sample_rate) { opus_sample_rate = p_sample_rate;  };
-    float get_opus_sample_rate() { return opus_sample_rate; };
-    void set_opus_channels(int p_channels) { opus_channels = p_channels;  };
-    float get_opus_channels() { return opus_channels; };
-    void set_buffer_length(float p_seconds) { buffer_len = p_seconds; };
-    float get_buffer_length() { return buffer_len; };
 };
 
-class AudioStreamPlaybackOpus : public AudioStreamPlaybackResampled {
-    GDCLASS(AudioStreamPlaybackOpus, AudioStreamPlaybackResampled)
-    friend class AudioStreamOpus;
-    Ref<AudioStreamOpus> base;
-    
+class AudioStreamPlaybackOpus : public AudioStreamPlayback {
+    GDCLASS(AudioStreamPlaybackOpus, AudioStreamPlayback)
+
+    enum EpisodeState {
+        EPISODE_UNINITIALIZED,
+        EPISODE_RECEIVING,
+        EPISODE_FINISHED,
+        EPISODE_STOPPED,
+    };
+
     std::atomic<bool> active{ false };
-    std::atomic<int64_t> mixed_frames{ 0 };
+    std::atomic<EpisodeState> episode_state{ EPISODE_UNINITIALIZED };
 
     OpusDecoder* opusdecoder = NULL;
-    PackedFloat32Array audiounpackedbuffer;
+    SpeexResamplerState* output_resampler = NULL;
+    int opus_sample_rate = 0;
+    int opus_channels = 0;
+    int output_mix_rate = 0;
     int max_decoded_frames = 0;
+    int resampler_input_latency = 0;
+    int resampler_output_latency = 0;
+    int flush_input_frames_remaining = 0;
+
+    PackedFloat32Array audiounpackedbuffer;
+    LocalVector<AudioFrame> resampler_silence;
 
     // Single-producer/single-consumer decoded PCM ring. The packet receiver is
     // the producer and Godot's audio mixing thread is the consumer.
-    std::vector<AudioFrame> audiosamplebuffer;
+    LocalVector<AudioFrame> audiosamplebuffer;
     std::atomic<int64_t> bufferbegin{ 0 };
     std::atomic<int64_t> buffertail{ 0 };
-    static constexpr int64_t NO_STREAM_END = -1;
-    std::atomic<int64_t> bufferstreamend{ 0 }; // paused when bufferbegin == bufferstreamend
+
+    std::atomic<int64_t> mixed_output_frames{ 0 };
+    std::atomic<int64_t> last_packet_output_frame{ 0 };
+    int64_t scheduled_feed_output_frame = 0;
+    int64_t stale_timeout_frames = 0;
+
     std::atomic<int64_t> underflow_frames{ 0 };
     std::atomic<int64_t> overflow_frames{ 0 };
     std::atomic<int64_t> decode_errors{ 0 };
@@ -105,6 +106,7 @@ class AudioStreamPlaybackOpus : public AudioStreamPlaybackResampled {
     int lastpacketsizeforfec = 960;
     std::atomic<float> chunkmax{ 0.0f };
     int queue_decoded_frames(const float *decoded_samples, int frame_count);
+    int resample_frames(const AudioFrame *input, int input_frames, AudioFrame *output, int output_frames, int &consumed_frames);
     void update_chunk_max(float magnitude);
 
     // Used to maps a pure sound wave in place of incoming audio data to check if problems are in playback or the data
@@ -114,11 +116,9 @@ class AudioStreamPlaybackOpus : public AudioStreamPlaybackResampled {
 
 protected:
     static void _bind_methods();
-    void initialize(const AudioStreamOpus* pbase);
 
 public:
-    virtual int32_t _mix_resampled(AudioFrame *dst_buffer, int32_t frame_count) override;
-    virtual float _get_stream_sampling_rate() const override  { return base->opus_sample_rate; };
+    virtual int32_t _mix(AudioFrame *dst_buffer, float rate_scale, int32_t frame_count) override;
 
     virtual void _start(double p_from_pos = 0.0) override;
     virtual void _stop() override;
@@ -128,6 +128,7 @@ public:
     virtual void _seek(double p_time) override;
     virtual void _tag_used_streams() override;
 
+    Error initialize(int p_opus_sample_rate, int p_opus_channels, float p_buffer_length = 2.0f, float p_start_delay = 0.0f, float p_stale_timeout = 2.0f);
     int available_space_frames() const;
     int queue_length_frames() const;
     int push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
@@ -137,7 +138,7 @@ public:
     int64_t get_overflow_frames() const;
     int64_t get_decode_errors() const;
     int get_last_decode_error() const;
-    void mark_end_opus_stream(bool clearmark);
+    int64_t finish_episode();
     void set_sinewave_frames(int sinewaveframes, float volume);
     AudioStreamPlaybackOpus();
     ~AudioStreamPlaybackOpus();

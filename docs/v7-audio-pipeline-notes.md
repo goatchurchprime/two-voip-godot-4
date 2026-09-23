@@ -7,7 +7,7 @@ belongs in the first v7 release.
 ## Order of work
 
 1. Harden and understand `AudioStreamPlaybackOpus`.
-2. Replace its single end marker with an explicit episode/timeline model.
+2. Give each talk episode its own playback, decoder and bounded PCM ring.
 3. Take ownership of output resampling and buffer correction.
 4. Revisit `TwovoipOpusEncoder` creation and runtime controls.
 5. Move microphone capture into C++ and evaluate the singleton/autoload shape.
@@ -53,43 +53,36 @@ packets. Changing packet duration must not recreate warmed denoiser or AGC
 state. RNNoise and Speex preprocessing constraints need to be considered
 separately from the legal Opus frame durations.
 
-## Present playback marker model
+## Present playback model
 
-The decoded PCM ring uses monotonic positions:
+`AudioStreamOpus` is a stateless factory. Each `AudioStreamPlayer.play()` call
+creates a new `AudioStreamPlaybackOpus`, and that playback represents exactly
+one talk episode. The helper provisions it from the episode header with its
+Opus rate, channel count, buffer capacity and initial playout delay.
 
-- `bufferbegin`: the next decoded PCM frame to mix;
-- `buffertail`: the position after the last decoded PCM frame written;
-- `bufferstreamend`: a single position at which mixing must pause.
+Each playback owns its Opus decoder, decoded PCM ring, Speex output resampler
+and episode state. `finish_episode()` closes only that playback; it drains and
+then stops itself. A playback whose footer is lost also stops after its receive
+queue has remained empty for the configured stale timeout. The
+`AudioStreamPlayer` and AudioServer mix overlapping playbacks, while
+`max_polyphony` bounds their number and determines when the oldest voice is
+discarded.
 
-When a talk episode ends, `mark_end_opus_stream(false)` stores the current
-`buffertail` as `bufferstreamend`. The next episode can be decoded into the same
-PCM ring beyond that position. `mark_end_opus_stream(true)` removes the pause,
-allowing playback to cross the boundary once the application believes enough
-audio is buffered.
+This removes the need for an end-marker FIFO or `OpusPlaybackTimeline`. It also
+keeps gaps honest: two episodes are not physically concatenated in one PCM
+ring. The current two-byte packet prefix can still identify only the current
+receiving episode, however. It permits an older episode to drain while a newer
+one receives, but truly interleaved voice and instrument streams will require a
+wider episode identifier and a playback lookup in the transport helper.
 
-This is not a representation of silence. It represents one application-held
-gate in a physically contiguous PCM queue. Consequently:
+## Toward timestamped episodes
 
-- only one pending boundary can be represented;
-- a later end marker can overwrite an earlier unconsumed marker;
-- clearing early concatenates two episodes with no audible gap;
-- clearing late creates arrival-dependent silence;
-- queue length measures PCM, not source-time distance or intended silence;
-- the buffer cannot explain where an episode or its associated animation is on
-  the presentation timeline.
-
-The original one-marker design was reasonable when hangtime made it unlikely
-that a complete episode, gap and later episode would coexist in a short ring.
-Short disconnected episodes and lead-in audio make that assumption less safe.
-
-## Generalizing to multiple episodes
-
-Do not insert potentially long silence into the PCM ring merely to preserve
-gaps. Keep decoded PCM in the existing bounded ring and add a bounded FIFO of
-episode metadata. A useful episode record will eventually need at least:
+Do not insert potentially long silence into a playback's PCM ring merely to
+preserve gaps. The playback itself is the episode record. It will eventually
+need at least:
 
 - an episode/stream identifier;
-- absolute PCM begin and end positions in the decoded ring timeline;
+- its source-frame begin and end positions;
 - source capture position or timestamp for its first sample;
 - whether its end has been received or inferred after a source/network stall;
 - its desired presentation start or the intended source-time gap from the
@@ -98,22 +91,11 @@ episode metadata. A useful episode record will eventually need at least:
   source audio;
 - references or source positions for viseme events belonging to the episode.
 
-As an incremental compatibility step, the existing Boolean marker API can be
-implemented as a FIFO of absolute end positions:
-
-- `mark_end_opus_stream(false)` appends a boundary at the current write tail;
-- `mark_end_opus_stream(true)` releases the oldest unreleased boundary;
-- the audio thread consumes released boundaries in order and waits at the
-  first unreleased boundary;
-- marker overflow is diagnosed rather than overwriting an earlier boundary.
-
-This would correctly retain N short episodes in one PCM ring, but it still
-would not reconstruct an intentional source-time gap. Accurate synchronization
-requires the fuller timestamped episode model.
-
-The metadata queue must be preallocated and safe for one producer and the audio
-mixing consumer. The audio callback must not allocate, lock, decode Opus or call
-GDScript.
+Accurate synchronization still requires source timestamps and a mapping to the
+destination mix clock. Episode objects remove cross-episode ring bookkeeping;
+they do not create that clock mapping by themselves. Every playback buffer must
+remain preallocated and safe for one producer and the audio mixing consumer.
+The audio callback must not allocate, lock, decode Opus or call GDScript.
 
 ## Leadtime
 
@@ -217,16 +199,17 @@ first packet of an episode, schedule its first sample for a deadline such as:
 presentation_time = mapped_capture_time + target_playout_delay
 ```
 
-Until that deadline the audio callback emits zero. Packets accumulate during
+Until that deadline the episode playback emits zero. Packets accumulate during
 the reserve, so playback begins with the intended amount of jitter protection.
 If the episode arrives late or catch-up policy requests it, the reserve can be
 shortened or skipped.
 
-Prefer representing this as a virtual, tagged timeline span rather than
-physically filling the decoded PCM ring with 400 ms of zeros. Physical zeros
-consume ring capacity, inflate the PCM queue metric and become indistinguishable
-from real recorded silence. A virtual span lets the mixer emit silence without
-advancing a PCM read cursor and can be discarded in constant time.
+The current playback represents this as a scheduled output frame rather than
+physically filling the decoded PCM ring with zeros. Physical zeros would consume
+ring capacity, inflate the PCM queue metric and become indistinguishable from
+real recorded silence. At present the deadline is relative to playback
+initialization; a later change must derive it from the episode's mapped capture
+time.
 
 At minimum, timeline spans must distinguish:
 
@@ -240,13 +223,6 @@ for synchronization, visemes and karaoke unless an explicit speed-up policy
 chooses to remove it. Concealment needs its own diagnostics and correction
 policy.
 
-The current helper does not reliably preserve a gap between episodes. It gates
-the PCM read cursor at one `bufferstreamend`, but the next episode is decoded
-contiguously after the old one and the helper clears the gate when total queued
-PCM exceeds its lag target. Depending on timing, that either concatenates the
-episodes or creates arrival-dependent silence. It also cannot retain several
-unconsumed episode boundaries.
-
 A deadline-driven timeline makes queue length a safety diagnostic rather than
 the primary clock. The initial target should be configurable and later
 adaptive; 400 ms is a sensible experiment, not a protocol constant. Scheduling
@@ -257,8 +233,8 @@ Karaoke should use the song clock as the authoritative presentation timeline.
 Useful playback observability will include:
 
 - current source frame and decoded ring position;
-- queued PCM duration and queued episode count;
-- the next unreleased boundary and its intended presentation time;
+- queued PCM duration and active episode count;
+- each episode's intended presentation time;
 - underflow, overflow, concealment, insertion, drop and resampling totals;
 - source-to-mix and source-to-audible timing estimates;
 - current resampling ratio and correction state;
@@ -266,18 +242,19 @@ Useful playback observability will include:
 
 ## Playback implementation stages
 
-1. Add deterministic tests for two and several short episodes sharing one ring,
-   including a later footer arriving before an earlier boundary is consumed.
-2. Replace the single marker with the bounded FIFO compatibility model.
-3. Add tagged, virtual pre-roll and timestamped episode metadata with explicit
-   gap policy.
-4. Add a source-frame-to-session-clock estimator and schedule playback against
+1. Implemented: give every episode an independently provisioned playback and
+   verify Godot player polyphony with deterministic tests.
+2. Implemented: replace `AudioStreamPlaybackResampled` with a playback-owned
+   Speex resampler and a virtual initial playout delay.
+3. Next: add source timestamps and explicit gap policy to the episode header.
+4. Add an episode identifier and playback lookup if packets from multiple
+   episodes may be interleaved.
+5. Add a source-frame-to-session-clock estimator and schedule playback against
    deadlines while reporting its current timing uncertainty.
-5. Replace `AudioStreamPlaybackResampled` with an owned Speex resampler whose
-   normal correction is driven by the intended presentation timeline.
-6. Keep large backlog recovery, Signalsmith stretching and realtime microphone
+6. Drive small Speex ratio corrections from the intended presentation timeline.
+7. Keep large backlog recovery, Signalsmith stretching and realtime microphone
    monitoring out of this first implementation.
-7. Add a replay fixture with audio and viseme timestamps before claiming
+8. Add a replay fixture with audio and viseme timestamps before claiming
    synchronization accuracy.
-8. Add a karaoke-oriented fixture driven by an authoritative song clock before
+9. Add a karaoke-oriented fixture driven by an authoritative song clock before
    designing its final public scheduling API.

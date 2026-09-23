@@ -10,7 +10,9 @@ var audio_stream_playback_opus : AudioStreamPlaybackOpus = null
 #frametimems = opusframesize*1000.0/opusframesize
 var audioserveroutputlatency = AudioServer.get_output_latency()
 @export var audio_buffer_lag_time_target = 0.6
-@export var audio_buffer_lag_time_target_tolerance = 0.35
+@export var audio_buffer_length = 2.0
+@export var maximum_simultaneous_episodes = 3
+@export var stale_episode_timeout = 2.0
 
 const asciiopenbrace = 123 # "{".to_ascii_buffer()[0]
 const asciiclosebrace = 125 # "}".to_ascii_buffer()[0]
@@ -23,10 +25,8 @@ const Noutoforderqueue = 4
 const Npacketinitialbatching = 2
 var outoforderchunkqueue = [ ]
 var opusframequeuecount = 0
-
-var playbackpausedonmark = false
-
-var lastemittedaudiobufferpitchscale = 1.0
+var opus_sample_rate = 48000
+var opus_channels = 2
 var runninglagtimeminimum = -1.0
 
 
@@ -35,31 +35,25 @@ func _ready():
 	if audioplayeropus.has_method("set_stream"):
 		audiostreamopus = AudioStreamOpus.new()
 		audioplayeropus.set_stream(audiostreamopus)
+		audioplayeropus.max_polyphony = maximum_simultaneous_episodes
 	else:
 		audioplayeropus = null
 		assert(false, "Audiostream player not found!")
 
 
-func setrecopusvalues(opus_sample_rate, opus_channels):
-	if not audioplayeropus.playing or audiostreamopus.opus_sample_rate != opus_sample_rate or audiostreamopus.opus_channels != opus_channels:
-		prints(":newplay: ", audioplayeropus.playing, audiostreamopus.opus_sample_rate, opus_sample_rate, audiostreamopus.opus_channels, opus_channels)
-		audiostreamopus.opus_sample_rate = opus_sample_rate
-		audiostreamopus.opus_channels = opus_channels
-		audioplayeropus.play()  # creates a new playback
-		audio_stream_playback_opus = audioplayeropus.get_stream_playback()
-		set_sinewave_out(sinewaveoutmode)
-		# begins in a paused state
-		# audio_stream_playback_opus.mark_end_opus_stream(false)
-		playbackpausedonmark = true
-		pausereached = false
-
-func unpausewhenbufferready():
-	assert (playbackpausedonmark)
-	var bufferlengthtime = audioserveroutputlatency + audio_stream_playback_opus.queue_length_frames()*1.0/audiostreamopus.opus_sample_rate
-	if bufferlengthtime > audio_buffer_lag_time_target:
-		audio_stream_playback_opus.mark_end_opus_stream(true)
-		playbackpausedonmark = false
-		runninglagtimeminimum = bufferlengthtime
+func setrecopusvalues(new_opus_sample_rate, new_opus_channels):
+	opus_sample_rate = new_opus_sample_rate
+	opus_channels = new_opus_channels
+	audioplayeropus.play()  # Every talking episode gets its own playback.
+	audio_stream_playback_opus = audioplayeropus.get_stream_playback()
+	var result = audio_stream_playback_opus.initialize(opus_sample_rate, opus_channels, audio_buffer_length, audio_buffer_lag_time_target, stale_episode_timeout)
+	if result != OK:
+		push_error("Could not initialize Opus playback: %s" % error_string(result))
+		audio_stream_playback_opus.stop()
+		audio_stream_playback_opus = null
+		return
+	set_sinewave_out(sinewaveoutmode)
+	pausereached = false
 
 func external_end_stream():
 	if inopusstream:
@@ -94,24 +88,24 @@ func receive_audio_packet(packet):
 				inopusstream = true
 
 			elif h.has("talkingtimeend"):
-				if playbackpausedonmark and audio_stream_playback_opus.queue_length_frames() == 0:
-					audio_stream_playback_opus.mark_end_opus_stream(true)
-				audio_stream_playback_opus.mark_end_opus_stream(false)
-				playbackpausedonmark = true
+				if audio_stream_playback_opus:
+					audio_stream_playback_opus.finish_episode()
 				pausereached = false
 				print("runninglagtimeminimum: ", runninglagtimeminimum, " (target: ", audio_buffer_lag_time_target, ")")
-				inopusstream = true
+				inopusstream = false
 
 	elif lenchunkprefix == -1:
 		pass
 
 	elif lenchunkprefix == 0:
-		audiostreamopus.push_opus_packet(packet, lenchunkprefix, 0)
+		if audio_stream_playback_opus == null:
+			return
+		audio_stream_playback_opus.push_opus_packet(packet, lenchunkprefix, 0)
 		opusframecount += 1
-		if playbackpausedonmark:
-			unpausewhenbufferready()
 
 	elif packet[1]&128 == (opusstreamcount%2)*128:
+		if audio_stream_playback_opus == null:
+			return
 		assert (lenchunkprefix == 2)
 		var opusframecountI = packet[0] + (packet[1]&127)*256
 		var opusframecountR = opusframecountI - opusframecount
@@ -154,16 +148,8 @@ func receive_audio_packet(packet):
 				opusframequeuecount -= 1
 				assert (opusframequeuecount >= 0)
 
-		if playbackpausedonmark:
-			unpausewhenbufferready()
-	
 	else:
 		prints("dropping frame with opusstream number mismatch", opusstreamcount, packet[0], packet[1], "streamcount", opusstreamcount)
-
-func setpitchscale(pitchscale):
-	if pitchscale != lastemittedaudiobufferpitchscale:
-		audioplayeropus.pitch_scale = pitchscale
-		lastemittedaudiobufferpitchscale = pitchscale
 
 var playingrecording = false
 var pausereached = false
@@ -180,31 +166,17 @@ func _physics_process(delta):
 		print("Skips during playback: ", currskips - prevskips)
 		prevskips = currskips
 		
-	var bufferlengthtime = audioserveroutputlatency + queuelengthframes*1.0/audiostreamopus.opus_sample_rate
-	if not playbackpausedonmark:
+	var bufferlengthtime = audioserveroutputlatency + queuelengthframes*1.0/opus_sample_rate
+	if runninglagtimeminimum < 0.0 or bufferlengthtime < runninglagtimeminimum:
 		runninglagtimeminimum = bufferlengthtime
-		if lastemittedaudiobufferpitchscale == 1.0:
-			if abs(bufferlengthtime - audio_buffer_lag_time_target) > audio_buffer_lag_time_target_tolerance:
-				setpitchscale(0.7 if (bufferlengthtime < audio_buffer_lag_time_target) else 1.4)
-				print(" set lastemittedaudiobufferpitchscale to ", lastemittedaudiobufferpitchscale)
-
-		elif (lastemittedaudiobufferpitchscale < 1.0) == (bufferlengthtime > audio_buffer_lag_time_target):
-			setpitchscale(1.0)
-			print(" set lastemittedaudiobufferpitchscale to ", lastemittedaudiobufferpitchscale)
-	
-	# leave the run-out at the same pitchscale
-	#elif lastemittedaudiobufferpitchscale != 1.0:
-	#	setpitchscale(1.0)
-	#	print(" set lastemittedaudiobufferpitchscale to ", lastemittedaudiobufferpitchscale)
 
 
-func replayrecording(speedup, recordedheader, recordedopuspackets, recordedfooter):
+func replayrecording(_speedup, recordedheader, recordedopuspackets, recordedfooter):
 	playingrecording = true
 	receive_audio_packet(JSON.stringify(recordedheader).to_ascii_buffer())
-	setpitchscale(speedup)
 	for x in recordedopuspackets:
 		if recordedheader["opusframesize"] > audio_stream_playback_opus.available_space_frames():
-			var tmm = audio_stream_playback_opus.queue_length_frames()*0.5/audiostreamopus.opus_sample_rate
+			var tmm = audio_stream_playback_opus.queue_length_frames()*0.5/opus_sample_rate
 			await get_tree().create_timer(tmm).timeout
 		receive_audio_packet(x)
 	receive_audio_packet(JSON.stringify(recordedfooter).to_ascii_buffer())
@@ -214,4 +186,4 @@ var sinewaveoutmode = false
 func set_sinewave_out(toggled_on):
 	sinewaveoutmode = toggled_on
 	if audio_stream_playback_opus:
-		audio_stream_playback_opus.set_sinewave_frames(audiostreamopus.opus_sample_rate/440 if toggled_on else 0, 0.05)
+		audio_stream_playback_opus.set_sinewave_frames(opus_sample_rate/440 if toggled_on else 0, 0.05)

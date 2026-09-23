@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="AudioStreamPlaybackOpus" inherits="AudioStreamPlaybackResampled" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="AudioStreamPlaybackOpus" inherits="AudioStreamPlayback" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 		Decodes queued Opus packets for playback.
 	</brief_description>
 	<description>
-		The playback object returned by AudioStreamOpus through AudioStreamPlayer.
+		The playback object returned by AudioStreamOpus through AudioStreamPlayer. Each instance owns one Opus episode, including its decoder, PCM ring and Speex output resampler.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -36,12 +36,20 @@
 		</method>
 		<method name="get_underflow_frames">
 			<return type="int" />
-			<description>Returns the number of silence frames emitted because the active stream queue was empty since playback started. Silence emitted at a marked stream end is not counted.</description>
+			<description>Returns the number of output silence frames emitted because an active episode's decoded queue was empty.</description>
 		</method>
-		<method name="mark_end_opus_stream">
-			<return type="void" />
-			<param index="0" name="clear_mark" type="bool" />
-			<description>Marks the queued stream end, or clears the previous mark.</description>
+		<method name="finish_episode">
+			<return type="int" />
+			<description>Marks this episode's input as complete. The playback drains its PCM and resampler state, then stops itself. Returns the absolute decoded write position, or [code]-1[/code] if the episode was not receiving.</description>
+		</method>
+		<method name="initialize">
+			<return type="int" enum="Error" />
+			<param index="0" name="opus_sample_rate" type="int" />
+			<param index="1" name="opus_channels" type="int" />
+			<param index="2" name="buffer_length" type="float" default="2.0" />
+			<param index="3" name="start_delay" type="float" default="0.0" />
+			<param index="4" name="stale_timeout" type="float" default="2.0" />
+			<description>Provisions this playback for one episode after AudioStreamPlayer.play(). [param start_delay] schedules its first audible audio relative to initialization. If no footer arrives, an empty episode stops after [param stale_timeout] seconds without a packet.</description>
 		</method>
 		<method name="push_opus_packet">
 			<return type="int" />

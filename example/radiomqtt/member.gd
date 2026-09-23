@@ -28,7 +28,7 @@ var timedelaytohide = 0.1
 var prevopusframecount = -1
 func _process(delta):
 	if twovoipspeaker.audio_stream_playback_opus:
-		$Node/ColorRectBufferQueue.size.x = min(1.0, twovoipspeaker.audio_stream_playback_opus.queue_length_frames()/$AudioStreamPlayer.stream.opus_sample_rate/$AudioStreamPlayer.stream.buffer_length)*size.x
+		$Node/ColorRectBufferQueue.size.x = min(1.0, twovoipspeaker.audio_stream_playback_opus.queue_length_frames()/twovoipspeaker.opus_sample_rate/twovoipspeaker.audio_buffer_length)*size.x
 		$AudioStreamPlayer.volume_db = $Node/Volume.value
 		var chunkv1 = twovoipspeaker.audio_stream_playback_opus.get_chunk_max()
 		if chunkv1 != 0.0:

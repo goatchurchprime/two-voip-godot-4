@@ -16,14 +16,14 @@ func _ready():
 	audiostreamopus = $AudioStreamPlayer.stream
 	$AudioStreamPlayer.play()
 	audio_stream_playback_opus = $AudioStreamPlayer.get_stream_playback()
-	audio_stream_playback_opus.mark_end_opus_stream(true)
+	assert(audio_stream_playback_opus.initialize(48000, 2, 0.4) == OK)
 
 	AudioServer.set_input_device_active(true)
 	opusencoder.initialize(AudioServer.get_input_mix_rate(), 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, opus_chunk_size)
 	opusencoder.create_opus_encoder(12000, 5, true)
 
 	# Voice says: "Listen to me"
-	print("Message length (seconds): ", len(opusaudiodata)*960.0/audiostreamopus.opus_sample_rate)
+	print("Message length (seconds): ", len(opusaudiodata)*960.0/48000.0)
 	for r in opusaudiodata:
 		opuspacketsbuffer.append(PackedByteArray(r))
 
@@ -50,6 +50,11 @@ func _process_record():
 func _process_playback():
 	while opus_chunk_size < audio_stream_playback_opus.available_space_frames() and len(opuspacketsbuffer) != 0:
 		audio_stream_playback_opus.push_opus_packet(opuspacketsbuffer.pop_front(), 0, 0)
+	if opuspacketsbuffer.is_empty() and not playback_finished:
+		audio_stream_playback_opus.finish_episode()
+		playback_finished = true
+
+var playback_finished = false
 
 var opusaudiodata = [
 	[72, 11, 228, 193, 34, 35, 97, 240],

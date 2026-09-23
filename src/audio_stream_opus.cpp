@@ -33,31 +33,21 @@
 #include <algorithm>
 #include <cmath>
 
+#include <godot_cpp/classes/audio_server.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 using namespace godot;
 
 void AudioStreamOpus::_bind_methods() {
-
-    ClassDB::bind_method(D_METHOD("set_opus_sample_rate", "opus_sample_rate"), &AudioStreamOpus::set_opus_sample_rate);
-    ClassDB::bind_method(D_METHOD("get_opus_sample_rate"), &AudioStreamOpus::get_opus_sample_rate);
-    ClassDB::bind_method(D_METHOD("set_opus_channels", "opus_sample_rate"), &AudioStreamOpus::set_opus_channels);
-    ClassDB::bind_method(D_METHOD("get_opus_channels"), &AudioStreamOpus::get_opus_channels);
-    ClassDB::bind_method(D_METHOD("set_buffer_length", "seconds"), &AudioStreamOpus::set_buffer_length);
-    ClassDB::bind_method(D_METHOD("get_buffer_length"), &AudioStreamOpus::get_buffer_length);
-
-
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "buffer_length", PROPERTY_HINT_RANGE, "0.1,10.0,0.1,suffix:s"), "set_buffer_length", "get_buffer_length");
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "opus_sample_rate", PROPERTY_HINT_RANGE, "20,192000,1"), "set_opus_sample_rate", "get_opus_sample_rate");
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "opus_channels", PROPERTY_HINT_RANGE, "1,2,1"), "set_opus_channels", "get_opus_channels");
 }
 
 void AudioStreamPlaybackOpus::_bind_methods() {
 
     ClassDB::bind_method(D_METHOD("available_space_frames"), &AudioStreamPlaybackOpus::available_space_frames);
     ClassDB::bind_method(D_METHOD("queue_length_frames"), &AudioStreamPlaybackOpus::queue_length_frames);
+    ClassDB::bind_method(D_METHOD("initialize", "opus_sample_rate", "opus_channels", "buffer_length", "start_delay", "stale_timeout"), &AudioStreamPlaybackOpus::initialize, DEFVAL(2.0f), DEFVAL(0.0f), DEFVAL(2.0f));
     ClassDB::bind_method(D_METHOD("push_opus_packet", "opusbytepacket", "begin", "decode_fec"), &AudioStreamPlaybackOpus::push_opus_packet);
-    ClassDB::bind_method(D_METHOD("mark_end_opus_stream", "clear_mark"), &AudioStreamPlaybackOpus::mark_end_opus_stream);
+    ClassDB::bind_method(D_METHOD("finish_episode"), &AudioStreamPlaybackOpus::finish_episode);
     ClassDB::bind_method(D_METHOD("get_chunk_max"), &AudioStreamPlaybackOpus::get_chunk_max);
     ClassDB::bind_method(D_METHOD("get_skips", "overflow"), &AudioStreamPlaybackOpus::get_skips);
     ClassDB::bind_method(D_METHOD("get_underflow_frames"), &AudioStreamPlaybackOpus::get_underflow_frames);
@@ -68,11 +58,8 @@ void AudioStreamPlaybackOpus::_bind_methods() {
 }
 
 Ref<AudioStreamPlayback> AudioStreamOpus::_instantiate_playback() const {
-    godot::UtilityFunctions::print_verbose("ref AudioStreamPlaybackOpus");
     Ref<AudioStreamPlaybackOpus> playback;
-    godot::UtilityFunctions::print_verbose("instantiate AudioStreamPlaybackOpus");
     playback.instantiate();
-    playback->initialize(this); 
     return playback;
 }
 
@@ -80,56 +67,86 @@ AudioStreamPlaybackOpus::AudioStreamPlaybackOpus() {
     godot::UtilityFunctions::print_verbose("construct AudioStreamPlaybackOpus");
 }
 
-void AudioStreamPlaybackOpus::initialize(const AudioStreamOpus* pbase) {
-    godot::UtilityFunctions::print_verbose("initialize AudioStreamPlaybackOpus");
-    base = Ref<AudioStreamOpus>(pbase);
-    int opuserror = 0;
-    godot::UtilityFunctions::print_verbose("opus_decoder_create ");
-    opusdecoder = opus_decoder_create(base->opus_sample_rate, base->opus_channels, &opuserror);
-    godot::UtilityFunctions::print_verbose("opus_decoder_created ");
-    if (opuserror == 0) {
-        // opus_decode_float()'s frame size is per channel. Opus packets can
-        // contain up to 120 ms, and the output buffer must include all channels.
-        max_decoded_frames = static_cast<int>(base->opus_sample_rate * 120 / 1000);
-        audiounpackedbuffer.resize(max_decoded_frames * base->opus_channels);
-        int audiosamplebuffersize = std::max(1, static_cast<int>(base->buffer_len * base->opus_sample_rate));
-        audiosamplebuffer.resize(audiosamplebuffersize); 
-    } else {
-        godot::UtilityFunctions::printerr("Opus_decoder_create error ", opuserror);   // will be one of OPUS_BAD_ARG=-1, OPUS_ALLOC_FAIL=-7, OPUS_INTERNAL_ERROR=-3
-        if (!((base->opus_sample_rate == 8000) || (base->opus_sample_rate == 12000) || (base->opus_sample_rate == 16000) || (base->opus_sample_rate == 24000) || (base->opus_sample_rate == 48000))) {
-            godot::UtilityFunctions::printerr("Opus sample rate must be one of 48000,24000,16000,12000,8000"); 
-        }
-        if (!((base->opus_channels == 1) || (base->opus_channels == 2))) {
-            godot::UtilityFunctions::printerr("Opus channels must be 1 or 2"); 
-        }
-        opusdecoder = NULL;  // or assert this
+Error AudioStreamPlaybackOpus::initialize(int p_opus_sample_rate, int p_opus_channels, float p_buffer_length, float p_start_delay, float p_stale_timeout) {
+    if (episode_state.load(std::memory_order_acquire) != EPISODE_UNINITIALIZED) {
+        return ERR_ALREADY_IN_USE;
     }
+    if (!((p_opus_sample_rate == 8000) || (p_opus_sample_rate == 12000) || (p_opus_sample_rate == 16000) || (p_opus_sample_rate == 24000) || (p_opus_sample_rate == 48000))) {
+        UtilityFunctions::printerr("Opus sample rate must be one of 48000,24000,16000,12000,8000");
+        return ERR_INVALID_PARAMETER;
+    }
+    if ((p_opus_channels != 1) && (p_opus_channels != 2)) {
+        UtilityFunctions::printerr("Opus channels must be 1 or 2");
+        return ERR_INVALID_PARAMETER;
+    }
+    if (p_buffer_length <= 0.0f || p_start_delay < 0.0f || p_stale_timeout <= 0.0f) {
+        return ERR_INVALID_PARAMETER;
+    }
+
+    int opuserror = 0;
+    OpusDecoder *new_decoder = opus_decoder_create(p_opus_sample_rate, p_opus_channels, &opuserror);
+    if (new_decoder == NULL || opuserror != OPUS_OK) {
+        UtilityFunctions::printerr("opus_decoder_create error ", opuserror);
+        return ERR_CANT_CREATE;
+    }
+
+    const int new_output_mix_rate = static_cast<int>(AudioServer::get_singleton()->get_mix_rate());
+    int speexerror = RESAMPLER_ERR_SUCCESS;
+    SpeexResamplerState *new_resampler = speex_resampler_init(2, p_opus_sample_rate, new_output_mix_rate, SPEEX_RESAMPLER_QUALITY_DEFAULT, &speexerror);
+    if (new_resampler == NULL || speexerror != RESAMPLER_ERR_SUCCESS) {
+        opus_decoder_destroy(new_decoder);
+        UtilityFunctions::printerr("Speex output resampler init failed code ", speexerror);
+        return ERR_CANT_CREATE;
+    }
+    speex_resampler_set_input_stride(new_resampler, 2);
+    speex_resampler_set_output_stride(new_resampler, 2);
+
+    opus_sample_rate = p_opus_sample_rate;
+    opus_channels = p_opus_channels;
+    output_mix_rate = new_output_mix_rate;
+    opusdecoder = new_decoder;
+    output_resampler = new_resampler;
+    // opus_decode_float()'s frame size is per channel. The decoder accepts
+    // packets containing up to 120 ms of audio.
+    max_decoded_frames = opus_sample_rate * 120 / 1000;
+    audiounpackedbuffer.resize(max_decoded_frames * opus_channels);
+    audiosamplebuffer.resize(std::max(1, static_cast<int>(p_buffer_length * opus_sample_rate)));
+    resampler_input_latency = speex_resampler_get_input_latency(output_resampler);
+    resampler_output_latency = speex_resampler_get_output_latency(output_resampler);
+    resampler_silence.resize(std::max(1, resampler_input_latency));
+    for (uint32_t i = 0; i < resampler_silence.size(); i++) {
+        resampler_silence[i] = { 0.0f, 0.0f };
+    }
+    flush_input_frames_remaining = resampler_input_latency;
+
     bufferbegin.store(0, std::memory_order_relaxed);
     buffertail.store(0, std::memory_order_relaxed);
-    bufferstreamend.store(0, std::memory_order_relaxed); // start out paused
+    const int64_t current_output_frame = mixed_output_frames.load(std::memory_order_acquire);
+    const int64_t audible_start_frame = current_output_frame + static_cast<int64_t>(std::ceil(p_start_delay * output_mix_rate));
+    scheduled_feed_output_frame = std::max(current_output_frame, audible_start_frame - resampler_output_latency);
+    last_packet_output_frame.store(current_output_frame, std::memory_order_relaxed);
+    stale_timeout_frames = static_cast<int64_t>(std::ceil(p_stale_timeout * output_mix_rate));
+    episode_state.store(EPISODE_RECEIVING, std::memory_order_release);
+    return OK;
 }
 
 AudioStreamPlaybackOpus::~AudioStreamPlaybackOpus() {
     if (opusdecoder != NULL) {
         opus_decoder_destroy(opusdecoder);
-        godot::UtilityFunctions::print_verbose("opus_decoder_destroy ");
         opusdecoder = NULL; 
+    }
+    if (output_resampler != NULL) {
+        speex_resampler_destroy(output_resampler);
+        output_resampler = NULL;
     }
 }
 
-void AudioStreamPlaybackOpus::mark_end_opus_stream(bool clearmark) {
-    if (clearmark) {
-        bufferstreamend.store(NO_STREAM_END, std::memory_order_release);
-        if (queue_length_frames() == 0)
-            begin_resample(); 
-    } else {
-        if (opusdecoder != NULL) 
-            opus_decoder_ctl(opusdecoder, OPUS_RESET_STATE);
-        bufferstreamend.store(buffertail.load(std::memory_order_acquire), std::memory_order_release);
-        // This sets the pause point. We should eventually fade down as we
-        // reach it, like AudioStreamPlaybackListNode::FADE_OUT_TO_PAUSE.
+int64_t AudioStreamPlaybackOpus::finish_episode() {
+    EpisodeState expected = EPISODE_RECEIVING;
+    if (!episode_state.compare_exchange_strong(expected, EPISODE_FINISHED, std::memory_order_release, std::memory_order_acquire)) {
+        return -1;
     }
-    godot::UtilityFunctions::print_verbose("bufferstreamend set to ", bufferstreamend.load(std::memory_order_acquire));
+    return buffertail.load(std::memory_order_acquire);
 }
 
 int64_t AudioStreamPlaybackOpus::get_skips(bool overflow) const {
@@ -153,6 +170,9 @@ int AudioStreamPlaybackOpus::get_last_decode_error() const {
 }
 
 int AudioStreamPlaybackOpus::queue_length_frames() const {
+    if (audiosamplebuffer.is_empty()) {
+        return 0;
+    }
     // Read the consumer-owned counter first so this concurrent snapshot can
     // overestimate the queue briefly, but cannot wrap below zero.
     const int64_t begin = bufferbegin.load(std::memory_order_acquire);
@@ -169,7 +189,7 @@ int AudioStreamPlaybackOpus::available_space_frames() const {
 //  *  decoder will not be in the optimal state to decode the next incoming packet. For the PLC and
 //  *  FEC cases, frame_size <b>must</b> be a multiple of 2.5 ms.
 int AudioStreamPlaybackOpus::push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec) {
-    if (opusdecoder == nullptr || begin < 0 || begin >= opusbytepacket.size()) {
+    if (episode_state.load(std::memory_order_acquire) != EPISODE_RECEIVING || opusdecoder == nullptr || begin < 0 || begin >= opusbytepacket.size()) {
         last_decode_error.store(OPUS_BAD_ARG, std::memory_order_relaxed);
         decode_errors.fetch_add(1, std::memory_order_relaxed);
         return OPUS_BAD_ARG;
@@ -194,7 +214,7 @@ int AudioStreamPlaybackOpus::push_opus_packet(const PackedByteArray& opusbytepac
     if (Dsinewaveframes > 0) {
         for (int i = 0; i < decodedsamples; i++) {
             float w = std::sin(Dsinewavephase * 2 * 3.14159265358979323846 / Dsinewaveframes) * Dsinewavevolume;
-            if (base->opus_channels == 2) {
+            if (opus_channels == 2) {
                 audiounpackedbuffer[i * 2] = w;
                 audiounpackedbuffer[i * 2 + 1] = w;
             } else {
@@ -208,6 +228,7 @@ int AudioStreamPlaybackOpus::push_opus_packet(const PackedByteArray& opusbytepac
     }
 
     queue_decoded_frames(audiounpackedbuffer.ptr(), decodedsamples);
+    last_packet_output_frame.store(mixed_output_frames.load(std::memory_order_acquire), std::memory_order_release);
     return decodedsamples;
 }
 
@@ -219,7 +240,7 @@ int AudioStreamPlaybackOpus::queue_decoded_frames(const float *decoded_samples, 
 
     for (int64_t i = 0; i < writable; i++) {
         AudioFrame &output = audiosamplebuffer[(tail + i) % audiosamplebuffer.size()];
-        if (base->opus_channels == 2) {
+        if (opus_channels == 2) {
             output = { decoded_samples[i * 2], decoded_samples[i * 2 + 1] };
         } else {
             output = { decoded_samples[i], decoded_samples[i] };
@@ -253,52 +274,135 @@ void AudioStreamPlaybackOpus::set_sinewave_frames(int sinewaveframes, float volu
     godot::UtilityFunctions::print_verbose("Sinewave frames set to ", Dsinewaveframes, " volume ", Dsinewavevolume);
 }
 
-int32_t AudioStreamPlaybackOpus::_mix_resampled(AudioFrame *buffer, int32_t frames) {
-    int64_t begin = bufferbegin.load(std::memory_order_relaxed);
-    const int64_t stream_end = bufferstreamend.load(std::memory_order_acquire);
-    const int64_t tail = buffertail.load(std::memory_order_acquire);
-    int64_t consumed = 0;
-    int64_t underflows = 0;
-    float local_chunk_max = 0.0f;
-    int i = 0; 
-    while (i < frames) {
-        if (begin == stream_end) {
-            buffer[i] = { 0.0, 0.0 };  // we should fade down when we get to the streamend
-        } else if (begin == tail) {
-            buffer[i] = { 0.0, 0.0 };
-            underflows++;
-        } else {
-            buffer[i] = audiosamplebuffer[begin % audiosamplebuffer.size()];
-            begin++;
-            consumed++;
-        }
-        local_chunk_max = std::max(local_chunk_max, std::max(std::abs(buffer[i].left), std::abs(buffer[i].right)));
-        i++;
+int AudioStreamPlaybackOpus::resample_frames(const AudioFrame *input, int input_frames, AudioFrame *output, int output_frames, int &consumed_frames) {
+    consumed_frames = 0;
+    if (output_resampler == NULL || input_frames <= 0 || output_frames <= 0) {
+        return 0;
     }
-    if (consumed > 0) {
+
+    spx_uint32_t left_input = input_frames;
+    spx_uint32_t left_output = output_frames;
+    const int left_error = speex_resampler_process_float(output_resampler, 0,
+            &input[0].left, &left_input, &output[0].left, &left_output);
+    spx_uint32_t right_input = input_frames;
+    spx_uint32_t right_output = output_frames;
+    const int right_error = speex_resampler_process_float(output_resampler, 1,
+            &input[0].right, &right_input, &output[0].right, &right_output);
+    if (left_error != RESAMPLER_ERR_SUCCESS || right_error != RESAMPLER_ERR_SUCCESS ||
+            left_input != right_input || left_output != right_output) {
+        return -1;
+    }
+
+    consumed_frames = static_cast<int>(left_input);
+    return static_cast<int>(left_output);
+}
+
+int32_t AudioStreamPlaybackOpus::_mix(AudioFrame *buffer, float rate_scale, int32_t frames) {
+    (void)rate_scale; // Network playback owns its timing and does not support pitch scaling.
+    if (frames <= 0) {
+        return 0;
+    }
+
+    for (int i = 0; i < frames; i++) {
+        buffer[i] = { 0.0f, 0.0f };
+    }
+    if (!active.load(std::memory_order_acquire)) {
+        return 0;
+    }
+
+    const int64_t output_begin = mixed_output_frames.load(std::memory_order_relaxed);
+    const int64_t output_end = output_begin + frames;
+    EpisodeState state = episode_state.load(std::memory_order_acquire);
+    if (state == EPISODE_UNINITIALIZED) {
+        mixed_output_frames.store(output_end, std::memory_order_release);
+        return frames;
+    }
+    if (state == EPISODE_STOPPED) {
+        active.store(false, std::memory_order_release);
+        return 0;
+    }
+
+    int output_offset = static_cast<int>(std::clamp<int64_t>(scheduled_feed_output_frame - output_begin, 0, frames));
+    int produced_total = 0;
+    int64_t begin = bufferbegin.load(std::memory_order_relaxed);
+    const int64_t tail = buffertail.load(std::memory_order_acquire);
+
+    while (output_offset + produced_total < frames) {
+        int consumed = 0;
+        int produced = 0;
+        if (begin < tail) {
+            const int ring_index = static_cast<int>(begin % audiosamplebuffer.size());
+            const int input_frames = static_cast<int>(std::min<int64_t>(tail - begin, audiosamplebuffer.size() - ring_index));
+            produced = resample_frames(&audiosamplebuffer[ring_index], input_frames,
+                    buffer + output_offset + produced_total, frames - output_offset - produced_total, consumed);
+            begin += consumed;
+        } else if (state == EPISODE_FINISHED && flush_input_frames_remaining > 0) {
+            const int input_frames = std::min(flush_input_frames_remaining, static_cast<int>(resampler_silence.size()));
+            produced = resample_frames(resampler_silence.ptr(), input_frames,
+                    buffer + output_offset + produced_total, frames - output_offset - produced_total, consumed);
+            flush_input_frames_remaining -= consumed;
+        } else {
+            break;
+        }
+
+        if (produced < 0) {
+            episode_state.store(EPISODE_STOPPED, std::memory_order_release);
+            active.store(false, std::memory_order_release);
+            break;
+        }
+        produced_total += produced;
+        if (produced == 0 && consumed == 0) {
+            break;
+        }
+        state = episode_state.load(std::memory_order_acquire);
+    }
+
+    if (begin != bufferbegin.load(std::memory_order_relaxed)) {
         bufferbegin.store(begin, std::memory_order_release);
     }
-    if (underflows > 0) {
-        underflow_frames.fetch_add(underflows, std::memory_order_relaxed);
+
+    state = episode_state.load(std::memory_order_acquire);
+    if (state == EPISODE_RECEIVING && begin == tail && output_end >= scheduled_feed_output_frame) {
+        const int64_t idle_start = std::max(last_packet_output_frame.load(std::memory_order_acquire), scheduled_feed_output_frame);
+        if (output_end - idle_start >= stale_timeout_frames) {
+            EpisodeState expected = EPISODE_RECEIVING;
+            episode_state.compare_exchange_strong(expected, EPISODE_FINISHED, std::memory_order_release, std::memory_order_acquire);
+            state = episode_state.load(std::memory_order_acquire);
+        }
+    }
+
+    const int unfilled_frames = frames - output_offset - produced_total;
+    if (state == EPISODE_RECEIVING && unfilled_frames > 0 && output_end > scheduled_feed_output_frame) {
+        underflow_frames.fetch_add(unfilled_frames, std::memory_order_relaxed);
+    }
+
+    float local_chunk_max = 0.0f;
+    for (int i = 0; i < frames; i++) {
+        local_chunk_max = std::max(local_chunk_max, std::max(std::abs(buffer[i].left), std::abs(buffer[i].right)));
     }
     update_chunk_max(local_chunk_max);
-    mixed_frames.fetch_add(frames, std::memory_order_relaxed);
+    mixed_output_frames.store(output_end, std::memory_order_release);
+
+    if (state == EPISODE_FINISHED && begin == tail && flush_input_frames_remaining == 0 && output_end >= scheduled_feed_output_frame) {
+        episode_state.store(EPISODE_STOPPED, std::memory_order_release);
+        active.store(false, std::memory_order_release);
+    }
     return frames;
 }
 
 void AudioStreamPlaybackOpus::_start(double p_from_pos) {
-    if (mixed_frames.load(std::memory_order_relaxed) == 0) {
-        begin_resample();
-    }
+    (void)p_from_pos;
     underflow_frames.store(0, std::memory_order_relaxed);
     overflow_frames.store(0, std::memory_order_relaxed);
     decode_errors.store(0, std::memory_order_relaxed);
     last_decode_error.store(OPUS_OK, std::memory_order_relaxed);
+    mixed_output_frames.store(0, std::memory_order_relaxed);
+    last_packet_output_frame.store(0, std::memory_order_relaxed);
     active.store(true, std::memory_order_release);
-    mixed_frames.store(0, std::memory_order_relaxed);
 }
 
 void AudioStreamPlaybackOpus::_stop() {
+    episode_state.store(EPISODE_STOPPED, std::memory_order_release);
     active.store(false, std::memory_order_release);
 }
 
@@ -311,7 +415,7 @@ int AudioStreamPlaybackOpus::_get_loop_count() const {
 }
 
 double AudioStreamPlaybackOpus::_get_playback_position() const {
-    return mixed_frames.load(std::memory_order_relaxed) / _get_stream_sampling_rate();
+    return output_mix_rate > 0 ? mixed_output_frames.load(std::memory_order_relaxed) / static_cast<double>(output_mix_rate) : 0.0;
 }
 
 void AudioStreamPlaybackOpus::_seek(double p_time) {
