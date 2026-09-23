@@ -9,7 +9,9 @@
 - create the Opus encoder during `TwovoipOpusEncoder.initialize()` and replace
   the separate creation call with live bitrate, complexity and signal controls;
 - allow a new Speex AGC state to be warmed toward a previously observed gain
-  using a short synthetic voiced signal.
+  using a short synthetic voiced signal;
+- add a deferred RNNoise mode and an explicit `denoise_chunk()` operation so
+  GDScript controls episode warm-up and which prepared chunks are denoised.
 
 ## 6.6.0 - 2026-09-23
 

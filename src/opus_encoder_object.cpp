@@ -73,6 +73,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("initialize", "input_mix_rate", "opus_sample_rate", "channels", "denoiser_mode", "agc_mode", "output_chunk_size"), &TwovoipOpusEncoder::initialize);
     ClassDB::bind_method(D_METHOD("get_required_input_chunk_size"), &TwovoipOpusEncoder::get_required_input_chunk_size);
     ClassDB::bind_method(D_METHOD("process_chunk", "audio_frames"), &TwovoipOpusEncoder::process_chunk);
+    ClassDB::bind_method(D_METHOD("denoise_chunk", "chunk_offset_back"), &TwovoipOpusEncoder::denoise_chunk);
     ClassDB::bind_method(D_METHOD("get_peak"), &TwovoipOpusEncoder::get_peak);
     ClassDB::bind_method(D_METHOD("get_rms"), &TwovoipOpusEncoder::get_rms);
     ClassDB::bind_method(D_METHOD("get_speech_probability"), &TwovoipOpusEncoder::get_speech_probability);
@@ -106,6 +107,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     BIND_ENUM_CONSTANT(DENOISER_DISABLED);
     BIND_ENUM_CONSTANT(DENOISER_SPEEX);
     BIND_ENUM_CONSTANT(DENOISER_RNNOISE);
+    BIND_ENUM_CONSTANT(DENOISER_RNNOISE_DEFERRED);
     BIND_ENUM_CONSTANT(AGC_DISABLED);
     BIND_ENUM_CONSTANT(AGC_APPLIED);
     BIND_ENUM_CONSTANT(AGC_MONITOR);
@@ -173,7 +175,7 @@ Error TwovoipOpusEncoder::create_voice_processor() {
         return ERR_UNAVAILABLE;
     }
 
-    if (denoiser_mode == DENOISER_RNNOISE) {
+    if (denoiser_mode == DENOISER_RNNOISE || denoiser_mode == DENOISER_RNNOISE_DEFERRED) {
 #ifdef RNNOISE
         int frame_size = rnnoise_get_frame_size();
         if (opus_sample_rate != 48000 || output_chunk_size % frame_size != 0) {
@@ -239,7 +241,7 @@ Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rat
     if (p_input_mix_rate <= 0 || !is_valid_opus_sample_rate(p_opus_sample_rate) ||
             !is_valid_opus_frame_size(p_opus_sample_rate, p_output_chunk_size) ||
             (p_channels != 1 && p_channels != 2) ||
-            p_denoiser_mode < DENOISER_DISABLED || p_denoiser_mode > DENOISER_RNNOISE ||
+            p_denoiser_mode < DENOISER_DISABLED || p_denoiser_mode > DENOISER_RNNOISE_DEFERRED ||
             p_agc_mode < AGC_DISABLED || p_agc_mode > AGC_MONITOR) {
         UtilityFunctions::printerr("Invalid audio pipeline configuration");
         return ERR_INVALID_PARAMETER;
@@ -507,16 +509,21 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
     }
     last_rms = std::sqrt(sum_squares / (output_chunk_size*channels));
 
-
-    process_denoiser(prepared_audio_chunk);
-
     return consumed_input_frames;
 }
 
+Error TwovoipOpusEncoder::denoise_chunk(int p_chunk_offset_back) {
+    if (!initialized)
+        return ERR_UNCONFIGURED;
+    if (audio_ringbuffer_index == 0)
+        return ERR_UNAVAILABLE;
+    const int available_chunks_back = std::min(audio_ringbuffer_index - 1, audio_ringbuffer_size_chunks - 1);
+    if (p_chunk_offset_back < 0 || p_chunk_offset_back > available_chunks_back)
+        return ERR_INVALID_PARAMETER;
+    float* prepared_audio_chunk = prepared_audio_ringbuffer.ptrw() +
+            (audio_ringbuffer_index - p_chunk_offset_back) % audio_ringbuffer_size_chunks * output_chunk_size;
+    last_speech_probability = 0.0F;
 
-
-
-void TwovoipOpusEncoder::process_denoiser(float* prepared_audio_chunk) {
 #ifdef RNNOISE
     if (rnnoise_st != NULL) {
         int nnoisechunks = (int)(output_chunk_size/rnnoise_get_frame_size());
@@ -535,21 +542,21 @@ void TwovoipOpusEncoder::process_denoiser(float* prepared_audio_chunk) {
     }
 #endif
 
-    if (speex_denoiser == NULL)
-        return;
-
-    for (int offset = 0; offset < output_chunk_size; offset += preprocess_frame_size) {
-        for (int frame = 0; frame < preprocess_frame_size; frame++) {
-            float sample = std::clamp(prepared_audio_chunk[offset + frame], -1.0F, 1.0F);
-            speex_frame[frame] = static_cast<spx_int16_t>(std::round(sample * 32767.0F));
+    if (speex_denoiser != NULL) {
+        for (int offset = 0; offset < output_chunk_size; offset += preprocess_frame_size) {
+            for (int frame = 0; frame < preprocess_frame_size; frame++) {
+                float sample = std::clamp(prepared_audio_chunk[offset + frame], -1.0F, 1.0F);
+                speex_frame[frame] = static_cast<spx_int16_t>(std::round(sample * 32767.0F));
+            }
+            speex_preprocess_run(speex_denoiser, speex_frame.data());
+            spx_int32_t speech_percent = 0;
+            speex_preprocess_ctl(speex_denoiser, SPEEX_PREPROCESS_GET_PROB, &speech_percent);
+            last_speech_probability = std::max(last_speech_probability, speech_percent / 100.0F);
+            for (int frame = 0; frame < preprocess_frame_size; frame++)
+                prepared_audio_chunk[offset + frame] = speex_frame[frame] / 32768.0F;
         }
-        speex_preprocess_run(speex_denoiser, speex_frame.data());
-        spx_int32_t speech_percent = 0;
-        speex_preprocess_ctl(speex_denoiser, SPEEX_PREPROCESS_GET_PROB, &speech_percent);
-        last_speech_probability = std::max(last_speech_probability, speech_percent / 100.0F);
-        for (int frame = 0; frame < preprocess_frame_size; frame++)
-            prepared_audio_chunk[offset + frame] = speex_frame[frame] / 32768.0F;
     }
+    return OK;
 }
 
 PackedVector2Array TwovoipOpusEncoder::get_current_chunk() const {

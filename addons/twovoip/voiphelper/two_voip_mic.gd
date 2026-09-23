@@ -153,6 +153,8 @@ func init_voip_mic(p_json_packets_as_binary: bool,
 func processtalkstreamends(talking: bool):
 	if talking and not currentlytalking:
 		var leadchunks = int(lead_time/frametimesecs)
+		const rnnwarmuptime = 0.2  # 10 chunks at the usual 20 ms frame duration.
+		var rnnwarmupchunks = ceili(rnnwarmuptime/frametimesecs)
 		talkingtimestart = Time.get_ticks_msec()*0.001 - leadchunks*frametimesecs
 		hangchunks = int(hang_time/frametimesecs)
 		prints("leadchunks ", leadchunks, "hangchunks", hangchunks)
@@ -175,6 +177,10 @@ func processtalkstreamends(talking: bool):
 		opusframecount = 0
 		currentlytalking = true
 		audio_chunk = null
+
+		if denoiser_mode == TwovoipOpusEncoder.DENOISER_RNNOISE_DEFERRED:
+			for i in range(leadchunks + 1 + rnnwarmupchunks):
+				opusencoder.denoise_chunk(leadchunks + rnnwarmupchunks - i)
 		for i in range(leadchunks + 1):
 			processopuschunk(leadchunks - i)
 
@@ -281,8 +287,8 @@ func _process(delta):
 			break
 		if opusencoder.process_chunk(audio_chunk) < 0:
 			break
-
-		if denoiser_mode != TwovoipOpusEncoder.DENOISER_DISABLED:
+		if denoiser_mode != TwovoipOpusEncoder.DENOISER_DISABLED and not (denoiser_mode == TwovoipOpusEncoder.DENOISER_RNNOISE_DEFERRED and not currentlytalking):
+			opusencoder.denoise_chunk(0)
 			speechnoiseprobability = opusencoder.get_speech_probability()
 		else:
 			speechnoiseprobability = 0.0

@@ -25,6 +25,11 @@
 			<param index="1" name="chunk_offset_back" type="int" default="0" />
 			<description>Encodes a conditioned chunk, prepending optional bytes. A positive [param chunk_offset_back] selects an earlier buffered chunk for voice-activation rewind. Returns an empty array if encoding fails.</description>
 		</method>
+		<method name="denoise_chunk">
+			<return type="Error" />
+			<param index="0" name="chunk_offset_back" type="int" />
+			<description>Runs the configured denoiser on the selected prepared ring chunk in place. Call once per selected chunk, in chronological order, before encoding the same offset. Deferred RNNoise mode can select older chunks to warm its recurrent state without continuously denoising idle input. A disabled denoiser is a no-op; an unavailable offset returns an error.</description>
+		</method>
 		<method name="get_gain" qualifiers="const">
 			<return type="float" />
 			<description>Returns the linear gain currently applied during processing.</description>
@@ -48,7 +53,7 @@
 		</method>
 		<method name="get_current_chunk" qualifiers="const">
 			<return type="PackedVector2Array" />
-			<description>Returns the last processed output-rate PCM chunk as stereo frames, before Opus encoding.</description>
+			<description>Returns the last processed output-rate PCM chunk as stereo frames. When a denoiser is configured it remains pre-denoising until [method denoise_chunk] is called for offset zero.</description>
 		</method>
 		<method name="get_peak" qualifiers="const">
 			<return type="float" />
@@ -121,6 +126,7 @@
 		<constant name="DENOISER_DISABLED" value="0" enum="Denoiser">No denoising.</constant>
 		<constant name="DENOISER_SPEEX" value="1" enum="Denoiser">Speex mono denoising.</constant>
 		<constant name="DENOISER_RNNOISE" value="2" enum="Denoiser">RNNoise at mono 48 kHz.</constant>
+		<constant name="DENOISER_RNNOISE_DEFERRED" value="3" enum="Denoiser">Store pre-denoised history for explicit processing with [method denoise_chunk].</constant>
 		<constant name="AGC_DISABLED" value="0" enum="AgcMode">No automatic gain.</constant>
 		<constant name="AGC_APPLIED" value="1" enum="AgcMode">Apply native Speex automatic gain before manual gain and denoising.</constant>
 		<constant name="AGC_MONITOR" value="2" enum="AgcMode">Observe pre-denoising native Speex automatic gain without applying its output.</constant>

@@ -182,6 +182,8 @@ func reprocessoriginalchunks():
 	for s in recordedsamples:
 		if opusencoder_forreprocessing.process_chunk(s) < 0:
 			break
+		if denoiser != TwovoipOpusEncoder.DENOISER_DISABLED:
+			opusencoder_forreprocessing.denoise_chunk(0)
 		var chunkmax = opusencoder_forreprocessing.get_peak()
 		recordedchunkmax = max(recordedchunkmax, chunkmax)
 		resampledchunkprefix.set(0, (resampledopusframecount%256))  # 32768 frames is 10 minutes

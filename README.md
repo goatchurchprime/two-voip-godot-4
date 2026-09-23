@@ -203,6 +203,37 @@ floating-point probability directly; Speex supplies an integer percentage via
 `SPEEX_PREPROCESS_GET_PROB`, which TwoVoIP divides by 100. These are useful for
 comparing changes from each denoiser but are not identically calibrated scores.
 
+`TwoVoipMic` calls `denoise_chunk(0)` for every processed chunk in
+`DENOISER_RNNOISE` mode. The alternative `DENOISER_RNNOISE_DEFERRED` stores
+post-gain, pre-denoising chunks while the microphone is idle. At the beginning
+of an episode, GDScript calls `denoise_chunk(chunk_offset_back)` once for each
+required chunk, in chronological order, before calling `encode_chunk()` with
+the same offset. This replays older chunks to warm RNNoise and then continues
+with offset zero while talking. The selected ring chunk is denoised in place
+and must not be denoised twice. Direct `TwovoipOpusEncoder` users likewise call
+`denoise_chunk()` explicitly after `process_chunk()` when denoising is enabled.
+
+The helper currently reserves 200 ms of history for RNNoise warm-up. It rounds
+up by the configured Opus frame duration: 20, 10, 5 or 4 chunks for 10, 20, 40
+or 60 ms frames respectively. RNNoise does not specify a canonical warm-up
+duration, so 200 ms is a conservative starting policy rather than an API
+requirement. In a small check over seven positions in a real voice recording,
+the RMS difference from an RNNoise state run continuously for one second was
+-69.3 dBFS on average and -61.4 dBFS at the 95th percentile after 200 ms of
+history. Listening tests remain more important than exact recurrent-state
+matching.
+
+As a quick CPU measurement, two 250-chunk runs on an Intel i5-1240P with Godot
+4.6, mono 48 kHz audio and 20 ms chunks measured RNNoise at 2.08–2.23 ms per
+chunk on average (2.95–3.12 ms at the 95th percentile). Running it 50 times per
+second therefore consumed 104–112 ms of CPU time per wall-clock second, or
+10.4–11.2% of one logical core. Deferred mode avoids nearly all of that RNNoise
+work while idle; its saving is approximately that percentage multiplied by the
+idle fraction. The work is not eliminated: with the default 150 ms lead and
+200 ms warm-up, episode start catches up 18 chunks in one batch, about 37–40 ms
+on that machine. These are local development measurements, not portable
+performance guarantees.
+
 The denoiser mode is selected in `initialize()`. Speex AGC and Speex denoising
 use separate preprocessor states so that AGC can remain continuously warmed
 before the future rewind-buffer boundary while denoising follows that boundary.
