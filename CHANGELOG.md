@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 6.6.0 - 2026-09-23
+
+- keep up to one second of conditioned microphone chunks in a bounded ring and
+  let `encode_chunk()` select an earlier chunk for voice-activation rewind;
+- restore configurable VOX lead time in `TwoVoipMic` so speech immediately
+  before the trigger is included without continuously running the Opus encoder;
 
 - make the decoded Opus playback ring safe between its single packet-producing
   thread and Godot's audio mixing thread, using monotonic 64-bit positions;
@@ -17,6 +22,8 @@
 - report stereo RMS per sample rather than scaling it by the channel count;
 - remove the incorrect claim that the Opus VOIP application mode enables
   in-band FEC by itself.
+- document the clock-scheduled playback and v7 audio-pipeline work separately
+  from the stable 6.x implementation.
 
 ## 6.5.0 - 2026-09-04
 

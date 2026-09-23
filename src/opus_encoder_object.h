@@ -93,7 +93,7 @@ private:
     int output_chunk_size = 0;  // usually 960 = 48000 * 20ms
     int preprocess_frame_size = 0; // usually 960, factor 10ms size
 
-    const float max_lead_time = 1.0; 
+    const float max_lead_time = 1.0;
     int audio_ringbuffer_size_chunks = 0; // about 50 for one clear second (over the top but good for testing)
     int audio_ringbuffer_index = 0; // goes around like a ring
     PackedFloat32Array prepared_audio_ringbuffer; // output_chunk_size*channels*audio_ringbuffer_size_chunks

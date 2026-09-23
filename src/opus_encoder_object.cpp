@@ -221,7 +221,7 @@ Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rat
     denoiser_mode = p_denoiser_mode;
     agc_mode = p_agc_mode;
     if (input_mix_rate != opus_sample_rate) {
-        int speexerror = 0; 
+        int speexerror = 0;
         int resamplingquality = 4;
         speex_resampler = speex_resampler_init(channels, input_mix_rate, opus_sample_rate, resamplingquality, &speexerror);
         if (speex_resampler == NULL) {
@@ -230,7 +230,7 @@ Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rat
             return ERR_CANT_CREATE;
         }
     }
-    
+
     Error error = configure_output_chunk_size(p_output_chunk_size, (int)ceil(max_lead_time*opus_sample_rate/p_output_chunk_size) + 1);
     if (error != OK) {
         destroy_audio_pipeline();
@@ -328,7 +328,7 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
         UtilityFunctions::printerr("Process_chunk audio_frames is too short: expected at least ", required_input_chunk_size, ", got ", audio_frames.size());
         return -1;
     }
-    
+
     const float* speexin;
     if (channels == 1) {
         if (mono_audio_frames.size() != required_input_chunk_size)
@@ -340,7 +340,7 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
     } else {
         speexin = (const float*)audio_frames.ptr();
     }
-    
+
     audio_ringbuffer_index++;
     float* prepared_audio_chunk = (float*)prepared_audio_ringbuffer.ptrw() + (audio_ringbuffer_index % audio_ringbuffer_size_chunks) * output_chunk_size * channels;
 
@@ -362,7 +362,7 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
         UtilityFunctions::printerr("No resampler is available for differing input and output chunk sizes");
         return -2;
     }
-    
+
     if (speex_agc != NULL) {
         for (int offset = 0; offset < output_chunk_size; offset += preprocess_frame_size) {
             for (int frame = 0; frame < preprocess_frame_size; frame++) {
@@ -379,7 +379,7 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
             agc_gain = std::pow(10.0F, static_cast<float>(gain_db) / 20.0F);
         }
     }
-    
+
     // apply fixed gain and measure peaks
     float sum_squares = 0.0F;
     for (int i = 0; i < output_chunk_size*channels; i++) {
@@ -511,7 +511,7 @@ PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_b
         UtilityFunctions::printerr("chunk_offset_back must be positive or zero");
         return PackedByteArray();
     }
-    
+
     float* prepared_audio_chunk = (float*)prepared_audio_ringbuffer.ptrw() + \
         (std::max(audio_ringbuffer_index - chunk_offset_back, 0) % audio_ringbuffer_size_chunks)*output_chunk_size*channels;
 
@@ -524,7 +524,7 @@ PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_b
     int nprefbytes = prefix_bytes.size();
     if (nprefbytes != 0) 
         memcpy(popus_bytes, prefix_bytes.ptr(), nprefbytes); 
-    int bytepacketsize = opus_encode_float(opus_encoder, (const float*)prepared_audio_chunk, output_chunk_size, 
+    int bytepacketsize = opus_encode_float(opus_encoder, (const float*)prepared_audio_chunk, output_chunk_size,
                                            opus_byte_buffer.ptrw() + nprefbytes, max_opus_byte_buffer - nprefbytes);
     if (bytepacketsize < 0) {
         UtilityFunctions::printerr("Opus encoding failed: ", opus_strerror(bytepacketsize), " (", bytepacketsize, ")");

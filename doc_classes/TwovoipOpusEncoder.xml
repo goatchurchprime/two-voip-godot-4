@@ -29,7 +29,8 @@
 		<method name="encode_chunk">
 			<return type="PackedByteArray" />
 			<param index="0" name="prefix_bytes" type="PackedByteArray" default="PackedByteArray()" />
-			<description>Encodes the most recently processed chunk, prepending optional bytes. Returns an empty array if encoding fails.</description>
+			<param index="1" name="chunk_offset_back" type="int" default="0" />
+			<description>Encodes a conditioned chunk, prepending optional bytes. A positive [param chunk_offset_back] selects an earlier buffered chunk for voice-activation rewind. Returns an empty array if encoding fails.</description>
 		</method>
 		<method name="get_gain" qualifiers="const">
 			<return type="float" />
