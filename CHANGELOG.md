@@ -11,7 +11,10 @@
 - allow a new Speex AGC state to be warmed toward a previously observed gain
   using a short synthetic voiced signal;
 - add a deferred RNNoise mode and an explicit `denoise_chunk()` operation so
-  GDScript controls episode warm-up and which prepared chunks are denoised.
+  GDScript controls episode warm-up and which prepared chunks are denoised;
+- replace the separate JSON metadata signal with one `PackedByteArray` stream,
+  using versioned positional JSON control arrays and naked binary or base64
+  Opus packets with unambiguous transport escaping.
 
 ## 6.6.0 - 2026-09-23
 

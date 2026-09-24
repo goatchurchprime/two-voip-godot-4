@@ -3,8 +3,7 @@ extends Control
 @export var speech_mode := true
 func _ready():
 	# Wire up the optional controls and feedback from your UI
-	$TwoVoipMic.init_voip_mic(true,
-							  $MicOnButton,
+	$TwoVoipMic.init_voip_mic(false, $MicOnButton,
 							  $InputOptionButton,
 							  $PTTButton,
 							  $VoxButton,

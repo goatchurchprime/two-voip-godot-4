@@ -10,7 +10,7 @@ func set_receiving(playername, toggled_on):
 		remove_receiving_player(playername)
 
 # When a player talks they send a stream of audio packets
-# with a JSON encoded header and footer to bookend the stream.
+# with ASCII JSON-array control packets to bookend the stream.
 # The new_output_players is the list of players who might 
 # have joined mid-stream and require a mid-stream header pick up
 # and decode the audio stream that is active.
@@ -19,7 +19,7 @@ var output_players : Array[String]
 
 func add_receiving_player(playername):
 	output_players.append(playername)
-	var audio_stream_packet_mid_header = $InputPlayer/TwoVoipMic.request_audio_json_packet_mid_header()
+	var audio_stream_packet_mid_header = $InputPlayer/TwoVoipMic.request_audio_packet_mid_header()
 	if audio_stream_packet_mid_header:
 		RPC_incomingaudiopacket(playername, audio_stream_packet_mid_header)
 

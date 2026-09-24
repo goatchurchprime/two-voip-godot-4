@@ -8,7 +8,7 @@ var audioeffectpitchshift : AudioEffectPitchShift = null
 var audioeffectpitchshiftidx = 0
 
 var resampledchunkprefix = PackedByteArray([2,3])
-var mqttpacketencodebase64 : bool = false
+var audio_packets_base64 : bool = false
 
 var recordedsamples = [ ]
 var recordedopuspackets = [ ]
@@ -16,8 +16,8 @@ var recordedresampledpackets = null
 const maxrecordedsamples = 10*50
 var recordedopuspacketsMemSize = 0
 var recordedchunkmax = 0.0
-var recordedheader = { }
-var recordedfooter = { }
+var recordedheader: Array = []
+var recordedfooter: Array = []
 
 var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
@@ -39,7 +39,8 @@ func _ready():
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxMosquitto/base64, $VBoxFrameLength/HBoxOpusFrame/AutoGainControl ]:
 		h.connect("toggled", func (_toggled_on): updatesamplerates())
 
-	$TwoVoipMic.init_voip_mic(false, $HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxMicTalk/VoxThreshold.material)
+	audio_packets_base64 = $HBoxMosquitto/base64.button_pressed
+	$TwoVoipMic.init_voip_mic(audio_packets_base64, $HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxMicTalk/VoxThreshold.material)
 	$TwoVoipMic.set_vox_threshhold(0.017)
 
 	for d in AudioServer.get_output_device_list():
@@ -77,7 +78,6 @@ func _ready():
 	await get_tree().create_timer(0.1).timeout
 	$HBoxMicTalk/MicWorking.set_pressed(true)
 	
-	$TwoVoipMic.connect("transmit_audio_json_packet", on_transmit_audio_json_packet)
 	$TwoVoipMic.connect("transmit_audio_packet", on_transmit_audio_packet)
 
 	# handle lower resolution screens
@@ -118,6 +118,8 @@ var previous_ptt := false
 
 func updatesamplerates():
 	$TwoVoipMic.processtalkstreamends(false)
+	audio_packets_base64 = $HBoxMosquitto/base64.button_pressed
+	$TwoVoipMic.set_encode_base64(audio_packets_base64)
 	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_input_mix_rate()
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
@@ -157,11 +159,22 @@ func reprocessoriginalchunks():
 	opusencoder_forreprocessing.signal_type = TwovoipOpusEncoder.SIGNAL_VOICE if $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed else TwovoipOpusEncoder.SIGNAL_MUSIC
 
 	opusencoder_forreprocessing.reset_opus_encoder()
-	recordedheader["opusframesize"] = $TwoVoipMic.opus_chunk_size
-	recordedheader["opussamplerate"] = opussamplerate
-	recordedheader["opuschannels"] = opuschannels
+	if not TwoVoipPacket.header_is_valid(recordedheader):
+		recordedheader = TwoVoipPacket.make_header(
+				TwoVoipPacket.TYPE_START, $TwoVoipMic.opus_chunk_size,
+				opussamplerate, opuschannels, resampledchunkprefix.size(), 0, 0,
+				0.0, audio_packets_base64)
+	recordedheader[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE] = $TwoVoipMic.opus_chunk_size
+	recordedheader[TwoVoipPacket.HeaderField.OPUS_SAMPLE_RATE] = opussamplerate
+	recordedheader[TwoVoipPacket.HeaderField.OPUS_CHANNELS] = opuschannels
+	recordedheader[TwoVoipPacket.HeaderField.AUDIO_ENCODING] = (
+			TwoVoipPacket.ENCODING_BASE64 if audio_packets_base64
+			else TwoVoipPacket.ENCODING_BINARY)
+	if not TwoVoipPacket.footer_is_valid(recordedfooter):
+		recordedfooter = TwoVoipPacket.make_footer(
+				int(recordedheader[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT]),
+				0, 0.0, 0.0)
 
-	mqttpacketencodebase64 = $HBoxMosquitto/base64.button_pressed
 	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d frames" % $TwoVoipMic.audio_chunk_size
 
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
@@ -187,12 +200,13 @@ func reprocessoriginalchunks():
 		var chunkmax = opusencoder_forreprocessing.get_peak()
 		recordedchunkmax = max(recordedchunkmax, chunkmax)
 		resampledchunkprefix.set(0, (resampledopusframecount%256))  # 32768 frames is 10 minutes
-		resampledchunkprefix.set(1, (int(resampledopusframecount/256)&127) + (recordedheader["opusstreamcount"]%2)*128)
+		resampledchunkprefix.set(1, (int(resampledopusframecount/256)&127) + (int(recordedheader[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT])%2)*128)
 		var opuspacket : PackedByteArray = opusencoder_forreprocessing.encode_chunk(resampledchunkprefix, 0)
+		opuspacket = TwoVoipPacket.encode_audio_packet(opuspacket, audio_packets_base64)
 		recordedopuspackets.append(opuspacket)
 		resampledopusframecount += 1
 		recordedopuspacketsMemSize += opuspacket.size() 
-	recordedfooter["opusframecount"] = resampledopusframecount
+	recordedfooter[TwoVoipPacket.FooterField.OPUS_FRAME_COUNT] = resampledopusframecount
 	$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
 	$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
 	var tm = len(recordedsamples)*frametimems*0.001
@@ -214,14 +228,19 @@ func recordoriginalchunks(audiosamples, chunkmax, opuspacket):
 	$VBoxPlayback/HBoxStream/ChunkMax.text = str(recordedchunkmax)
 
 func on_transmit_audio_packet(opuspacket : PackedByteArray):
-	if len(recordedsamples) < maxrecordedsamples:
+	if TwoVoipPacket.is_control_packet(opuspacket):
+		intercept_transmit_audio_control_packet(TwoVoipPacket.decode_control_packet(opuspacket))
+	elif len(recordedsamples) < maxrecordedsamples:
 		recordoriginalchunks($TwoVoipMic.audio_chunk, $TwoVoipMic.last_chunkmax, opuspacket)
-	$MQTTnetwork.transportaudiopacket(opuspacket, mqttpacketencodebase64, max(0, $HBoxLogging/TransmissionNoise.selected))
+	$MQTTnetwork.transportaudiopacket(opuspacket, max(0, $HBoxLogging/TransmissionNoise.selected))
 
-func on_transmit_audio_json_packet(audiostreampacketheader):
-	print(audiostreampacketheader)
+func intercept_transmit_audio_control_packet(control_packet: Array):
+	print(control_packet)
+	if control_packet.is_empty():
+		return
 
-	if audiostreampacketheader.has("talkingtimestart"):
+	if control_packet[0] == TwoVoipPacket.TYPE_START:
+		assert(TwoVoipPacket.header_is_valid(control_packet))
 		recordedsamples = [ ]
 		recordedopuspackets = [ ]
 		recordedresampledpackets = [ ]
@@ -234,17 +253,14 @@ func on_transmit_audio_json_packet(audiostreampacketheader):
 		$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(0)
 	
 		print("start talking")
-		audiostreampacketheader["mqttpacketencoding"] = "base64" if mqttpacketencodebase64 else "binary"
-		recordedheader = audiostreampacketheader
-		recordedfooter = { }
-		$MQTTnetwork.transportaudiopacketjson(audiostreampacketheader)
+		recordedheader = control_packet.duplicate()
+		recordedfooter = []
 	
-	else:
-		recordedfooter = audiostreampacketheader
-		assert(audiostreampacketheader.has("talkingtimeend"))
+	elif control_packet[0] == TwoVoipPacket.TYPE_END:
+		assert(TwoVoipPacket.footer_is_valid(control_packet))
+		recordedfooter = control_packet.duplicate()
 		print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
-		$MQTTnetwork.transportaudiopacketjson(audiostreampacketheader)
-		print("Talked for ", audiostreampacketheader["talkingtimeduration"], " seconds")
+		print("Talked for ", control_packet[TwoVoipPacket.FooterField.TALKING_TIME_DURATION], " seconds")
 
 func _on_vox_threshold_gui_input(event):
 	if event is InputEventMouseButton and event.pressed:
@@ -257,8 +273,8 @@ func _on_play_pressed():
 		SelfMember.get_node("AudioStreamPlayer").pitch_scale = speedup
 		audioeffectpitchshift.pitch_scale = 1.0/speedup
 
-	recordedheader.erase("opusframecount")
-	SelfMember.twovoipspeaker.replayrecording($VBoxPlayback/HBoxStream/StreamSpeedup.value, recordedheader, recordedopuspackets, recordedfooter)
+	if TwoVoipPacket.header_is_valid(recordedheader) and TwoVoipPacket.footer_is_valid(recordedfooter):
+		SelfMember.twovoipspeaker.replayrecording($VBoxPlayback/HBoxStream/StreamSpeedup.value, recordedheader, recordedopuspackets, recordedfooter)
 
 var saveplaybackfile = "user://savedplayback.dat"
 func _on_sav_options_item_selected(index):

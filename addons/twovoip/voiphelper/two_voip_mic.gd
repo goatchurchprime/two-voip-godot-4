@@ -1,7 +1,7 @@
 extends Node
 
 var opusencoder : TwovoipOpusEncoder
-var chunkprefix : PackedByteArray = PackedByteArray([0,0]) 
+var chunkprefix : PackedByteArray = PackedByteArray([0,0])
 
 var lead_time : float = 0.15
 var hang_time : float  = 0.7
@@ -18,11 +18,10 @@ var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
 var audiosampleframematerial = null
 
-signal transmit_audio_json_packet(audiostreampacketheader : Dictionary)
 signal transmit_audio_packet(opuspacket : PackedByteArray)
-var json_packets_as_binary : bool = false
 
 const rootmeansquaremaxmeasurement = false
+var encode_base64 = false
 
 var microphoneaudiosamplescountSeconds = 0.0
 var microphoneaudiosamplescount = 0
@@ -112,13 +111,13 @@ func _on_vox_toggled(toggled_on):
 	pttbutton.toggle_mode = toggled_on
 	pttbutton.set_pressed(false)
 
-func init_voip_mic(p_json_packets_as_binary: bool,
+func init_voip_mic(p_encode_base64: bool,
 				   p_miconbutton: Button, 
 				   p_optioninputdevice: OptionButton, 
 				   p_pttbutton: Button,
 				   p_voxbutton: Button, 
 				   p_audiosampleframematerial: Material):
-	json_packets_as_binary = p_json_packets_as_binary
+	encode_base64 = p_encode_base64
 	miconbutton = p_miconbutton
 	if miconbutton == null:
 		miconbutton = Button.new()
@@ -150,6 +149,10 @@ func init_voip_mic(p_json_packets_as_binary: bool,
 
 	set_process(true)
 
+func set_encode_base64(p_encode_base64: bool):
+	assert(not currentlytalking, "Audio encoding cannot change during a talk episode")
+	encode_base64 = p_encode_base64
+
 func processtalkstreamends(talking: bool):
 	if talking and not currentlytalking:
 		var leadchunks = int(lead_time/frametimesecs)
@@ -158,20 +161,11 @@ func processtalkstreamends(talking: bool):
 		talkingtimestart = Time.get_ticks_msec()*0.001 - leadchunks*frametimesecs
 		hangchunks = int(hang_time/frametimesecs)
 		prints("leadchunks ", leadchunks, "hangchunks", hangchunks)
-		var audiostreampacketheader = { 
-			"opusframesize":opus_chunk_size, 
-			"opussamplerate":opussamplerate, 
-			"opuschannels":opuschannels,
-			"lenchunkprefix":len(chunkprefix), 
-			"opusstreamcount":opusstreamcount, 
-			"opusframecount":0,
-			"talkingtimestart":talkingtimestart
-		}
-
-		if json_packets_as_binary:
-			transmit_audio_packet.emit(JSON.stringify(audiostreampacketheader).to_ascii_buffer())
-		else:
-			transmit_audio_json_packet.emit(audiostreampacketheader)
+		var audiostreampacketheader := TwoVoipPacket.make_header(
+				TwoVoipPacket.TYPE_START, opus_chunk_size, opussamplerate,
+				opuschannels, len(chunkprefix), opusstreamcount, 0,
+				talkingtimestart, encode_base64)
+		transmit_audio_packet.emit(TwoVoipPacket.encode_control_packet(audiostreampacketheader))
 
 		opusencoder.reset_opus_encoder()
 		opusframecount = 0
@@ -188,35 +182,20 @@ func processtalkstreamends(talking: bool):
 		currentlytalking = false
 		var talkingtimeend = Time.get_ticks_msec()*0.001
 		var talkingtimeduration = talkingtimeend - talkingtimestart
-		var audiopacketstreamfooter = {
-			"opusstreamcount":opusstreamcount, 
-			"opusframecount":opusframecount,
-			"talkingtimeduration":talkingtimeduration,
-			"talkingtimeend":talkingtimeend 
-		}
+		var audiopacketstreamfooter := TwoVoipPacket.make_footer(
+				opusstreamcount, opusframecount, talkingtimeduration, talkingtimeend)
 		print("My voice chunktime=", talkingtimeduration/opusframecount, " over ", talkingtimeduration, " seconds")
-		if json_packets_as_binary:
-			transmit_audio_packet.emit(JSON.stringify(audiopacketstreamfooter).to_ascii_buffer())
-		else:
-			transmit_audio_json_packet.emit(audiopacketstreamfooter)
+		transmit_audio_packet.emit(TwoVoipPacket.encode_control_packet(audiopacketstreamfooter))
 		opusstreamcount += 1
 
-func request_audio_json_packet_mid_header():
+func request_audio_packet_mid_header():
 	if not currentlytalking:
 		return null
-	var audiostreampacketmidheader = { 
-			"opusframesize":opus_chunk_size, 
-			"opussamplerate":opussamplerate, 
-			"opuschannels":opuschannels,
-			"lenchunkprefix":len(chunkprefix), 
-			"opusstreamcount":opusstreamcount, 
-			"opusframecount":opusframecount-1,
-			"talkingtimestart":talkingtimestart
-		}
-	if json_packets_as_binary:
-		return JSON.stringify(audiostreampacketmidheader).to_ascii_buffer()
-	else:
-		return audiostreampacketmidheader
+	var audiostreampacketmidheader := TwoVoipPacket.make_header(
+			TwoVoipPacket.TYPE_MID, opus_chunk_size, opussamplerate,
+			opuschannels, len(chunkprefix), opusstreamcount, opusframecount - 1,
+			talkingtimestart, encode_base64)
+	return TwoVoipPacket.encode_control_packet(audiostreampacketmidheader)
 
 func set_vox_threshhold(p_vox_threshhold):
 	vox_threshhold = p_vox_threshhold
@@ -271,7 +250,7 @@ func processopuschunk(chunks_back):
 	else:
 		assert (len(chunkprefix) == 0)
 	var opuspacket : PackedByteArray = opusencoder.encode_chunk(chunkprefix, chunks_back)
-	transmit_audio_packet.emit(opuspacket)
+	transmit_audio_packet.emit(TwoVoipPacket.encode_audio_packet(opuspacket, encode_base64))
 	opusframecount += 1
 
 var audio_chunk = null

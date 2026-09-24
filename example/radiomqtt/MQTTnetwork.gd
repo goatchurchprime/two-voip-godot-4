@@ -42,24 +42,15 @@ func _on_mqtt_broker_item_selected(index):
 	else:
 		$GridContainer/broker.text = "mosquitto.doesliverpool.xyz"
 
-func transportaudiopacket(packet, asbase64, dithertype):
+func transportaudiopacket(packet, dithertype):
 	if audioouttopic:
 		if dithertype:
 			if randf() < 0.2:
 				var tt = abs(randfn(0.0, 0.1))
 				print("Delaying dither ", tt)
 				await get_tree().create_timer(tt).timeout
-		if asbase64:
-			$MQTT.publish(audioouttopic, Marshalls.raw_to_base64(packet).to_ascii_buffer())
-		else:
-			$MQTT.publish(audioouttopic, packet)
+		$MQTT.publish(audioouttopic, packet)
 
-func transportaudiopacketjson(jheader):
-	if audioouttopicmeta:
-		var packet = JSON.stringify(jheader).to_ascii_buffer()
-		$MQTT.publish(audioouttopicmeta, packet)
-		#print("set nodelay")
-		#$MQTT.socket.set_no_delay(true)
 
 func received_mqtt(topic, msg):
 	if flogfile != null:
@@ -79,12 +70,11 @@ func received_mqtt(topic, msg):
 						$MQTT.subscribe("%s/%s/audio/meta" % [roomtopic, membername])
 						#$MQTT.subscribe("%s/%s/audio/meta/%s" % [roomtopic, membername, myname])
 						$MQTT.subscribe("%s/%s/audio" % [roomtopic, membername])
-					var jmidheader = get_node("../TwoVoipMic").request_audio_json_packet_mid_header()
-					if jmidheader:
-						jmidheader["mqttpacketencoding"] = "base64" if get_parent().mqttpacketencodebase64 else "binary"
+					var midheader = get_node("../TwoVoipMic").request_audio_packet_mid_header()
+					if midheader:
 						var mhtopic = "%s/%s/audio/meta/%s" % [roomtopic, myname, membername]
-						print(myname, ": MIDHEADER going out ", mhtopic, jmidheader)
-						$MQTT.publish(mhtopic, JSON.stringify(jmidheader).to_ascii_buffer())
+						print(myname, ": MIDHEADER going out ", mhtopic, midheader.get_string_from_ascii())
+						$MQTT.publish(mhtopic, midheader)
 					
 				elif msg == Mstatusdisconnected or msg == MstatusdisconnectedLW:
 					var member = Members.get_node_or_null(membername)
@@ -127,11 +117,10 @@ func on_broker_connect():
 	$MQTT.publish(statustopic, Mstatusconnected, true)
 	audioouttopic = "%s/%s/audio" % [roomtopic, myname]
 	audioouttopicmeta = "%s/%s/audio/meta" % [roomtopic, myname]
-	var jmidheader = get_node("../TwoVoipMic").request_audio_json_packet_mid_header()
-	if jmidheader:
-		jmidheader["mqttpacketencoding"] = "base64" if get_parent().mqttpacketencodebase64 else "binary"
-		print("onconnect MIDHEADER going out ", audioouttopicmeta, jmidheader)
-		$MQTT.publish(audioouttopicmeta, JSON.stringify(jmidheader).to_ascii_buffer())
+	var midheader = get_node("../TwoVoipMic").request_audio_packet_mid_header()
+	if midheader:
+		print("onconnect MIDHEADER going out ", audioouttopicmeta, midheader.get_string_from_ascii())
+		$MQTT.publish(audioouttopicmeta, midheader)
 	$Connect/ColorRectConnecting.visible = false
 
 func on_broker_disconnect():

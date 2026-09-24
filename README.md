@@ -61,14 +61,34 @@ You are recommended to use the `voiphelper` module rather than implement your Vo
 core `opus` and `rnnoise` components because it has the necessary features of Vox gating (Voice activation), 
 jitter buffers, packet re-ordering (in case of unreliable transmition) and dynamic lag management.
 
-The speech is sent as binary streams of opus packets with a two byte header to number the packet with
-JSON encoded headers and footers to assist with reliability and debugging.
+The speech is sent as naked binary or base64 Opus packets with a two-byte packet
+number prefix. ASCII JSON arrays carry control information in the same packet
+stream. Start and mid-stream headers use:
 
-The parameters of the header are `{ opusframesize, opussamplerate, opuschannels, lenchunkprefix, opusstreamcount, opusframecount, talkingtimestart }` and the parameters of the footer are `{ opusstreamcount, opusframecount, talkingtimeduration, talkingtimeend }`.
+```
+["start", version, opus_frame_size, opus_sample_rate, opus_channels,
+ chunk_prefix_length, opus_stream_count, opus_frame_count,
+ talking_time_start, "binary" or "base64"]
+```
+
+The mid-stream form replaces `"start"` with `"mid"`. The footer is:
+
+```
+["end", opus_stream_count, opus_frame_count,
+ talking_time_duration, talking_time_end]
+```
+
+`TwoVoipPacket.HeaderField` and `TwoVoipPacket.FooterField` name the positional
+entries so application code does not depend on unexplained numeric indices.
+Control packets always begin with `["` and end with `]`. A rare raw audio packet
+whose two-byte prefix is also `["` gets a trailing transport escape byte; the
+receiver removes that byte before calling libopus. Base64 needs no escape
+because its alphabet contains no square brackets or quotes.
 
 As mentioned above `lenchunkprefix=2`. Also, `opusstreamcount` increments with each stream to give it a unique id,
-and `opusframecount=0` in the header.  If a player joins the network while one someone is talking mid-stream,
-then `request_audio_json_packet_mid_header()` will prove a header object with the correct value in `opusframecount`.
+and `opusframecount=0` in the header. If a player joins the network while
+someone is talking, `request_audio_packet_mid_header()` provides an ASCII
+control packet with the current frame count and audio encoding.
 
 ### simpleexample
 
@@ -76,10 +96,11 @@ This module contains the minimal wrapper for the `TwoVoipMic` and `TwoVoipSpeake
 
 #### Input player
 
-The function `$TwoVoipMic.init_voip_mic()` takes seven parameters.  The first parameter is `json_packets_as_binary` which means that
-that the values that would have been emitted to the signal `transmit_audio_json_packet` are stringified and emitted to
-`transmit_audio_packet`.  This simplifies the library, but removes the ability to easily intercept the json headers and footers
-and use the data in them.
+The first parameter to `$TwoVoipMic.init_voip_mic()` selects naked base64 Opus
+packets when true and naked binary Opus packets when false. All audio and ASCII
+control packets are emitted as `PackedByteArray` values through
+`transmit_audio_packet`. Applications may intercept and parse control packets
+with the static `TwoVoipPacket` helpers when they need the metadata.
 
 The next four parameters are optional buttons `MicOn`, `PTT`, `Vox`, `Denoise` that you can choose to share from the user interface in your game.
 The sixth parameter `InputOption` is of type [OptionButton](https://docs.godotengine.org/en/stable/classes/class_optionbutton.html#optionbutton) and is populated with the results of
@@ -100,7 +121,8 @@ audio captured before the threshold was reached to avoid clipping the beginning 
 The `TwoVoipSpeaker` module handles incoming VoIP packets in the function 
 `receive_audio_packet(packet)` and manages an `AudioStreamOpus` object loaded into an `AudioStreamPlayer`.
 
-The packets are either raw opus chunks or json-encoded header or footer.  The function `external_end_stream()`
+The packets are either naked binary/base64 Opus chunks or ASCII JSON-array
+control packets. The function `external_end_stream()`
 will auto-generate an end stream if one is missing because the network has been interrupted so that it doesn't
 try to retain the buffers.
 
@@ -253,11 +275,14 @@ voice preprocessing is disabled.
 
 #### Networking layer
 
-In the `transmit_audio_json_packet=true` mode the `TwoVoipMic` module outputs all its data via the signal
-`transmit_audio_packet(opuspacket)` which needs to be sent to the `receive_audio_packet(packet)` for each player.
+`TwoVoipMic` outputs all data through `transmit_audio_packet(packet)`. Forward
+each `PackedByteArray` unchanged to `TwoVoipSpeaker.receive_audio_packet(packet)`.
+The helper reads the encoding from each start or mid-stream header and performs
+base64 conversion internally; the network adapter does not inspect audio data.
 
-When a player joins mid-stream use `TwoVoipMic.request_audio_json_packet_mid_header()` to create an intermediate
-header for them so that they know how to decode the opus packets.
+When a player joins mid-stream use `TwoVoipMic.request_audio_packet_mid_header()`
+to create an intermediate control packet so it knows how to decode subsequent
+Opus packets.
 
 ## Building the addon
 

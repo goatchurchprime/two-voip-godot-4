@@ -14,11 +14,10 @@ var audioserveroutputlatency = AudioServer.get_output_latency()
 @export var maximum_simultaneous_episodes = 3
 @export var stale_episode_timeout = 2.0
 
-const asciiopenbrace = 123 # "{".to_ascii_buffer()[0]
-const asciiclosebrace = 125 # "}".to_ascii_buffer()[0]
 var lenchunkprefix = 2
 var opusstreamcount = 0
 var inopusstream = false
+var audio_packets_base64 = false
 var opusframecount = 0
 var opusframesize = 960
 const Noutoforderqueue = 4
@@ -58,43 +57,63 @@ func setrecopusvalues(new_opus_sample_rate, new_opus_channels):
 func external_end_stream():
 	if inopusstream:
 		print(":externally ending the stream at cutout")
-		receive_audio_packet(JSON.stringify({"talkingtimeend":-1}).to_ascii_buffer())
+		var footer := TwoVoipPacket.make_footer(opusstreamcount, opusframecount, 0.0, -1.0)
+		receive_audio_packet(TwoVoipPacket.encode_control_packet(footer))
+
+func receive_audio_control_packet(control_packet: Array):
+	if control_packet.is_empty():
+		push_warning("Invalid TwoVoIP control packet")
+		return
+	var packet_type = control_packet[0]
+	if packet_type == TwoVoipPacket.TYPE_START or packet_type == TwoVoipPacket.TYPE_MID:
+		if not TwoVoipPacket.header_is_valid(control_packet):
+			push_warning("Unsupported or malformed TwoVoIP stream header")
+			return
+		setrecopusvalues(
+				int(control_packet[TwoVoipPacket.HeaderField.OPUS_SAMPLE_RATE]),
+				int(control_packet[TwoVoipPacket.HeaderField.OPUS_CHANNELS]))
+		lenchunkprefix = int(control_packet[TwoVoipPacket.HeaderField.CHUNK_PREFIX_LENGTH])
+		opusstreamcount = int(control_packet[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT])
+		opusframesize = int(control_packet[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE])
+		audio_packets_base64 = TwoVoipPacket.header_uses_base64(control_packet)
+		opusframecount = 0
+		if packet_type == TwoVoipPacket.TYPE_MID:
+			print("Mid speech header: ", control_packet[TwoVoipPacket.HeaderField.OPUS_FRAME_COUNT])
+			opusframecount = int(control_packet[TwoVoipPacket.HeaderField.OPUS_FRAME_COUNT]) + 1
+		outoforderchunkqueue.clear()
+		for i in range(Noutoforderqueue):
+			outoforderchunkqueue.push_back(null)
+		opusframequeuecount = 0
+		assert(Npacketinitialbatching < Noutoforderqueue)
+		runninglagtimeminimum = -1.0
+		inopusstream = true
+	elif packet_type == TwoVoipPacket.TYPE_END:
+		if not TwoVoipPacket.footer_is_valid(control_packet):
+			push_warning("Malformed TwoVoIP stream footer")
+			return
+		if audio_stream_playback_opus:
+			audio_stream_playback_opus.finish_episode()
+		pausereached = false
+		print("runninglagtimeminimum: ", runninglagtimeminimum, " (target: ", audio_buffer_lag_time_target, ")")
+		inopusstream = false
+	else:
+		push_warning("Unknown TwoVoIP control packet type: %s" % packet_type)
 
 func receive_audio_packet(packet):
 	if audiostreamopus == null:
 		return
-	if len(packet) <= 3:
-		print("Bad packet too short")
-	elif packet[0] == asciiopenbrace and packet[-1] == asciiclosebrace:
-		var h = JSON.parse_string(packet.get_string_from_ascii())
-		if h != null:
-			print("audio json packet ", h)
+	if TwoVoipPacket.is_control_packet(packet):
+		receive_audio_control_packet(TwoVoipPacket.decode_control_packet(packet))
+		return
+	if not inopusstream:
+		print("Audio packet received before a stream header")
+		return
+	packet = TwoVoipPacket.decode_audio_packet(packet, audio_packets_base64)
+	if len(packet) <= lenchunkprefix:
+		print("Bad audio packet too short")
+		return
 
-			if h.has("talkingtimestart"):
-				setrecopusvalues(h["opussamplerate"], h.get("opuschannels", 2))
-				lenchunkprefix = int(h["lenchunkprefix"])
-				opusstreamcount = int(h["opusstreamcount"])
-				opusframesize = int(h["opusframesize"])
-				opusframecount = 0
-				if h.get("opusframecount", 0) != 0:
-					prints("Mid speech header!!! ", h["opusframecount"])
-					opusframecount = int(h["opusframecount"]) + 1
-				outoforderchunkqueue.clear()
-				for i in range(Noutoforderqueue):
-					outoforderchunkqueue.push_back(null)
-				opusframequeuecount = 0
-				assert (Npacketinitialbatching < Noutoforderqueue)
-				runninglagtimeminimum = -1.0
-				inopusstream = true
-
-			elif h.has("talkingtimeend"):
-				if audio_stream_playback_opus:
-					audio_stream_playback_opus.finish_episode()
-				pausereached = false
-				print("runninglagtimeminimum: ", runninglagtimeminimum, " (target: ", audio_buffer_lag_time_target, ")")
-				inopusstream = false
-
-	elif lenchunkprefix == -1:
+	if lenchunkprefix == -1:
 		pass
 
 	elif lenchunkprefix == 0:
@@ -173,13 +192,13 @@ func _physics_process(delta):
 
 func replayrecording(_speedup, recordedheader, recordedopuspackets, recordedfooter):
 	playingrecording = true
-	receive_audio_packet(JSON.stringify(recordedheader).to_ascii_buffer())
+	receive_audio_packet(TwoVoipPacket.encode_control_packet(recordedheader))
 	for x in recordedopuspackets:
-		if recordedheader["opusframesize"] > audio_stream_playback_opus.available_space_frames():
+		if recordedheader[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE] > audio_stream_playback_opus.available_space_frames():
 			var tmm = audio_stream_playback_opus.queue_length_frames()*0.5/opus_sample_rate
 			await get_tree().create_timer(tmm).timeout
 		receive_audio_packet(x)
-	receive_audio_packet(JSON.stringify(recordedfooter).to_ascii_buffer())
+	receive_audio_packet(TwoVoipPacket.encode_control_packet(recordedfooter))
 	playingrecording = false
 
 var sinewaveoutmode = false

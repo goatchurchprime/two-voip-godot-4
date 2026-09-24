@@ -6,21 +6,14 @@ var opuspacketsbuffer = [ ]
 var colourfast = Color.GREEN
 var colourslow = Color.ORANGE
 var colourpause = Color.GRAY
-var mqttpacketencodebase64 = true
-
 func setname(lname):
 	set_name(lname)
 	$Label.text = name
 	
 func receivemqttaudiometa(msg):
-	assert (msg[0] == "{".to_ascii_buffer()[0])
 	twovoipspeaker.receive_audio_packet(msg)
-	var h = JSON.parse_string(msg.get_string_from_ascii())
-	mqttpacketencodebase64 = (h.get("mqttpacketencoding") == "base64")
 
 func receivemqttaudio(msg):
-	if mqttpacketencodebase64:
-		msg = Marshalls.base64_to_raw(msg.get_string_from_ascii())
 	twovoipspeaker.receive_audio_packet(msg)
 
 
