@@ -14,12 +14,14 @@ var audioserveroutputlatency = AudioServer.get_output_latency()
 @export var maximum_simultaneous_episodes = 3
 @export var stale_episode_timeout = 2.0
 
-var lenchunkprefix = 2
+var lenchunkprefix = TwoVoipPacket.TIMESTAMPED_CHUNK_PREFIX_SIZE
 var opusstreamcount = 0
 var inopusstream = false
 var audio_packets_base64 = false
 var opusframecount = 0
 var opusframesize = 960
+var source_first_frame_time_usec: int = 0
+var source_packet_first_frame_time_usec: int = 0
 const Noutoforderqueue = 4
 const Npacketinitialbatching = 2
 var outoforderchunkqueue = [ ]
@@ -75,6 +77,7 @@ func receive_audio_control_packet(control_packet: Array):
 		lenchunkprefix = int(control_packet[TwoVoipPacket.HeaderField.CHUNK_PREFIX_LENGTH])
 		opusstreamcount = int(control_packet[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT])
 		opusframesize = int(control_packet[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE])
+		source_first_frame_time_usec = int(control_packet[TwoVoipPacket.HeaderField.FIRST_FRAME_TIME_USEC])
 		audio_packets_base64 = TwoVoipPacket.header_uses_base64(control_packet)
 		opusframecount = 0
 		if packet_type == TwoVoipPacket.TYPE_MID:
@@ -112,6 +115,8 @@ func receive_audio_packet(packet):
 	if len(packet) <= lenchunkprefix:
 		print("Bad audio packet too short")
 		return
+	if lenchunkprefix >= TwoVoipPacket.TIMESTAMPED_CHUNK_PREFIX_SIZE:
+		source_packet_first_frame_time_usec = TwoVoipPacket.get_chunk_first_frame_time_usec(packet)
 
 	if lenchunkprefix == -1:
 		pass
@@ -125,7 +130,7 @@ func receive_audio_packet(packet):
 	elif packet[1]&128 == (opusstreamcount%2)*128:
 		if audio_stream_playback_opus == null:
 			return
-		assert (lenchunkprefix == 2)
+		assert (lenchunkprefix >= TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE)
 		var opusframecountI = packet[0] + (packet[1]&127)*256
 		var opusframecountR = opusframecountI - opusframecount
 		if opusframecountR < 0:

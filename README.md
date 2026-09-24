@@ -61,14 +61,16 @@ You are recommended to use the `voiphelper` module rather than implement your Vo
 core `opus` and `rnnoise` components because it has the necessary features of Vox gating (Voice activation), 
 jitter buffers, packet re-ordering (in case of unreliable transmition) and dynamic lag management.
 
-The speech is sent as naked binary or base64 Opus packets with a two-byte packet
-number prefix. ASCII JSON arrays carry control information in the same packet
-stream. Start and mid-stream headers use:
+The speech is sent as naked binary or base64 Opus packets with a ten-byte
+diagnostic prefix. Bytes 0-1 contain the packet number and stream parity. Bytes
+2-9 contain the unsigned 64-bit Unix timestamp, in microseconds, of the first
+microphone input frame represented by that Opus packet. ASCII JSON arrays carry
+control information in the same packet stream. Start and mid-stream headers use:
 
 ```
 ["start", version, opus_frame_size, opus_sample_rate, opus_channels,
  chunk_prefix_length, opus_stream_count, opus_frame_count,
- talking_time_start, "binary" or "base64"]
+ first_frame_time_usec, "binary" or "base64"]
 ```
 
 The mid-stream form replaces `"start"` with `"mid"`. The footer is:
@@ -81,12 +83,15 @@ The mid-stream form replaces `"start"` with `"mid"`. The footer is:
 `TwoVoipPacket.HeaderField` and `TwoVoipPacket.FooterField` name the positional
 entries so application code does not depend on unexplained numeric indices.
 Control packets always begin with `["` and end with `]`. A rare raw audio packet
-whose two-byte prefix is also `["` gets a trailing transport escape byte; the
+whose first two prefix bytes are also `["` gets a trailing transport escape byte; the
 receiver removes that byte before calling libopus. Base64 needs no escape
 because its alphabet contains no square brackets or quotes.
 
-As mentioned above `lenchunkprefix=2`. Also, `opusstreamcount` increments with each stream to give it a unique id,
-and `opusframecount=0` in the header. If a player joins the network while
+For this diagnostic format `lenchunkprefix=10`. The timestamp is calculated
+immediately before retrieving a microphone chunk by subtracting
+`AudioServer.get_input_frames_available() / AudioServer.get_input_mix_rate()`
+from the current Unix time. Also, `opusstreamcount` increments with each stream
+to give it a unique id, and `opusframecount=0` in the header. If a player joins the network while
 someone is talking, `request_audio_packet_mid_header()` provides an ASCII
 control packet with the current frame count and audio encoding.
 

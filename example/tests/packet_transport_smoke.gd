@@ -22,10 +22,10 @@ func make_opus_packets(stream_count: int, encode_base64: bool) -> Array[PackedBy
 	var packets: Array[PackedByteArray] = []
 	for frame_count in range(2):
 		assert(encoder.process_chunk(make_mono(frame_count * 0.25)) == 960)
-		var prefix := PackedByteArray([
-			frame_count % 256,
-			(int(frame_count / 256) & 127) + (stream_count % 2) * 128,
-		])
+		var prefix := TwoVoipPacket.make_timestamped_chunk_prefix()
+		prefix[0] = frame_count % 256
+		prefix[1] = (int(frame_count / 256) & 127) + (stream_count % 2) * 128
+		TwoVoipPacket.set_chunk_first_frame_time_usec(prefix, 1700000000000000 + frame_count * 20000)
 		packets.append(TwoVoipPacket.encode_audio_packet(
 				encoder.encode_chunk(prefix, 0), encode_base64))
 	return packets
@@ -33,13 +33,16 @@ func make_opus_packets(stream_count: int, encode_base64: bool) -> Array[PackedBy
 
 func run_speaker_episode(speaker: Node, stream_count: int, encode_base64: bool) -> void:
 	var header := TwoVoipPacket.make_header(
-			TwoVoipPacket.TYPE_START, 960, 48000, 1, 2, stream_count, 0,
-			12.5, encode_base64)
+			TwoVoipPacket.TYPE_START, 960, 48000, 1,
+			TwoVoipPacket.TIMESTAMPED_CHUNK_PREFIX_SIZE, stream_count, 0,
+			1700000000000000, encode_base64)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
 	assert(speaker.audio_packets_base64 == encode_base64)
 	for packet in make_opus_packets(stream_count, encode_base64):
 		speaker.receive_audio_packet(packet)
 	assert(speaker.opusframecount == 2)
+	assert(speaker.source_first_frame_time_usec == 1700000000000000)
+	assert(speaker.source_packet_first_frame_time_usec == 1700000000020000)
 	assert(speaker.audio_stream_playback_opus != null)
 	var footer := TwoVoipPacket.make_footer(stream_count, 2, 0.04, 12.54)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(footer))
@@ -48,7 +51,9 @@ func run_speaker_episode(speaker: Node, stream_count: int, encode_base64: bool) 
 
 func run_tests() -> void:
 	var binary_header := TwoVoipPacket.make_header(
-			TwoVoipPacket.TYPE_START, 960, 48000, 1, 2, 7, 0, 12.5, false)
+			TwoVoipPacket.TYPE_START, 960, 48000, 1,
+			TwoVoipPacket.TIMESTAMPED_CHUNK_PREFIX_SIZE, 7, 0,
+			1700000000000000, false)
 	assert(TwoVoipPacket.header_is_valid(binary_header))
 	assert(binary_header[TwoVoipPacket.HeaderField.VERSION] == TwoVoipPacket.WIRE_VERSION)
 	assert(binary_header[TwoVoipPacket.HeaderField.AUDIO_ENCODING] == TwoVoipPacket.ENCODING_BINARY)
@@ -57,6 +62,7 @@ func run_tests() -> void:
 	var decoded_header := TwoVoipPacket.decode_control_packet(control_wire)
 	assert(TwoVoipPacket.header_is_valid(decoded_header))
 	assert(int(decoded_header[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE]) == 960)
+	assert(int(decoded_header[TwoVoipPacket.HeaderField.FIRST_FRAME_TIME_USEC]) == 1700000000000000)
 	assert(decoded_header[TwoVoipPacket.HeaderField.AUDIO_ENCODING] == TwoVoipPacket.ENCODING_BINARY)
 
 	var ordinary_audio := PackedByteArray([3, 4, 5, 6])
@@ -74,12 +80,18 @@ func run_tests() -> void:
 	assert(TwoVoipPacket.decode_audio_packet(escaped_wire, false) == ambiguous_audio)
 
 	var base64_header := TwoVoipPacket.make_header(
-			TwoVoipPacket.TYPE_MID, 960, 48000, 1, 2, 7, 42, 12.5, true)
+			TwoVoipPacket.TYPE_MID, 960, 48000, 1,
+			TwoVoipPacket.TIMESTAMPED_CHUNK_PREFIX_SIZE, 7, 42,
+			1700000000000000, true)
 	assert(TwoVoipPacket.header_is_valid(base64_header))
 	assert(TwoVoipPacket.header_uses_base64(base64_header))
 	var base64_wire := TwoVoipPacket.encode_audio_packet(ambiguous_audio, true)
 	assert(not TwoVoipPacket.is_control_packet(base64_wire))
 	assert(TwoVoipPacket.decode_audio_packet(base64_wire, true) == ambiguous_audio)
+
+	var timestamped_prefix := TwoVoipPacket.make_timestamped_chunk_prefix()
+	TwoVoipPacket.set_chunk_first_frame_time_usec(timestamped_prefix, 1700000000123456)
+	assert(TwoVoipPacket.get_chunk_first_frame_time_usec(timestamped_prefix) == 1700000000123456)
 
 	var footer := TwoVoipPacket.make_footer(7, 43, 0.86, 13.36)
 	assert(TwoVoipPacket.footer_is_valid(footer))

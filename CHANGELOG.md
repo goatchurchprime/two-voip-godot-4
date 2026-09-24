@@ -14,7 +14,10 @@
   GDScript controls episode warm-up and which prepared chunks are denoised;
 - replace the separate JSON metadata signal with one `PackedByteArray` stream,
   using versioned positional JSON control arrays and naked binary or base64
-  Opus packets with unambiguous transport escaping.
+  Opus packets with unambiguous transport escaping;
+- add the estimated Unix time of the first captured microphone frame to each
+  temporary ten-byte Opus prefix and to the episode header for interruption
+  measurement and packet-trace replay.
 
 ## 6.6.0 - 2026-09-23
 

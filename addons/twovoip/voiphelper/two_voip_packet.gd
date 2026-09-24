@@ -2,7 +2,7 @@ class_name TwoVoipPacket
 extends RefCounted
 
 
-const WIRE_VERSION := 1
+const WIRE_VERSION := 2
 
 const TYPE_START := "start"
 const TYPE_MID := "mid"
@@ -15,6 +15,11 @@ const ASCII_OPEN_BRACKET := 91
 const ASCII_QUOTE := 34
 const ASCII_CLOSE_BRACKET := 93
 
+const CHUNK_SEQUENCE_PREFIX_SIZE := 2
+const CHUNK_FIRST_FRAME_TIME_OFFSET := CHUNK_SEQUENCE_PREFIX_SIZE
+const CHUNK_FIRST_FRAME_TIME_SIZE := 8
+const TIMESTAMPED_CHUNK_PREFIX_SIZE := CHUNK_SEQUENCE_PREFIX_SIZE + CHUNK_FIRST_FRAME_TIME_SIZE
+
 
 enum HeaderField {
 	TYPE,
@@ -25,7 +30,7 @@ enum HeaderField {
 	CHUNK_PREFIX_LENGTH,
 	OPUS_STREAM_COUNT,
 	OPUS_FRAME_COUNT,
-	TALKING_TIME_START,
+	FIRST_FRAME_TIME_USEC,
 	AUDIO_ENCODING,
 	SIZE,
 }
@@ -44,7 +49,7 @@ enum FooterField {
 static func make_header(packet_type: String, opus_frame_size: int,
 		opus_sample_rate: int, opus_channels: int, chunk_prefix_length: int,
 		opus_stream_count: int, opus_frame_count: int,
-		talking_time_start: float, encode_base64: bool) -> Array:
+		first_frame_time_usec: int, encode_base64: bool) -> Array:
 	assert(packet_type == TYPE_START or packet_type == TYPE_MID)
 	var packet: Array = []
 	packet.resize(HeaderField.SIZE)
@@ -56,7 +61,7 @@ static func make_header(packet_type: String, opus_frame_size: int,
 	packet[HeaderField.CHUNK_PREFIX_LENGTH] = chunk_prefix_length
 	packet[HeaderField.OPUS_STREAM_COUNT] = opus_stream_count
 	packet[HeaderField.OPUS_FRAME_COUNT] = opus_frame_count
-	packet[HeaderField.TALKING_TIME_START] = talking_time_start
+	packet[HeaderField.FIRST_FRAME_TIME_USEC] = first_frame_time_usec
 	packet[HeaderField.AUDIO_ENCODING] = ENCODING_BASE64 if encode_base64 else ENCODING_BINARY
 	return packet
 
@@ -105,6 +110,23 @@ static func footer_is_valid(packet: Array) -> bool:
 
 static func header_uses_base64(packet: Array) -> bool:
 	return packet[HeaderField.AUDIO_ENCODING] == ENCODING_BASE64
+
+
+static func make_timestamped_chunk_prefix() -> PackedByteArray:
+	var prefix := PackedByteArray()
+	prefix.resize(TIMESTAMPED_CHUNK_PREFIX_SIZE)
+	return prefix
+
+
+static func set_chunk_first_frame_time_usec(prefix: PackedByteArray, time_usec: int) -> void:
+	assert(prefix.size() >= TIMESTAMPED_CHUNK_PREFIX_SIZE)
+	prefix.encode_u64(CHUNK_FIRST_FRAME_TIME_OFFSET, time_usec)
+
+
+static func get_chunk_first_frame_time_usec(packet: PackedByteArray) -> int:
+	if packet.size() < TIMESTAMPED_CHUNK_PREFIX_SIZE:
+		return 0
+	return packet.decode_u64(CHUNK_FIRST_FRAME_TIME_OFFSET)
 
 
 static func has_escaped_control_prefix(packet: PackedByteArray) -> bool:
