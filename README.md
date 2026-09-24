@@ -280,6 +280,11 @@ each `PackedByteArray` unchanged to `TwoVoipSpeaker.receive_audio_packet(packet)
 The helper reads the encoding from each start or mid-stream header and performs
 base64 conversion internally; the network adapter does not inspect audio data.
 
+The MQTT example publishes Opus packets on `/audio` and control arrays on
+`/audio/meta`. A mid-stream header intended for one newly joined member uses
+`/audio/meta/<member>`. All three routes deliver the unchanged packet to the
+same `TwoVoipSpeaker.receive_audio_packet()` entry point.
+
 When a player joins mid-stream use `TwoVoipMic.request_audio_packet_mid_header()`
 to create an intermediate control packet so it knows how to decode subsequent
 Opus packets.

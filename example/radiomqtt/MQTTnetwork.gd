@@ -42,14 +42,18 @@ func _on_mqtt_broker_item_selected(index):
 	else:
 		$GridContainer/broker.text = "mosquitto.doesliverpool.xyz"
 
-func transportaudiopacket(packet, dithertype):
-	if audioouttopic:
-		if dithertype:
-			if randf() < 0.2:
-				var tt = abs(randfn(0.0, 0.1))
-				print("Delaying dither ", tt)
-				await get_tree().create_timer(tt).timeout
-		$MQTT.publish(audioouttopic, packet)
+func transportaudiopacket(packet: PackedByteArray, dithertype: int, meta_recipient := ""):
+	var topic = audioouttopicmeta if TwoVoipPacket.is_control_packet(packet) else audioouttopic
+	if topic.is_empty():
+		return
+	if not meta_recipient.is_empty():
+		assert(TwoVoipPacket.is_control_packet(packet))
+		topic += "/%s" % meta_recipient
+	if dithertype and randf() < 0.2:
+		var tt = abs(randfn(0.0, 0.1))
+		print("Delaying dither ", tt)
+		await get_tree().create_timer(tt).timeout
+	$MQTT.publish(topic, packet)
 
 
 func received_mqtt(topic, msg):
@@ -72,9 +76,8 @@ func received_mqtt(topic, msg):
 						$MQTT.subscribe("%s/%s/audio" % [roomtopic, membername])
 					var midheader = get_node("../TwoVoipMic").request_audio_packet_mid_header()
 					if midheader:
-						var mhtopic = "%s/%s/audio/meta/%s" % [roomtopic, myname, membername]
-						print(myname, ": MIDHEADER going out ", mhtopic, midheader.get_string_from_ascii())
-						$MQTT.publish(mhtopic, midheader)
+						print(myname, ": MIDHEADER going out to ", membername, " ", midheader.get_string_from_ascii())
+						transportaudiopacket(midheader, 0, membername)
 					
 				elif msg == Mstatusdisconnected or msg == MstatusdisconnectedLW:
 					var member = Members.get_node_or_null(membername)
@@ -120,7 +123,7 @@ func on_broker_connect():
 	var midheader = get_node("../TwoVoipMic").request_audio_packet_mid_header()
 	if midheader:
 		print("onconnect MIDHEADER going out ", audioouttopicmeta, midheader.get_string_from_ascii())
-		$MQTT.publish(audioouttopicmeta, midheader)
+		transportaudiopacket(midheader, 0)
 	$Connect/ColorRectConnecting.visible = false
 
 func on_broker_disconnect():
