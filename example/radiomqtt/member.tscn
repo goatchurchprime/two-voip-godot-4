@@ -7,7 +7,8 @@
 resource_local_to_scene = true
 
 [node name="Member" type="ColorRect" unique_id=1106839630]
-custom_minimum_size = Vector2(290, 40)
+custom_minimum_size = Vector2(550, 68)
+size_flags_horizontal = 3
 anchors_preset = -1
 anchor_right = 0.028
 anchor_bottom = 0.035
@@ -48,10 +49,64 @@ color = Color(0.9137255, 0.94509804, 0.9882353, 0.9098039)
 [node name="ColorRectBufferQueue" type="ColorRect" parent="Node" unique_id=176855979]
 layout_mode = 0
 offset_left = -54.0
-offset_top = 37.0
+offset_top = 32.0
 offset_right = -5.0
-offset_bottom = 42.0
+offset_bottom = 36.0
 color = Color(0.0352941, 0.788235, 1, 1)
+
+[node name="LagText" type="Label" parent="." unique_id=1185963938]
+layout_mode = 0
+offset_left = 54.0
+offset_top = 38.0
+offset_right = 540.0
+offset_bottom = 55.0
+theme_override_font_sizes/font_size = 12
+text = "capture→arrival —   avg —   range —   target 600"
+
+[node name="LagMeter" type="Control" parent="." unique_id=3186348536]
+clip_contents = true
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 54.0
+offset_top = 56.0
+offset_right = -10.0
+offset_bottom = 64.0
+grow_horizontal = 2
+
+[node name="Background" type="ColorRect" parent="LagMeter" unique_id=2238192728]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.08, 0.08, 0.08, 1)
+
+[node name="Range" type="ColorRect" parent="LagMeter" unique_id=2361917305]
+layout_mode = 0
+offset_top = 2.0
+offset_right = 2.0
+offset_bottom = 6.0
+color = Color(0.4, 0.7, 1, 0.7)
+
+[node name="Average" type="ColorRect" parent="LagMeter" unique_id=779610612]
+layout_mode = 0
+offset_right = 2.0
+offset_bottom = 8.0
+color = Color(0.2, 1, 0.5, 1)
+
+[node name="Current" type="ColorRect" parent="LagMeter" unique_id=166862837]
+layout_mode = 0
+offset_right = 4.0
+offset_bottom = 8.0
+color = Color(1, 1, 0, 1)
+
+[node name="Target" type="ColorRect" parent="LagMeter" unique_id=839313733]
+layout_mode = 0
+offset_right = 2.0
+offset_bottom = 8.0
+color = Color(0, 1, 1, 1)
 
 [node name="ButtonToneOutput" type="Button" parent="Node" unique_id=1661628005]
 layout_mode = 0
