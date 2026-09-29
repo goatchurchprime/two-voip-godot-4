@@ -13,9 +13,10 @@
 			<return type="int" />
 			<description>Returns unused capacity in decoded audio frames.</description>
 		</method>
-		<method name="get_chunk_max">
+		<method name="get_tail_max">
 			<return type="float" />
-			<description>Returns the recent decoded peak magnitude.</description>
+			<param index="0" name="frame_count" type="int" />
+			<description>Returns the peak magnitude in the most recently decoded [param frame_count] PCM frames. Returns zero when the requested history is unavailable.</description>
 		</method>
 		<method name="get_decode_errors">
 			<return type="int" />
@@ -27,7 +28,12 @@
 		</method>
 		<method name="get_overflow_frames">
 			<return type="int" />
-			<description>Returns the number of decoded frames dropped because the playback ring was full since playback started.</description>
+			<description>Returns the number of unread frames overwritten by newer decoded frames.</description>
+		</method>
+		<method name="get_tail_hash">
+			<return type="int" />
+			<param index="0" name="frame_count" type="int" />
+			<description>Calculates a 32-bit FNV-1a hash over the most recently decoded [param frame_count] stereo PCM frames. Samples are quantized to signed 16-bit values before hashing. Returns [code]-1[/code] when the requested history is unavailable.</description>
 		</method>
 		<method name="get_skips">
 			<return type="int" />
@@ -46,17 +52,18 @@
 			<return type="int" enum="Error" />
 			<param index="0" name="opus_sample_rate" type="int" />
 			<param index="1" name="opus_channels" type="int" />
-			<param index="2" name="buffer_length" type="float" default="2.0" />
-			<param index="3" name="start_delay" type="float" default="0.0" />
-			<param index="4" name="stale_timeout" type="float" default="2.0" />
-			<description>Provisions this playback for one episode after AudioStreamPlayer.play(). [param start_delay] schedules its first audible audio relative to initialization. If no footer arrives, an empty episode stops after [param stale_timeout] seconds without a packet.</description>
+			<param index="2" name="opus_frame_size" type="int" />
+			<param index="3" name="buffer_length" type="float" default="2.0" />
+			<param index="4" name="start_delay" type="float" default="0.0" />
+			<param index="5" name="stale_timeout" type="float" default="2.0" />
+			<description>Provisions this playback for one episode after AudioStreamPlayer.play(). [param opus_frame_size] is the required decoded frames per channel for every packet and must represent a valid Opus duration. The PCM ring retains at least two seconds of decoded history. [param start_delay] schedules its first audible audio relative to initialization. If no footer arrives, an empty episode stops after [param stale_timeout] seconds without a packet.</description>
 		</method>
 		<method name="push_opus_packet">
 			<return type="int" />
 			<param index="0" name="opusbytepacket" type="PackedByteArray" />
 			<param index="1" name="begin" type="int" />
 			<param index="2" name="decode_fec" type="int" />
-			<description>Decodes one packet from [param begin], optionally using forward error correction. Returns the decoded frame count, or a negative libopus error code. Decoded frames which do not fit in the playback ring are counted by [method get_overflow_frames]. Call this from one producer thread only.</description>
+			<description>Checks that the packet decodes to the configured frame size, then decodes it from [param begin], optionally using forward error correction. Returns the decoded frame count, or a negative libopus error code. When the ring is full, its oldest unread frames are overwritten and counted by [method get_overflow_frames] so new decoding can continue. Call this and the tail measurement methods from one producer thread only.</description>
 		</method>
 		<method name="queue_length_frames">
 			<return type="int" />

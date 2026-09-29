@@ -143,7 +143,7 @@ Obviously the system needs to know when a stream has ended (a footer has been re
 
 The `set_sinewave_out()` setting replaces the audio as it is decoded with a 440Hz tone so it's possible
 to tell the difference between choppy transmission and playing and a choppy microphone data.
-Use `get_chunk_max()` to get an indicator of the audio coming from a particular player, which helps
+Use `get_tail_max(frame_count)` to get an indicator of the recent decoded audio from a particular player, which helps
 to tell the difference between whether they are muted, or your playback volume has been turned down.
 
 ### Low-level encoder processing

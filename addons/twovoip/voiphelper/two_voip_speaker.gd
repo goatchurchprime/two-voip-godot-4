@@ -42,12 +42,13 @@ func _ready():
 		assert(false, "Audiostream player not found!")
 
 
-func setrecopusvalues(new_opus_sample_rate, new_opus_channels):
+func setrecopusvalues(new_opus_sample_rate, new_opus_channels, new_opus_frame_size):
 	opus_sample_rate = new_opus_sample_rate
 	opus_channels = new_opus_channels
+	opusframesize = new_opus_frame_size
 	audioplayeropus.play()  # Every talking episode gets its own playback.
 	audio_stream_playback_opus = audioplayeropus.get_stream_playback()
-	var result = audio_stream_playback_opus.initialize(opus_sample_rate, opus_channels, audio_buffer_length, audio_buffer_lag_time_target, stale_episode_timeout)
+	var result = audio_stream_playback_opus.initialize(opus_sample_rate, opus_channels, opusframesize, audio_buffer_length, audio_buffer_lag_time_target, stale_episode_timeout)
 	if result != OK:
 		push_error("Could not initialize Opus playback: %s" % error_string(result))
 		audio_stream_playback_opus.stop()
@@ -73,10 +74,10 @@ func receive_audio_control_packet(control_packet: Array):
 			return
 		setrecopusvalues(
 				int(control_packet[TwoVoipPacket.HeaderField.OPUS_SAMPLE_RATE]),
-				int(control_packet[TwoVoipPacket.HeaderField.OPUS_CHANNELS]))
+				int(control_packet[TwoVoipPacket.HeaderField.OPUS_CHANNELS]),
+				int(control_packet[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE]))
 		lenchunkprefix = int(control_packet[TwoVoipPacket.HeaderField.CHUNK_PREFIX_LENGTH])
 		opusstreamcount = int(control_packet[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT])
-		opusframesize = int(control_packet[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE])
 		source_first_frame_time_usec = int(control_packet[TwoVoipPacket.HeaderField.FIRST_FRAME_TIME_USEC])
 		audio_packets_base64 = TwoVoipPacket.header_uses_base64(control_packet)
 		opusframecount = 0

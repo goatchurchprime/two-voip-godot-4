@@ -16,7 +16,7 @@ func _ready():
 	audiostreamopus = $AudioStreamPlayer.stream
 	$AudioStreamPlayer.play()
 	audio_stream_playback_opus = $AudioStreamPlayer.get_stream_playback()
-	assert(audio_stream_playback_opus.initialize(48000, 2, 0.4) == OK)
+	assert(audio_stream_playback_opus.initialize(48000, 2, opus_chunk_size, 0.4) == OK)
 
 	AudioServer.set_input_device_active(true)
 	opusencoder.initialize(AudioServer.get_input_mix_rate(), 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, opus_chunk_size)

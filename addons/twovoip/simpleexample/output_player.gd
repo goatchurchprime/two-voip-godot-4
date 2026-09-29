@@ -19,7 +19,7 @@ func _on_sine_output_button_toggled(toggled_on):
 
 func _process(delta):
 	if $TwoVoipSpeaker.audio_stream_playback_opus:
-		var maxchunkvol = $TwoVoipSpeaker.audio_stream_playback_opus.get_chunk_max()
+		var maxchunkvol = $TwoVoipSpeaker.audio_stream_playback_opus.get_tail_max($TwoVoipSpeaker.opusframesize)
 		$ColorRectLoudness.size.x = clamp(maxchunkvol*500, 1, 50)
 		var queuetime = $TwoVoipSpeaker.audio_stream_playback_opus.queue_length_frames()/$TwoVoipSpeaker.opus_sample_rate/$TwoVoipSpeaker.audio_buffer_length
 		$ColorRectBuffer.size.x = clamp(queuetime*100, 1, 50)

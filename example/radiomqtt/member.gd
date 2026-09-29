@@ -73,7 +73,7 @@ func _process(delta):
 	if twovoipspeaker.audio_stream_playback_opus:
 		$Node/ColorRectBufferQueue.size.x = min(1.0, twovoipspeaker.audio_stream_playback_opus.queue_length_frames()/twovoipspeaker.opus_sample_rate/twovoipspeaker.audio_buffer_length)*size.x
 		$AudioStreamPlayer.volume_db = $Node/Volume.value
-		var chunkv1 = twovoipspeaker.audio_stream_playback_opus.get_chunk_max()
+		var chunkv1 = twovoipspeaker.audio_stream_playback_opus.get_tail_max(twovoipspeaker.opusframesize)
 		if chunkv1 != 0.0:
 			chunkv1 = min(chunkv1*10, 1.0)
 			$Node/ColorRectLoudness.size.x = chunkv1*size.x
