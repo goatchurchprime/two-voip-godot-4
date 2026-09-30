@@ -8,12 +8,12 @@ resource_local_to_scene = true
 
 [node name="Member" type="ColorRect" unique_id=1106839630]
 custom_minimum_size = Vector2(550, 68)
-size_flags_horizontal = 3
 anchors_preset = -1
 anchor_right = 0.028
 anchor_bottom = 0.035
 offset_right = 366.2
 offset_bottom = 5.0
+size_flags_horizontal = 3
 color = Color(0.423529, 0, 0.423529, 1)
 script = ExtResource("1_o3hks")
 
@@ -54,6 +54,25 @@ offset_right = -5.0
 offset_bottom = 36.0
 color = Color(0.0352941, 0.788235, 1, 1)
 
+[node name="ButtonToneOutput" type="Button" parent="Node" unique_id=1661628005]
+layout_mode = 0
+offset_left = 131.0
+offset_top = 4.0
+offset_right = 149.0
+offset_bottom = 35.0
+tooltip_text = "Substitute audio packets with steady tone"
+toggle_mode = true
+text = "T"
+
+[node name="Volume" type="SpinBox" parent="Node" unique_id=130648977]
+layout_mode = 0
+offset_left = 150.0
+offset_top = 4.0
+offset_right = 233.062
+offset_bottom = 35.0
+min_value = -80.0
+max_value = 24.0
+
 [node name="LagText" type="Label" parent="." unique_id=1185963938]
 layout_mode = 0
 offset_left = 54.0
@@ -63,7 +82,7 @@ offset_bottom = 55.0
 theme_override_font_sizes/font_size = 12
 text = "capture→arrival —   avg —   range —   target 600"
 
-[node name="LagMeter" type="Control" parent="." unique_id=3186348536]
+[node name="LagMeter" type="Control" parent="." unique_id=-1108618760]
 clip_contents = true
 layout_mode = 1
 anchors_preset = 10
@@ -74,7 +93,7 @@ offset_right = -10.0
 offset_bottom = 64.0
 grow_horizontal = 2
 
-[node name="Background" type="ColorRect" parent="LagMeter" unique_id=2238192728]
+[node name="Background" type="ColorRect" parent="LagMeter" unique_id=-2056774568]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -83,7 +102,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.08, 0.08, 0.08, 1)
 
-[node name="Range" type="ColorRect" parent="LagMeter" unique_id=2361917305]
+[node name="Range" type="ColorRect" parent="LagMeter" unique_id=-1933049991]
 layout_mode = 0
 offset_top = 2.0
 offset_right = 2.0
@@ -108,23 +127,5 @@ offset_right = 2.0
 offset_bottom = 8.0
 color = Color(0, 1, 1, 1)
 
-[node name="ButtonToneOutput" type="Button" parent="Node" unique_id=1661628005]
-layout_mode = 0
-offset_left = 131.0
-offset_top = 4.0
-offset_right = 149.0
-offset_bottom = 35.0
-tooltip_text = "Substitute audio packets with steady tone"
-toggle_mode = true
-text = "T"
-
-[node name="Volume" type="SpinBox" parent="Node" unique_id=130648977]
-layout_mode = 0
-offset_left = 150.0
-offset_top = 4.0
-offset_right = 233.062
-offset_bottom = 35.0
-min_value = -80.0
-max_value = 24.0
-
+[connection signal="finished" from="AudioStreamPlayer" to="." method="_on_audio_stream_player_finished"]
 [connection signal="toggled" from="Node/ButtonToneOutput" to="AudioStreamPlayer/TwoVoipSpeaker" method="set_sinewave_out"]

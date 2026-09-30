@@ -49,6 +49,7 @@ void AudioStreamPlaybackOpus::_bind_methods() {
     ClassDB::bind_method(D_METHOD("push_opus_packet", "opusbytepacket", "begin", "decode_fec"), &AudioStreamPlaybackOpus::push_opus_packet);
     ClassDB::bind_method(D_METHOD("finish_episode"), &AudioStreamPlaybackOpus::finish_episode);
     ClassDB::bind_method(D_METHOD("get_tail_max", "frame_count"), &AudioStreamPlaybackOpus::get_tail_max);
+    ClassDB::bind_method(D_METHOD("get_frame_number_actually_in_speaker"), &AudioStreamPlaybackOpus::get_frame_number_actually_in_speaker);
     ClassDB::bind_method(D_METHOD("get_skips", "overflow"), &AudioStreamPlaybackOpus::get_skips);
     ClassDB::bind_method(D_METHOD("get_underflow_frames"), &AudioStreamPlaybackOpus::get_underflow_frames);
     ClassDB::bind_method(D_METHOD("get_overflow_frames"), &AudioStreamPlaybackOpus::get_overflow_frames);
@@ -100,7 +101,8 @@ Error AudioStreamPlaybackOpus::initialize(int p_opus_sample_rate, int p_opus_cha
         return ERR_CANT_CREATE;
     }
 
-    const int new_output_mix_rate = static_cast<int>(AudioServer::get_singleton()->get_mix_rate());
+    AudioServer *audio_server = AudioServer::get_singleton();
+    const int new_output_mix_rate = static_cast<int>(audio_server->get_mix_rate());
     int speexerror = RESAMPLER_ERR_SUCCESS;
     SpeexResamplerState *new_resampler = speex_resampler_init(2, p_opus_sample_rate, new_output_mix_rate, SPEEX_RESAMPLER_QUALITY_DEFAULT, &speexerror);
     if (new_resampler == NULL || speexerror != RESAMPLER_ERR_SUCCESS) {
@@ -115,6 +117,7 @@ Error AudioStreamPlaybackOpus::initialize(int p_opus_sample_rate, int p_opus_cha
     opus_channels = p_opus_channels;
     opus_frame_size = p_opus_frame_size;
     output_mix_rate = new_output_mix_rate;
+    output_latency_seconds = audio_server->get_output_latency();
     opusdecoder = new_decoder;
     output_resampler = new_resampler;
     audiounpackedbuffer.resize(opus_frame_size * opus_channels);
@@ -200,7 +203,7 @@ int AudioStreamPlaybackOpus::push_opus_packet(const PackedByteArray& opusbytepac
     if (episode_state.load(std::memory_order_acquire) != EPISODE_RECEIVING || opusdecoder == nullptr || begin < 0 || begin >= opusbytepacket.size()) {
         last_decode_error.store(OPUS_BAD_ARG, std::memory_order_relaxed);
         decode_errors.fetch_add(1, std::memory_order_relaxed);
-        return OPUS_BAD_ARG;
+        return OPUS_BAD_ARG; // negative
     }
 
     const unsigned char *opus_data = opusbytepacket.ptr() + begin;
@@ -209,7 +212,7 @@ int AudioStreamPlaybackOpus::push_opus_packet(const PackedByteArray& opusbytepac
     if (packet_frame_size != opus_frame_size) {
         last_decode_error.store(OPUS_INVALID_PACKET, std::memory_order_relaxed);
         decode_errors.fetch_add(1, std::memory_order_relaxed);
-        return OPUS_INVALID_PACKET;
+        return OPUS_INVALID_PACKET; // negative
     }
 
     int decodedsamples = opus_decode_float(opusdecoder, opus_data, opus_data_size,
@@ -223,7 +226,7 @@ int AudioStreamPlaybackOpus::push_opus_packet(const PackedByteArray& opusbytepac
     if (decodedsamples != opus_frame_size) {
         last_decode_error.store(OPUS_INVALID_PACKET, std::memory_order_relaxed);
         decode_errors.fetch_add(1, std::memory_order_relaxed);
-        return OPUS_INVALID_PACKET;
+        return OPUS_INVALID_PACKET; // negative
     }
 
     // Replace decoded audio with a pure sine wave to listen for playback crackles.
@@ -308,6 +311,25 @@ float AudioStreamPlaybackOpus::get_tail_max(int frame_count) const {
     return chunk_max;
 }
 
+int64_t AudioStreamPlaybackOpus::get_frame_number_actually_in_speaker() const {
+    if (opus_sample_rate == 0) {
+        return -1;
+    }
+    const EpisodeState state = episode_state.load(std::memory_order_acquire);
+    if (state == EPISODE_DRAINING) {
+        const double audible_output_frame = mixed_output_frames.load(std::memory_order_acquire) +
+                AudioServer::get_singleton()->get_time_since_last_mix() * output_mix_rate -
+                output_latency_seconds * output_mix_rate;
+        const double output_frames_before_end = std::max(0.0, episode_end_output_frame - audible_output_frame);
+        return static_cast<int64_t>(std::floor(buffer_write_frame.load(std::memory_order_acquire) -
+                output_frames_before_end * opus_sample_rate / output_mix_rate));
+    }
+    const int64_t read_frame = buffer_read_frame.load(std::memory_order_acquire);
+    const double audible_frame = read_frame - resampler_input_latency +
+            (AudioServer::get_singleton()->get_time_since_last_mix() - output_latency_seconds) * opus_sample_rate;
+    return static_cast<int64_t>(std::floor(audible_frame));
+}
+
 void AudioStreamPlaybackOpus::set_sinewave_frames(int sinewaveframes, float volume) {
     Dsinewaveframes = sinewaveframes;
     Dsinewavephase = 0;
@@ -361,6 +383,14 @@ int32_t AudioStreamPlaybackOpus::_mix(AudioFrame *buffer, float rate_scale, int3
     if (state == EPISODE_STOPPED) {
         active.store(false, std::memory_order_release);
         return 0;
+    }
+    if (state == EPISODE_DRAINING) {
+        mixed_output_frames.store(output_end, std::memory_order_release);
+        if (output_end - output_latency_seconds * output_mix_rate >= episode_end_output_frame) {
+            episode_state.store(EPISODE_STOPPED, std::memory_order_release);
+            active.store(false, std::memory_order_release);
+        }
+        return frames;
     }
 
     int output_offset = static_cast<int>(std::clamp<int64_t>(scheduled_feed_output_frame - output_begin, 0, frames));
@@ -421,8 +451,8 @@ int32_t AudioStreamPlaybackOpus::_mix(AudioFrame *buffer, float rate_scale, int3
     mixed_output_frames.store(output_end, std::memory_order_release);
 
     if (state == EPISODE_FINISHED && read_frame == write_frame && flush_input_frames_remaining == 0 && output_end >= scheduled_feed_output_frame) {
-        episode_state.store(EPISODE_STOPPED, std::memory_order_release);
-        active.store(false, std::memory_order_release);
+        episode_end_output_frame = output_begin + output_offset + produced_total;
+        episode_state.store(EPISODE_DRAINING, std::memory_order_release);
     }
     return frames;
 }

@@ -69,6 +69,7 @@ class AudioStreamPlaybackOpus : public AudioStreamPlayback {
         EPISODE_UNINITIALIZED,
         EPISODE_RECEIVING,
         EPISODE_FINISHED,
+        EPISODE_DRAINING,
         EPISODE_STOPPED,
     };
 
@@ -81,6 +82,7 @@ class AudioStreamPlaybackOpus : public AudioStreamPlayback {
     int opus_channels = 0;
     int opus_frame_size = 0;
     int output_mix_rate = 0;
+    double output_latency_seconds = 0.0;
     int resampler_input_latency = 0;
     int resampler_output_latency = 0;
     int flush_input_frames_remaining = 0;
@@ -98,6 +100,7 @@ class AudioStreamPlaybackOpus : public AudioStreamPlayback {
     std::atomic<int64_t> mixed_output_frames{ 0 };
     std::atomic<int64_t> last_packet_output_frame{ 0 };
     int64_t scheduled_feed_output_frame = 0;
+    int64_t episode_end_output_frame = 0;
     int64_t stale_timeout_frames = 0;
 
     std::atomic<int64_t> underflow_frames{ 0 };
@@ -132,6 +135,7 @@ public:
     int queue_length_frames() const;
     int push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
     float get_tail_max(int frame_count) const;
+    int64_t get_frame_number_actually_in_speaker() const;
     int64_t get_skips(bool overflow) const;
     int64_t get_underflow_frames() const;
     int64_t get_overflow_frames() const;

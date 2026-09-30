@@ -66,26 +66,17 @@ func update_lag_display():
 			and abs(lag_current_ms - lag_average_ms) > maxf(20.0, standard_deviation * 3.0)
 	$LagMeter/Current.color = Color.RED if is_outlier else Color.YELLOW
 
-
-var timedelaytohide = 0.1
-var prevopusframecount = -1
 func _process(delta):
-	if twovoipspeaker.audio_stream_playback_opus:
+	if twovoipspeaker.audio_stream_playback_opus and twovoipspeaker.audio_stream_playback_opus.is_playing():
 		$Node/ColorRectBufferQueue.size.x = min(1.0, twovoipspeaker.audio_stream_playback_opus.queue_length_frames()/twovoipspeaker.opus_sample_rate/twovoipspeaker.audio_buffer_length)*size.x
 		$AudioStreamPlayer.volume_db = $Node/Volume.value
-		var chunkv1 = twovoipspeaker.audio_stream_playback_opus.get_tail_max(twovoipspeaker.opusframesize)
-		if chunkv1 != 0.0:
-			chunkv1 = min(chunkv1*10, 1.0)
-			$Node/ColorRectLoudness.size.x = chunkv1*size.x
-			timedelaytohide = 0.1
-		prevopusframecount = twovoipspeaker.opusframecount
-
+		var speaker_frame = twovoipspeaker.audio_stream_playback_opus.get_frame_number_actually_in_speaker() + twovoipspeaker.playbackstartframenumber
+		var chunkv1 = twovoipspeaker.get_frame_max(speaker_frame)
+		$Node/ColorRectLoudness.size.x = lerp(min(chunkv1*5, 1.0)*size.x, $Node/ColorRectLoudness.size.x, 0.75)
 		if $AudioStreamPlayer.pitch_scale == 1.0:
 			$Node/ColorRectBufferQueue.color = colournormal
 		else:
 			$Node/ColorRectBufferQueue.color = colourslow if $AudioStreamPlayer.pitch_scale < 1.0 else colourfast
 
-	if timedelaytohide > 0.0:
-		timedelaytohide -= delta
-		if timedelaytohide <= 0.0:
-			$Node/ColorRectLoudness.size.x = 0
+func _on_audio_stream_player_finished():
+	$Node/ColorRectLoudness.size.x = 0

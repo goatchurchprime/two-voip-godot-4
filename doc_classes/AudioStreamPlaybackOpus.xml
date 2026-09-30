@@ -22,6 +22,10 @@
 			<return type="int" />
 			<description>Returns the number of Opus packets which failed to decode since playback started.</description>
 		</method>
+		<method name="get_frame_number_actually_in_speaker">
+			<return type="int" />
+			<description>Estimates the playback-local decoded source frame currently audible at the speaker. The estimate follows the consumed PCM position and compensates for Speex input latency, time since the last Godot mix, and the audio driver's output latency. It is negative while the corresponding virtual frame precedes the first decoded frame.</description>
+		</method>
 		<method name="get_last_decode_error">
 			<return type="int" />
 			<description>Returns [constant @GlobalScope.OK] after a successful decode, otherwise the latest negative libopus error code.</description>

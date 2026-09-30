@@ -20,6 +20,8 @@ var inopusstream = false
 var audio_packets_base64 = false
 var opusframecount = 0
 var opusframesize = 960
+var tailframenumber = 0
+var playbackstartframenumber = 0
 var source_first_frame_time_usec: int = 0
 var source_packet_first_frame_time_usec: int = 0
 const Noutoforderqueue = 4
@@ -29,7 +31,7 @@ var opusframequeuecount = 0
 var opus_sample_rate = 48000
 var opus_channels = 2
 var runninglagtimeminimum = -1.0
-
+var decoded_frame_max_values := PackedFloat32Array()
 
 func _ready():
 	audioplayeropus = get_parent().findaudioplayer() if get_parent().has_method("findaudioplayer") else get_parent()
@@ -46,6 +48,8 @@ func setrecopusvalues(new_opus_sample_rate, new_opus_channels, new_opus_frame_si
 	opus_sample_rate = new_opus_sample_rate
 	opus_channels = new_opus_channels
 	opusframesize = new_opus_frame_size
+	decoded_frame_max_values.resize(max(1, ceili(max(2.0, audio_buffer_length)*opus_sample_rate/opusframesize)))
+	decoded_frame_max_values.fill(0.0)
 	audioplayeropus.play()  # Every talking episode gets its own playback.
 	audio_stream_playback_opus = audioplayeropus.get_stream_playback()
 	var result = audio_stream_playback_opus.initialize(opus_sample_rate, opus_channels, opusframesize, audio_buffer_length, audio_buffer_lag_time_target, stale_episode_timeout)
@@ -56,6 +60,31 @@ func setrecopusvalues(new_opus_sample_rate, new_opus_channels, new_opus_frame_si
 		return
 	set_sinewave_out(sinewaveoutmode)
 	pausereached = false
+
+func report_opus_error(opus_err):
+	if opus_err == -4:
+		push_error("OPUS_INVALID_PACKET")
+	elif opus_err == -1:
+		push_error("OPUS_BAD_ARG")
+	else:
+		push_error("OPUS_ERR")
+
+func push_opus_packet(packet: PackedByteArray, begin: int, decode_fec: bool):
+	var decoded_frames = audio_stream_playback_opus.push_opus_packet(packet, begin, 1 if decode_fec else 0)
+	if decoded_frames < 0:
+		report_opus_error(decoded_frames)
+	else:
+		assert (tailframenumber == opusframecount*opusframesize)
+		var chunk_index = int(tailframenumber / opusframesize)
+		decoded_frame_max_values[chunk_index % decoded_frame_max_values.size()] = audio_stream_playback_opus.get_tail_max(opusframesize)
+		tailframenumber += decoded_frames
+	return decoded_frames
+
+func get_frame_max(frame_number: int) -> float:
+	if frame_number < playbackstartframenumber or opusframesize <= 0:
+		return 0.0
+	var chunk_index = int(frame_number / opusframesize)
+	return decoded_frame_max_values[chunk_index % decoded_frame_max_values.size()]
 
 func external_end_stream():
 	if inopusstream:
@@ -81,9 +110,13 @@ func receive_audio_control_packet(control_packet: Array):
 		source_first_frame_time_usec = int(control_packet[TwoVoipPacket.HeaderField.FIRST_FRAME_TIME_USEC])
 		audio_packets_base64 = TwoVoipPacket.header_uses_base64(control_packet)
 		opusframecount = 0
+		tailframenumber = 0
+		playbackstartframenumber = 0
 		if packet_type == TwoVoipPacket.TYPE_MID:
 			print("Mid speech header: ", control_packet[TwoVoipPacket.HeaderField.OPUS_FRAME_COUNT])
 			opusframecount = int(control_packet[TwoVoipPacket.HeaderField.OPUS_FRAME_COUNT]) + 1
+			tailframenumber = opusframecount*opusframesize
+			playbackstartframenumber = tailframenumber
 		outoforderchunkqueue.clear()
 		for i in range(Noutoforderqueue):
 			outoforderchunkqueue.push_back(null)
@@ -125,7 +158,7 @@ func receive_audio_packet(packet):
 	elif lenchunkprefix == 0:
 		if audio_stream_playback_opus == null:
 			return
-		audio_stream_playback_opus.push_opus_packet(packet, lenchunkprefix, 0)
+		push_opus_packet(packet, lenchunkprefix, false)
 		opusframecount += 1
 
 	elif packet[1]&128 == (opusstreamcount%2)*128:
@@ -146,7 +179,7 @@ func receive_audio_packet(packet):
 			while opusframecountR >= Noutoforderqueue:
 				print("shifting outoforderqueue ", opusframecountI, " ", ("null" if outoforderchunkqueue[0] == null else len(outoforderchunkqueue[0])))
 				if outoforderchunkqueue[0] != null:
-					audio_stream_playback_opus.push_opus_packet(outoforderchunkqueue[0], lenchunkprefix, 0)
+					push_opus_packet(outoforderchunkqueue[0], lenchunkprefix, false)
 					opusframequeuecount -= 1
 				else:
 					var nextvalidpacketforfec = packet
@@ -154,7 +187,7 @@ func receive_audio_packet(packet):
 						if outoforderchunkqueue[i] != null:
 							nextvalidpacketforfec = outoforderchunkqueue[i]
 							break
-					audio_stream_playback_opus.push_opus_packet(nextvalidpacketforfec, lenchunkprefix, 1)
+					push_opus_packet(nextvalidpacketforfec, lenchunkprefix, true)
 				outoforderchunkqueue.pop_front()
 				outoforderchunkqueue.push_back(null)
 				opusframecountR -= 1
@@ -167,7 +200,7 @@ func receive_audio_packet(packet):
 				if opusframesize > audio_stream_playback_opus.available_space_frames():
 					print("!!! segment space filled up")
 					break
-				audio_stream_playback_opus.push_opus_packet(outoforderchunkqueue.pop_front(), lenchunkprefix, 0)
+				push_opus_packet(outoforderchunkqueue.pop_front(), lenchunkprefix, false)
 				outoforderchunkqueue.push_back(null)
 				opusframecount += 1
 				opusframequeuecount -= 1
@@ -181,6 +214,9 @@ var pausereached = false
 var prevskips = 0
 func _physics_process(delta):
 	if audio_stream_playback_opus == null:
+		return
+	if not audio_stream_playback_opus.is_playing(): # could use the finished signal
+		audio_stream_playback_opus = null
 		return
 	if playingrecording:
 		return

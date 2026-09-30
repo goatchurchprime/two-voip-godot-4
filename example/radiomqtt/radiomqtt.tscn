@@ -671,9 +671,8 @@ text = "Table of users connected on the on the same topic (including self).
 "
 fit_content = true
 
-[node name="Members" type="GridContainer" parent="." unique_id=51825703]
+[node name="Members" type="VBoxContainer" parent="." unique_id=2036808396]
 layout_mode = 2
-columns = 1
 
 [node name="Self" parent="Members" unique_id=1074924714 instance=ExtResource("4_w5dv2")]
 layout_mode = 2
