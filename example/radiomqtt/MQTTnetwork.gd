@@ -10,8 +10,8 @@ var statustopic = ""
 
 var permembersubscribe = true # the subscriptions can come in too late for permember to work
 
-@onready var Members = get_node("../Members")
-@onready var SelfMember = get_node("../Members/Self")
+@onready var Members = get_node("../ScrollMembers/Members")
+@onready var SelfMember = get_node("../ScrollMembers/Members/Self")
 
 @onready var Mstatusconnected = "connected".to_ascii_buffer()
 @onready var Mstatusdisconnected = "disconnnected".to_ascii_buffer()

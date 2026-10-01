@@ -125,17 +125,14 @@ static func make_hash_response(opus_stream_count: int, first_frame: int,
 	packet[HashResponseField.HASH] = hash
 	return packet
 
-
 static func encode_control_packet(packet: Array) -> PackedByteArray:
 	return JSON.stringify(packet).to_ascii_buffer()
-
 
 static func is_control_packet(packet: PackedByteArray) -> bool:
 	return packet.size() >= 4 \
 			and packet[0] == ASCII_OPEN_BRACKET \
 			and packet[1] == ASCII_QUOTE \
 			and packet[-1] == ASCII_CLOSE_BRACKET
-
 
 static func decode_control_packet(packet: PackedByteArray) -> Array:
 	if not is_control_packet(packet):

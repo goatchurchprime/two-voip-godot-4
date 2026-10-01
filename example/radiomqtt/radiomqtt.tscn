@@ -60,6 +60,9 @@ bg_color = Color(0.654902, 0.266667, 0.345098, 1)
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_m5fk6"]
 bg_color = Color(0.509804, 0.145098, 0.203922, 1)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0f5ov"]
+bg_color = Color(0.27351275, 0.21252704, 0.79083645, 1)
+
 [node name="radiomqtt" type="VBoxContainer" unique_id=1710413281]
 anchors_preset = 15
 anchor_right = 1.0
@@ -76,6 +79,7 @@ script = ExtResource("1_anot2")
 [node name="LabelTitle" type="Label" parent="." unique_id=1539758880]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
+tooltip_text = "Hold down [u]PTT[/u] (Push-To-Talk) to record, or toggle [u]Vox[/u] to activate PTT automatically by volume. Hold down [u]Sil[/u] to set the silnce threshold for Vox."
 theme_type_variation = &"HeaderSmall"
 theme_override_styles/normal = SubResource("StyleBoxFlat_kcsl6")
 text = "Voice Opus Compressed Packets over MQTT Demo v4.0"
@@ -98,13 +102,13 @@ text = "[bgcolor=black][color=red]Warning: Godot 4.6 required for AudioServer.ge
 fit_content = true
 
 [node name="Label" type="RichTextLabel" parent="." unique_id=2113114438]
+visible = false
 layout_mode = 2
 bbcode_enabled = true
 text = "Hold down [u]PTT[/u] (Push-To-Talk) to record, or toggle [u]Vox[/u] to activate PTT automatically by volume. Hold down [u]Sil[/u] to set the silnce threshold for Vox."
 fit_content = true
 
 [node name="HSeparator3" type="HSeparator" parent="." unique_id=1948958551]
-custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 
 [node name="HBoxBigButtons" type="HBoxContainer" parent="." unique_id=428623000]
@@ -225,14 +229,13 @@ layout_mode = 2
 size_flags_horizontal = 3
 
 [node name="HSeparator" type="HSeparator" parent="." unique_id=1762685707]
-custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 
 [node name="VBoxFrameLength" type="VBoxContainer" parent="." unique_id=801652356]
 layout_mode = 2
 
 [node name="Label" type="Label" parent="VBoxFrameLength" unique_id=1139052314]
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_onpxr")
@@ -379,15 +382,15 @@ button_pressed = true
 text = "Voice optimized"
 
 [node name="HSeparator4" type="HSeparator" parent="." unique_id=1623262998]
-custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 
 [node name="VBoxPlayback" type="VBoxContainer" parent="." unique_id=1920975076]
 layout_mode = 2
 
 [node name="Label2" type="Label" parent="VBoxPlayback" unique_id=1209577319]
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
+tooltip_text = "Playback the current recording after compression at different rates defined below.  Compression is applied to the original raw recording."
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_67wxx")
 text = "Recording Playback"
@@ -395,6 +398,7 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="Label3" type="RichTextLabel" parent="VBoxPlayback" unique_id=2061846851]
+visible = false
 layout_mode = 2
 bbcode_enabled = true
 text = "Playback the current recording after compression at different rates defined below.  Compression is applied to the original raw recording."
@@ -502,11 +506,10 @@ layout_mode = 2
 editable = false
 
 [node name="HSeparator5" type="HSeparator" parent="." unique_id=1578073327]
-custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 
 [node name="Label4" type="Label" parent="." unique_id=2057443875]
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_7rhvb")
@@ -659,22 +662,34 @@ toggle_mode = true
 text = "Replay"
 
 [node name="HSeparator6" type="HSeparator" parent="." unique_id=732837562]
-custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 
-[node name="RichTextLabel" type="RichTextLabel" parent="." unique_id=495078222]
-custom_minimum_size = Vector2(550, 0)
+[node name="Label5" type="Label" parent="." unique_id=7242316]
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
-size_flags_horizontal = 4
-bbcode_enabled = true
-text = "Table of users connected on the on the same topic (including self).
-"
-fit_content = true
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_0f5ov")
+text = "Networked nodes"
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="Members" type="VBoxContainer" parent="." unique_id=2036808396]
+[node name="HBoxNetManage" type="HBoxContainer" parent="." unique_id=1581184646]
 layout_mode = 2
 
-[node name="Self" parent="Members" unique_id=1074924714 instance=ExtResource("4_w5dv2")]
+[node name="HackCheckButton" type="CheckButton" parent="HBoxNetManage" unique_id=673598173]
+layout_mode = 2
+text = "Audio unpack hash check "
+
+[node name="ScrollMembers" type="ScrollContainer" parent="." unique_id=1053756819]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 2
+
+[node name="Members" type="VBoxContainer" parent="ScrollMembers" unique_id=2036808396]
+layout_mode = 2
+
+[node name="Self" parent="ScrollMembers/Members" unique_id=1074924714 instance=ExtResource("4_w5dv2")]
 layout_mode = 2
 
 [node name="HBoxVisemes" type="HBoxContainer" parent="." unique_id=203336160]

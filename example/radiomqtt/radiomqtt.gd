@@ -2,7 +2,7 @@ extends Control
 
 
 @onready var speechbusidx = AudioServer.get_bus_index("SpeechBus")
-@onready var SelfMember = $Members/Self
+@onready var SelfMember = $ScrollMembers/Members/Self
 
 var audioeffectpitchshift : AudioEffectPitchShift = null
 var audioeffectpitchshiftidx = 0
