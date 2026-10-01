@@ -34,7 +34,6 @@ var opus_sample_rate = 48000
 var opus_channels = 2
 var runninglagtimeminimum = -1.0
 var decoded_frame_max_values := PackedFloat32Array()
-var pending_hash_requests: Array[Array] = []
 
 func _ready():
 	audioplayeropus = get_parent().findaudioplayer() if get_parent().has_method("findaudioplayer") else get_parent()
@@ -81,7 +80,6 @@ func push_opus_packet(packet: PackedByteArray, begin: int, decode_fec: bool):
 		var chunk_index = int(tailframenumber / opusframesize)
 		decoded_frame_max_values[chunk_index % decoded_frame_max_values.size()] = audio_stream_playback_opus.get_tail_max(opusframesize)
 		tailframenumber += decoded_frames
-		answer_pending_hash_requests()
 	return decoded_frames
 
 func get_frame_max(frame_number: int) -> float:
@@ -89,23 +87,6 @@ func get_frame_max(frame_number: int) -> float:
 		return 0.0
 	var chunk_index = int(frame_number / opusframesize)
 	return decoded_frame_max_values[chunk_index % decoded_frame_max_values.size()]
-
-func answer_pending_hash_requests(finish: bool = false):
-	var still_pending: Array[Array] = []
-	for request in pending_hash_requests:
-		var first_frame = int(request[TwoVoipPacket.HashRequestField.FIRST_FRAME])
-		var frame_count = int(request[TwoVoipPacket.HashRequestField.FRAME_COUNT])
-		if not finish and first_frame + frame_count > tailframenumber:
-			still_pending.append(request)
-			continue
-		var hash = -1
-		if audio_stream_playback_opus and first_frame >= playbackstartframenumber:
-			hash = audio_stream_playback_opus.get_frame_hash(
-					first_frame - playbackstartframenumber, frame_count)
-		var response = TwoVoipPacket.make_hash_response(
-				opusstreamcount, first_frame, frame_count, hash)
-		hash_response_ready.emit(TwoVoipPacket.encode_control_packet(response))
-	pending_hash_requests = still_pending
 
 func external_end_stream():
 	if inopusstream:
@@ -122,7 +103,6 @@ func receive_audio_control_packet(control_packet: Array):
 		if not TwoVoipPacket.header_is_valid(control_packet):
 			push_warning("Unsupported or malformed TwoVoIP stream header")
 			return
-		answer_pending_hash_requests(true)
 		setrecopusvalues(
 				int(control_packet[TwoVoipPacket.HeaderField.OPUS_SAMPLE_RATE]),
 				int(control_packet[TwoVoipPacket.HeaderField.OPUS_CHANNELS]),
@@ -152,7 +132,6 @@ func receive_audio_control_packet(control_packet: Array):
 			return
 		if audio_stream_playback_opus:
 			audio_stream_playback_opus.finish_episode()
-		answer_pending_hash_requests(true)
 		pausereached = false
 		print("runninglagtimeminimum: ", runninglagtimeminimum, " (target: ", audio_buffer_lag_time_target, ")")
 		inopusstream = false
@@ -162,8 +141,15 @@ func receive_audio_control_packet(control_packet: Array):
 			return
 		if int(control_packet[TwoVoipPacket.HashRequestField.OPUS_STREAM_COUNT]) != opusstreamcount:
 			return
-		pending_hash_requests.append(control_packet)
-		answer_pending_hash_requests()
+		var first_frame = int(control_packet[TwoVoipPacket.HashRequestField.FIRST_FRAME])
+		var frame_count = int(control_packet[TwoVoipPacket.HashRequestField.FRAME_COUNT])
+		var hash = -1
+		if audio_stream_playback_opus and first_frame >= playbackstartframenumber:
+			hash = audio_stream_playback_opus.get_frame_hash(
+					first_frame - playbackstartframenumber, frame_count)
+		var response = TwoVoipPacket.make_hash_response(
+				opusstreamcount, first_frame, frame_count, hash)
+		hash_response_ready.emit(TwoVoipPacket.encode_control_packet(response))
 	else:
 		push_warning("Unknown TwoVoIP control packet type: %s" % packet_type)
 

@@ -40,13 +40,13 @@ func run_speaker_episode(speaker: Node, stream_count: int, encode_base64: bool) 
 			1700000000000000, encode_base64)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
 	assert(speaker.audio_packets_base64 == encode_base64)
-	var hash_responses: Array[Array] = []
+	var early_hash_responses: Array[Array] = []
 	speaker.hash_response_ready.connect(func(packet):
-		hash_responses.append(TwoVoipPacket.decode_control_packet(packet)), CONNECT_ONE_SHOT)
-	var hash_request = TwoVoipPacket.make_hash_request(stream_count, 0, 1920)
-	assert(TwoVoipPacket.hash_request_is_valid(hash_request))
-	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(hash_request))
-	assert(hash_responses.is_empty())
+		early_hash_responses.append(TwoVoipPacket.decode_control_packet(packet)), CONNECT_ONE_SHOT)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(
+			TwoVoipPacket.make_hash_request(stream_count, 0, 1920)))
+	assert(early_hash_responses.size() == 1)
+	assert(int(early_hash_responses[0][TwoVoipPacket.HashResponseField.HASH]) == -1)
 	var source_reference := AudioStreamPlaybackOpus.new()
 	assert(source_reference.initialize(48000, 1, 960) == OK)
 	for packet in make_opus_packets(stream_count, encode_base64):
@@ -54,6 +54,7 @@ func run_speaker_episode(speaker: Node, stream_count: int, encode_base64: bool) 
 		assert(source_reference.push_opus_packet(
 				original_packet, TwoVoipPacket.TIMESTAMPED_CHUNK_PREFIX_SIZE, 0) == 960)
 		speaker.receive_audio_packet(packet)
+	assert(early_hash_responses.size() == 1)
 	assert(speaker.opusframecount == 2)
 	assert(speaker.source_first_frame_time_usec == 1700000000000000)
 	assert(speaker.source_packet_first_frame_time_usec == 1700000000020000)
@@ -61,6 +62,12 @@ func run_speaker_episode(speaker: Node, stream_count: int, encode_base64: bool) 
 	assert(speaker.decoded_frame_max_values.size() >= 2)
 	assert(speaker.get_frame_max(0) > 0.0)
 	assert(speaker.playbackstartframenumber == 0)
+	var hash_responses: Array[Array] = []
+	speaker.hash_response_ready.connect(func(packet):
+		hash_responses.append(TwoVoipPacket.decode_control_packet(packet)), CONNECT_ONE_SHOT)
+	var hash_request = TwoVoipPacket.make_hash_request(stream_count, 0, 1920)
+	assert(TwoVoipPacket.hash_request_is_valid(hash_request))
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(hash_request))
 	assert(hash_responses.size() == 1)
 	assert(TwoVoipPacket.hash_response_is_valid(hash_responses[0]))
 	assert(int(hash_responses[0][TwoVoipPacket.HashResponseField.HASH]) ==
@@ -129,14 +136,14 @@ func run_tests() -> void:
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(base64_header))
 	assert(speaker.playbackstartframenumber == 43 * 960)
 	assert(speaker.tailframenumber == speaker.playbackstartframenumber)
+	var mid_first_frame = 43 * 960
+	for packet in make_opus_packets(7, true, 43):
+		speaker.receive_audio_packet(packet)
 	var mid_hash_responses: Array[Array] = []
 	speaker.hash_response_ready.connect(func(packet):
 		mid_hash_responses.append(TwoVoipPacket.decode_control_packet(packet)), CONNECT_ONE_SHOT)
-	var mid_first_frame = 43 * 960
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(
 			TwoVoipPacket.make_hash_request(7, mid_first_frame, 1920)))
-	for packet in make_opus_packets(7, true, 43):
-		speaker.receive_audio_packet(packet)
 	assert(mid_hash_responses.size() == 1)
 	assert(int(mid_hash_responses[0][TwoVoipPacket.HashResponseField.HASH]) >= 0)
 	speaker.audio_stream_playback_opus.stop()
