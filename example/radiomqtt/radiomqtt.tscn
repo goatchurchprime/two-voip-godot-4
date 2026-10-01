@@ -676,7 +676,7 @@ vertical_alignment = 1
 [node name="HBoxNetManage" type="HBoxContainer" parent="." unique_id=1581184646]
 layout_mode = 2
 
-[node name="HackCheckButton" type="CheckButton" parent="HBoxNetManage" unique_id=673598173]
+[node name="HashCheckButton" type="CheckButton" parent="HBoxNetManage" unique_id=673598173]
 layout_mode = 2
 text = "Audio unpack hash check "
 
@@ -718,3 +718,4 @@ text = "sil"
 [connection signal="toggled" from="MQTTnetwork/Connect" to="MQTTnetwork" method="_on_connect_toggled"]
 [connection signal="item_selected" from="MQTTnetwork/GridContainer/presets" to="MQTTnetwork" method="_on_mqtt_broker_item_selected"]
 [connection signal="toggled" from="HBoxLogging/ReplayButton" to="MQTTnetwork" method="_on_replay_button_toggled"]
+[connection signal="toggled" from="HBoxNetManage/HashCheckButton" to="." method="_on_hash_check_button_toggled"]

@@ -113,8 +113,7 @@ static func make_hash_request(opus_stream_count: int, first_frame: int,
 	return packet
 
 
-static func make_hash_response(opus_stream_count: int, first_frame: int,
-		frame_count: int, hash: int) -> Array:
+static func make_hash_response(opus_stream_count: int, first_frame: int, frame_count: int, hash: int) -> Array:
 	var packet: Array = []
 	packet.resize(HashResponseField.SIZE)
 	packet[HashResponseField.TYPE] = TYPE_HASH_RESPONSE

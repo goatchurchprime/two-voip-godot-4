@@ -19,14 +19,6 @@ var recordedchunkmax = 0.0
 var recordedheader: Array = []
 var recordedfooter: Array = []
 
-var sent_audio_reference: AudioStreamPlaybackOpus = null
-var sent_reference_stream_count = -1
-var sent_reference_prefix_length = 0
-var sent_reference_frame_count = 0
-var sent_hash_frame_count = 0
-var sent_next_hash_end_frame = 0
-var sent_hashes: Dictionary = {}
-
 var audiosampleframetextureimage : Image
 var audiosampleframetexture : ImageTexture
 
@@ -87,7 +79,6 @@ func _ready():
 	$HBoxMicTalk/MicWorking.set_pressed(true)
 	
 	$TwoVoipMic.connect("transmit_audio_packet", on_transmit_audio_packet)
-	$TwoVoipMic.connect("transmit_naked_opus_packet", on_transmit_naked_opus_packet)
 
 	# handle lower resolution screens
 	var window_size = get_node("/root").size
@@ -250,47 +241,6 @@ func on_transmit_audio_packet(opuspacket : PackedByteArray):
 func hash_key(stream_count: int, first_frame: int, frame_count: int) -> String:
 	return "%d:%d:%d" % [stream_count, first_frame, frame_count]
 
-func on_transmit_naked_opus_packet(opuspacket: PackedByteArray):
-	if sent_audio_reference == null:
-		return
-	var decoded_frames = sent_audio_reference.push_opus_packet(
-			opuspacket, sent_reference_prefix_length, 0)
-	if decoded_frames < 0:
-		push_error("Local reference Opus decode failed: %d" % decoded_frames)
-		return
-	sent_reference_frame_count += decoded_frames
-	while sent_reference_frame_count >= sent_next_hash_end_frame:
-		var first_frame = sent_next_hash_end_frame - sent_hash_frame_count
-		var local_hash = sent_audio_reference.get_frame_hash(
-				first_frame, sent_hash_frame_count)
-		if local_hash < 0:
-			break
-		sent_hashes[hash_key(sent_reference_stream_count, first_frame,
-				sent_hash_frame_count)] = local_hash
-		var request = TwoVoipPacket.make_hash_request(
-				sent_reference_stream_count, first_frame, sent_hash_frame_count)
-		$MQTTnetwork.transportaudiopacket(
-				TwoVoipPacket.encode_control_packet(request), 0)
-		sent_next_hash_end_frame += sent_hash_frame_count
-
-func receive_audio_hash_response(receiver_name: String, response: Array):
-	if not TwoVoipPacket.hash_response_is_valid(response):
-		return
-	var stream_count = int(response[TwoVoipPacket.HashResponseField.OPUS_STREAM_COUNT])
-	var first_frame = int(response[TwoVoipPacket.HashResponseField.FIRST_FRAME])
-	var frame_count = int(response[TwoVoipPacket.HashResponseField.FRAME_COUNT])
-	var received_hash = int(response[TwoVoipPacket.HashResponseField.HASH])
-	var key = hash_key(stream_count, first_frame, frame_count)
-	if not sent_hashes.has(key):
-		print("Audio hash response from %s has no local reference: %s" % [receiver_name, key])
-	elif received_hash < 0:
-		print("Audio hash range unavailable from %s: %s" % [receiver_name, key])
-	elif received_hash == int(sent_hashes[key]):
-		print("Audio hash MATCH from %s: %s = %08x" % [receiver_name, key, received_hash])
-	else:
-		push_error("Audio hash MISMATCH from %s: %s local=%08x remote=%08x" % [
-				receiver_name, key, int(sent_hashes[key]), received_hash])
-
 func intercept_transmit_audio_control_packet(control_packet: Array):
 	print(control_packet)
 	if control_packet.is_empty():
@@ -298,17 +248,6 @@ func intercept_transmit_audio_control_packet(control_packet: Array):
 
 	if control_packet[0] == TwoVoipPacket.TYPE_START:
 		assert(TwoVoipPacket.header_is_valid(control_packet))
-		sent_audio_reference = AudioStreamPlaybackOpus.new()
-		var sample_rate = int(control_packet[TwoVoipPacket.HeaderField.OPUS_SAMPLE_RATE])
-		var frame_size = int(control_packet[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE])
-		var channels = int(control_packet[TwoVoipPacket.HeaderField.OPUS_CHANNELS])
-		assert(sent_audio_reference.initialize(sample_rate, channels, frame_size) == OK)
-		sent_reference_stream_count = int(control_packet[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT])
-		sent_reference_prefix_length = int(control_packet[TwoVoipPacket.HeaderField.CHUNK_PREFIX_LENGTH])
-		sent_reference_frame_count = 0
-		sent_hash_frame_count = frame_size * max(1, int(sample_rate / frame_size))
-		sent_next_hash_end_frame = sent_hash_frame_count
-		sent_hashes.clear()
 		recordedsamples = [ ]
 		recordedopuspackets = [ ]
 		recordedresampledpackets = [ ]
@@ -374,3 +313,6 @@ func _process(delta):
 func _on_gain_manual_spin_box_value_changed(value):
 	$TwoVoipMic.set_gain(value)
 	reprocessoriginalchunks()
+
+func _on_hash_check_button_toggled(toggled_on):
+	$TwoVoipMic.check_unpack_hash_codes = toggled_on

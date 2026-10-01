@@ -100,7 +100,7 @@ func received_mqtt(topic, msg):
 			elif member:
 				var control_packet = TwoVoipPacket.decode_control_packet(msg)
 				if TwoVoipPacket.hash_response_is_valid(control_packet):
-					get_parent().receive_audio_hash_response(membername, control_packet)
+					get_node("../TwoVoipMic").receive_audio_hash_response(membername, control_packet)
 					return
 				if stopic[roomtopicwords+1] == "audio":
 					member.receivemqttaudio(msg)
