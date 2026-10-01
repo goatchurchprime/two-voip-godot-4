@@ -1,15 +1,36 @@
 ## Description
 
 Welcome to the GodotEngine GDExtension [TwovVoip](https://store.godotengine.org/asset/goatchurch/twovoip/) designed 
-to cater to all your VoIP (Voice Over IP) needs when building networked games in Godot.
-
-This plugin uses the industry standard [Xiph/Opus](https://github.com/xiph/opus) compression library 
-and the [Xiph/RNNoise](https://github.com/xiph/rnnoise) de-noiser all wrapped in an easy-to-integrate voiphelper 
-component to help you get your game players speaking to one another over the network in minutes.
+to cater to all your VoIP (Voice Over IP) needs when building networked games in Godot which is intended to work right out of the box.
 
 Thanks to [@ajlennon](https://github.com/ajlennon) and [@DmitriySalnikov](https://github.com/DmitriySalnikov) 
 for work on the github actions that are successfully building this plugin across 
 [all six](https://docs.godotengine.org/en/stable/about/list_of_features.html#platforms) GodotEngine supported platforms.
+
+
+## Components of this library
+
+The following libraries from Xiph are compiled into this plugin:
+
+| Dependency | Version used | Pinned source | Release Date |
+| --- | --- | --- | --- |
+| [libopus](https://github.com/xiph/opus) | v1.5.2 | [`ddbe4838`](https://github.com/xiph/opus/commit/ddbe48383984d56acd9e1ab6a090c54ca6b735a6) | 10 April 2024 |
+| [RNNoise](https://github.com/xiph/rnnoise) | v0.2 + 1 commit | [`372f7b4b`](https://github.com/xiph/rnnoise/commit/372f7b4b76cde4ca1ec4605353dd17898a99de38) | 15 April 2024 |
+| [SpeexDSP](https://github.com/xiph/speexdsp) | 1.2.1 | [`1b28a0f6`](https://github.com/xiph/speexdsp/commit/1b28a0f61bc31162979e1f26f3981fc3637095c8) | 13 June 2022 |
+
+The core library, `libopus` is the industry standard for compressing voice packets, `RNNoise` is a hight quality denoiser that works at 48kHz, and `SpeexDSP`
+has a resampler, automatic gain control and an echo canceller (not yet used).
+
+You can use these components themselves, or you can use the VoipHelper module (written in GDScript) to manage all the higher
+level functionality, such as voice gating, packet numbering, jitter buffers and network lag.  There is also a hook to add in vizemes data.
+
+Since most of the bugs and problems encountered in a voip module are to do with networking and the fact that the packing and 
+and unpacking is done on different machines, there is a networked example that works over MQTT that has proven 
+to show up all the issues that occur when running this with a normal network system.
+
+## Minimal example here
+
+
 
 ## High level demo
 

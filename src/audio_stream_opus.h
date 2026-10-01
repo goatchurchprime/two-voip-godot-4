@@ -141,7 +141,7 @@ public:
     int64_t get_overflow_frames() const;
     int64_t get_decode_errors() const;
     int get_last_decode_error() const;
-    int64_t get_tail_hash(int frame_count) const;
+    int64_t get_frame_hash(int64_t first_frame, int frame_count) const;
     int64_t finish_episode();
     void set_sinewave_frames(int sinewaveframes, float volume);
     AudioStreamPlaybackOpus();

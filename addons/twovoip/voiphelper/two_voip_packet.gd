@@ -7,6 +7,8 @@ const WIRE_VERSION := 2
 const TYPE_START := "start"
 const TYPE_MID := "mid"
 const TYPE_END := "end"
+const TYPE_HASH_REQUEST := "hash?"
+const TYPE_HASH_RESPONSE := "hash"
 
 const ENCODING_BINARY := "binary"
 const ENCODING_BASE64 := "base64"
@@ -46,6 +48,27 @@ enum FooterField {
 }
 
 
+enum HashRequestField {
+	TYPE,
+	VERSION,
+	OPUS_STREAM_COUNT,
+	FIRST_FRAME,
+	FRAME_COUNT,
+	SIZE,
+}
+
+
+enum HashResponseField {
+	TYPE,
+	VERSION,
+	OPUS_STREAM_COUNT,
+	FIRST_FRAME,
+	FRAME_COUNT,
+	HASH,
+	SIZE,
+}
+
+
 static func make_header(packet_type: String, opus_frame_size: int,
 		opus_sample_rate: int, opus_channels: int, chunk_prefix_length: int,
 		opus_stream_count: int, opus_frame_count: int,
@@ -78,6 +101,31 @@ static func make_footer(opus_stream_count: int, opus_frame_count: int,
 	return packet
 
 
+static func make_hash_request(opus_stream_count: int, first_frame: int,
+		frame_count: int) -> Array:
+	var packet: Array = []
+	packet.resize(HashRequestField.SIZE)
+	packet[HashRequestField.TYPE] = TYPE_HASH_REQUEST
+	packet[HashRequestField.VERSION] = WIRE_VERSION
+	packet[HashRequestField.OPUS_STREAM_COUNT] = opus_stream_count
+	packet[HashRequestField.FIRST_FRAME] = first_frame
+	packet[HashRequestField.FRAME_COUNT] = frame_count
+	return packet
+
+
+static func make_hash_response(opus_stream_count: int, first_frame: int,
+		frame_count: int, hash: int) -> Array:
+	var packet: Array = []
+	packet.resize(HashResponseField.SIZE)
+	packet[HashResponseField.TYPE] = TYPE_HASH_RESPONSE
+	packet[HashResponseField.VERSION] = WIRE_VERSION
+	packet[HashResponseField.OPUS_STREAM_COUNT] = opus_stream_count
+	packet[HashResponseField.FIRST_FRAME] = first_frame
+	packet[HashResponseField.FRAME_COUNT] = frame_count
+	packet[HashResponseField.HASH] = hash
+	return packet
+
+
 static func encode_control_packet(packet: Array) -> PackedByteArray:
 	return JSON.stringify(packet).to_ascii_buffer()
 
@@ -106,6 +154,22 @@ static func header_is_valid(packet: Array) -> bool:
 
 static func footer_is_valid(packet: Array) -> bool:
 	return packet.size() == FooterField.SIZE and packet[FooterField.TYPE] == TYPE_END
+
+
+static func hash_request_is_valid(packet: Array) -> bool:
+	return packet.size() == HashRequestField.SIZE \
+			and packet[HashRequestField.TYPE] == TYPE_HASH_REQUEST \
+			and packet[HashRequestField.VERSION] == WIRE_VERSION \
+			and packet[HashRequestField.FIRST_FRAME] >= 0 \
+			and packet[HashRequestField.FRAME_COUNT] > 0
+
+
+static func hash_response_is_valid(packet: Array) -> bool:
+	return packet.size() == HashResponseField.SIZE \
+			and packet[HashResponseField.TYPE] == TYPE_HASH_RESPONSE \
+			and packet[HashResponseField.VERSION] == WIRE_VERSION \
+			and packet[HashResponseField.FIRST_FRAME] >= 0 \
+			and packet[HashResponseField.FRAME_COUNT] > 0
 
 
 static func header_uses_base64(packet: Array) -> bool:

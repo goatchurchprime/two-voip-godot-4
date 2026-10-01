@@ -72,6 +72,8 @@ func received_mqtt(topic, msg):
 					var member = load("res://radiomqtt/member.tscn").instantiate()
 					member.setname(membername)
 					Members.add_child(member)
+					member.get_node("AudioStreamPlayer/TwoVoipSpeaker").hash_response_ready.connect(
+							func(packet): transportaudiopacket(packet, 0, membername))
 					if permembersubscribe:
 						$MQTT.subscribe("%s/%s/audio/meta" % [roomtopic, membername])
 						#$MQTT.subscribe("%s/%s/audio/meta/%s" % [roomtopic, membername, myname])
@@ -96,6 +98,10 @@ func received_mqtt(topic, msg):
 			if membername == myname:
 				pass
 			elif member:
+				var control_packet = TwoVoipPacket.decode_control_packet(msg)
+				if TwoVoipPacket.hash_response_is_valid(control_packet):
+					get_parent().receive_audio_hash_response(membername, control_packet)
+					return
 				if stopic[roomtopicwords+1] == "audio":
 					member.receivemqttaudio(msg)
 				else:

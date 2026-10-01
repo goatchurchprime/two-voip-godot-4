@@ -56,12 +56,13 @@ func run_tests() -> void:
 		decoded_frame_count += decoded_frames
 		assert(comparison.push_opus_packet(packet, 0, 0) == 960)
 		if packet_index == 0:
-			first_packet_hash = reference.get_tail_hash(960)
+			first_packet_hash = reference.get_frame_hash(0, 960)
 	assert(decoded_frame_count == 105600)
 	assert(reference.queue_length_frames() == 96000)
 	assert(reference.get_overflow_frames() == 9600)
-	assert(reference.get_tail_hash(48000) == comparison.get_tail_hash(48000))
-	assert(reference.get_tail_hash(96001) == -1)
+	assert(reference.get_frame_hash(decoded_frame_count - 48000, 48000) == comparison.get_frame_hash(decoded_frame_count - 48000, 48000))
+	assert(reference.get_frame_hash(0, 960) == -1)
+	assert(reference.get_frame_hash(decoded_frame_count - 96001, 96001) == -1)
 	assert(reference.get_tail_max(960) > 0.0)
 
 	var stream := AudioStreamOpus.new()
@@ -85,7 +86,7 @@ func run_tests() -> void:
 	assert(playback.get_last_decode_error() < 0)
 	assert(playback.get_skips(true) == playback.get_overflow_frames())
 	assert(playback.get_skips(false) == playback.get_underflow_frames())
-	assert(playback.get_tail_hash(960) == first_packet_hash)
+	assert(playback.get_frame_hash(0, 960) == first_packet_hash)
 	assert(playback.finish_episode() == 960)
 	assert(drain_episode(playback))
 

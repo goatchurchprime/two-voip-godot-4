@@ -34,10 +34,11 @@
 			<return type="int" />
 			<description>Returns the number of unread frames overwritten by newer decoded frames.</description>
 		</method>
-		<method name="get_tail_hash">
+		<method name="get_frame_hash">
 			<return type="int" />
-			<param index="0" name="frame_count" type="int" />
-			<description>Calculates a 32-bit FNV-1a hash over the most recently decoded [param frame_count] stereo PCM frames. Samples are quantized to signed 16-bit values before hashing. Returns [code]-1[/code] when the requested history is unavailable.</description>
+			<param index="0" name="first_frame" type="int" />
+			<param index="1" name="frame_count" type="int" />
+			<description>Calculates a 32-bit FNV-1a hash over decoded stereo PCM frames beginning at playback-local [param first_frame]. Samples are quantized to signed 16-bit values before hashing. Returns [code]-1[/code] when any part of the requested range is not retained.</description>
 		</method>
 		<method name="get_skips">
 			<return type="int" />

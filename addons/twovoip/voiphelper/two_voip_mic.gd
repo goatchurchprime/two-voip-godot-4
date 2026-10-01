@@ -19,6 +19,7 @@ var audiosampleframetexture : ImageTexture
 var audiosampleframematerial = null
 
 signal transmit_audio_packet(opuspacket : PackedByteArray)
+signal transmit_naked_opus_packet(opuspacket : PackedByteArray)
 
 const rootmeansquaremaxmeasurement = false
 var encode_base64 = false
@@ -276,6 +277,7 @@ func processopuschunk(chunks_back):
 		assert (len(chunkprefix) == 0)
 	var opuspacket : PackedByteArray = opusencoder.encode_chunk(chunkprefix, chunks_back)
 	transmit_audio_packet.emit(TwoVoipPacket.encode_audio_packet(opuspacket, encode_base64))
+	transmit_naked_opus_packet.emit(opuspacket)
 	opusframecount += 1
 
 var audio_chunk = null

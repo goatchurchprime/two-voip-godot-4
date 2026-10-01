@@ -55,7 +55,7 @@ void AudioStreamPlaybackOpus::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_overflow_frames"), &AudioStreamPlaybackOpus::get_overflow_frames);
     ClassDB::bind_method(D_METHOD("get_decode_errors"), &AudioStreamPlaybackOpus::get_decode_errors);
     ClassDB::bind_method(D_METHOD("get_last_decode_error"), &AudioStreamPlaybackOpus::get_last_decode_error);
-    ClassDB::bind_method(D_METHOD("get_tail_hash", "frame_count"), &AudioStreamPlaybackOpus::get_tail_hash);
+    ClassDB::bind_method(D_METHOD("get_frame_hash", "first_frame", "frame_count"), &AudioStreamPlaybackOpus::get_frame_hash);
     ClassDB::bind_method(D_METHOD("set_sinewave_frames", "sinewaveframes", "volume"), &AudioStreamPlaybackOpus::set_sinewave_frames);
 }
 
@@ -276,14 +276,16 @@ int AudioStreamPlaybackOpus::queue_decoded_frames(const float *decoded_samples, 
     return frame_count;
 }
 
-int64_t AudioStreamPlaybackOpus::get_tail_hash(int frame_count) const {
+int64_t AudioStreamPlaybackOpus::get_frame_hash(int64_t first_frame, int frame_count) const {
     const int64_t write_frame = buffer_write_frame.load(std::memory_order_acquire);
-    if (frame_count <= 0 || frame_count > audiosamplebuffer.size() || frame_count > write_frame) {
+    if (first_frame < std::max<int64_t>(0, write_frame - audiosamplebuffer.size()) ||
+            frame_count <= 0 || frame_count > audiosamplebuffer.size() ||
+            first_frame > write_frame - frame_count) {
         return -1;
     }
 
     uint32_t hash = 2166136261u;
-    for (int64_t frame = write_frame - frame_count; frame < write_frame; frame++) {
+    for (int64_t frame = first_frame; frame < first_frame + frame_count; frame++) {
         const AudioFrame &sample_frame = audiosamplebuffer[frame % audiosamplebuffer.size()];
         for (float sample : { sample_frame.left, sample_frame.right }) {
             const int16_t quantized = static_cast<int16_t>(std::lround(std::clamp(sample, -1.0f, 1.0f) * 32767.0f));
