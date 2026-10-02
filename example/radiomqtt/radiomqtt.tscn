@@ -82,7 +82,7 @@ layout_mode = 2
 tooltip_text = "Hold down [u]PTT[/u] (Push-To-Talk) to record, or toggle [u]Vox[/u] to activate PTT automatically by volume. Hold down [u]Sil[/u] to set the silnce threshold for Vox."
 theme_type_variation = &"HeaderSmall"
 theme_override_styles/normal = SubResource("StyleBoxFlat_kcsl6")
-text = "Voice Opus Compressed Packets over MQTT Demo v4.0"
+text = "Voice Opus Compressed Packets over MQTT Demo v7"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -679,6 +679,10 @@ layout_mode = 2
 [node name="HashCheckButton" type="CheckButton" parent="HBoxNetManage" unique_id=673598173]
 layout_mode = 2
 text = "Audio unpack hash check "
+
+[node name="HashErrors" type="SpinBox" parent="HBoxNetManage" unique_id=333100909]
+layout_mode = 2
+max_value = 1000.0
 
 [node name="ScrollMembers" type="ScrollContainer" parent="." unique_id=1053756819]
 layout_mode = 2

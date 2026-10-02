@@ -42,7 +42,7 @@ func _on_mqtt_broker_item_selected(index):
 	else:
 		$GridContainer/broker.text = "mosquitto.doesliverpool.xyz"
 	if OS.has_feature("web"):
-		$GridContainer/broker.text = "wss://mosquitto.doesliverpool.xyz:8081"
+		$GridContainer/broker.text = "test.mosquitto.org"
 
 func transportaudiopacket(packet: PackedByteArray, dithertype: int, meta_recipient := ""):
 	var topic = audioouttopicmeta if TwoVoipPacket.is_control_packet(packet) else audioouttopic

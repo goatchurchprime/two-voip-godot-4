@@ -300,6 +300,7 @@ func receive_audio_hash_response(receiver_name: String, response: Array):
 	var received_hash = int(response[TwoVoipPacket.HashResponseField.HASH])
 	if received_hash != recent_hash_code:
 		print("Audio hash response from %s bad" % [receiver_name])
+		get_node("../HBoxNetManage/HashErrors").value += 1
 	recent_hash_code = 0
 
 var audio_chunk = null
