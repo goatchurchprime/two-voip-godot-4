@@ -21,6 +21,8 @@ var opusstreamcount = 0
 var inopusstream = false
 var audio_packets_base64 = false
 var opusframecount = 0
+var outputsumsquares : float = 0.0
+var outputrms : float = 0.0
 var opusframesize = 960
 var tailframenumber = 0
 var playbackstartframenumber = 0
@@ -79,6 +81,7 @@ func push_opus_packet(packet: PackedByteArray, begin: int, decode_fec: bool):
 		assert (tailframenumber == opusframecount*opusframesize)
 		var chunk_index = int(tailframenumber / opusframesize)
 		decoded_frame_max_values[chunk_index % decoded_frame_max_values.size()] = audio_stream_playback_opus.get_tail_max(opusframesize)
+		outputsumsquares += audio_stream_playback_opus.get_tail_sum_squares(opusframesize)
 		tailframenumber += decoded_frames
 	return decoded_frames
 
@@ -112,6 +115,8 @@ func receive_audio_control_packet(control_packet: Array):
 		source_first_frame_time_usec = int(control_packet[TwoVoipPacket.HeaderField.FIRST_FRAME_TIME_USEC])
 		audio_packets_base64 = TwoVoipPacket.header_uses_base64(control_packet)
 		opusframecount = 0
+		outputsumsquares = 0.0
+		outputrms = 0.0
 		tailframenumber = 0
 		playbackstartframenumber = 0
 		if packet_type == TwoVoipPacket.TYPE_MID:
@@ -132,9 +137,17 @@ func receive_audio_control_packet(control_packet: Array):
 			return
 		if audio_stream_playback_opus:
 			audio_stream_playback_opus.finish_episode()
+		var outputframecount = tailframenumber - playbackstartframenumber
+		outputrms = sqrt(outputsumsquares/outputframecount) if outputframecount > 0 else 0.0
+		var sentrms = float(control_packet[TwoVoipPacket.FooterField.RMS])
+		var rmsdifference = outputrms - sentrms
+		var rmsdifferencepercent = 100.0*rmsdifference/sentrms if sentrms > 0.0 else 0.0
+		print("sent RMS: ", sentrms, " decoded RMS: ", outputrms,
+				" difference: ", rmsdifference, " (", rmsdifferencepercent, "%)")
 		pausereached = false
 		print("runninglagtimeminimum: ", runninglagtimeminimum, " (target: ", audio_buffer_lag_time_target, ")")
 		inopusstream = false
+		return outputrms
 	elif packet_type == TwoVoipPacket.TYPE_HASH_REQUEST:
 		if not TwoVoipPacket.hash_request_is_valid(control_packet):
 			push_warning("Malformed decoded-audio hash request")
@@ -157,8 +170,7 @@ func receive_audio_packet(packet):
 	if audiostreamopus == null:
 		return
 	if TwoVoipPacket.is_control_packet(packet):
-		receive_audio_control_packet(TwoVoipPacket.decode_control_packet(packet))
-		return
+		return receive_audio_control_packet(TwoVoipPacket.decode_control_packet(packet))
 	if not inopusstream:
 		print("Audio packet received before a stream header")
 		return

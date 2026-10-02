@@ -135,6 +135,7 @@ public:
     int queue_length_frames() const;
     int push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
     float get_tail_max(int frame_count) const;
+    float get_tail_sum_squares(int frame_count) const;
     int64_t get_frame_number_actually_in_speaker() const;
     int64_t get_skips(bool overflow) const;
     int64_t get_underflow_frames() const;

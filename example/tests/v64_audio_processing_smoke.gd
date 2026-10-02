@@ -59,6 +59,7 @@ func _initialize() -> void:
 	assert(stereo_rms.initialize(48000, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
 	assert(stereo_rms.process_chunk(make_constant(960, 0.25)) == 960)
 	assert(abs(stereo_rms.get_rms() - 0.25) < 0.000001)
+	assert(abs(stereo_rms.get_chunk_sum_squares(0) - 60.0) < 0.000001)
 
 	var short_frames := make_stereo(881)
 	assert(encoder.process_chunk(short_frames) == -1)

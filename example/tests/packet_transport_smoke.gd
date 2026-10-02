@@ -49,10 +49,12 @@ func run_speaker_episode(speaker: Node, stream_count: int, encode_base64: bool) 
 	assert(int(early_hash_responses[0][TwoVoipPacket.HashResponseField.HASH]) == -1)
 	var source_reference := AudioStreamPlaybackOpus.new()
 	assert(source_reference.initialize(48000, 1, 960) == OK)
+	var sent_sum_squares = 0.0
 	for packet in make_opus_packets(stream_count, encode_base64):
 		var original_packet = TwoVoipPacket.decode_audio_packet(packet, encode_base64)
 		assert(source_reference.push_opus_packet(
 				original_packet, TwoVoipPacket.TIMESTAMPED_CHUNK_PREFIX_SIZE, 0) == 960)
+		sent_sum_squares += source_reference.get_tail_sum_squares(960)
 		speaker.receive_audio_packet(packet)
 	assert(early_hash_responses.size() == 1)
 	assert(speaker.opusframecount == 2)
@@ -72,8 +74,11 @@ func run_speaker_episode(speaker: Node, stream_count: int, encode_base64: bool) 
 	assert(TwoVoipPacket.hash_response_is_valid(hash_responses[0]))
 	assert(int(hash_responses[0][TwoVoipPacket.HashResponseField.HASH]) ==
 			source_reference.get_frame_hash(0, 1920))
-	var footer := TwoVoipPacket.make_footer(stream_count, 2, 0.04, 12.54)
-	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(footer))
+	var sent_rms = sqrt(sent_sum_squares/1920)
+	var footer := TwoVoipPacket.make_footer(stream_count, 2, 0.04, 12.54, sent_rms)
+	var output_rms = speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(footer))
+	assert(output_rms == sent_rms)
+	assert(output_rms == speaker.outputrms)
 	assert(not speaker.inopusstream)
 
 
@@ -121,12 +126,13 @@ func run_tests() -> void:
 	TwoVoipPacket.set_chunk_first_frame_time_usec(timestamped_prefix, 1700000000123456)
 	assert(TwoVoipPacket.get_chunk_first_frame_time_usec(timestamped_prefix) == 1700000000123456)
 
-	var footer := TwoVoipPacket.make_footer(7, 43, 0.86, 13.36)
+	var footer := TwoVoipPacket.make_footer(7, 43, 0.86, 13.36, 0.125)
 	assert(TwoVoipPacket.footer_is_valid(footer))
 	var decoded_footer := TwoVoipPacket.decode_control_packet(
 			TwoVoipPacket.encode_control_packet(footer))
 	assert(TwoVoipPacket.footer_is_valid(decoded_footer))
 	assert(int(decoded_footer[TwoVoipPacket.FooterField.OPUS_FRAME_COUNT]) == 43)
+	assert(float(decoded_footer[TwoVoipPacket.FooterField.RMS]) == 0.125)
 
 	var player := AudioStreamPlayer.new()
 	get_root().add_child(player)

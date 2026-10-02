@@ -106,7 +106,6 @@ func received_mqtt(topic, msg):
 					member.receivemqttaudio(msg)
 				else:
 					var atopic = stopic[roomtopicwords+1].split("/", true, 3)
-					print(myname, ": Recieved on ttttttopic  ", atopic)
 					if len(atopic) >= 2 and atopic[1] == "meta":
 						if (len(atopic) == 2) or (atopic[2] == myname):
 							member.receivemqttaudiometa(msg)

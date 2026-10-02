@@ -44,6 +44,7 @@ enum FooterField {
 	OPUS_FRAME_COUNT,
 	TALKING_TIME_DURATION,
 	TALKING_TIME_END,
+	RMS,
 	SIZE,
 }
 
@@ -90,7 +91,7 @@ static func make_header(packet_type: String, opus_frame_size: int,
 
 
 static func make_footer(opus_stream_count: int, opus_frame_count: int,
-		talking_time_duration: float, talking_time_end: float) -> Array:
+		talking_time_duration: float, talking_time_end: float, rms: float = 0.0) -> Array:
 	var packet: Array = []
 	packet.resize(FooterField.SIZE)
 	packet[FooterField.TYPE] = TYPE_END
@@ -98,6 +99,7 @@ static func make_footer(opus_stream_count: int, opus_frame_count: int,
 	packet[FooterField.OPUS_FRAME_COUNT] = opus_frame_count
 	packet[FooterField.TALKING_TIME_DURATION] = talking_time_duration
 	packet[FooterField.TALKING_TIME_END] = talking_time_end
+	packet[FooterField.RMS] = rms
 	return packet
 
 

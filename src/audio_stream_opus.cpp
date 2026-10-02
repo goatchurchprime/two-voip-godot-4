@@ -49,6 +49,7 @@ void AudioStreamPlaybackOpus::_bind_methods() {
     ClassDB::bind_method(D_METHOD("push_opus_packet", "opusbytepacket", "begin", "decode_fec"), &AudioStreamPlaybackOpus::push_opus_packet);
     ClassDB::bind_method(D_METHOD("finish_episode"), &AudioStreamPlaybackOpus::finish_episode);
     ClassDB::bind_method(D_METHOD("get_tail_max", "frame_count"), &AudioStreamPlaybackOpus::get_tail_max);
+    ClassDB::bind_method(D_METHOD("get_tail_sum_squares", "frame_count"), &AudioStreamPlaybackOpus::get_tail_sum_squares);
     ClassDB::bind_method(D_METHOD("get_frame_number_actually_in_speaker"), &AudioStreamPlaybackOpus::get_frame_number_actually_in_speaker);
     ClassDB::bind_method(D_METHOD("get_skips", "overflow"), &AudioStreamPlaybackOpus::get_skips);
     ClassDB::bind_method(D_METHOD("get_underflow_frames"), &AudioStreamPlaybackOpus::get_underflow_frames);
@@ -311,6 +312,20 @@ float AudioStreamPlaybackOpus::get_tail_max(int frame_count) const {
         chunk_max = std::max(chunk_max, std::max(std::abs(sample_frame.left), std::abs(sample_frame.right)));
     }
     return chunk_max;
+}
+
+float AudioStreamPlaybackOpus::get_tail_sum_squares(int frame_count) const {
+    const int64_t write_frame = buffer_write_frame.load(std::memory_order_acquire);
+    if (frame_count <= 0 || frame_count > audiosamplebuffer.size() || frame_count > write_frame) {
+        return 0.0f;
+    }
+
+    float sum_squares = 0.0f;
+    for (int64_t frame = write_frame - frame_count; frame < write_frame; frame++) {
+        const AudioFrame &sample_frame = audiosamplebuffer[frame % audiosamplebuffer.size()];
+        sum_squares += 0.5f * (sample_frame.left * sample_frame.left + sample_frame.right * sample_frame.right);
+    }
+    return sum_squares;
 }
 
 int64_t AudioStreamPlaybackOpus::get_frame_number_actually_in_speaker() const {

@@ -49,6 +49,7 @@ var denoiser_mode = TwovoipOpusEncoder.DENOISER_DISABLED
 @export var check_unpack_hash_codes : bool = false
 var chunks_per_hash = 50
 var recent_hash_code = 0
+var sentsumsquares = 0.0
 var sent_audio_reference: AudioStreamPlaybackOpus = null
 
 func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_denoiser_mode, p_agc_mode):
@@ -181,6 +182,8 @@ func processtalkstreamends(talking: bool):
 				talking_first_frame_time_usec, encode_base64)
 		transmit_audio_packet.emit(TwoVoipPacket.encode_control_packet(audiostreampacketheader))
 		
+		sentsumsquares = 0.0
+		sent_audio_reference = null
 		if check_unpack_hash_codes:
 			sent_audio_reference = AudioStreamPlaybackOpus.new()
 			sent_audio_reference.initialize(opussamplerate, opuschannels, opus_chunk_size)
@@ -200,8 +203,9 @@ func processtalkstreamends(talking: bool):
 		currentlytalking = false
 		var talkingtimeend = Time.get_ticks_msec()*0.001
 		var talkingtimeduration = talkingtimeend - talkingtimestart
+		var sentrms = sqrt(sentsumsquares/(opusframecount*opus_chunk_size)) if opusframecount > 0 else 0.0
 		var audiopacketstreamfooter := TwoVoipPacket.make_footer(
-				opusstreamcount, opusframecount, talkingtimeduration, talkingtimeend)
+				opusstreamcount, opusframecount, talkingtimeduration, talkingtimeend, sentrms)
 		print("My voice chunktime=", talkingtimeduration/opusframecount, " over ", talkingtimeduration, " seconds")
 		transmit_audio_packet.emit(TwoVoipPacket.encode_control_packet(audiopacketstreamfooter))
 		opusstreamcount += 1
@@ -287,11 +291,14 @@ func processopuschunk(chunks_back):
 	transmit_audio_packet.emit(TwoVoipPacket.encode_audio_packet(opuspacket, encode_base64))
 	opusframecount += 1
 	if sent_audio_reference:
-		sent_audio_reference.push_opus_packet(opuspacket, len(chunkprefix), 0)
+		if sent_audio_reference.push_opus_packet(opuspacket, len(chunkprefix), 0) > 0:
+			sentsumsquares += sent_audio_reference.get_tail_sum_squares(opus_chunk_size)
 		if (opusframecount % chunks_per_hash) == 0 and check_unpack_hash_codes:
 			recent_hash_code = sent_audio_reference.get_frame_hash((opusframecount - chunks_per_hash)*opus_chunk_size, chunks_per_hash*opus_chunk_size)
 			var hashrequest = TwoVoipPacket.make_hash_request(opusstreamcount, (opusframecount - chunks_per_hash)*opus_chunk_size, chunks_per_hash*opus_chunk_size)
 			transmit_audio_packet.emit(TwoVoipPacket.encode_control_packet(hashrequest))
+	else:
+		sentsumsquares += opusencoder.get_chunk_sum_squares(chunks_back)
 
 func receive_audio_hash_response(receiver_name: String, response: Array):
 	#var stream_count = int(response[TwoVoipPacket.HashResponseField.OPUS_STREAM_COUNT])

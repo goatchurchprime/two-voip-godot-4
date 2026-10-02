@@ -76,6 +76,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("denoise_chunk", "chunk_offset_back"), &TwovoipOpusEncoder::denoise_chunk);
     ClassDB::bind_method(D_METHOD("get_peak"), &TwovoipOpusEncoder::get_peak);
     ClassDB::bind_method(D_METHOD("get_rms"), &TwovoipOpusEncoder::get_rms);
+    ClassDB::bind_method(D_METHOD("get_chunk_sum_squares", "chunk_offset_back"), &TwovoipOpusEncoder::get_chunk_sum_squares);
     ClassDB::bind_method(D_METHOD("get_speech_probability"), &TwovoipOpusEncoder::get_speech_probability);
     ClassDB::bind_method(D_METHOD("get_current_chunk"), &TwovoipOpusEncoder::get_current_chunk);
     ClassDB::bind_method(D_METHOD("get_current_chunk_16khz", "reset_sampler"), &TwovoipOpusEncoder::get_current_chunk_16khz);
@@ -510,6 +511,24 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
     last_rms = std::sqrt(sum_squares / (output_chunk_size*channels));
 
     return consumed_input_frames;
+}
+
+float TwovoipOpusEncoder::get_chunk_sum_squares(int p_chunk_offset_back) const {
+    if (!initialized || audio_ringbuffer_index == 0) {
+        return 0.0F;
+    }
+    const int available_chunks_back = std::min(audio_ringbuffer_index - 1, audio_ringbuffer_size_chunks - 1);
+    if (p_chunk_offset_back < 0 || p_chunk_offset_back > available_chunks_back) {
+        return 0.0F;
+    }
+
+    const float *prepared_audio_chunk = prepared_audio_ringbuffer.ptr() +
+            (audio_ringbuffer_index - p_chunk_offset_back) % audio_ringbuffer_size_chunks * output_chunk_size * channels;
+    float sum_squares = 0.0F;
+    for (int i = 0; i < output_chunk_size * channels; i++) {
+        sum_squares += prepared_audio_chunk[i] * prepared_audio_chunk[i];
+    }
+    return sum_squares / channels;
 }
 
 Error TwovoipOpusEncoder::denoise_chunk(int p_chunk_offset_back) {
