@@ -38,7 +38,7 @@ func run_tests() -> void:
 	assert(encoder.set_bitrate(12000) == OK)
 	assert(encoder.set_complexity(5) == OK)
 	assert(encoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE) == OK)
-	assert(encoder.process_chunk(make_mono(960)) == 960)
+	assert(encoder.push_input_chunk(make_mono(960)) == 960)
 	var packet := encoder.encode_chunk()
 	assert(not packet.is_empty())
 
@@ -78,7 +78,7 @@ func run_tests() -> void:
 
 	var short_encoder := TwovoipOpusEncoder.new()
 	assert(short_encoder.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 480) == OK)
-	assert(short_encoder.process_chunk(make_mono(480)) == 480)
+	assert(short_encoder.push_input_chunk(make_mono(480)) == 480)
 	assert(playback.push_opus_packet(short_encoder.encode_chunk(), 0, 0) < 0)
 	assert(playback.get_decode_errors() == 1)
 	assert(playback.push_opus_packet(PackedByteArray(), 0, 0) < 0)

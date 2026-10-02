@@ -78,10 +78,9 @@ func received_mqtt(topic, msg):
 						$MQTT.subscribe("%s/%s/audio/meta" % [roomtopic, membername])
 						#$MQTT.subscribe("%s/%s/audio/meta/%s" % [roomtopic, membername, myname])
 						$MQTT.subscribe("%s/%s/audio" % [roomtopic, membername])
-					var midheader = get_node("../TwoVoipMic").request_audio_packet_mid_header()
-					if midheader:
-						print(myname, ": MIDHEADER going out to ", membername, " ", midheader.get_string_from_ascii())
-						transportaudiopacket(midheader, 0, membername)
+					for midpacket in get_node("../TwoVoipMic").request_audio_packet_midstream():
+						print(myname, ": MIDSTREAM going out to ", membername, " ", midpacket.get_string_from_ascii())
+						transportaudiopacket(midpacket, 0, membername)
 					
 				elif msg == Mstatusdisconnected or msg == MstatusdisconnectedLW:
 					var member = Members.get_node_or_null(membername)
@@ -127,10 +126,9 @@ func on_broker_connect():
 	$MQTT.publish(statustopic, Mstatusconnected, true)
 	audioouttopic = "%s/%s/audio" % [roomtopic, myname]
 	audioouttopicmeta = "%s/%s/audio/meta" % [roomtopic, myname]
-	var midheader = get_node("../TwoVoipMic").request_audio_packet_mid_header()
-	if midheader:
-		print("onconnect MIDHEADER going out ", audioouttopicmeta, midheader.get_string_from_ascii())
-		transportaudiopacket(midheader, 0)
+	for midpacket in get_node("../TwoVoipMic").request_audio_packet_midstream():
+		print("onconnect MIDSTREAM going out ", audioouttopicmeta, midpacket.get_string_from_ascii())
+		transportaudiopacket(midpacket, 0)
 	$Connect/ColorRectConnecting.visible = false
 
 func on_broker_disconnect():

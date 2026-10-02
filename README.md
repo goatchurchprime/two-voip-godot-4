@@ -82,39 +82,42 @@ You are recommended to use the `voiphelper` module rather than implement your Vo
 core `opus` and `rnnoise` components because it has the necessary features of Vox gating (Voice activation), 
 jitter buffers, packet re-ordering (in case of unreliable transmition) and dynamic lag management.
 
-The speech is sent as naked binary or base64 Opus packets with a ten-byte
-diagnostic prefix. Bytes 0-1 contain the packet number and stream parity. Bytes
-2-9 contain the unsigned 64-bit Unix timestamp, in microseconds, of the first
-microphone input frame represented by that Opus packet. ASCII JSON arrays carry
-control information in the same packet stream. Start and mid-stream headers use:
+The speech is sent as naked binary or base64 Opus packets with a two-byte
+prefix containing the packet number and stream parity. ASCII JSON arrays carry
+control information in the same packet stream. A stream starts with:
 
 ```
 ["start", version, opus_frame_size, opus_sample_rate, opus_channels,
  chunk_prefix_length, opus_stream_count, opus_frame_count,
- first_frame_time_usec, "binary" or "base64"]
+ first_frame_time_usec, opus_bitrate, "binary" or "base64"]
 ```
 
-The mid-stream form replaces `"start"` with `"mid"`. The footer is:
+A mid-stream update contains the absolute state applying to the next frame:
+
+```
+["mid", opus_stream_count, next_frame_count, frame0_time_usec, opus_bitrate]
+```
+
+The footer is:
 
 ```
 ["end", opus_stream_count, opus_frame_count,
  talking_time_duration, talking_time_end]
 ```
 
-`TwoVoipPacket.HeaderField` and `TwoVoipPacket.FooterField` name the positional
-entries so application code does not depend on unexplained numeric indices.
+`TwoVoipPacket.HeaderField`, `TwoVoipPacket.MidField` and
+`TwoVoipPacket.FooterField` name the positional entries so application code
+does not depend on unexplained numeric indices.
 Control packets always begin with `["` and end with `]`. A rare raw audio packet
 whose first two prefix bytes are also `["` gets a trailing transport escape byte; the
 receiver removes that byte before calling libopus. Base64 needs no escape
 because its alphabet contains no square brackets or quotes.
 
-For this diagnostic format `lenchunkprefix=10`. The timestamp is calculated
-immediately before retrieving a microphone chunk by subtracting
-`AudioServer.get_input_frames_available() / AudioServer.get_input_mix_rate()`
-from the current Unix time. Also, `opusstreamcount` increments with each stream
-to give it a unique id, and `opusframecount=0` in the header. If a player joins the network while
-someone is talking, `request_audio_packet_mid_header()` provides an ASCII
-control packet with the current frame count and audio encoding.
+`opusstreamcount` increments with each stream and `opusframecount=0` in the
+start header. If a player joins while someone is talking,
+`request_audio_packet_midstream()` returns a normal start header followed by a
+mid-stream update containing the current frame count, calculated frame-zero
+time and bitrate.
 
 ### simpleexample
 
@@ -190,7 +193,7 @@ assert(encoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE) == OK)
 
 var required := encoder.get_required_input_chunk_size()
 var frames := AudioServer.get_input_frames(required)
-var consumed := encoder.process_chunk(frames)
+var consumed := encoder.push_input_chunk(frames)
 if consumed >= 0:
     var peak := encoder.get_peak()
     var rms := encoder.get_rms()
@@ -207,7 +210,7 @@ or non-network playback own that buffering.
 `get_current_chunk_16khz(reset_sampler)` is an experimental, optional adapter
 for external speech and viseme analysers. It lazily downmixes and resamples the
 current conditioned chunk only when called; no 16 kHz work occurs in
-`process_chunk()`. A 20 ms chunk contains 320 samples. The caller must invoke it
+`push_input_chunk()`. A 20 ms chunk contains 320 samples. The caller must invoke it
 at most once for each processed chunk because its private Speex resampler keeps
 streaming history. Pass `true` after deliberately skipping one or more chunks
 (for example, while the microphone is silent) so stale resampler history is
@@ -216,7 +219,7 @@ the Vizemes integration rather than remain part of TwoVoIP.
 
 `get_required_input_chunk_size()` is constant for the initialized object's lifetime.
 It is the ceiling of the input/output sample ratio, and is
-therefore conservative for fractional combinations. `process_chunk()` rejects
+therefore conservative for fractional combinations. `push_input_chunk()` rejects
 a shorter array without advancing processing state and returns the number of
 input frames actually consumed. The Speex filter state and output capacity can
 occasionally leave additional frames unconsumed, particularly on the first
@@ -259,7 +262,7 @@ required chunk, in chronological order, before calling `encode_chunk()` with
 the same offset. This replays older chunks to warm RNNoise and then continues
 with offset zero while talking. The selected ring chunk is denoised in place
 and must not be denoised twice. Direct `TwovoipOpusEncoder` users likewise call
-`denoise_chunk()` explicitly after `process_chunk()` when denoising is enabled.
+`denoise_chunk()` explicitly after `push_input_chunk()` when denoising is enabled.
 
 The helper currently reserves 200 ms of history for RNNoise warm-up. It rounds
 up by the configured Opus frame duration: 20, 10, 5 or 4 chunks for 10, 20, 40
@@ -303,17 +306,16 @@ voice preprocessing is disabled.
 
 `TwoVoipMic` outputs all data through `transmit_audio_packet(packet)`. Forward
 each `PackedByteArray` unchanged to `TwoVoipSpeaker.receive_audio_packet(packet)`.
-The helper reads the encoding from each start or mid-stream header and performs
+The helper reads the encoding from each start header and performs
 base64 conversion internally; the network adapter does not inspect audio data.
 
 The MQTT example publishes Opus packets on `/audio` and control arrays on
-`/audio/meta`. A mid-stream header intended for one newly joined member uses
+`/audio/meta`. Start and mid-stream packets intended for one newly joined member use
 `/audio/meta/<member>`. All three routes deliver the unchanged packet to the
 same `TwoVoipSpeaker.receive_audio_packet()` entry point.
 
-When a player joins mid-stream use `TwoVoipMic.request_audio_packet_mid_header()`
-to create an intermediate control packet so it knows how to decode subsequent
-Opus packets.
+When a player joins mid-stream use `TwoVoipMic.request_audio_packet_midstream()`
+and deliver both returned control packets in order.
 
 ## Building the addon
 

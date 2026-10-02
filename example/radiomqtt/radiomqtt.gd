@@ -7,7 +7,7 @@ extends Control
 var audioeffectpitchshift : AudioEffectPitchShift = null
 var audioeffectpitchshiftidx = 0
 
-var resampledchunkprefix := TwoVoipPacket.make_timestamped_chunk_prefix()
+var resampledchunkprefix := TwoVoipPacket.make_sequence_chunk_prefix()
 var audio_packets_base64 : bool = false
 
 var recordedsamples = [ ]
@@ -163,10 +163,11 @@ func reprocessoriginalchunks():
 		recordedheader = TwoVoipPacket.make_header(
 				TwoVoipPacket.TYPE_START, $TwoVoipMic.opus_chunk_size,
 				opussamplerate, opuschannels, resampledchunkprefix.size(), 0, 0,
-				0, audio_packets_base64)
+				0, opusencoder_forreprocessing.get_bitrate(), audio_packets_base64)
 	recordedheader[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE] = $TwoVoipMic.opus_chunk_size
 	recordedheader[TwoVoipPacket.HeaderField.OPUS_SAMPLE_RATE] = opussamplerate
 	recordedheader[TwoVoipPacket.HeaderField.OPUS_CHANNELS] = opuschannels
+	recordedheader[TwoVoipPacket.HeaderField.OPUS_BITRATE] = opusencoder_forreprocessing.get_bitrate()
 	recordedheader[TwoVoipPacket.HeaderField.AUDIO_ENCODING] = (
 			TwoVoipPacket.ENCODING_BASE64 if audio_packets_base64
 			else TwoVoipPacket.ENCODING_BINARY)
@@ -193,7 +194,7 @@ func reprocessoriginalchunks():
 	#opusencoder_forreprocessing.resetencoder(true)
 	var resampledopusframecount = 0
 	for s in recordedsamples:
-		if opusencoder_forreprocessing.process_chunk(s) < 0:
+		if opusencoder_forreprocessing.push_input_chunk(s) < 0:
 			break
 		if denoiser != TwovoipOpusEncoder.DENOISER_DISABLED:
 			opusencoder_forreprocessing.denoise_chunk(0)
@@ -201,10 +202,6 @@ func reprocessoriginalchunks():
 		recordedchunkmax = max(recordedchunkmax, chunkmax)
 		resampledchunkprefix.set(0, (resampledopusframecount%256))  # 32768 frames is 10 minutes
 		resampledchunkprefix.set(1, (int(resampledopusframecount/256)&127) + (int(recordedheader[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT])%2)*128)
-		TwoVoipPacket.set_chunk_first_frame_time_usec(
-				resampledchunkprefix,
-				int(recordedheader[TwoVoipPacket.HeaderField.FIRST_FRAME_TIME_USEC])
-						+ int(resampledopusframecount * frametimems * 1000.0))
 		var opuspacket : PackedByteArray = opusencoder_forreprocessing.encode_chunk(resampledchunkprefix, 0)
 		opuspacket = TwoVoipPacket.encode_audio_packet(opuspacket, audio_packets_base64)
 		recordedopuspackets.append(opuspacket)

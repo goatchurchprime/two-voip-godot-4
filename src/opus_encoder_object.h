@@ -120,15 +120,15 @@ private:
 
     SpeexResamplerState* resampler_16khz = NULL;
 
-
     float last_peak = 0.0F;
     float last_rms = 0.0F;
     float last_speech_probability = 0.0F;
+    const float dc_filter = 0.0001F;
+    float dc_value = 0.0F;
     float gain = 1.0F;
     float agc_gain = 1.0F;
     Denoiser denoiser_mode = DENOISER_DISABLED;
     AgcMode agc_mode = AGC_DISABLED;
-    bool initialized = false;
 
     void destroy_audio_pipeline();
     void destroy_voice_processor();
@@ -143,7 +143,7 @@ protected:
 public:
     Error initialize(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, Denoiser p_denoiser_mode, AgcMode p_agc_mode, int p_output_chunk_size);
     int get_required_input_chunk_size() const { return required_input_chunk_size; }
-    int process_chunk(const PackedVector2Array &audio_frames);
+    int push_input_chunk(const PackedVector2Array &audio_frames);
     Error denoise_chunk(int p_chunk_offset_back);
     float get_peak() const { return last_peak; }
     float get_rms() const { return last_rms; }

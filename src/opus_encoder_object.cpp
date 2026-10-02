@@ -72,7 +72,7 @@ int get_opus_signal_type(TwovoipOpusEncoder::SignalType p_signal_type) {
 void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("initialize", "input_mix_rate", "opus_sample_rate", "channels", "denoiser_mode", "agc_mode", "output_chunk_size"), &TwovoipOpusEncoder::initialize);
     ClassDB::bind_method(D_METHOD("get_required_input_chunk_size"), &TwovoipOpusEncoder::get_required_input_chunk_size);
-    ClassDB::bind_method(D_METHOD("process_chunk", "audio_frames"), &TwovoipOpusEncoder::process_chunk);
+    ClassDB::bind_method(D_METHOD("push_input_chunk", "audio_frames"), &TwovoipOpusEncoder::push_input_chunk);
     ClassDB::bind_method(D_METHOD("denoise_chunk", "chunk_offset_back"), &TwovoipOpusEncoder::denoise_chunk);
     ClassDB::bind_method(D_METHOD("get_peak"), &TwovoipOpusEncoder::get_peak);
     ClassDB::bind_method(D_METHOD("get_rms"), &TwovoipOpusEncoder::get_rms);
@@ -140,7 +140,6 @@ void TwovoipOpusEncoder::destroy_audio_pipeline() {
     prepared_audio_ringbuffer.resize(0);
     output_chunk_size = 0;
     required_input_chunk_size = 0;
-    initialized = false;
 }
 
 void TwovoipOpusEncoder::destroy_voice_processor() {
@@ -235,7 +234,7 @@ Error TwovoipOpusEncoder::create_voice_processor() {
 }
 
 Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, Denoiser p_denoiser_mode, AgcMode p_agc_mode, int p_output_chunk_size) {
-    if (initialized) {
+    if (opus_encoder != NULL) {
         UtilityFunctions::printerr("TwovoipOpusEncoder is already initialized");
         return ERR_ALREADY_IN_USE;
     }
@@ -275,7 +274,6 @@ Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rat
         destroy_audio_pipeline();
         return error;
     }
-    initialized = true;
     return OK;
 }
 
@@ -312,7 +310,7 @@ void TwovoipOpusEncoder::update_agc_gain() {
 }
 
 Error TwovoipOpusEncoder::target_agc_gain(float p_target_gain) {
-    if (!initialized)
+    if (opus_encoder == NULL)
         return ERR_UNCONFIGURED;
     if (speex_agc == NULL)
         return ERR_UNAVAILABLE;
@@ -384,7 +382,7 @@ Error TwovoipOpusEncoder::create_opus_encoder() {
 }
 
 Error TwovoipOpusEncoder::set_bitrate(int p_bitrate) {
-    if (!initialized || opus_encoder == NULL) {
+    if (opus_encoder == NULL) {
         return ERR_UNCONFIGURED;
     }
     if (p_bitrate < 500 || p_bitrate > 512000) {
@@ -400,7 +398,7 @@ Error TwovoipOpusEncoder::set_bitrate(int p_bitrate) {
 }
 
 Error TwovoipOpusEncoder::set_complexity(int p_complexity) {
-    if (!initialized || opus_encoder == NULL) {
+    if (opus_encoder == NULL) {
         return ERR_UNCONFIGURED;
     }
     if (p_complexity < 0 || p_complexity > 10) {
@@ -416,7 +414,7 @@ Error TwovoipOpusEncoder::set_complexity(int p_complexity) {
 }
 
 Error TwovoipOpusEncoder::set_signal_type(SignalType p_signal_type) {
-    if (!initialized || opus_encoder == NULL) {
+    if (opus_encoder == NULL) {
         return ERR_UNCONFIGURED;
     }
     const int opus_signal_type = get_opus_signal_type(p_signal_type);
@@ -437,17 +435,17 @@ void TwovoipOpusEncoder::reset_opus_encoder() {
         opus_encoder_ctl(opus_encoder, OPUS_RESET_STATE);
 }
 
-int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
+int TwovoipOpusEncoder::push_input_chunk(const PackedVector2Array &audio_frames) {
     int consumed_input_frames = 0;
     last_peak = 0.0F;
     last_rms = 0.0F;
     last_speech_probability = 0.0F;
-    if (!initialized) {
+    if (opus_encoder == NULL) {
         UtilityFunctions::printerr("TwovoipOpusEncoder not initialized");
         return -1;
     }
     if (audio_frames.size() < required_input_chunk_size) {
-        UtilityFunctions::printerr("Process_chunk audio_frames is too short: expected at least ", required_input_chunk_size, ", got ", audio_frames.size());
+        UtilityFunctions::printerr("push_input_chunk audio_frames is too short: expected at least ", required_input_chunk_size, ", got ", audio_frames.size());
         return -1;
     }
 
@@ -485,6 +483,17 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
         return -2;
     }
 
+    for (int frame = 0; frame < consumed_input_frames; frame++) {
+        float input_value = 0.0F;
+        for (int channel = 0; channel < channels; channel++)
+            input_value += speexin[frame * channels + channel];
+        input_value /= channels;
+        dc_value = input_value * dc_filter + dc_value * (1.0F - dc_filter);
+    }
+    if (abs(dc_value) > 0.1) {
+        UtilityFunctions::print("Microphone DC value: ", dc_value);
+    }
+
     if (speex_agc != NULL) {
         for (int offset = 0; offset < output_chunk_size; offset += preprocess_frame_size) {
             for (int frame = 0; frame < preprocess_frame_size; frame++) {
@@ -514,7 +523,7 @@ int TwovoipOpusEncoder::process_chunk(const PackedVector2Array &audio_frames) {
 }
 
 float TwovoipOpusEncoder::get_chunk_sum_squares(int p_chunk_offset_back) const {
-    if (!initialized || audio_ringbuffer_index == 0) {
+    if (opus_encoder == NULL || audio_ringbuffer_index == 0) {
         return 0.0F;
     }
     const int available_chunks_back = std::min(audio_ringbuffer_index - 1, audio_ringbuffer_size_chunks - 1);
@@ -532,7 +541,7 @@ float TwovoipOpusEncoder::get_chunk_sum_squares(int p_chunk_offset_back) const {
 }
 
 Error TwovoipOpusEncoder::denoise_chunk(int p_chunk_offset_back) {
-    if (!initialized)
+    if (opus_encoder == NULL)
         return ERR_UNCONFIGURED;
     if (audio_ringbuffer_index == 0)
         return ERR_UNAVAILABLE;
@@ -596,7 +605,7 @@ PackedVector2Array TwovoipOpusEncoder::get_current_chunk() const {
 
 PackedFloat32Array TwovoipOpusEncoder::get_current_chunk_16khz(bool p_reset_sampler) {
     PackedFloat32Array output_16khz;
-    if (!initialized) {
+    if (opus_encoder == NULL) {
         UtilityFunctions::printerr("TwovoipOpusEncoder not initialized");
         return output_16khz;
     }

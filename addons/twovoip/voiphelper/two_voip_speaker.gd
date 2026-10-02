@@ -139,15 +139,11 @@ func receive_audio_control_packet(control_packet: Array):
 			audio_stream_playback_opus.finish_episode()
 		var outputframecount = tailframenumber - playbackstartframenumber
 		outputrms = sqrt(outputsumsquares/outputframecount) if outputframecount > 0 else 0.0
-		var sentrms = float(control_packet[TwoVoipPacket.FooterField.RMS])
-		var rmsdifference = outputrms - sentrms
-		var rmsdifferencepercent = 100.0*rmsdifference/sentrms if sentrms > 0.0 else 0.0
-		print("sent RMS: ", sentrms, " decoded RMS: ", outputrms,
-				" difference: ", rmsdifference, " (", rmsdifferencepercent, "%)")
+		control_packet[TwoVoipPacket.FooterField.RMS] = outputrms
 		pausereached = false
 		print("runninglagtimeminimum: ", runninglagtimeminimum, " (target: ", audio_buffer_lag_time_target, ")")
 		inopusstream = false
-		return outputrms
+		return control_packet
 	elif packet_type == TwoVoipPacket.TYPE_HASH_REQUEST:
 		if not TwoVoipPacket.hash_request_is_valid(control_packet):
 			push_warning("Malformed decoded-audio hash request")

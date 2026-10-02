@@ -41,7 +41,7 @@ func _process_record():
 		var frames = AudioServer.get_input_frames(opusencoder.get_required_input_chunk_size())
 		if not frames:
 			break
-		opusencoder.process_chunk(frames)
+		opusencoder.push_input_chunk(frames)
 		chunkcount += 1
 		chunkmax = max(chunkmax, opusencoder.get_peak())
 		var opusdata : PackedByteArray = opusencoder.encode_chunk(prepend);
