@@ -64,6 +64,11 @@ func run_tests() -> void:
 	assert(reference.get_frame_hash(0, 960) == -1)
 	assert(reference.get_frame_hash(decoded_frame_count - 96001, 96001) == -1)
 	assert(reference.get_tail_max(960) > 0.0)
+	var receiver_pause_buffer := AudioStreamPlaybackOpus.new()
+	assert(receiver_pause_buffer.initialize(48000, 1, 960, 3.0, 4.0) == OK)
+	assert(receiver_pause_buffer.push_silence(3 * 48000) == 3 * 48000)
+	assert(receiver_pause_buffer.available_space_frames() == 0)
+	assert(receiver_pause_buffer.push_silence(1) == -1)
 
 	var stream := AudioStreamOpus.new()
 	var playback: AudioStreamPlaybackOpus = stream.instantiate_playback()
@@ -141,6 +146,7 @@ func run_tests() -> void:
 	playback = null
 	reference = null
 	comparison = null
+	receiver_pause_buffer = null
 	stream = null
 	short_encoder = null
 	encoder = null

@@ -12,9 +12,9 @@ var audio_stream_playback_opus : AudioStreamPlaybackOpus = null
 #frametimems = opusframesize*1000.0/opusframesize
 var audioserveroutputlatency = AudioServer.get_output_latency()
 @export var audio_buffer_lag_time_target = 0.6
-@export var audio_buffer_length = 2.0
+@export var audio_buffer_length = 3.0
 @export var maximum_simultaneous_episodes = 3
-@export var stale_episode_timeout = 2.0
+@export var stale_episode_timeout = 4.0
 
 var lenchunkprefix = TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE
 var opusstreamcount = 0

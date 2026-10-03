@@ -15,13 +15,13 @@ func make_mono(phase: float) -> PackedVector2Array:
 
 
 func make_opus_packets(stream_count: int, encode_base64: bool,
-		first_frame: int = 0) -> Array[PackedByteArray]:
+		first_frame: int = 0, packet_count: int = 2) -> Array[PackedByteArray]:
 	var encoder := TwovoipOpusEncoder.new()
 	assert(encoder.initialize(48000, 48000, 1,
 			TwovoipOpusEncoder.DENOISER_DISABLED,
 			TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
 	var packets: Array[PackedByteArray] = []
-	for packet_offset in range(2):
+	for packet_offset in range(packet_count):
 		var frame_count = first_frame + packet_offset
 		assert(encoder.push_input_chunk(make_mono(frame_count * 0.25)) == 960)
 		var prefix := TwoVoipPacket.make_sequence_chunk_prefix()
@@ -122,6 +122,19 @@ func run_counter_wrap(speaker: Node, stream_count: int) -> void:
 	assert(speaker.opusframecount == first_frame + 2)
 	assert(speaker.source_packet_first_frame_time_usec == next_frame_time_usec + 20000)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, first_frame + 2, 0.04, 0.0)))
+
+
+func run_small_packet_reordering(speaker: Node, stream_count: int) -> void:
+	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0, next_frame_time_usec, 12000, false)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+	var packets := make_opus_packets(stream_count, false, 0, 3)
+	speaker.receive_audio_packet(packets[1])
+	speaker.receive_audio_packet(packets[0])
+	speaker.receive_audio_packet(packets[2])
+	assert(speaker.opusframecount == 3)
+	assert(speaker.opusframequeuecount == 0)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, 3, 0.06, 0.0)))
 
 
 func run_mid_without_playback(speaker: Node) -> void:
@@ -300,6 +313,7 @@ func run_tests() -> void:
 	run_speaker_episode(speaker, 9, true)
 	run_mid_join_and_gap(speaker, 10)
 	run_counter_wrap(speaker, 11)
+	run_small_packet_reordering(speaker, 12)
 	run_mid_without_playback(speaker)
 	run_input_gap_detection()
 	run_stream_start_without_history()
