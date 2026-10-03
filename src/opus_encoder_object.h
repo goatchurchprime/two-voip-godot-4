@@ -144,6 +144,7 @@ public:
     Error initialize(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, Denoiser p_denoiser_mode, AgcMode p_agc_mode, int p_output_chunk_size);
     int get_required_input_chunk_size() const { return required_input_chunk_size; }
     int push_input_chunk(const PackedVector2Array &audio_frames);
+    int push_silent_input_chunks(int p_chunk_count);
     Error denoise_chunk(int p_chunk_offset_back);
     float get_peak() const { return last_peak; }
     float get_rms() const { return last_rms; }

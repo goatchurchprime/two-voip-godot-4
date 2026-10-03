@@ -73,6 +73,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("initialize", "input_mix_rate", "opus_sample_rate", "channels", "denoiser_mode", "agc_mode", "output_chunk_size"), &TwovoipOpusEncoder::initialize);
     ClassDB::bind_method(D_METHOD("get_required_input_chunk_size"), &TwovoipOpusEncoder::get_required_input_chunk_size);
     ClassDB::bind_method(D_METHOD("push_input_chunk", "audio_frames"), &TwovoipOpusEncoder::push_input_chunk);
+    ClassDB::bind_method(D_METHOD("push_silent_input_chunks", "chunk_count"), &TwovoipOpusEncoder::push_silent_input_chunks);
     ClassDB::bind_method(D_METHOD("denoise_chunk", "chunk_offset_back"), &TwovoipOpusEncoder::denoise_chunk);
     ClassDB::bind_method(D_METHOD("get_peak"), &TwovoipOpusEncoder::get_peak);
     ClassDB::bind_method(D_METHOD("get_rms"), &TwovoipOpusEncoder::get_rms);
@@ -520,6 +521,19 @@ int TwovoipOpusEncoder::push_input_chunk(const PackedVector2Array &audio_frames)
     last_rms = std::sqrt(sum_squares / (output_chunk_size*channels));
 
     return consumed_input_frames;
+}
+
+int TwovoipOpusEncoder::push_silent_input_chunks(int p_chunk_count) {
+    if (opus_encoder == NULL || p_chunk_count < 0)
+        return -1;
+    const int chunk_count = std::min(p_chunk_count, audio_ringbuffer_size_chunks);
+    PackedVector2Array silent_frames;
+    silent_frames.resize(required_input_chunk_size);
+    for (int chunk = 0; chunk < chunk_count; chunk++) {
+        if (push_input_chunk(silent_frames) < 0)
+            return -1;
+    }
+    return chunk_count;
 }
 
 float TwovoipOpusEncoder::get_chunk_sum_squares(int p_chunk_offset_back) const {

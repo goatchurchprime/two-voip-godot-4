@@ -231,63 +231,47 @@ func receive_audio_packet(packet):
 		push_opus_packet(packet, lenchunkprefix, false)
 		opusframecount += 1
 
-	elif packet[1]&128 == (opusstreamcount%2)*128:
+	else:
 		if audio_stream_playback_opus == null:
 			return
 		assert (lenchunkprefix >= TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE)
-		var opusframecountI: int = packet[0] + (packet[1]&127)*256
-		var frame_count_offset: int = opusframecountI - (opusframecount % 32768)
-		if frame_count_offset < -16384:
-			frame_count_offset += 32768
-		elif frame_count_offset > 16384:
-			frame_count_offset -= 32768
-		var unwrapped_frame_count: int = opusframecount + frame_count_offset
+		var unwrapped_frame_count := TwoVoipPacket.decode_sequence_chunk_prefix(packet, opusframecount, opusstreamcount)
+		if unwrapped_frame_count < 0:
+			prints("dropping stale or wrong-stream frame", opusstreamcount, packet[0])
+			return
 		source_packet_first_frame_time_usec = source_next_frame_time_usec \
 				+ int((unwrapped_frame_count - source_next_frame_count) * opusframesize \
 				* 1000000.0 / opus_sample_rate)
-		var opusframecountR = opusframecountI - opusframecount
-		if opusframecountR < 0:
-			if opusframecountR < -30000:
-				print("framecount Wrapround 10mins? ", opusframecount, " ", opusframecountI)
-				opusframecount = opusframecountI
-				opusframecountR = 0
-			else:
-				print("late arriving frame ignored ", opusframecountR)
-			
-		if opusframecountR >= 0:
-			while opusframecountR >= Noutoforderqueue:
-				print("shifting outoforderqueue ", opusframecountI, " ", ("null" if outoforderchunkqueue[0] == null else len(outoforderchunkqueue[0])))
-				if outoforderchunkqueue[0] != null:
-					push_opus_packet(outoforderchunkqueue[0], lenchunkprefix, false)
-					opusframequeuecount -= 1
-				else:
-					var nextvalidpacketforfec = packet
-					for i in range(1, Noutoforderqueue):
-						if outoforderchunkqueue[i] != null:
-							nextvalidpacketforfec = outoforderchunkqueue[i]
-							break
-					push_opus_packet(nextvalidpacketforfec, lenchunkprefix, true)
-				outoforderchunkqueue.pop_front()
-				outoforderchunkqueue.push_back(null)
-				opusframecountR -= 1
-				opusframecount += 1
-				assert (opusframequeuecount >= 0)
-
-			outoforderchunkqueue[opusframecountR] = packet
-			opusframequeuecount += 1
-			while outoforderchunkqueue[0] != null and opusframecount + opusframequeuecount >= Npacketinitialbatching:
-				if opusframesize > audio_stream_playback_opus.available_space_frames():
-					print("!!! segment space filled up")
-					break
-				push_opus_packet(outoforderchunkqueue.pop_front(), lenchunkprefix, false)
-				outoforderchunkqueue.push_back(null)
-				opusframecount += 1
+		var opusframecountR = unwrapped_frame_count - opusframecount
+		while opusframecountR >= Noutoforderqueue:
+			print("shifting outoforderqueue ", unwrapped_frame_count, " ", ("null" if outoforderchunkqueue[0] == null else len(outoforderchunkqueue[0])))
+			if outoforderchunkqueue[0] != null:
+				push_opus_packet(outoforderchunkqueue[0], lenchunkprefix, false)
 				opusframequeuecount -= 1
-				assert (opusframequeuecount >= 0)
+			else:
+				var nextvalidpacketforfec = packet
+				for i in range(1, Noutoforderqueue):
+					if outoforderchunkqueue[i] != null:
+						nextvalidpacketforfec = outoforderchunkqueue[i]
+						break
+				push_opus_packet(nextvalidpacketforfec, lenchunkprefix, true)
+			outoforderchunkqueue.pop_front()
+			outoforderchunkqueue.push_back(null)
+			opusframecountR -= 1
+			opusframecount += 1
+			assert (opusframequeuecount >= 0)
 
-	else:
-		prints("dropping frame with opusstream number mismatch", opusstreamcount, packet[0], packet[1], "streamcount", opusstreamcount)
-
+		outoforderchunkqueue[opusframecountR] = packet
+		opusframequeuecount += 1
+		while outoforderchunkqueue[0] != null and opusframecount + opusframequeuecount >= Npacketinitialbatching:
+			if opusframesize > audio_stream_playback_opus.available_space_frames():
+				print("!!! segment space filled up")
+				break
+			push_opus_packet(outoforderchunkqueue.pop_front(), lenchunkprefix, false)
+			outoforderchunkqueue.push_back(null)
+			opusframecount += 1
+			opusframequeuecount -= 1
+			assert (opusframequeuecount >= 0)
 var playingrecording = false
 func _physics_process(delta):
 	if audio_stream_playback_opus == null:

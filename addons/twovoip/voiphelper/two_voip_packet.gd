@@ -2,7 +2,7 @@ class_name TwoVoipPacket
 extends RefCounted
 
 
-const WIRE_VERSION := 4
+const WIRE_VERSION := 5
 
 const TYPE_START := "start"
 const TYPE_MID := "mid"
@@ -17,7 +17,11 @@ const ASCII_OPEN_BRACKET := 91
 const ASCII_QUOTE := 34
 const ASCII_CLOSE_BRACKET := 93
 
-const CHUNK_SEQUENCE_PREFIX_SIZE := 2
+const CHUNK_SEQUENCE_PREFIX_SIZE := 1
+# The receiver infers higher bits; an unnotified displacement must be less than 64 frames.
+const CHUNK_SEQUENCE_MODULUS := 128
+const CHUNK_SEQUENCE_MASK := 127
+const CHUNK_STREAM_PARITY_MASK := 128
 const CHUNK_FIRST_FRAME_TIME_OFFSET := CHUNK_SEQUENCE_PREFIX_SIZE
 const CHUNK_FIRST_FRAME_TIME_SIZE := 8
 const TIMESTAMPED_CHUNK_PREFIX_SIZE := CHUNK_SEQUENCE_PREFIX_SIZE + CHUNK_FIRST_FRAME_TIME_SIZE
@@ -216,6 +220,18 @@ static func make_sequence_chunk_prefix() -> PackedByteArray:
 	var prefix := PackedByteArray()
 	prefix.resize(CHUNK_SEQUENCE_PREFIX_SIZE)
 	return prefix
+
+static func set_sequence_chunk_prefix(prefix: PackedByteArray, frame_count: int, stream_count: int) -> void:
+	assert(prefix.size() >= CHUNK_SEQUENCE_PREFIX_SIZE)
+	prefix[0] = frame_count % CHUNK_SEQUENCE_MODULUS + (stream_count % 2)*CHUNK_STREAM_PARITY_MASK
+
+static func decode_sequence_chunk_prefix(packet: PackedByteArray, minimum_frame_count: int, stream_count: int) -> int:
+	if packet.size() < CHUNK_SEQUENCE_PREFIX_SIZE or packet[0]&CHUNK_STREAM_PARITY_MASK != (stream_count % 2)*CHUNK_STREAM_PARITY_MASK:
+		return -1
+	var frame_count_offset: int = ((packet[0]&CHUNK_SEQUENCE_MASK) - (minimum_frame_count % CHUNK_SEQUENCE_MODULUS) + CHUNK_SEQUENCE_MODULUS) % CHUNK_SEQUENCE_MODULUS
+	if frame_count_offset >= CHUNK_SEQUENCE_MODULUS/2:
+		return -1
+	return minimum_frame_count + frame_count_offset
 
 
 static func set_chunk_first_frame_time_usec(prefix: PackedByteArray, time_usec: int) -> void:

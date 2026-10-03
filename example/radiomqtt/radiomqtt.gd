@@ -200,8 +200,7 @@ func reprocessoriginalchunks():
 			opusencoder_forreprocessing.denoise_chunk(0)
 		var chunkmax = opusencoder_forreprocessing.get_peak()
 		recordedchunkmax = max(recordedchunkmax, chunkmax)
-		resampledchunkprefix.set(0, (resampledopusframecount%256))  # 32768 frames is 10 minutes
-		resampledchunkprefix.set(1, (int(resampledopusframecount/256)&127) + (int(recordedheader[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT])%2)*128)
+		TwoVoipPacket.set_sequence_chunk_prefix(resampledchunkprefix, resampledopusframecount, int(recordedheader[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT]))
 		var opuspacket : PackedByteArray = opusencoder_forreprocessing.encode_chunk(resampledchunkprefix, 0)
 		opuspacket = TwoVoipPacket.encode_audio_packet(opuspacket, audio_packets_base64)
 		recordedopuspackets.append(opuspacket)

@@ -25,8 +25,7 @@ func make_opus_packets(stream_count: int, encode_base64: bool,
 		var frame_count = first_frame + packet_offset
 		assert(encoder.push_input_chunk(make_mono(frame_count * 0.25)) == 960)
 		var prefix := TwoVoipPacket.make_sequence_chunk_prefix()
-		prefix[0] = frame_count % 256
-		prefix[1] = (int(frame_count / 256) & 127) + (stream_count % 2) * 128
+		TwoVoipPacket.set_sequence_chunk_prefix(prefix, frame_count, stream_count)
 		packets.append(TwoVoipPacket.encode_audio_packet(
 				encoder.encode_chunk(prefix, 0), encode_base64))
 	return packets
@@ -111,8 +110,61 @@ func run_mid_join_and_gap(speaker: Node, stream_count: int) -> void:
 	assert(not speaker.inopusstream)
 
 
+func run_counter_wrap(speaker: Node, stream_count: int) -> void:
+	const first_frame := 127
+	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, first_frame, next_frame_time_usec, 12000, false)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+	for packet in make_opus_packets(stream_count, false, first_frame):
+		speaker.receive_audio_packet(packet)
+	assert(speaker.opusframecount == first_frame + 2)
+	assert(speaker.source_packet_first_frame_time_usec == next_frame_time_usec + 20000)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, first_frame + 2, 0.04, 0.0)))
+
+
+func run_input_gap_detection() -> void:
+	var mic := Node.new()
+	mic.set_script(preload("res://addons/twovoip/voiphelper/two_voip_mic.gd"))
+	mic.opusencoder = TwovoipOpusEncoder.new()
+	assert(mic.opusencoder.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	mic.currentlytalking = true
+	mic.opusstreamcount = 12
+	mic.opusframecount = 30
+	mic.frame0usec = 1700000000000000
+	mic.input_gap_threshold = 0.05
+	mic.input_chunk_first_frame_times_usec.resize(10)
+	var emitted_packets: Array[PackedByteArray] = []
+	mic.transmit_audio_packet.connect(func(packet): emitted_packets.append(packet))
+	mic.detect_audio_input_gap(1700000000660000)
+	assert(mic.input_chunk_number == 2)
+	assert(mic.get_input_chunk_first_frame_time_usec(0) == 1700000000640000)
+	assert(mic.opusencoder.push_input_chunk(make_mono(0.0)) == 960)
+	mic.input_chunk_number += 1
+	mic.input_chunk_first_frame_times_usec[mic.input_chunk_number] = 1700000000660000
+	mic.processopuschunk(0)
+	assert(mic.opusframecount == 34)
+	assert(emitted_packets.size() == 2)
+	assert(mic.opusencoder.get_chunk_sum_squares(1) == 0.0)
+	var mid := TwoVoipPacket.decode_control_packet(emitted_packets[0])
+	assert(int(mid[TwoVoipPacket.MidField.NEXT_FRAME_COUNT]) == 33)
+	assert(int(mid[TwoVoipPacket.MidField.NEXT_FRAME_TIME_USEC]) == 1700000000660000)
+	assert(TwoVoipPacket.decode_sequence_chunk_prefix(emitted_packets[1], 33, 12) == 33)
+	mic.free()
+
+
 func run_tests() -> void:
-	assert(TwoVoipPacket.WIRE_VERSION == 4)
+	assert(TwoVoipPacket.WIRE_VERSION == 5)
+	var sequence_prefix := TwoVoipPacket.make_sequence_chunk_prefix()
+	assert(sequence_prefix.size() == 1)
+	TwoVoipPacket.set_sequence_chunk_prefix(sequence_prefix, 128, 7)
+	assert(TwoVoipPacket.decode_sequence_chunk_prefix(sequence_prefix, 127, 7) == 128)
+	assert(TwoVoipPacket.decode_sequence_chunk_prefix(sequence_prefix, 128, 7) == 128)
+	assert(TwoVoipPacket.decode_sequence_chunk_prefix(sequence_prefix, 129, 7) == -1)
+	TwoVoipPacket.set_sequence_chunk_prefix(sequence_prefix, 191, 7)
+	assert(TwoVoipPacket.decode_sequence_chunk_prefix(sequence_prefix, 128, 7) == 191)
+	TwoVoipPacket.set_sequence_chunk_prefix(sequence_prefix, 192, 7)
+	assert(TwoVoipPacket.decode_sequence_chunk_prefix(sequence_prefix, 128, 7) == -1)
+	assert(TwoVoipPacket.decode_sequence_chunk_prefix(sequence_prefix, 127, 8) == -1)
 	var binary_header := TwoVoipPacket.make_header(
 			TwoVoipPacket.TYPE_START, 960, 48000, 1,
 			TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, 7, 0,
@@ -177,6 +229,8 @@ func run_tests() -> void:
 	run_speaker_episode(speaker, 8, false)
 	run_speaker_episode(speaker, 9, true)
 	run_mid_join_and_gap(speaker, 10)
+	run_counter_wrap(speaker, 11)
+	run_input_gap_detection()
 	player.stop()
 	player.queue_free()
 	await process_frame

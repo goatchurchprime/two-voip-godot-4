@@ -5,6 +5,7 @@ var chunkprefix := TwoVoipPacket.make_sequence_chunk_prefix()
 
 var lead_time : float = 0.15
 var hang_time : float  = 0.7
+var input_gap_threshold : float = 0.1
 var vox_threshhold = 0.07
 var currentlytalking = false
 var opusframecount = 0
@@ -24,9 +25,6 @@ signal transmit_audio_packet(opuspacket : PackedByteArray)
 const rootmeansquaremaxmeasurement = false
 var encode_base64 = false
 
-var microphoneaudiosamplescountSeconds = 0.0
-var microphoneaudiosamplescount = 0
-var microphoneaudiosamplescountSecondsSampleWindow = 10.0
 var agc_mode = TwovoipOpusEncoder.AGC_DISABLED
 
 var talkingtimestart = 0
@@ -233,6 +231,13 @@ func make_audio_packet_midstream_update() -> PackedByteArray:
 			opusencoder.get_bitrate())
 	return TwoVoipPacket.encode_control_packet(audiostreampacketmid)
 
+func notify_audio_input_gap(missing_frame_count: int, next_frame_time_usec: int):
+	assert(currentlytalking)
+	assert(missing_frame_count > 0)
+	opusframecount += missing_frame_count
+	var mid := TwoVoipPacket.make_mid(opusstreamcount, opusframecount, next_frame_time_usec, opusencoder.get_bitrate())
+	transmit_audio_packet.emit(TwoVoipPacket.encode_control_packet(mid))
+
 func request_audio_packet_midstream() -> Array[PackedByteArray]:
 	if not currentlytalking:
 		return []
@@ -287,26 +292,33 @@ func processvox(chunkmax, speechnoiseprobability, resampled_chunk):
 		else:
 			audiosampleframematerial.set_shader_parameter("chunktexenabled", false)
 
-func remember_input_chunk_first_frame_time_usec(time_usec: int) -> void:
-	input_chunk_number += 1
-	input_chunk_first_frame_times_usec[
-			input_chunk_number % input_chunk_first_frame_times_usec.size()] = time_usec
-
 func get_input_chunk_first_frame_time_usec(chunks_back: int) -> int:
-	if chunks_back < 0 or chunks_back > min(input_chunk_number,
-			input_chunk_first_frame_times_usec.size() - 1):
+	if chunks_back < 0 or chunks_back > min(input_chunk_number, input_chunk_first_frame_times_usec.size() - 1):
 		return 0
-	return input_chunk_first_frame_times_usec[
-			(input_chunk_number - chunks_back) % input_chunk_first_frame_times_usec.size()]
+	return input_chunk_first_frame_times_usec[(input_chunk_number - chunks_back) % input_chunk_first_frame_times_usec.size()]
+
+func detect_audio_input_gap(frameCusec):
+	if not currentlytalking:
+		return
+	var frameCusec_predicted = frame0usec + opusframecount*opusframedurationms*1000
+	var gap_usec = frameCusec - frameCusec_predicted
+	if gap_usec >= input_gap_threshold*1000000.0:
+		prints("* mic pred ", gap_usec/1000000.0)
+		var missing_frame_count = roundi(gap_usec/(opusframedurationms*1000.0))
+		if missing_frame_count > 0:
+			var stored_silent_chunks = opusencoder.push_silent_input_chunks(missing_frame_count)
+			assert(stored_silent_chunks >= 0)
+			for chunk in range(stored_silent_chunks):
+				input_chunk_number += 1
+				input_chunk_first_frame_times_usec[input_chunk_number % input_chunk_first_frame_times_usec.size()] = frameCusec - (stored_silent_chunks - chunk)*opusframedurationms*1000
+			notify_audio_input_gap(missing_frame_count, frameCusec)
+	elif gap_usec <= -input_gap_threshold*1000000.0:
+		push_error("impossible big negative gap in the audio stream timing %f" % (gap_usec/1000000.0))
 
 func processopuschunk(chunks_back):
 	assert(currentlytalking)
-	var frameCusec = get_input_chunk_first_frame_time_usec(chunks_back)
-	var frameCusec_predicted = frame0usec + opusframecount*opusframedurationms*1000
-	prints("* mic pred ", (frameCusec - frameCusec_predicted)/1000000.0)
 	if len(chunkprefix) >= TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE:
-		chunkprefix.set(0, (opusframecount%256))  # 32768 frames is 10 minutes
-		chunkprefix.set(1, (int(opusframecount/256)&127) + (opusstreamcount%2)*128)
+		TwoVoipPacket.set_sequence_chunk_prefix(chunkprefix, opusframecount, opusstreamcount)
 	else:
 		assert (len(chunkprefix) == 0)
 	var opuspacket : PackedByteArray = opusencoder.encode_chunk(chunkprefix, chunks_back)
@@ -337,7 +349,6 @@ var last_chunkmax = 0.0
 var speechnoiseprobability = 0.0
 
 func _process(delta):
-	microphoneaudiosamplescountSeconds += delta
 	processtalkstreamends(pttbutton.button_pressed)
 	while true:
 		var input_frames_available := AudioServer.get_input_frames_available()
@@ -345,9 +356,11 @@ func _process(delta):
 		audio_chunk = AudioServer.get_input_frames(opusencoder.get_required_input_chunk_size())
 		if len(audio_chunk) == 0:
 			break
+		detect_audio_input_gap(first_frame_time_usec)
 		if opusencoder.push_input_chunk(audio_chunk) < 0:
 			break
-		remember_input_chunk_first_frame_time_usec(first_frame_time_usec)
+		input_chunk_number += 1
+		input_chunk_first_frame_times_usec[input_chunk_number % input_chunk_first_frame_times_usec.size()] = first_frame_time_usec
 		talking_first_frame_time_usec
 		if denoiser_mode != TwovoipOpusEncoder.DENOISER_DISABLED and not (denoiser_mode == TwovoipOpusEncoder.DENOISER_RNNOISE_DEFERRED and not currentlytalking):
 			opusencoder.denoise_chunk(0)
@@ -358,12 +371,6 @@ func _process(delta):
 			last_chunkmax = opusencoder.get_rms()
 		else:
 			last_chunkmax = opusencoder.get_peak()
-		microphoneaudiosamplescount += len(audio_chunk)
-		if microphoneaudiosamplescountSeconds > microphoneaudiosamplescountSecondsSampleWindow:
-			print("x audiosamples rate ", microphoneaudiosamplescount/microphoneaudiosamplescountSeconds)
-			microphoneaudiosamplescount = 0
-			microphoneaudiosamplescountSeconds = 0.0
-			microphoneaudiosamplescountSecondsSampleWindow *= 1.5
 		processvox(last_chunkmax, speechnoiseprobability, opusencoder.get_current_chunk())
 		if currentlytalking:
 			processopuschunk(0)
