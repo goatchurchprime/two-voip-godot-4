@@ -68,9 +68,23 @@ This section has the "Play" button to decode and play back the most recent recor
 
 Finally, there is an MQTT transmission section to push audio packets over the network via a broker on a topic.  Click the \[Connect\] button to go online while a friend does the same on another computer and you should be able to talk to one another over the internet (don't forget to use the PTT button or enable VoX).  Several presets are given for convenience, and it will automatically use websockets if you are operating from HTML5.
 
-MQTT is a lightweight protocol implemented in another GodotEngine GDExtension [https://godotengine.org/asset-library/asset/1993](godot-mqtt) and described [here](https://github.com/goatchurchprime/godot-mqtt/?tab=readme-ov-file#mqtt). Its publish, subscribe, retained and last will messaging system provides an effective framework for tracking the joining state of each player.  There is a line of text beginning with `mosquitto_sub` command that you can copy into your terminal window to watch the data fly by. 
+MQTT is a lightweight protocol implemented by the GDScript
+[godot-mqtt addon](https://github.com/goatchurchprime/godot-mqtt). Its publish,
+subscribe, retained and last-will messaging provides an effective framework for
+tracking the joining state of each player. The example vendors the addon's V1.5
+feature set from commit
+[`da09c8af652f278db7ee6def4bc476831573b19d`](https://github.com/goatchurchprime/godot-mqtt/commit/da09c8af652f278db7ee6def4bc476831573b19d),
+including its optional simulated and LAN brokers. The MQTT repository had not
+yet created a V1.5 Git tag when this version was vendored. There is a line of
+text beginning with `mosquitto_sub` that you can copy into your terminal to
+watch the data fly by.
 
-There is a fuzzing system to degrade the data and a logging system so you can record and replay an episode of packets.
+The simulated broker can apply deterministic latency, jitter, loss,
+duplication, reordering, hold-and-burst and connection interruptions to selected
+topics. This allows network faults to be tested at the transport boundary
+instead of adding them to the VoIP library. The broker is intended for trusted
+native LAN development and does not provide TLS, authentication, persistence or
+WebSocket hosting.
 
 The table of users shows who is connected to this broker and whether they are transmitting.
 

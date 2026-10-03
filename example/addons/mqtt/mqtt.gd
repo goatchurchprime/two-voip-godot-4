@@ -42,9 +42,13 @@ const CP_CONNECT = 0x10
 const CP_PUBLISH = 0x30
 const CP_SUBSCRIBE = 0x82
 const CP_UNSUBSCRIBE = 0xa2
-const CP_PUBREC = 0x40
+const CP_PUBACK = 0x40
+const CP_PUBREC = 0x50
 const CP_SUBACK = 0x90
 const CP_UNSUBACK = 0xb0
+
+const MAX_PACKET_SIZE = 2097151
+const MAX_PACKETS_PER_FRAME = 64
 
 var pid = 0
 var user = null
@@ -89,28 +93,36 @@ func receiveintobuffer():
 				printerr("get_available_bytes returned -1")
 				return FAILED
 			if n != 0:
-				assert (n > 0)
 				var sv = sslsocket.get_data(n)
-				assert (sv[0] == 0)  # error code
+				if sv[0] != OK:
+					printerr("TLS socket read error: ", sv[0])
+					return sv[0]
 				receivedbuffer.append_array(sv[1])
+		else:
+			return ERR_CONNECTION_ERROR
 				
-	elif socket != null and socket.get_status() == StreamPeerTCP.STATUS_CONNECTED:
+	elif socket != null:
 		var E = socket.poll()
 		if E != 0:
 			printerr("Socket poll error: ", E)
 			return E
+		if socket.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+			return ERR_CONNECTION_ERROR
 		var n = socket.get_available_bytes()
 		if n == -1:
 			printerr("get_available_bytes returned -1")
 			return FAILED
 		if n != 0:
-			assert (n > 0)
 			var sv = socket.get_data(n)
-			assert (sv[0] == 0)  # error code
+			if sv[0] != OK:
+				printerr("TCP socket read error: ", sv[0])
+				return sv[0]
 			receivedbuffer.append_array(sv[1])
 			
 	elif websocket != null:
 		websocket.poll()
+		if websocket.get_ready_state() != WebSocketPeer.STATE_OPEN:
+			return ERR_CONNECTION_ERROR
 		while websocket.get_available_packet_count() != 0:
 			receivedbuffer.append_array(websocket.get_packet())
 	
@@ -169,6 +181,7 @@ func _process(delta):
 					brokerconnectmode = BCM_WAITING_CONNMESSAGE
 				elif sslsocketstatus >= StreamPeerTLS.STATUS_ERROR:
 					print("bad sslsocket.connect_to_stream")
+					brokerconnectmode = BCM_FAILED_CONNECTION
 					emit_signal("broker_connection_failed")
 				
 	elif brokerconnectmode == BCM_WAITING_CONNMESSAGE:
@@ -176,9 +189,13 @@ func _process(delta):
 		brokerconnectmode = BCM_WAITING_CONNACK
 		
 	elif brokerconnectmode == BCM_WAITING_CONNACK or brokerconnectmode == BCM_CONNECTED:
-		receiveintobuffer()
-		while wait_msg():
-			pass
+		var receive_error = receiveintobuffer()
+		if receive_error != null and receive_error != OK:
+			_fail_connection("Socket receive failed: %s" % receive_error)
+			return
+		var packets_processed := 0
+		while packets_processed < MAX_PACKETS_PER_FRAME and wait_msg():
+			packets_processed += 1
 		if brokerconnectmode == BCM_CONNECTED and pingticksnext0 < Time.get_ticks_msec():
 			pingreq()
 			pingticksnext0 = Time.get_ticks_msec() + pinginterval*1000
@@ -193,14 +210,19 @@ func _ready():
 		client_id = "rr%d" % randi()
 
 func set_last_will(stopic, smsg, retain=false, qos=0):
-	assert((0 <= qos) and (qos <= 2))
-	assert(stopic)
+	if qos < 0 or qos > 1:
+		push_error("MQTT QoS %d is not supported; use QoS 0 or 1" % qos)
+		return false
+	if not stopic:
+		push_error("MQTT last-will topic must not be empty")
+		return false
 	self.lw_topic = stopic.to_ascii_buffer()
 	self.lw_msg = smsg if binarymessages else smsg.to_ascii_buffer()
 	self.lw_qos = qos
 	self.lw_retain = retain
 	if verbose_level:
 		print("LASTWILL%s topic=%s msg=%s" % [ " <retain>" if retain else "", stopic, smsg])
+	return true
 
 func set_user_pass(suser, spswd):
 	if suser != null:
@@ -212,7 +234,7 @@ func set_user_pass(suser, spswd):
 
 
 static func encoderemaininglength(pkt, sz):
-	assert(sz < 2097152)
+	assert(sz <= MAX_PACKET_SIZE)
 	var i = 1
 	while sz > 0x7f:
 		pkt[i] = (sz & 0x7f) | 0x80
@@ -241,7 +263,6 @@ func firstmessagetoserver():
 			(2+len(self.lw_topic)+2+len(self.lw_msg) if self.lw_topic else 0)
 	encoderemaininglength(pkt, sz)
 	var remstartpos = len(pkt)
-	print("MQTT".to_ascii_buffer())
 	encodevarstr(pkt, [0x4D, 0x51, 0x54, 0x54]); # "MQTT".to_ascii_buffer()
 	var protocollevel = 0x04  # MQTT v3.1.1
 	var connectflags = (0xC0 if self.user != null else 0) | \
@@ -334,6 +355,9 @@ func disconnect_from_server():
 	
 
 func publish(stopic, smsg, retain=false, qos=0):
+	if qos < 0 or qos > 1:
+		push_error("MQTT QoS %d is not supported; use QoS 0 or 1" % qos)
+		return 0
 	var msg = smsg.to_ascii_buffer() if not binarymessages else smsg
 	var topic = stopic.to_ascii_buffer()
 	
@@ -345,7 +369,7 @@ func publish(stopic, smsg, retain=false, qos=0):
 	var remstartpos = len(pkt)
 	encodevarstr(pkt, topic)
 	if qos > 0:
-		pid += 1
+		pid = _next_pid()
 		encodeshortint(pkt, pid)
 	pkt.append_array(msg)
 	assert (len(pkt) - remstartpos == sz)
@@ -355,7 +379,10 @@ func publish(stopic, smsg, retain=false, qos=0):
 	return pid
 
 func subscribe(stopic, qos=0):
-	pid += 1
+	if qos < 0 or qos > 1:
+		push_error("MQTT QoS %d is not supported; use QoS 0 or 1" % qos)
+		return 0
+	pid = _next_pid()
 	var topic = stopic.to_ascii_buffer()
 	var sz = 2 + 2 + len(topic) + 1
 	var pkt = PackedByteArray()
@@ -370,6 +397,7 @@ func subscribe(stopic, qos=0):
 	if verbose_level:
 		print("SUBSCRIBE[%d] topic=%s" % [pid, stopic])
 	senddata(pkt)
+	return pid
 
 func pingreq():
 	if verbose_level >= 2:
@@ -377,7 +405,7 @@ func pingreq():
 	senddata(PackedByteArray([CP_PINGREQ, 0x00]))
 
 func unsubscribe(stopic):
-	pid += 1
+	pid = _next_pid()
 	var topic = stopic.to_ascii_buffer()
 	var sz = 2 + 2 + len(topic)
 	var pkt = PackedByteArray()
@@ -391,6 +419,11 @@ func unsubscribe(stopic):
 		print("UNSUBSCRIBE[%d] topic=%s" % [pid, stopic])
 	assert (len(pkt) - remstartpos == sz)
 	senddata(pkt)
+	return pid
+
+
+func _next_pid():
+	return (pid % 65535) + 1
 
 func wait_msg():
 	var n = receivedbuffer.size()
@@ -398,44 +431,67 @@ func wait_msg():
 		return false
 	var op = receivedbuffer[0]
 	var i = 1
-	var sz = receivedbuffer[i] & 0x7f
-	while (receivedbuffer[i] & 0x80):
-		i += 1
+	var sz = 0
+	var multiplier = 1
+	var remaining_length_bytes = 0
+	while true:
 		if i == n:
 			return false
-		sz += (receivedbuffer[i] & 0x7f) << ((i-1)*7)
-	i += 1
+		var encoded_byte = receivedbuffer[i]
+		i += 1
+		remaining_length_bytes += 1
+		sz += (encoded_byte & 0x7f) * multiplier
+		if (encoded_byte & 0x80) == 0:
+			break
+		if remaining_length_bytes == 4:
+			return _protocol_error("remaining length exceeds four bytes")
+		multiplier *= 128
+	if sz > MAX_PACKET_SIZE:
+		return _protocol_error("packet exceeds the %d byte limit" % MAX_PACKET_SIZE)
 	if n < i + sz:
 		return false
-		
+
 	if op == CP_PINGRESP:
-		assert (sz == 0)
+		if sz != 0:
+			return _protocol_error("PINGRESP must have an empty payload")
 		if verbose_level >= 2:
 			print("PINGRESP")
-			
-	elif op & 0xf0 == 0x30:
-		var topic_len = (receivedbuffer[i]<<8) + receivedbuffer[i+1]
+
+	elif op & 0xf0 == CP_PUBLISH:
+		if sz < 2:
+			return _protocol_error("PUBLISH is missing its topic length")
+		var qos = (op >> 1) & 0x03
+		if qos == 2:
+			return _protocol_error("incoming QoS 2 PUBLISH is not supported")
+		if qos == 3:
+			return _protocol_error("PUBLISH contains invalid QoS flags")
+		var topic_len = (receivedbuffer[i] << 8) + receivedbuffer[i+1]
 		var im = i + 2
+		if topic_len == 0 or im + topic_len > i + sz:
+			return _protocol_error("PUBLISH contains an invalid topic length")
 		var topic = receivedbuffer.slice(im, im + topic_len).get_string_from_ascii()
 		im += topic_len
 		var pid1 = 0
-		if op & 6:
-			pid1 = (receivedbuffer[im]<<8) + receivedbuffer[im+1]
+		if qos == 1:
+			if im + 2 > i + sz:
+				return _protocol_error("PUBLISH is missing its packet identifier")
+			pid1 = (receivedbuffer[im] << 8) + receivedbuffer[im+1]
+			if pid1 == 0:
+				return _protocol_error("PUBLISH packet identifier must not be zero")
 			im += 2
 		var data = receivedbuffer.slice(im, i + sz)
 		var msg = data if binarymessages else data.get_string_from_ascii()
-		
+
 		if verbose_level >= 2:
 			print("received topic=", topic, " msg=", msg)
 		emit_signal("received_message", topic, msg)
-		
-		if op & 6 == 2:
-			senddata(PackedByteArray([0x40, 0x02, (pid1 >> 8), (pid1 & 0xFF)]))
-		elif op & 6 == 4:
-			assert(0)
+
+		if qos == 1:
+			senddata(PackedByteArray([CP_PUBACK, 0x02, (pid1 >> 8), (pid1 & 0xFF)]))
 
 	elif op == CP_CONNACK:
-		assert (sz == 2)
+		if sz != 2:
+			return _protocol_error("CONNACK payload must be two bytes")
 		var retcode = receivedbuffer[i+1]
 		if verbose_level:
 			print("CONNACK ret=%02x" % retcode)
@@ -444,27 +500,29 @@ func wait_msg():
 			emit_signal("broker_connected")
 		else:
 			if verbose_level:
-				print("Bad connection retcode=", retcode) # see https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html
+				print("Bad connection retcode=", retcode)
+			brokerconnectmode = BCM_FAILED_CONNECTION
 			emit_signal("broker_connection_failed")
 
-	elif op == CP_PUBREC:
-		assert (sz == 2)
-		var apid = (receivedbuffer[i]<<8) + receivedbuffer[i+1]
+	elif op == CP_PUBACK:
+		if sz != 2:
+			return _protocol_error("PUBACK payload must be two bytes")
+		var apid = (receivedbuffer[i] << 8) + receivedbuffer[i+1]
 		if verbose_level >= 2:
 			print("PUBACK[%d]" % apid)
-		emit_signal("publish_acknowledgewait_msg", apid)
+		emit_signal("publish_acknowledge", apid)
 
 	elif op == CP_SUBACK:
-		assert (sz == 3)
-		var apid = (receivedbuffer[i]<<8) + receivedbuffer[i+1]
+		if sz != 3:
+			return _protocol_error("SUBACK payload must be three bytes")
+		var apid = (receivedbuffer[i] << 8) + receivedbuffer[i+1]
 		if verbose_level:
 			print("SUBACK[%d] ret=%02x" % [apid, receivedbuffer[i+2]])
-		#if receivedbuffer[i+2] == 0x80:
-		#	E = FAILED
 
 	elif op == CP_UNSUBACK:
-		assert (sz == 2)
-		var apid = (receivedbuffer[i]<<8) + receivedbuffer[i+1]
+		if sz != 2:
+			return _protocol_error("UNSUBACK payload must be two bytes")
+		var apid = (receivedbuffer[i] << 8) + receivedbuffer[i+1]
 		if verbose_level:
 			print("UNSUBACK[%d]" % apid)
 
@@ -474,6 +532,21 @@ func wait_msg():
 
 	trimreceivedbuffer(i + sz)
 	return true
+
+
+func _protocol_error(message: String):
+	push_error("Malformed MQTT packet: " + message)
+	receivedbuffer.clear()
+	if brokerconnectmode != BCM_NOCONNECTION:
+		cleanupsockets()
+		emit_signal("broker_disconnected")
+	return false
+
+
+func _fail_connection(message: String):
+	printerr(message)
+	brokerconnectmode = BCM_FAILED_CONNECTION
+	emit_signal("broker_connection_failed")
 
 func trimreceivedbuffer(n):
 	if n == receivedbuffer.size():
