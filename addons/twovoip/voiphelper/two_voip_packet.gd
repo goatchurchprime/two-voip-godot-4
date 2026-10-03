@@ -2,7 +2,7 @@ class_name TwoVoipPacket
 extends RefCounted
 
 
-const WIRE_VERSION := 3
+const WIRE_VERSION := 4
 
 const TYPE_START := "start"
 const TYPE_MID := "mid"
@@ -31,8 +31,8 @@ enum HeaderField {
 	OPUS_CHANNELS,
 	CHUNK_PREFIX_LENGTH,
 	OPUS_STREAM_COUNT,
-	OPUS_FRAME_COUNT,
-	FIRST_FRAME_TIME_USEC,
+	NEXT_FRAME_COUNT,
+	NEXT_FRAME_TIME_USEC,
 	OPUS_BITRATE,
 	AUDIO_ENCODING,
 	SIZE,
@@ -43,7 +43,7 @@ enum MidField {
 	TYPE,
 	OPUS_STREAM_COUNT,
 	NEXT_FRAME_COUNT,
-	FRAME0_TIME_USEC,
+	NEXT_FRAME_TIME_USEC,
 	OPUS_BITRATE,
 	SIZE,
 }
@@ -83,8 +83,8 @@ enum HashResponseField {
 
 static func make_header(packet_type: String, opus_frame_size: int,
 		opus_sample_rate: int, opus_channels: int, chunk_prefix_length: int,
-		opus_stream_count: int, opus_frame_count: int,
-		first_frame_time_usec: int, opus_bitrate: int, encode_base64: bool) -> Array:
+		opus_stream_count: int, next_frame_count: int,
+		next_frame_time_usec: int, opus_bitrate: int, encode_base64: bool) -> Array:
 	assert(packet_type == TYPE_START)
 	var packet: Array = []
 	packet.resize(HeaderField.SIZE)
@@ -95,21 +95,21 @@ static func make_header(packet_type: String, opus_frame_size: int,
 	packet[HeaderField.OPUS_CHANNELS] = opus_channels
 	packet[HeaderField.CHUNK_PREFIX_LENGTH] = chunk_prefix_length
 	packet[HeaderField.OPUS_STREAM_COUNT] = opus_stream_count
-	packet[HeaderField.OPUS_FRAME_COUNT] = opus_frame_count
-	packet[HeaderField.FIRST_FRAME_TIME_USEC] = first_frame_time_usec
+	packet[HeaderField.NEXT_FRAME_COUNT] = next_frame_count
+	packet[HeaderField.NEXT_FRAME_TIME_USEC] = next_frame_time_usec
 	packet[HeaderField.OPUS_BITRATE] = opus_bitrate
 	packet[HeaderField.AUDIO_ENCODING] = ENCODING_BASE64 if encode_base64 else ENCODING_BINARY
 	return packet
 
 
 static func make_mid(opus_stream_count: int, next_frame_count: int,
-		frame0_time_usec: int, opus_bitrate: int) -> Array:
+		next_frame_time_usec: int, opus_bitrate: int) -> Array:
 	var packet: Array = []
 	packet.resize(MidField.SIZE)
 	packet[MidField.TYPE] = TYPE_MID
 	packet[MidField.OPUS_STREAM_COUNT] = opus_stream_count
 	packet[MidField.NEXT_FRAME_COUNT] = next_frame_count
-	packet[MidField.FRAME0_TIME_USEC] = frame0_time_usec
+	packet[MidField.NEXT_FRAME_TIME_USEC] = next_frame_time_usec
 	packet[MidField.OPUS_BITRATE] = opus_bitrate
 	return packet
 
@@ -170,6 +170,7 @@ static func header_is_valid(packet: Array) -> bool:
 	return packet.size() == HeaderField.SIZE \
 			and packet[HeaderField.TYPE] == TYPE_START \
 			and packet[HeaderField.VERSION] == WIRE_VERSION \
+			and packet[HeaderField.NEXT_FRAME_COUNT] >= 0 \
 			and (packet[HeaderField.AUDIO_ENCODING] == ENCODING_BINARY \
 					or packet[HeaderField.AUDIO_ENCODING] == ENCODING_BASE64)
 

@@ -54,7 +54,7 @@ var sent_audio_reference: AudioStreamPlaybackOpus = null
 
 func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_denoiser_mode, p_agc_mode):
 	input_mix_rate = AudioServer.get_input_mix_rate()
-	var bitrate_changed := opusencoder != null and opusencoder.get_bitrate() != p_opusbitrate
+	var bitrate_changed = opusencoder != null and opusencoder.get_bitrate() != p_opusbitrate
 	if opusencoder == null or opussamplerate != p_opussamplerate or opuschannels != p_channels or denoiser_mode != p_denoiser_mode or agc_mode != p_agc_mode or opusframedurationms != p_opusframedurationms:
 		opusencoder = TwovoipOpusEncoder.new()
 		opusframedurationms = p_opusframedurationms
@@ -218,15 +218,18 @@ func processtalkstreamends(talking: bool):
 		opusstreamcount += 1
 		sent_audio_reference = null
 
-func make_audio_packet_midstream_update() -> PackedByteArray:
-	var mid_frame0_usec := talking_first_frame_time_usec
+func get_next_frame_time_usec() -> int:
+	var next_frame_time_usec = talking_first_frame_time_usec + opusframecount * opusframedurationms * 1000
 	if opusframecount > 0:
 		var latest_frame_time_usec := get_input_chunk_first_frame_time_usec(0)
 		if latest_frame_time_usec != 0:
-			mid_frame0_usec = latest_frame_time_usec \
-					- (opusframecount - 1) * opusframedurationms * 1000
+			next_frame_time_usec = latest_frame_time_usec \
+					+ opusframedurationms * 1000
+	return next_frame_time_usec
+
+func make_audio_packet_midstream_update() -> PackedByteArray:
 	var audiostreampacketmid := TwoVoipPacket.make_mid(
-			opusstreamcount, opusframecount, mid_frame0_usec,
+			opusstreamcount, opusframecount, get_next_frame_time_usec(),
 			opusencoder.get_bitrate())
 	return TwoVoipPacket.encode_control_packet(audiostreampacketmid)
 
@@ -235,10 +238,9 @@ func request_audio_packet_midstream() -> Array[PackedByteArray]:
 		return []
 	var audiostreampacketheader := TwoVoipPacket.make_header(
 			TwoVoipPacket.TYPE_START, opus_chunk_size, opussamplerate,
-			opuschannels, len(chunkprefix), opusstreamcount, 0,
-			talking_first_frame_time_usec, opusencoder.get_bitrate(), encode_base64)
-	return [TwoVoipPacket.encode_control_packet(audiostreampacketheader),
-			make_audio_packet_midstream_update()]
+			opuschannels, len(chunkprefix), opusstreamcount, opusframecount,
+			get_next_frame_time_usec(), opusencoder.get_bitrate(), encode_base64)
+	return [TwoVoipPacket.encode_control_packet(audiostreampacketheader)]
 
 func set_vox_threshhold(p_vox_threshhold):
 	vox_threshhold = p_vox_threshhold

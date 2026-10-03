@@ -99,7 +99,6 @@ class AudioStreamPlaybackOpus : public AudioStreamPlayback {
 
     std::atomic<int64_t> mixed_output_frames{ 0 };
     std::atomic<int64_t> last_packet_output_frame{ 0 };
-    int64_t scheduled_feed_output_frame = 0;
     int64_t episode_end_output_frame = 0;
     int64_t stale_timeout_frames = 0;
 
@@ -130,9 +129,10 @@ public:
     virtual void _seek(double p_time) override;
     virtual void _tag_used_streams() override;
 
-    Error initialize(int p_opus_sample_rate, int p_opus_channels, int p_opus_frame_size, float p_buffer_length = 2.0f, float p_start_delay = 0.0f, float p_stale_timeout = 2.0f);
+    Error initialize(int p_opus_sample_rate, int p_opus_channels, int p_opus_frame_size, float p_buffer_length = 2.0f, float p_stale_timeout = 2.0f);
     int available_space_frames() const;
     int queue_length_frames() const;
+    int push_silence(int frame_count);
     int push_opus_packet(const PackedByteArray& opusbytepacket, int begin, int decode_fec);
     float get_tail_max(int frame_count) const;
     float get_tail_sum_squares(int frame_count) const;

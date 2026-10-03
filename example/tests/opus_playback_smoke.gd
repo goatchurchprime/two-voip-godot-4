@@ -68,7 +68,7 @@ func run_tests() -> void:
 	var stream := AudioStreamOpus.new()
 	var playback: AudioStreamPlaybackOpus = stream.instantiate_playback()
 	playback.start()
-	assert(playback.initialize(48000, 1, 960, 0.01, 0.0, 2.0) == OK)
+	assert(playback.initialize(48000, 1, 960, 0.01, 2.0) == OK)
 
 	assert(playback.push_opus_packet(packet, 0, 0) == 960)
 	assert(playback.queue_length_frames() == 960)
@@ -94,8 +94,8 @@ func run_tests() -> void:
 	var second_episode: AudioStreamPlaybackOpus = stream.instantiate_playback()
 	first_episode.start()
 	second_episode.start()
-	assert(first_episode.initialize(48000, 1, 960, 0.1, 0.0, 2.0) == OK)
-	assert(second_episode.initialize(48000, 1, 960, 0.1, 0.0, 2.0) == OK)
+	assert(first_episode.initialize(48000, 1, 960, 0.1, 2.0) == OK)
+	assert(second_episode.initialize(48000, 1, 960, 0.1, 2.0) == OK)
 	assert(first_episode.push_opus_packet(packet, 0, 0) == 960)
 	assert(second_episode.push_opus_packet(packet, 0, 0) == 960)
 	assert(first_episode.finish_episode() == 960)
@@ -104,17 +104,27 @@ func run_tests() -> void:
 	assert(second_episode.queue_length_frames() == 960)
 	assert(drain_episode(second_episode))
 
+	var silence_episode: AudioStreamPlaybackOpus = stream.instantiate_playback()
+	silence_episode.start()
+	assert(silence_episode.initialize(48000, 1, 960, 0.1, 2.0) == OK)
+	assert(silence_episode.push_silence(480) == 480)
+	assert(silence_episode.queue_length_frames() == 480)
+	assert(silence_episode.push_opus_packet(packet, 0, 0) == 960)
+	assert(silence_episode.queue_length_frames() == 1440)
+	assert(silence_episode.finish_episode() == 1440)
+	assert(drain_episode(silence_episode))
+
 	var player := AudioStreamPlayer.new()
 	get_root().add_child(player)
 	player.stream = stream
 	player.max_polyphony = 3
 	player.play()
 	var player_episode_one: AudioStreamPlaybackOpus = player.get_stream_playback()
-	assert(player_episode_one.initialize(48000, 1, 960, 0.1, 0.0, 2.0) == OK)
+	assert(player_episode_one.initialize(48000, 1, 960, 0.1, 2.0) == OK)
 	player.play()
 	var player_episode_two: AudioStreamPlaybackOpus = player.get_stream_playback()
 	assert(player_episode_two != player_episode_one)
-	assert(player_episode_two.initialize(48000, 1, 960, 0.1, 0.0, 2.0) == OK)
+	assert(player_episode_two.initialize(48000, 1, 960, 0.1, 2.0) == OK)
 	assert(player_episode_one.is_playing())
 	assert(player_episode_two.is_playing())
 	assert(player_episode_one.finish_episode() == 0)
@@ -127,6 +137,7 @@ func run_tests() -> void:
 	player_episode_two = null
 	first_episode = null
 	second_episode = null
+	silence_episode = null
 	playback = null
 	reference = null
 	comparison = null

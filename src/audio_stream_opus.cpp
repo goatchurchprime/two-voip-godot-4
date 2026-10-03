@@ -45,7 +45,8 @@ void AudioStreamPlaybackOpus::_bind_methods() {
 
     ClassDB::bind_method(D_METHOD("available_space_frames"), &AudioStreamPlaybackOpus::available_space_frames);
     ClassDB::bind_method(D_METHOD("queue_length_frames"), &AudioStreamPlaybackOpus::queue_length_frames);
-    ClassDB::bind_method(D_METHOD("initialize", "opus_sample_rate", "opus_channels", "opus_frame_size", "buffer_length", "start_delay", "stale_timeout"), &AudioStreamPlaybackOpus::initialize, DEFVAL(2.0f), DEFVAL(0.0f), DEFVAL(2.0f));
+    ClassDB::bind_method(D_METHOD("initialize", "opus_sample_rate", "opus_channels", "opus_frame_size", "buffer_length", "stale_timeout"), &AudioStreamPlaybackOpus::initialize, DEFVAL(2.0f), DEFVAL(2.0f));
+    ClassDB::bind_method(D_METHOD("push_silence", "frame_count"), &AudioStreamPlaybackOpus::push_silence);
     ClassDB::bind_method(D_METHOD("push_opus_packet", "opusbytepacket", "begin", "decode_fec"), &AudioStreamPlaybackOpus::push_opus_packet);
     ClassDB::bind_method(D_METHOD("finish_episode"), &AudioStreamPlaybackOpus::finish_episode);
     ClassDB::bind_method(D_METHOD("get_tail_max", "frame_count"), &AudioStreamPlaybackOpus::get_tail_max);
@@ -70,7 +71,7 @@ AudioStreamPlaybackOpus::AudioStreamPlaybackOpus() {
     godot::UtilityFunctions::print_verbose("construct AudioStreamPlaybackOpus");
 }
 
-Error AudioStreamPlaybackOpus::initialize(int p_opus_sample_rate, int p_opus_channels, int p_opus_frame_size, float p_buffer_length, float p_start_delay, float p_stale_timeout) {
+Error AudioStreamPlaybackOpus::initialize(int p_opus_sample_rate, int p_opus_channels, int p_opus_frame_size, float p_buffer_length, float p_stale_timeout) {
     if (episode_state.load(std::memory_order_acquire) != EPISODE_UNINITIALIZED) {
         return ERR_ALREADY_IN_USE;
     }
@@ -91,7 +92,7 @@ Error AudioStreamPlaybackOpus::initialize(int p_opus_sample_rate, int p_opus_cha
         UtilityFunctions::printerr("Opus frame size must represent 2.5, 5, 10, 20, 40 or 60 ms");
         return ERR_INVALID_PARAMETER;
     }
-    if (p_buffer_length <= 0.0f || p_start_delay < 0.0f || p_stale_timeout <= 0.0f) {
+    if (p_buffer_length <= 0.0f || p_stale_timeout <= 0.0f) {
         return ERR_INVALID_PARAMETER;
     }
 
@@ -134,8 +135,6 @@ Error AudioStreamPlaybackOpus::initialize(int p_opus_sample_rate, int p_opus_cha
     buffer_read_frame.store(0, std::memory_order_relaxed);
     buffer_write_frame.store(0, std::memory_order_relaxed);
     const int64_t current_output_frame = mixed_output_frames.load(std::memory_order_acquire);
-    const int64_t audible_start_frame = current_output_frame + static_cast<int64_t>(std::ceil(p_start_delay * output_mix_rate));
-    scheduled_feed_output_frame = std::max(current_output_frame, audible_start_frame - resampler_output_latency);
     last_packet_output_frame.store(current_output_frame, std::memory_order_relaxed);
     stale_timeout_frames = static_cast<int64_t>(std::ceil(p_stale_timeout * output_mix_rate));
     episode_state.store(EPISODE_RECEIVING, std::memory_order_release);
@@ -194,6 +193,28 @@ int AudioStreamPlaybackOpus::queue_length_frames() const {
 
 int AudioStreamPlaybackOpus::available_space_frames() const {
     return static_cast<int>(audiosamplebuffer.size()) - queue_length_frames();
+}
+
+int AudioStreamPlaybackOpus::push_silence(int frame_count) {
+    if (episode_state.load(std::memory_order_acquire) != EPISODE_RECEIVING || frame_count < 0) {
+        return -1;
+    }
+    if (frame_count == 0) {
+        return 0;
+    }
+
+    std::lock_guard<std::mutex> buffer_lock(buffer_mutex);
+    const int64_t write_frame = buffer_write_frame.load(std::memory_order_relaxed);
+    const int64_t read_frame = buffer_read_frame.load(std::memory_order_acquire);
+    const int64_t queued = std::clamp<int64_t>(write_frame - read_frame, 0, audiosamplebuffer.size());
+    if (frame_count > audiosamplebuffer.size() - queued) {
+        return -1;
+    }
+    for (int frame = 0; frame < frame_count; frame++) {
+        audiosamplebuffer[(write_frame + frame) % audiosamplebuffer.size()] = { 0.0f, 0.0f };
+    }
+    buffer_write_frame.store(write_frame + frame_count, std::memory_order_release);
+    return frame_count;
 }
 
 //  *  not be capable of decoding some packets. In the case of PLC (data==NULL) or FEC (decode_fec=1),
@@ -410,25 +431,24 @@ int32_t AudioStreamPlaybackOpus::_mix(AudioFrame *buffer, float rate_scale, int3
         return frames;
     }
 
-    int output_offset = static_cast<int>(std::clamp<int64_t>(scheduled_feed_output_frame - output_begin, 0, frames));
     int produced_total = 0;
     std::lock_guard<std::mutex> buffer_lock(buffer_mutex);
     int64_t read_frame = buffer_read_frame.load(std::memory_order_relaxed);
     const int64_t write_frame = buffer_write_frame.load(std::memory_order_acquire);
 
-    while (output_offset + produced_total < frames) {
+    while (produced_total < frames) {
         int consumed = 0;
         int produced = 0;
         if (read_frame < write_frame) {
             const int ring_index = static_cast<int>(read_frame % audiosamplebuffer.size());
             const int input_frames = static_cast<int>(std::min<int64_t>(write_frame - read_frame, audiosamplebuffer.size() - ring_index));
             produced = resample_frames(&audiosamplebuffer[ring_index], input_frames,
-                    buffer + output_offset + produced_total, frames - output_offset - produced_total, consumed);
+                    buffer + produced_total, frames - produced_total, consumed);
             read_frame += consumed;
         } else if (state == EPISODE_FINISHED && flush_input_frames_remaining > 0) {
             const int input_frames = std::min(flush_input_frames_remaining, static_cast<int>(resampler_silence.size()));
             produced = resample_frames(resampler_silence.ptr(), input_frames,
-                    buffer + output_offset + produced_total, frames - output_offset - produced_total, consumed);
+                    buffer + produced_total, frames - produced_total, consumed);
             flush_input_frames_remaining -= consumed;
         } else {
             break;
@@ -451,8 +471,8 @@ int32_t AudioStreamPlaybackOpus::_mix(AudioFrame *buffer, float rate_scale, int3
     }
 
     state = episode_state.load(std::memory_order_acquire);
-    if (state == EPISODE_RECEIVING && read_frame == write_frame && output_end >= scheduled_feed_output_frame) {
-        const int64_t idle_start = std::max(last_packet_output_frame.load(std::memory_order_acquire), scheduled_feed_output_frame);
+    if (state == EPISODE_RECEIVING && read_frame == write_frame) {
+        const int64_t idle_start = last_packet_output_frame.load(std::memory_order_acquire);
         if (output_end - idle_start >= stale_timeout_frames) {
             EpisodeState expected = EPISODE_RECEIVING;
             episode_state.compare_exchange_strong(expected, EPISODE_FINISHED, std::memory_order_release, std::memory_order_acquire);
@@ -460,15 +480,15 @@ int32_t AudioStreamPlaybackOpus::_mix(AudioFrame *buffer, float rate_scale, int3
         }
     }
 
-    const int unfilled_frames = frames - output_offset - produced_total;
-    if (state == EPISODE_RECEIVING && unfilled_frames > 0 && output_end > scheduled_feed_output_frame) {
+    const int unfilled_frames = frames - produced_total;
+    if (state == EPISODE_RECEIVING && unfilled_frames > 0) {
         underflow_frames.fetch_add(unfilled_frames, std::memory_order_relaxed);
     }
 
     mixed_output_frames.store(output_end, std::memory_order_release);
 
-    if (state == EPISODE_FINISHED && read_frame == write_frame && flush_input_frames_remaining == 0 && output_end >= scheduled_feed_output_frame) {
-        episode_end_output_frame = output_begin + output_offset + produced_total;
+    if (state == EPISODE_FINISHED && read_frame == write_frame && flush_input_frames_remaining == 0) {
+        episode_end_output_frame = output_begin + produced_total;
         episode_state.store(EPISODE_DRAINING, std::memory_order_release);
     }
     return frames;

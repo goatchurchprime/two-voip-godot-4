@@ -16,7 +16,7 @@ var audioserveroutputlatency = AudioServer.get_output_latency()
 @export var maximum_simultaneous_episodes = 3
 @export var stale_episode_timeout = 2.0
 
-var lenchunkprefix = TwoVoipPacket.TIMESTAMPED_CHUNK_PREFIX_SIZE
+var lenchunkprefix = TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE
 var opusstreamcount = 0
 var inopusstream = false
 var audio_packets_base64 = false
@@ -26,8 +26,11 @@ var outputrms : float = 0.0
 var opusframesize = 960
 var tailframenumber = 0
 var playbackstartframenumber = 0
-var source_first_frame_time_usec: int = 0
+var episodefirstframenumber = 0
+var source_next_frame_count: int = 0
+var source_next_frame_time_usec: int = 0
 var source_packet_first_frame_time_usec: int = 0
+var source_bitrate = 0
 const Noutoforderqueue = 4
 const Npacketinitialbatching = 2
 var outoforderchunkqueue = [ ]
@@ -56,14 +59,44 @@ func setrecopusvalues(new_opus_sample_rate, new_opus_channels, new_opus_frame_si
 	decoded_frame_max_values.fill(0.0)
 	audioplayeropus.play()  # Every talking episode gets its own playback.
 	audio_stream_playback_opus = audioplayeropus.get_stream_playback()
-	var result = audio_stream_playback_opus.initialize(opus_sample_rate, opus_channels, opusframesize, audio_buffer_length, audio_buffer_lag_time_target, stale_episode_timeout)
+	var result = audio_stream_playback_opus.initialize(opus_sample_rate, opus_channels,
+			opusframesize, audio_buffer_length, stale_episode_timeout)
 	if result != OK:
 		push_error("Could not initialize Opus playback: %s" % error_string(result))
 		audio_stream_playback_opus.stop()
 		audio_stream_playback_opus = null
 		return
 	set_sinewave_out(sinewaveoutmode)
-	pausereached = false
+
+func start_playback_timeline(next_frame_count: int, next_frame_time_usec: int):
+	var now_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var frame_age := (now_usec - next_frame_time_usec) / 1000000.0
+	var padding_frames := roundi(max(0.0,
+			audio_buffer_lag_time_target - audioserveroutputlatency - frame_age) \
+			* opus_sample_rate)
+	padding_frames = min(padding_frames,
+			max(0, audio_stream_playback_opus.available_space_frames() - opusframesize))
+	if audio_stream_playback_opus.push_silence(padding_frames) != padding_frames:
+		push_error("Could not queue initial Opus playback silence")
+		padding_frames = 0
+	opusframecount = next_frame_count
+	tailframenumber = opusframecount * opusframesize
+	episodefirstframenumber = tailframenumber
+	playbackstartframenumber = tailframenumber - padding_frames
+	source_next_frame_time_usec = next_frame_time_usec
+
+func push_silent_opus_frames(frame_count: int) -> bool:
+	if frame_count <= 0:
+		return true
+	var silent_sample_frames: int = frame_count * opusframesize
+	if audio_stream_playback_opus.push_silence(silent_sample_frames) != silent_sample_frames:
+		push_warning("Not enough playback buffer space for %d silent Opus frames" % frame_count)
+		return false
+	for frame in range(opusframecount, opusframecount + frame_count):
+		decoded_frame_max_values[frame % decoded_frame_max_values.size()] = 0.0
+	opusframecount += frame_count
+	tailframenumber += silent_sample_frames
+	return true
 
 func report_opus_error(opus_err):
 	if opus_err == -4:
@@ -86,7 +119,7 @@ func push_opus_packet(packet: PackedByteArray, begin: int, decode_fec: bool):
 	return decoded_frames
 
 func get_frame_max(frame_number: int) -> float:
-	if frame_number < playbackstartframenumber or opusframesize <= 0:
+	if frame_number < episodefirstframenumber or opusframesize <= 0:
 		return 0.0
 	var chunk_index = int(frame_number / opusframesize)
 	return decoded_frame_max_values[chunk_index % decoded_frame_max_values.size()]
@@ -102,7 +135,7 @@ func receive_audio_control_packet(control_packet: Array):
 		push_warning("Invalid TwoVoIP control packet")
 		return
 	var packet_type = control_packet[0]
-	if packet_type == TwoVoipPacket.TYPE_START or packet_type == TwoVoipPacket.TYPE_MID:
+	if packet_type == TwoVoipPacket.TYPE_START:
 		if not TwoVoipPacket.header_is_valid(control_packet):
 			push_warning("Unsupported or malformed TwoVoIP stream header")
 			return
@@ -112,18 +145,17 @@ func receive_audio_control_packet(control_packet: Array):
 				int(control_packet[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE]))
 		lenchunkprefix = int(control_packet[TwoVoipPacket.HeaderField.CHUNK_PREFIX_LENGTH])
 		opusstreamcount = int(control_packet[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT])
-		source_first_frame_time_usec = int(control_packet[TwoVoipPacket.HeaderField.FIRST_FRAME_TIME_USEC])
+		source_next_frame_count = int(control_packet[TwoVoipPacket.HeaderField.NEXT_FRAME_COUNT])
+		source_next_frame_time_usec = int(control_packet[TwoVoipPacket.HeaderField.NEXT_FRAME_TIME_USEC])
+		source_packet_first_frame_time_usec = 0
+		source_bitrate = int(control_packet[TwoVoipPacket.HeaderField.OPUS_BITRATE])
 		audio_packets_base64 = TwoVoipPacket.header_uses_base64(control_packet)
 		opusframecount = 0
 		outputsumsquares = 0.0
 		outputrms = 0.0
 		tailframenumber = 0
 		playbackstartframenumber = 0
-		if packet_type == TwoVoipPacket.TYPE_MID:
-			print("Mid speech header: ", control_packet[TwoVoipPacket.HeaderField.OPUS_FRAME_COUNT])
-			opusframecount = int(control_packet[TwoVoipPacket.HeaderField.OPUS_FRAME_COUNT]) + 1
-			tailframenumber = opusframecount*opusframesize
-			playbackstartframenumber = tailframenumber
+		episodefirstframenumber = 0
 		outoforderchunkqueue.clear()
 		for i in range(Noutoforderqueue):
 			outoforderchunkqueue.push_back(null)
@@ -131,16 +163,29 @@ func receive_audio_control_packet(control_packet: Array):
 		assert(Npacketinitialbatching < Noutoforderqueue)
 		runninglagtimeminimum = -1.0
 		inopusstream = true
+		start_playback_timeline(
+				source_next_frame_count,
+				source_next_frame_time_usec)
+	elif packet_type == TwoVoipPacket.TYPE_MID:
+		if not TwoVoipPacket.mid_is_valid(control_packet):
+			push_warning("Malformed TwoVoIP mid-stream update")
+			return
+		if not inopusstream or int(control_packet[TwoVoipPacket.MidField.OPUS_STREAM_COUNT]) != opusstreamcount:
+			return
+		source_next_frame_count = int(control_packet[TwoVoipPacket.MidField.NEXT_FRAME_COUNT])
+		source_next_frame_time_usec = int(control_packet[TwoVoipPacket.MidField.NEXT_FRAME_TIME_USEC])
+		source_bitrate = int(control_packet[TwoVoipPacket.MidField.OPUS_BITRATE])
+		if source_next_frame_count > opusframecount:
+			push_silent_opus_frames(source_next_frame_count - opusframecount)
 	elif packet_type == TwoVoipPacket.TYPE_END:
 		if not TwoVoipPacket.footer_is_valid(control_packet):
 			push_warning("Malformed TwoVoIP stream footer")
 			return
 		if audio_stream_playback_opus:
 			audio_stream_playback_opus.finish_episode()
-		var outputframecount = tailframenumber - playbackstartframenumber
+		var outputframecount = tailframenumber - episodefirstframenumber
 		outputrms = sqrt(outputsumsquares/outputframecount) if outputframecount > 0 else 0.0
 		control_packet[TwoVoipPacket.FooterField.RMS] = outputrms
-		pausereached = false
 		print("runninglagtimeminimum: ", runninglagtimeminimum, " (target: ", audio_buffer_lag_time_target, ")")
 		inopusstream = false
 		return control_packet
@@ -153,7 +198,7 @@ func receive_audio_control_packet(control_packet: Array):
 		var first_frame = int(control_packet[TwoVoipPacket.HashRequestField.FIRST_FRAME])
 		var frame_count = int(control_packet[TwoVoipPacket.HashRequestField.FRAME_COUNT])
 		var hash = -1
-		if audio_stream_playback_opus and first_frame >= playbackstartframenumber:
+		if audio_stream_playback_opus and first_frame >= episodefirstframenumber:
 			hash = audio_stream_playback_opus.get_frame_hash(
 					first_frame - playbackstartframenumber, frame_count)
 		var response = TwoVoipPacket.make_hash_response(
@@ -174,15 +219,15 @@ func receive_audio_packet(packet):
 	if len(packet) <= lenchunkprefix:
 		print("Bad audio packet too short")
 		return
-	if lenchunkprefix >= TwoVoipPacket.TIMESTAMPED_CHUNK_PREFIX_SIZE:
-		source_packet_first_frame_time_usec = TwoVoipPacket.get_chunk_first_frame_time_usec(packet)
-
 	if lenchunkprefix == -1:
 		pass
 
 	elif lenchunkprefix == 0:
 		if audio_stream_playback_opus == null:
 			return
+		source_packet_first_frame_time_usec = source_next_frame_time_usec \
+				+ int((opusframecount - source_next_frame_count) * opusframesize \
+				* 1000000.0 / opus_sample_rate)
 		push_opus_packet(packet, lenchunkprefix, false)
 		opusframecount += 1
 
@@ -190,7 +235,16 @@ func receive_audio_packet(packet):
 		if audio_stream_playback_opus == null:
 			return
 		assert (lenchunkprefix >= TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE)
-		var opusframecountI = packet[0] + (packet[1]&127)*256
+		var opusframecountI: int = packet[0] + (packet[1]&127)*256
+		var frame_count_offset: int = opusframecountI - (opusframecount % 32768)
+		if frame_count_offset < -16384:
+			frame_count_offset += 32768
+		elif frame_count_offset > 16384:
+			frame_count_offset -= 32768
+		var unwrapped_frame_count: int = opusframecount + frame_count_offset
+		source_packet_first_frame_time_usec = source_next_frame_time_usec \
+				+ int((unwrapped_frame_count - source_next_frame_count) * opusframesize \
+				* 1000000.0 / opus_sample_rate)
 		var opusframecountR = opusframecountI - opusframecount
 		if opusframecountR < 0:
 			if opusframecountR < -30000:
@@ -235,8 +289,6 @@ func receive_audio_packet(packet):
 		prints("dropping frame with opusstream number mismatch", opusstreamcount, packet[0], packet[1], "streamcount", opusstreamcount)
 
 var playingrecording = false
-var pausereached = false
-var prevskips = 0
 func _physics_process(delta):
 	if audio_stream_playback_opus == null:
 		return
@@ -246,12 +298,6 @@ func _physics_process(delta):
 	if playingrecording:
 		return
 	var queuelengthframes = audio_stream_playback_opus.queue_length_frames()
-	if not pausereached and queuelengthframes == 0:
-		pausereached = true
-		var currskips = audio_stream_playback_opus.get_skips(false)
-		print("Skips during playback: ", currskips - prevskips)
-		prevskips = currskips
-		
 	var bufferlengthtime = audioserveroutputlatency + queuelengthframes*1.0/opus_sample_rate
 	if runninglagtimeminimum < 0.0 or bufferlengthtime < runninglagtimeminimum:
 		runninglagtimeminimum = bufferlengthtime
