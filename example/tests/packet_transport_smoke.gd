@@ -73,6 +73,8 @@ func run_speaker_episode(speaker: Node, stream_count: int, encode_base64: bool) 
 	assert(int(hash_responses[0][TwoVoipPacket.HashResponseField.HASH]) ==
 			source_reference.get_frame_hash(0, 1920))
 	var sent_rms = sqrt(sent_sum_squares/1920)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count - 1, 2, 0.04, 12.54, sent_rms)))
+	assert(speaker.inopusstream)
 	var footer := TwoVoipPacket.make_footer(stream_count, 2, 0.04, 12.54, sent_rms)
 	var returned_footer = speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(footer))
 	assert(returned_footer[TwoVoipPacket.FooterField.RMS] == sent_rms)
@@ -122,6 +124,16 @@ func run_counter_wrap(speaker: Node, stream_count: int) -> void:
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, first_frame + 2, 0.04, 0.0)))
 
 
+func run_mid_without_playback(speaker: Node) -> void:
+	speaker.inopusstream = true
+	speaker.opusstreamcount = 12
+	speaker.source_next_frame_count = 5
+	speaker.audio_stream_playback_opus = null
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_mid(12, 10, 1700000000200000, 12000)))
+	assert(speaker.source_next_frame_count == 5)
+	speaker.inopusstream = false
+
+
 func run_input_gap_detection() -> void:
 	var mic := Node.new()
 	mic.set_script(preload("res://addons/twovoip/voiphelper/two_voip_mic.gd"))
@@ -149,6 +161,64 @@ func run_input_gap_detection() -> void:
 	assert(int(mid[TwoVoipPacket.MidField.NEXT_FRAME_COUNT]) == 33)
 	assert(int(mid[TwoVoipPacket.MidField.NEXT_FRAME_TIME_USEC]) == 1700000000660000)
 	assert(TwoVoipPacket.decode_sequence_chunk_prefix(emitted_packets[1], 33, 12) == 33)
+	mic.free()
+
+
+func run_stream_start_without_history() -> void:
+	var mic := Node.new()
+	mic.set_script(preload("res://addons/twovoip/voiphelper/two_voip_mic.gd"))
+	mic.opusencoder = TwovoipOpusEncoder.new()
+	assert(mic.opusencoder.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	mic.input_chunk_first_frame_times_usec.resize(51)
+	var emitted_packets: Array[PackedByteArray] = []
+	mic.transmit_audio_packet.connect(func(packet): emitted_packets.append(packet))
+	mic.processtalkstreamends(true)
+	assert(not mic.currentlytalking)
+	assert(emitted_packets.is_empty())
+	assert(mic.opusencoder.push_input_chunk(make_mono(0.0)) == 960)
+	mic.input_chunk_number = 0
+	mic.input_chunk_first_frame_times_usec[0] = 1700000000000000
+	mic.processtalkstreamends(true)
+	assert(mic.currentlytalking)
+	assert(mic.frame0usec == 1700000000000000)
+	assert(emitted_packets.size() == 2)
+	var header := TwoVoipPacket.decode_control_packet(emitted_packets[0])
+	assert(int(header[TwoVoipPacket.HeaderField.NEXT_FRAME_TIME_USEC]) == 1700000000000000)
+	mic.free()
+
+
+func run_input_gap_restart() -> void:
+	var mic := Node.new()
+	mic.set_script(preload("res://addons/twovoip/voiphelper/two_voip_mic.gd"))
+	mic.opusencoder = TwovoipOpusEncoder.new()
+	assert(mic.opusencoder.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	mic.currentlytalking = true
+	mic.opusstreamcount = 12
+	mic.opusframecount = 30
+	mic.frame0usec = 1700000000000000
+	mic.talkingtimestart = Time.get_ticks_msec()*0.001 - 0.6
+	mic.input_chunk_first_frame_times_usec.resize(10)
+	mic.voxbutton = Button.new()
+	mic.voxbutton.toggle_mode = true
+	mic.voxbutton.button_pressed = true
+	mic.pttbutton = Button.new()
+	mic.pttbutton.toggle_mode = true
+	mic.pttbutton.button_pressed = true
+	var emitted_packets: Array[PackedByteArray] = []
+	mic.transmit_audio_packet.connect(func(packet): emitted_packets.append(packet))
+	mic.detect_audio_input_gap(1700000002700000)
+	assert(not mic.currentlytalking)
+	assert(mic.opusstreamcount == 13)
+	assert(not mic.pttbutton.button_pressed)
+	assert(mic.opusencoder.get_chunk_sum_squares(0) == 0.0)
+	assert(emitted_packets.size() == 1)
+	var footer := TwoVoipPacket.decode_control_packet(emitted_packets[0])
+	assert(footer[TwoVoipPacket.FooterField.TYPE] == TwoVoipPacket.TYPE_END)
+	assert(int(footer[TwoVoipPacket.FooterField.OPUS_FRAME_COUNT]) == 30)
+	mic.processvox(1.0, 0.0, PackedVector2Array())
+	assert(mic.pttbutton.button_pressed)
+	mic.voxbutton.free()
+	mic.pttbutton.free()
 	mic.free()
 
 
@@ -230,7 +300,10 @@ func run_tests() -> void:
 	run_speaker_episode(speaker, 9, true)
 	run_mid_join_and_gap(speaker, 10)
 	run_counter_wrap(speaker, 11)
+	run_mid_without_playback(speaker)
 	run_input_gap_detection()
+	run_stream_start_without_history()
+	run_input_gap_restart()
 	player.stop()
 	player.queue_free()
 	await process_frame

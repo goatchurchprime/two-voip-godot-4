@@ -170,7 +170,7 @@ func receive_audio_control_packet(control_packet: Array):
 		if not TwoVoipPacket.mid_is_valid(control_packet):
 			push_warning("Malformed TwoVoIP mid-stream update")
 			return
-		if not inopusstream or int(control_packet[TwoVoipPacket.MidField.OPUS_STREAM_COUNT]) != opusstreamcount:
+		if not inopusstream or audio_stream_playback_opus == null or int(control_packet[TwoVoipPacket.MidField.OPUS_STREAM_COUNT]) != opusstreamcount:
 			return
 		source_next_frame_count = int(control_packet[TwoVoipPacket.MidField.NEXT_FRAME_COUNT])
 		source_next_frame_time_usec = int(control_packet[TwoVoipPacket.MidField.NEXT_FRAME_TIME_USEC])
@@ -180,6 +180,8 @@ func receive_audio_control_packet(control_packet: Array):
 	elif packet_type == TwoVoipPacket.TYPE_END:
 		if not TwoVoipPacket.footer_is_valid(control_packet):
 			push_warning("Malformed TwoVoIP stream footer")
+			return
+		if int(control_packet[TwoVoipPacket.FooterField.OPUS_STREAM_COUNT]) != opusstreamcount:
 			return
 		if audio_stream_playback_opus:
 			audio_stream_playback_opus.finish_episode()
@@ -278,6 +280,7 @@ func _physics_process(delta):
 		return
 	if not audio_stream_playback_opus.is_playing(): # could use the finished signal
 		audio_stream_playback_opus = null
+		inopusstream = false
 		return
 	if playingrecording:
 		return

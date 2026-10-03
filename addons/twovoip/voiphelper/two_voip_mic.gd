@@ -6,6 +6,7 @@ var chunkprefix := TwoVoipPacket.make_sequence_chunk_prefix()
 var lead_time : float = 0.15
 var hang_time : float  = 0.7
 var input_gap_threshold : float = 0.1
+var input_gap_restart_threshold : float = 1.0
 var vox_threshhold = 0.07
 var currentlytalking = false
 var opusframecount = 0
@@ -173,9 +174,12 @@ func set_encode_base64(p_encode_base64: bool):
 
 func processtalkstreamends(talking: bool):
 	if talking and not currentlytalking:
-		var leadchunks = int(lead_time/frametimesecs)
+		if input_chunk_number < 0:
+			return
+		var available_chunks_back = min(input_chunk_number, input_chunk_first_frame_times_usec.size() - 1)
+		var leadchunks = min(int(lead_time/frametimesecs), available_chunks_back)
 		const rnnwarmuptime = 0.2  # 10 chunks at the usual 20 ms frame duration.
-		var rnnwarmupchunks = ceili(rnnwarmuptime/frametimesecs)
+		var rnnwarmupchunks = min(ceili(rnnwarmuptime/frametimesecs), available_chunks_back - leadchunks)
 		talkingtimestart = Time.get_ticks_msec()*0.001 - leadchunks*frametimesecs
 		talking_first_frame_time_usec = get_input_chunk_first_frame_time_usec(leadchunks)
 		hangchunks = int(hang_time/frametimesecs)
@@ -300,6 +304,9 @@ func get_input_chunk_first_frame_time_usec(chunks_back: int) -> int:
 func detect_audio_input_gap(frameCusec):
 	if not currentlytalking:
 		return
+	if frameCusec == 0 or frame0usec == 0:
+		push_error("Cannot detect an audio input gap without valid frame times")
+		return
 	var frameCusec_predicted = frame0usec + opusframecount*opusframedurationms*1000
 	var gap_usec = frameCusec - frameCusec_predicted
 	if gap_usec >= input_gap_threshold*1000000.0:
@@ -311,7 +318,13 @@ func detect_audio_input_gap(frameCusec):
 			for chunk in range(stored_silent_chunks):
 				input_chunk_number += 1
 				input_chunk_first_frame_times_usec[input_chunk_number % input_chunk_first_frame_times_usec.size()] = frameCusec - (stored_silent_chunks - chunk)*opusframedurationms*1000
-			notify_audio_input_gap(missing_frame_count, frameCusec)
+			if gap_usec >= input_gap_restart_threshold*1000000.0:
+				processtalkstreamends(false)
+				if voxbutton != null and voxbutton.button_pressed:
+					pttbutton.button_pressed = false
+					hangchunkscountup = hangchunks + 1
+			else:
+				notify_audio_input_gap(missing_frame_count, frameCusec)
 	elif gap_usec <= -input_gap_threshold*1000000.0:
 		push_error("impossible big negative gap in the audio stream timing %f" % (gap_usec/1000000.0))
 

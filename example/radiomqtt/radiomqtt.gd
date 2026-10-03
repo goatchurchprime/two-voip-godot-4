@@ -316,7 +316,7 @@ func _on_hash_check_button_toggled(toggled_on):
 func _on_pause_check_toggled(toggled_on):
 	get_tree().paused = toggled_on
 	if toggled_on:
-		await get_tree().create_timer(1.0).timeout
+		await get_tree().create_timer(3.0).timeout
 		$HBoxNetManage/PauseCheck.button_pressed = false
 
 func _on_stall_in_1_toggled(toggled_on):
