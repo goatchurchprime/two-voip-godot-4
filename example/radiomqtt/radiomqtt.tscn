@@ -522,7 +522,7 @@ layout_mode = 2
 script = ExtResource("2_y485j")
 
 [node name="MQTT" parent="MQTTnetwork" unique_id=1372585551 instance=ExtResource("2_4wm5t")]
-verbose_level = 1
+verbose_level = 0
 binarymessages = true
 
 [node name="Connect" type="Button" parent="MQTTnetwork" unique_id=1623789959]

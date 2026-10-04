@@ -1,0 +1,274 @@
+[gd_scene format=3]
+
+[node name="TwoVoipTimingMeter" type="Control"]
+custom_minimum_size = Vector2(542, 88)
+mouse_filter = 1
+tooltip_text = "PCM playout (blue audio, grey reserve, purple source-gap silence, orange FEC), packet reorder slots, arrival variation, and the most recent receiver state transition."
+
+[node name="LagText" type="Label" parent="."]
+layout_mode = 0
+offset_right = 542.0
+offset_bottom = 30.0
+theme_override_font_sizes/font_size = 11
+text = "capture→arrival offset —   bitrate —\nvariation —   playout —   target —"
+
+[node name="Display" type="ColorRect" parent="."]
+layout_mode = 0
+offset_top = 32.0
+offset_right = 542.0
+offset_bottom = 88.0
+color = Color(0.055, 0.065, 0.08, 1)
+
+[node name="ReorderLabel" type="Label" parent="Display"]
+layout_mode = 0
+offset_left = 286.0
+offset_right = 344.0
+offset_bottom = 13.0
+theme_override_font_sizes/font_size = 9
+text = "REORDER"
+
+[node name="ArrivalLabel" type="Label" parent="Display"]
+layout_mode = 0
+offset_left = 356.0
+offset_right = 538.0
+offset_bottom = 13.0
+theme_override_font_sizes/font_size = 9
+text = "ARRIVAL VARIATION"
+
+[node name="OutputClip" type="Control" parent="Display"]
+clip_contents = true
+layout_mode = 0
+offset_left = 4.0
+offset_top = 15.0
+offset_right = 274.0
+offset_bottom = 30.0
+
+[node name="OutputCells" type="HBoxContainer" parent="Display/OutputClip"]
+layout_mode = 0
+offset_right = 286.0
+offset_bottom = 15.0
+theme_override_constants/separation = 1
+
+[node name="Cell00" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell01" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell02" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell03" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell04" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell05" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell06" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell07" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell08" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell09" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell10" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell11" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell12" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell13" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell14" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell15" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell16" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell17" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell18" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell19" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell20" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell21" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell22" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell23" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell24" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell25" type="ColorRect" parent="Display/OutputClip/OutputCells"]
+custom_minimum_size = Vector2(10, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="TargetBufferHighlight" type="ColorRect" parent="Display/OutputClip"]
+layout_mode = 0
+offset_right = 1.0
+offset_bottom = 15.0
+mouse_filter = 2
+color = Color(0, 1, 1, 0.12)
+
+[node name="AudibleHead" type="ColorRect" parent="Display/OutputClip"]
+layout_mode = 0
+offset_right = 0.0
+offset_bottom = 15.0
+mouse_filter = 2
+color = Color(1, 0.25, 0.25, 0.72)
+
+[node name="ReorderSlots" type="HBoxContainer" parent="Display"]
+layout_mode = 0
+offset_left = 286.0
+offset_top = 15.0
+offset_right = 344.0
+offset_bottom = 30.0
+theme_override_constants/separation = 1
+
+[node name="Slot0" type="ColorRect" parent="Display/ReorderSlots"]
+custom_minimum_size = Vector2(13, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Slot1" type="ColorRect" parent="Display/ReorderSlots"]
+custom_minimum_size = Vector2(13, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Slot2" type="ColorRect" parent="Display/ReorderSlots"]
+custom_minimum_size = Vector2(13, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Slot3" type="ColorRect" parent="Display/ReorderSlots"]
+custom_minimum_size = Vector2(13, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Arrival" type="ColorRect" parent="Display"]
+clip_contents = true
+layout_mode = 0
+offset_left = 356.0
+offset_top = 15.0
+offset_right = 538.0
+offset_bottom = 30.0
+tooltip_text = "Capture-to-arrival time contains an unknown fixed difference between the source and receiver clocks. The meter subtracts the minimum observed value, showing variation above the fastest observed arrival: blue range, green average, yellow current (red when an outlier), cyan configured playout target."
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Range" type="ColorRect" parent="Display/Arrival"]
+layout_mode = 0
+offset_top = 4.0
+offset_right = 1.0
+offset_bottom = 11.0
+color = Color(0.3, 0.65, 1, 0.75)
+
+[node name="Average" type="ColorRect" parent="Display/Arrival"]
+layout_mode = 0
+offset_right = 2.0
+offset_bottom = 15.0
+color = Color(0.25, 1, 0.45, 1)
+
+[node name="Current" type="ColorRect" parent="Display/Arrival"]
+layout_mode = 0
+offset_right = 3.0
+offset_bottom = 15.0
+color = Color(1, 1, 0, 1)
+
+[node name="Target" type="ColorRect" parent="Display/Arrival"]
+layout_mode = 0
+offset_right = 2.0
+offset_bottom = 15.0
+color = Color(0, 1, 1, 1)
+
+[node name="TriggerBackground" type="ColorRect" parent="Display"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 36.0
+offset_right = 538.0
+offset_bottom = 53.0
+color = Color(1, 0.72, 0.28, 0.25)
+
+[node name="TriggerLabel" type="Label" parent="Display"]
+layout_mode = 0
+offset_left = 7.0
+offset_top = 35.0
+offset_right = 535.0
+offset_bottom = 54.0
+theme_override_font_sizes/font_size = 10
+text = "TRIGGER  idle   | restart 0  drop 0  queued 0"

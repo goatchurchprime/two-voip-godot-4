@@ -61,6 +61,9 @@ func run_speaker_episode(speaker: Node, stream_count: int, encode_base64: bool) 
 	assert(speaker.audio_stream_playback_opus != null)
 	assert(speaker.decoded_frame_max_values.size() >= 2)
 	assert(speaker.get_frame_max(0) > 0.0)
+	assert(speaker.get_incoming_bitrate() == 12000)
+	assert(speaker.get_playout_lag_time() >= 0.0)
+	assert(speaker.offset_sample_count == 2)
 	assert(speaker.playbackstartframenumber == 0)
 	var hash_responses: Array[Array] = []
 	speaker.hash_response_ready.connect(func(packet):
@@ -103,9 +106,13 @@ func run_mid_join_and_gap(speaker: Node, stream_count: int) -> void:
 	assert(speaker.opusframecount == first_frame + 3)
 	assert(speaker.tailframenumber == (first_frame + 3) * 960)
 	assert(speaker.source_bitrate == 16000)
+	assert(speaker._get_frame_kind(first_frame * 960) == speaker.FRAME_KIND_SOURCE_GAP)
+	assert(speaker.decoded_frame_max_values[first_frame % speaker.decoded_frame_max_values.size()] == speaker.DISPLAY_SOURCE_GAP)
 	for packet in make_opus_packets(stream_count, false, first_frame + 3):
 		speaker.receive_audio_packet(packet)
 	assert(speaker.opusframecount == first_frame + 5)
+	assert(speaker._get_frame_kind((first_frame + 3) * 960) == speaker.FRAME_KIND_AUDIO)
+	assert(speaker.decoded_frame_max_values[(first_frame + 3) % speaker.decoded_frame_max_values.size()] >= 0.0)
 	assert(speaker.source_packet_first_frame_time_usec == next_frame_time_usec + 80000)
 	var footer := TwoVoipPacket.make_footer(stream_count, first_frame + 5, 0.1, 0.0)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(footer))
@@ -137,14 +144,68 @@ func run_small_packet_reordering(speaker: Node, stream_count: int) -> void:
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, 3, 0.06, 0.0)))
 
 
-func run_mid_without_playback(speaker: Node) -> void:
-	speaker.inopusstream = true
-	speaker.opusstreamcount = 12
-	speaker.source_next_frame_count = 5
+func run_receiver_playback_restart(speaker: Node, stream_count: int) -> void:
+	var previous_stale_timeout: float = speaker.stale_episode_timeout
+	speaker.stale_episode_timeout = 0.01
+	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0, next_frame_time_usec, 12000, false)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+	for packet in make_opus_packets(stream_count, false, 0, 2):
+		speaker.receive_audio_packet(packet)
+	var interrupted_playback: AudioStreamPlaybackOpus = speaker.audio_stream_playback_opus
+	for mix_index in range(400):
+		interrupted_playback.mix_audio(1.0, 256)
+		if not interrupted_playback.is_playing():
+			break
+	assert(not interrupted_playback.is_playing())
+	speaker._physics_process(0.0)
+	assert(speaker.audio_stream_playback_opus == null)
+	assert(speaker.inopusstream)
+
+	# Later packets from the same wire episode provision a replacement playback
+	# while retaining the absolute packet sequence established by START/MID.
+	for packet in make_opus_packets(stream_count, false, 2, 2):
+		speaker.receive_audio_packet(packet)
+	assert(speaker.audio_stream_playback_opus != null)
+	assert(speaker.audio_stream_playback_opus != interrupted_playback)
+	assert(speaker.audio_stream_playback_opus.is_playing())
+	assert(speaker.inopusstream)
+	assert(speaker.opusframecount == 4)
+	assert(speaker.playback_restart_count == 1)
+	assert("starvation" in speaker.diagnostic_trigger)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, 4, 0.08, 0.0)))
+	speaker.stale_episode_timeout = previous_stale_timeout
+
+
+func run_receiver_backlog_restart(speaker: Node, stream_count: int) -> void:
+	# Model packets released after a local pause. Their source time is old, so a
+	# replacement playback must not add a fresh target delay.
+	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0) - 10000000
+	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0, next_frame_time_usec, 12000, false)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+	for packet in make_opus_packets(stream_count, false, 0, 160):
+		speaker.receive_audio_packet(packet)
+	assert(speaker.inopusstream)
+	assert(speaker.opusframecount == 160)
+	assert(speaker.playback_restart_count > 0)
+	assert(speaker.audio_stream_playback_opus.is_playing())
+	assert(speaker.audio_stream_playback_opus.queue_length_frames() <= 3 * 48000)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, 160, 3.2, 0.0)))
+
+
+func run_mid_restarts_playback(speaker: Node, stream_count: int) -> void:
+	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 5, next_frame_time_usec, 12000, false)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+	speaker.audio_stream_playback_opus.stop()
 	speaker.audio_stream_playback_opus = null
-	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_mid(12, 10, 1700000000200000, 12000)))
-	assert(speaker.source_next_frame_count == 5)
-	speaker.inopusstream = false
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_mid(stream_count, 10, next_frame_time_usec + 100000, 12000)))
+	assert(speaker.source_next_frame_count == 10)
+	assert(speaker.opusframecount == 10)
+	assert(speaker.inopusstream)
+	assert(speaker.audio_stream_playback_opus != null)
+	assert(speaker.audio_stream_playback_opus.is_playing())
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, 10, 0.1, 0.0)))
 
 
 func run_input_gap_detection() -> void:
@@ -235,6 +296,32 @@ func run_input_gap_restart() -> void:
 	mic.free()
 
 
+func run_application_resume_restart() -> void:
+	var mic := Node.new()
+	mic.set_script(preload("res://addons/twovoip/voiphelper/two_voip_mic.gd"))
+	mic.opusencoder = TwovoipOpusEncoder.new()
+	assert(mic.opusencoder.initialize(48000, 48000, 1,
+			TwovoipOpusEncoder.DENOISER_DISABLED,
+			TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	mic.currentlytalking = true
+	mic.opusstreamcount = 20
+	mic.opusframecount = 2
+	mic.talkingtimestart = Time.get_ticks_msec() * 0.001 - 0.04
+	var emitted_packets: Array[PackedByteArray] = []
+	mic.transmit_audio_packet.connect(func(packet): emitted_packets.append(packet))
+	mic._notification(Node.NOTIFICATION_APPLICATION_RESUMED)
+	assert(mic.application_resume_pending)
+	assert(mic.application_resume_count == 1)
+	assert(mic.consume_application_resume())
+	assert(not mic.currentlytalking)
+	assert(mic.opusstreamcount == 21)
+	assert(emitted_packets.size() == 1)
+	var footer := TwoVoipPacket.decode_control_packet(emitted_packets[0])
+	assert(footer[TwoVoipPacket.FooterField.TYPE] == TwoVoipPacket.TYPE_END)
+	assert(not mic.consume_application_resume())
+	mic.free()
+
+
 func run_tests() -> void:
 	assert(TwoVoipPacket.WIRE_VERSION == 5)
 	var sequence_prefix := TwoVoipPacket.make_sequence_chunk_prefix()
@@ -309,17 +396,32 @@ func run_tests() -> void:
 	var speaker := Node.new()
 	speaker.set_script(preload("res://addons/twovoip/voiphelper/two_voip_speaker.gd"))
 	player.add_child(speaker)
+	var timing_meter := preload("res://addons/twovoip/voiphelper/two_voip_timing_meter.tscn").instantiate()
+	get_root().add_child(timing_meter)
+	assert(timing_meter.get_script() == null)
+	speaker.init_voip_speaker(timing_meter)
+	assert(speaker.timing_output_cells.size() > 20)
 	run_speaker_episode(speaker, 8, false)
 	run_speaker_episode(speaker, 9, true)
 	run_mid_join_and_gap(speaker, 10)
 	run_counter_wrap(speaker, 11)
 	run_small_packet_reordering(speaker, 12)
-	run_mid_without_playback(speaker)
+	run_receiver_playback_restart(speaker, 13)
+	run_receiver_backlog_restart(speaker, 14)
+	run_mid_restarts_playback(speaker, 15)
 	run_input_gap_detection()
 	run_stream_start_without_history()
 	run_input_gap_restart()
+	run_application_resume_restart()
+	speaker._update_timing_meter(0.0)
+	assert("bitrate" in timing_meter.get_node("LagText").text)
+	assert(timing_meter.get_node("Display/OutputClip/TargetBufferHighlight").size.x > 0.0)
 	player.stop()
+	speaker._update_timing_meter(0.0)
+	assert(timing_meter.get_node("LagText").text.is_empty())
+	assert(timing_meter.get_node("Display/OutputClip/AudibleHead").size.x == 0.0)
 	player.queue_free()
+	timing_meter.queue_free()
 	await process_frame
 	speaker = null
 	player = null

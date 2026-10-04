@@ -159,18 +159,16 @@ func reprocessoriginalchunks():
 	opusencoder_forreprocessing.signal_type = TwovoipOpusEncoder.SIGNAL_VOICE if $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed else TwovoipOpusEncoder.SIGNAL_MUSIC
 
 	opusencoder_forreprocessing.reset_opus_encoder()
-	if not TwoVoipPacket.header_is_valid(recordedheader):
-		recordedheader = TwoVoipPacket.make_header(
-				TwoVoipPacket.TYPE_START, $TwoVoipMic.opus_chunk_size,
-				opussamplerate, opuschannels, resampledchunkprefix.size(), 0, 0,
-				0, opusencoder_forreprocessing.get_bitrate(), audio_packets_base64)
-	recordedheader[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE] = $TwoVoipMic.opus_chunk_size
-	recordedheader[TwoVoipPacket.HeaderField.OPUS_SAMPLE_RATE] = opussamplerate
-	recordedheader[TwoVoipPacket.HeaderField.OPUS_CHANNELS] = opuschannels
-	recordedheader[TwoVoipPacket.HeaderField.OPUS_BITRATE] = opusencoder_forreprocessing.get_bitrate()
-	recordedheader[TwoVoipPacket.HeaderField.AUDIO_ENCODING] = (
-			TwoVoipPacket.ENCODING_BASE64 if audio_packets_base64
-			else TwoVoipPacket.ENCODING_BINARY)
+	var recorded_stream_count := 0
+	var recorded_first_frame_time_usec := 0
+	if TwoVoipPacket.header_is_valid(recordedheader):
+		recorded_stream_count = int(recordedheader[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT])
+		recorded_first_frame_time_usec = int(recordedheader[TwoVoipPacket.HeaderField.NEXT_FRAME_TIME_USEC])
+	recordedheader = TwoVoipPacket.make_header(
+			TwoVoipPacket.TYPE_START, $TwoVoipMic.opus_chunk_size,
+			opussamplerate, opuschannels, resampledchunkprefix.size(),
+			recorded_stream_count, 0, recorded_first_frame_time_usec,
+			opusencoder_forreprocessing.get_bitrate(), audio_packets_base64)
 	if not TwoVoipPacket.footer_is_valid(recordedfooter):
 		recordedfooter = TwoVoipPacket.make_footer(
 				int(recordedheader[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT]),
@@ -254,16 +252,12 @@ func intercept_transmit_audio_control_packet(control_packet: Array):
 		recordedchunkmax = 0.0
 		$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(0)
 		$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(0)
-	
-		print("start talking")
 		recordedheader = control_packet.duplicate()
 		recordedfooter = []
 	
 	elif control_packet[0] == TwoVoipPacket.TYPE_END:
 		assert(TwoVoipPacket.footer_is_valid(control_packet))
 		recordedfooter = control_packet.duplicate()
-		print("recordedpacketsMemSize ", recordedopuspacketsMemSize)
-		print("Talked for ", control_packet[TwoVoipPacket.FooterField.TALKING_TIME_DURATION], " seconds")
 
 func _on_vox_threshold_gui_input(event):
 	if event is InputEventMouseButton and event.pressed:

@@ -57,7 +57,9 @@ Opus rate, channel count, buffer capacity and initial playout delay.
 Each playback owns its Opus decoder, decoded PCM ring, Speex output resampler
 and episode state. `finish_episode()` closes only that playback; it drains and
 then stops itself. A playback whose footer is lost also stops after its receive
-queue has remained empty for the configured stale timeout. The
+queue has remained empty for the configured stale timeout. The helper retains
+the active wire episode, however, and provisions a replacement playback if a
+later packet or MID update proves that the same episode is still live. The
 `AudioStreamPlayer` and AudioServer mix overlapping playbacks, while
 `max_polyphony` bounds their number and determines when the oldest voice is
 discarded.
@@ -233,6 +235,27 @@ Useful playback observability will include:
 - source-to-mix and source-to-audible timing estimates;
 - current resampling ratio and correction state;
 - viseme source frame, scheduled mix frame and observed lateness.
+
+The demonstration timing animation should not own any of those facts. A
+script-free timing-meter scene lives with `voiphelper`; applications may
+instantiate it and pass its root control to `init_voip_speaker()`. The receiver
+then populates its labels and `ColorRect`s directly. This keeps the debug view
+replaceable without publishing the jitter-buffer internals as a diagnostics
+API. Normal application policy only needs compact summary queries such as the
+current playout lag and incoming bitrate.
+
+The debug history uses one float ring. Non-negative entries are decoded peak
+magnitudes (including `0.0` for real decoded silence); exact negative sentinels
+represent empty, source-gap and FEC cells. Receiver playout reserve is derived
+from its scheduled frame span. This layout can later be uploaded directly as a
+scalar GPU texture without maintaining a parallel provenance array.
+
+Application suspension is a discontinuity, not unusually large network jitter.
+`Time.get_ticks_usec()` cannot be assumed to include sleep on every supported
+platform. The source therefore uses the application-resumed notification to
+close the old episode before processing newly captured audio, then spends one
+process pass rebuilding capture history. The existing captured-frame timestamp
+check remains the fallback when no useful lifecycle notification is delivered.
 
 ## Playback implementation stages
 

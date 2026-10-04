@@ -50,6 +50,23 @@ var chunks_per_hash = 50
 var recent_hash_code = 0
 var sentsumsquares = 0.0
 var sent_audio_reference: AudioStreamPlaybackOpus = null
+var application_resume_pending := false
+var application_resume_count := 0
+
+func _notification(what: int):
+	if what == NOTIFICATION_APPLICATION_RESUMED:
+		# get_ticks_usec() is not a portable suspend clock. Force a fresh wire
+		# episode before any captured post-resume frame can use the old mapping.
+		application_resume_pending = true
+		application_resume_count += 1
+
+func consume_application_resume() -> bool:
+	if not application_resume_pending:
+		return false
+	application_resume_pending = false
+	if currentlytalking:
+		processtalkstreamends(false)
+	return true
 
 func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_denoiser_mode, p_agc_mode):
 	input_mix_rate = AudioServer.get_input_mix_rate()
@@ -183,7 +200,6 @@ func processtalkstreamends(talking: bool):
 		talkingtimestart = Time.get_ticks_msec()*0.001 - leadchunks*frametimesecs
 		talking_first_frame_time_usec = get_input_chunk_first_frame_time_usec(leadchunks)
 		hangchunks = int(hang_time/frametimesecs)
-		prints("leadchunks ", leadchunks, "hangchunks", hangchunks)
 		var audiostreampacketheader := TwoVoipPacket.make_header(
 				TwoVoipPacket.TYPE_START, opus_chunk_size, opussamplerate,
 				opuschannels, len(chunkprefix), opusstreamcount, 0,
@@ -215,7 +231,9 @@ func processtalkstreamends(talking: bool):
 		var sentrms = sqrt(sentsumsquares/(opusframecount*opus_chunk_size)) if opusframecount > 0 else 0.0
 		var audiopacketstreamfooter := TwoVoipPacket.make_footer(
 				opusstreamcount, opusframecount, talkingtimeduration, talkingtimeend, sentrms)
-		print("My voice chunktime=", talkingtimeduration/opusframecount, " over ", talkingtimeduration, " seconds")
+		var chunk_time: float = talkingtimeduration / opusframecount if opusframecount > 0 else 0.0
+		print("TwoVoIP mic END stream=%d frames=%d duration=%.3f s chunk=%.4f s" % [
+				opusstreamcount, opusframecount, talkingtimeduration, chunk_time])
 		transmit_audio_packet.emit(TwoVoipPacket.encode_control_packet(audiopacketstreamfooter))
 		opusstreamcount += 1
 		sent_audio_reference = null
@@ -361,8 +379,11 @@ var audio_chunk = null
 var last_chunkmax = 0.0
 var speechnoiseprobability = 0.0
 
-func _process(delta):
-	processtalkstreamends(pttbutton.button_pressed)
+func _process(_delta):
+	var resumed_this_process := consume_application_resume()
+	# Spend one process pass rebuilding capture history after resume. This keeps
+	# pre-suspend lead-time audio out of the new episode.
+	processtalkstreamends(pttbutton.button_pressed and not resumed_this_process)
 	while true:
 		var input_frames_available := AudioServer.get_input_frames_available()
 		var first_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0 - input_frames_available * 1000000.0 / input_mix_rate)

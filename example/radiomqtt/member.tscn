@@ -2,12 +2,13 @@
 
 [ext_resource type="Script" uid="uid://b16etfqd68ijo" path="res://radiomqtt/member.gd" id="1_o3hks"]
 [ext_resource type="Script" uid="uid://c4ejxw3wm6tur" path="res://addons/twovoip/voiphelper/two_voip_speaker.gd" id="2_137g6"]
+[ext_resource type="PackedScene" path="res://addons/twovoip/voiphelper/two_voip_timing_meter.tscn" id="3_timing"]
 
 [sub_resource type="AudioStreamOpus" id="AudioStreamOpus_137g6"]
 resource_local_to_scene = true
 
 [node name="Member" type="ColorRect" unique_id=1106839630]
-custom_minimum_size = Vector2(550, 68)
+custom_minimum_size = Vector2(550, 128)
 anchors_preset = -1
 anchor_right = 0.028
 anchor_bottom = 0.035
@@ -46,14 +47,6 @@ offset_right = 55.0
 offset_bottom = 10.0
 color = Color(0.9137255, 0.94509804, 0.9882353, 0.9098039)
 
-[node name="ColorRectBufferQueue" type="ColorRect" parent="Node" unique_id=176855979]
-layout_mode = 0
-offset_left = -54.0
-offset_top = 32.0
-offset_right = -5.0
-offset_bottom = 36.0
-color = Color(0.0352941, 0.788235, 1, 1)
-
 [node name="ButtonToneOutput" type="Button" parent="Node" unique_id=1661628005]
 layout_mode = 0
 offset_left = 131.0
@@ -73,59 +66,15 @@ offset_bottom = 35.0
 min_value = -80.0
 max_value = 24.0
 
-[node name="LagText" type="Label" parent="." unique_id=1185963938]
-layout_mode = 0
-offset_left = 54.0
-offset_top = 38.0
-offset_right = 540.0
-offset_bottom = 55.0
-theme_override_font_sizes/font_size = 12
-text = "capture→arrival —   avg —   range —   target 600"
-
-[node name="LagMeter" type="Control" parent="." unique_id=-1108618760]
-clip_contents = true
+[node name="TimingMeter" parent="." instance=ExtResource("3_timing")]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_left = 54.0
-offset_top = 56.0
-offset_right = -10.0
-offset_bottom = 64.0
+offset_left = 4.0
+offset_top = 36.0
+offset_right = -4.0
+offset_bottom = 124.0
 grow_horizontal = 2
-
-[node name="Background" type="ColorRect" parent="LagMeter" unique_id=-2056774568]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.08, 0.08, 0.08, 1)
-
-[node name="Range" type="ColorRect" parent="LagMeter" unique_id=-1933049991]
-layout_mode = 0
-offset_top = 2.0
-offset_right = 2.0
-offset_bottom = 6.0
-color = Color(0.4, 0.7, 1, 0.7)
-
-[node name="Average" type="ColorRect" parent="LagMeter" unique_id=779610612]
-layout_mode = 0
-offset_right = 2.0
-offset_bottom = 8.0
-color = Color(0.2, 1, 0.5, 1)
-
-[node name="Current" type="ColorRect" parent="LagMeter" unique_id=166862837]
-layout_mode = 0
-offset_right = 4.0
-offset_bottom = 8.0
-color = Color(1, 1, 0, 1)
-
-[node name="Target" type="ColorRect" parent="LagMeter" unique_id=839313733]
-layout_mode = 0
-offset_right = 2.0
-offset_bottom = 8.0
-color = Color(0, 1, 1, 1)
 
 [connection signal="finished" from="AudioStreamPlayer" to="." method="_on_audio_stream_player_finished"]
 [connection signal="toggled" from="Node/ButtonToneOutput" to="AudioStreamPlayer/TwoVoipSpeaker" method="set_sinewave_out"]
