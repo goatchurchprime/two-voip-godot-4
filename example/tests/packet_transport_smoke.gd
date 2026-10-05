@@ -63,7 +63,7 @@ func run_speaker_episode(speaker: Node, stream_count: int, encode_base64: bool) 
 	assert(speaker.get_frame_max(0) > 0.0)
 	assert(speaker.get_incoming_bitrate() == 12000)
 	assert(speaker.get_playout_lag_time() >= 0.0)
-	assert(speaker.offset_sample_count == 2)
+	assert(speaker.timing_meter.offset_sample_count == 2)
 	assert(speaker.playbackstartframenumber == 0)
 	var hash_responses: Array[Array] = []
 	speaker.hash_response_ready.connect(func(packet):
@@ -105,15 +105,32 @@ func run_mid_join_and_gap(speaker: Node, stream_count: int) -> void:
 					next_frame_time_usec + 60000, 16000)))
 	assert(speaker.opusframecount == first_frame + 3)
 	assert(speaker.tailframenumber == (first_frame + 3) * 960)
+	var tail_after_mid: int = speaker.tailframenumber
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(
+			TwoVoipPacket.make_mid(stream_count, first_frame + 3,
+					next_frame_time_usec + 60000, 16000)))
+	assert(speaker.tailframenumber == tail_after_mid)
 	assert(speaker.source_bitrate == 16000)
-	assert(speaker._get_frame_kind(first_frame * 960) == speaker.FRAME_KIND_SOURCE_GAP)
-	assert(speaker.decoded_frame_max_values[first_frame % speaker.decoded_frame_max_values.size()] == speaker.DISPLAY_SOURCE_GAP)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(
+			TwoVoipPacket.make_mid(stream_count, first_frame + 8,
+					next_frame_time_usec + 60000, 16000)))
+	assert(speaker.rejected_mid_count == 1)
+	assert(speaker.opusframecount == first_frame + 3)
+	assert(speaker.source_next_frame_count == first_frame + 3)
+	assert(speaker.timing_meter._get_frame_kind(first_frame * 960) \
+			== speaker.timing_meter.FRAME_KIND_SOURCE_GAP)
+	assert(speaker.decoded_frame_max_values[
+			first_frame % speaker.decoded_frame_max_values.size()] \
+			== speaker.DISPLAY_SOURCE_GAP)
 	for packet in make_opus_packets(stream_count, false, first_frame + 3):
 		speaker.receive_audio_packet(packet)
 	assert(speaker.opusframecount == first_frame + 5)
-	assert(speaker._get_frame_kind((first_frame + 3) * 960) == speaker.FRAME_KIND_AUDIO)
-	assert(speaker.decoded_frame_max_values[(first_frame + 3) % speaker.decoded_frame_max_values.size()] >= 0.0)
+	assert(speaker.timing_meter._get_frame_kind((first_frame + 3) * 960) \
+			== speaker.timing_meter.FRAME_KIND_AUDIO)
+	assert(speaker.decoded_frame_max_values[
+			(first_frame + 3) % speaker.decoded_frame_max_values.size()] >= 0.0)
 	assert(speaker.source_packet_first_frame_time_usec == next_frame_time_usec + 80000)
+	assert(speaker.last_mid_to_audio_usec >= 0)
 	var footer := TwoVoipPacket.make_footer(stream_count, first_frame + 5, 0.1, 0.0)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(footer))
 	assert(not speaker.inopusstream)
@@ -137,6 +154,9 @@ func run_small_packet_reordering(speaker: Node, stream_count: int) -> void:
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
 	var packets := make_opus_packets(stream_count, false, 0, 3)
 	speaker.receive_audio_packet(packets[1])
+	speaker.receive_audio_packet(packets[1])
+	assert(speaker.opusframequeuecount == 1)
+	assert(speaker.duplicate_packet_count == 1)
 	speaker.receive_audio_packet(packets[0])
 	speaker.receive_audio_packet(packets[2])
 	assert(speaker.opusframecount == 3)
@@ -172,9 +192,51 @@ func run_receiver_playback_restart(speaker: Node, stream_count: int) -> void:
 	assert(speaker.inopusstream)
 	assert(speaker.opusframecount == 4)
 	assert(speaker.playback_restart_count == 1)
-	assert("starvation" in speaker.diagnostic_trigger)
+	assert("starvation" in speaker.timing_meter.diagnostic_trigger)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, 4, 0.08, 0.0)))
 	speaker.stale_episode_timeout = previous_stale_timeout
+
+
+func run_receiver_clock_stall_restart(speaker: Node, stream_count: int) -> void:
+	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0, next_frame_time_usec, 12000, false)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+	var interrupted_playback: AudioStreamPlaybackOpus = speaker.audio_stream_playback_opus
+	# Model a local pause in which monotonic time advanced but the speaker frame
+	# did not. The next packet must replace only local playback, not the episode.
+	speaker.playback_clock_anchor_ticks_usec -= 200000
+	for packet in make_opus_packets(stream_count, false, 0, 2):
+		speaker.receive_audio_packet(packet)
+	assert(speaker.audio_stream_playback_opus != interrupted_playback)
+	assert(speaker.playback_restart_count == 1)
+	assert(speaker.inopusstream)
+	assert(speaker.opusframecount == 2)
+	assert("clock stalled" in speaker.timing_meter.diagnostic_trigger)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, 2, 0.04, 0.0)))
+
+
+func run_receiver_input_starvation_extends_playout(speaker: Node, stream_count: int) -> void:
+	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0, next_frame_time_usec, 12000, false)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+	var starved_playback: AudioStreamPlaybackOpus = speaker.audio_stream_playback_opus
+	# Consume the initial reserve and continue mixing silence without reaching
+	# the stale-episode timeout. This models an interrupted receiver input while
+	# its independent audio thread keeps running.
+	for mix_index in range(200):
+		starved_playback.mix_audio(1.0, 256)
+	assert(starved_playback.is_playing())
+	assert(starved_playback.get_underflow_frames() > speaker.playback_underflow_baseline)
+	for packet in make_opus_packets(stream_count, false, 0, 2):
+		speaker.receive_audio_packet(packet)
+	assert(speaker.audio_stream_playback_opus == starved_playback)
+	assert(speaker.playback_restart_count == 0)
+	assert(speaker.inopusstream)
+	assert(speaker.opusframecount == 2)
+	assert(speaker.playout_delay_extension_usec > 0)
+	assert(speaker.get_effective_playout_lag_target() > speaker.audio_buffer_lag_time_target)
+	assert("extend playout" in speaker.timing_meter.diagnostic_trigger)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, 2, 0.04, 0.0)))
 
 
 func run_receiver_backlog_restart(speaker: Node, stream_count: int) -> void:
@@ -236,6 +298,17 @@ func run_input_gap_detection() -> void:
 	assert(int(mid[TwoVoipPacket.MidField.NEXT_FRAME_TIME_USEC]) == 1700000000660000)
 	assert(TwoVoipPacket.decode_sequence_chunk_prefix(emitted_packets[1], 33, 12) == 33)
 	mic.free()
+
+
+func run_mqtt_log_payload_roundtrip() -> void:
+	var mqtt_network := Control.new()
+	mqtt_network.set_script(preload("res://radiomqtt/MQTTnetwork.gd"))
+	var payload := PackedByteArray([0, 10, 32, 127, 128, 255])
+	var encoded: String = mqtt_network.encode_log_payload(payload)
+	assert(encoded.begins_with("b64:"))
+	assert(mqtt_network.decode_log_payload(encoded) == payload)
+	assert(mqtt_network.decode_log_payload("legacy") == "legacy".to_ascii_buffer())
+	mqtt_network.free()
 
 
 func run_stream_start_without_history() -> void:
@@ -398,28 +471,95 @@ func run_tests() -> void:
 	player.add_child(speaker)
 	var timing_meter := preload("res://addons/twovoip/voiphelper/two_voip_timing_meter.tscn").instantiate()
 	get_root().add_child(timing_meter)
-	assert(timing_meter.get_script() == null)
+	assert(timing_meter is TwoVoipTimingMeter)
 	speaker.init_voip_speaker(timing_meter)
-	assert(speaker.timing_output_cells.size() > 20)
+	assert(timing_meter.output_cells.size() == 52)
+	assert(timing_meter.arrival_sparks.size() == ceili(
+			(timing_meter.display_before_source + timing_meter.display_span)
+			* speaker.opus_sample_rate / speaker.opusframesize))
+	var output_clip: Control = timing_meter.get_node("Display/OutputClip")
+	var arrival_graph: Control = timing_meter.get_node("Display/Arrival")
+	assert(output_clip.position.x == arrival_graph.position.x)
+	assert(output_clip.size.x == arrival_graph.size.x)
+	timing_meter.record_packet_arrival(2000000, 1900000)
+	var found_arrival_spark := false
+	for density in timing_meter.arrival_spark_density:
+		found_arrival_spark = found_arrival_spark or density > 0.0
+	assert(found_arrival_spark)
+	timing_meter._reset_offset_statistics()
 	run_speaker_episode(speaker, 8, false)
 	run_speaker_episode(speaker, 9, true)
 	run_mid_join_and_gap(speaker, 10)
 	run_counter_wrap(speaker, 11)
 	run_small_packet_reordering(speaker, 12)
 	run_receiver_playback_restart(speaker, 13)
-	run_receiver_backlog_restart(speaker, 14)
-	run_mid_restarts_playback(speaker, 15)
+	run_receiver_clock_stall_restart(speaker, 14)
+	run_receiver_input_starvation_extends_playout(speaker, 15)
+	run_receiver_backlog_restart(speaker, 16)
+	run_mid_restarts_playback(speaker, 17)
 	run_input_gap_detection()
+	run_mqtt_log_payload_roundtrip()
 	run_stream_start_without_history()
 	run_input_gap_restart()
 	run_application_resume_restart()
-	speaker._update_timing_meter(0.0)
-	assert("bitrate" in timing_meter.get_node("LagText").text)
-	assert(timing_meter.get_node("Display/OutputClip/TargetBufferHighlight").size.x > 0.0)
+	timing_meter.update_display(0.0)
+	assert(timing_meter.TIMING_EMPTY.a == 0.0)
+	var audible_deadline: ColorRect = timing_meter.get_node("Display/OutputClip/AudibleDeadline")
+	assert(audible_deadline.position.x < audible_deadline.get_parent().size.x)
+	var display_width: float = audible_deadline.get_parent().size.x
+	var display_duration: float = timing_meter.display_before_source \
+			+ timing_meter.display_span
+	assert(is_equal_approx((audible_deadline.position.x + audible_deadline.size.x) /
+			display_width, (timing_meter.display_before_source \
+			+ speaker.audio_buffer_lag_time_target) / display_duration))
+	var source_event: ColorRect = timing_meter.get_node("Display/Arrival/SourceEvent")
+	assert(source_event.position.x > 0.0)
+	var acquisition: ColorRect = timing_meter.get_node("Display/Arrival/Acquisition")
+	assert(acquisition.visible)
+	assert(acquisition.color == timing_meter.TIMING_ACQUISITION)
+	assert(audible_deadline.color == timing_meter.TIMING_AUDIBLE_DEADLINE)
+	var audible_head: ColorRect = timing_meter.get_node("Display/OutputClip/AudibleHead")
+	assert(is_equal_approx(audible_head.position.x + audible_head.size.x,
+			audible_deadline.position.x + audible_deadline.size.x))
+	var audible_level: ColorRect = timing_meter.get_node("Display/AudibleLevel")
+	assert(audible_level.visible)
+	assert(audible_level.position.x > audible_deadline.get_parent().position.x \
+			+ audible_deadline.position.x + audible_deadline.size.x)
+	assert(audible_level.size.y == timing_meter.get_node("Display/Arrival").size.y)
+	var original_target: float = speaker.audio_buffer_lag_time_target
+	var original_deadline_x: float = audible_deadline.position.x
+	speaker.audio_buffer_lag_time_target = original_target + 0.1
+	timing_meter.update_display(0.0)
+	assert(audible_deadline.position.x > original_deadline_x)
+	assert(is_equal_approx((audible_deadline.position.x + audible_deadline.size.x) /
+			display_width, (timing_meter.display_before_source \
+			+ speaker.audio_buffer_lag_time_target) / display_duration))
+	speaker.audio_buffer_lag_time_target = original_target
+	timing_meter.update_display(0.0)
+	var active_deadline_x := audible_deadline.position.x
+	var active_acquisition_x := acquisition.position.x
+	var anomaly_snapshot: Dictionary = timing_meter.anomaly_snapshot(
+			"test", 621.0, 29000, 1200)
+	assert(anomaly_snapshot.reason == "test")
+	assert(anomaly_snapshot.queue_ms == 621.0)
+	assert(anomaly_snapshot.queue_frames == 29000)
+	timing_meter.set_transport_context({
+		"record_packet_index": 123,
+		"recorded_ticks_msec": 456,
+		"replay": true,
+	})
+	anomaly_snapshot = timing_meter.anomaly_snapshot("context test", 621.0, 29000, 1200)
+	assert(anomaly_snapshot.transport_context.record_packet_index == 123)
 	player.stop()
-	speaker._update_timing_meter(0.0)
-	assert(timing_meter.get_node("LagText").text.is_empty())
+	timing_meter.update_display(0.0)
 	assert(timing_meter.get_node("Display/OutputClip/AudibleHead").size.x == 0.0)
+	assert(audible_level.visible)
+	assert(audible_deadline.visible)
+	assert(audible_deadline.position.x == active_deadline_x)
+	assert(audible_deadline.color == timing_meter.TIMING_AUDIBLE_DEADLINE)
+	assert(acquisition.visible)
+	assert(acquisition.position.x == active_acquisition_x)
+	assert(acquisition.color == timing_meter.TIMING_ACQUISITION)
 	player.queue_free()
 	timing_meter.queue_free()
 	await process_frame

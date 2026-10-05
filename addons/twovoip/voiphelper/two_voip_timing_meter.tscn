@@ -1,274 +1,380 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://e4oo2o3vuymy"]
 
-[node name="TwoVoipTimingMeter" type="Control"]
-custom_minimum_size = Vector2(542, 88)
-mouse_filter = 1
+[ext_resource type="Script" uid="uid://3vgmsdp7r60s" path="res://addons/twovoip/voiphelper/two_voip_timing_meter.gd" id="1_timing"]
+
+[node name="TwoVoipTimingMeter" type="Control" unique_id=868499691]
+custom_minimum_size = Vector2(542, 29)
+layout_mode = 3
+anchors_preset = 0
 tooltip_text = "PCM playout (blue audio, grey reserve, purple source-gap silence, orange FEC), packet reorder slots, arrival variation, and the most recent receiver state transition."
+mouse_filter = 1
+script = ExtResource("1_timing")
 
-[node name="LagText" type="Label" parent="."]
+[node name="Display" type="ColorRect" parent="." unique_id=1944979701]
 layout_mode = 0
 offset_right = 542.0
-offset_bottom = 30.0
-theme_override_font_sizes/font_size = 11
-text = "capture→arrival offset —   bitrate —\nvariation —   playout —   target —"
-
-[node name="Display" type="ColorRect" parent="."]
-layout_mode = 0
-offset_top = 32.0
-offset_right = 542.0
-offset_bottom = 88.0
+offset_bottom = 29.0
 color = Color(0.055, 0.065, 0.08, 1)
 
-[node name="ReorderLabel" type="Label" parent="Display"]
-layout_mode = 0
-offset_left = 286.0
-offset_right = 344.0
-offset_bottom = 13.0
-theme_override_font_sizes/font_size = 9
-text = "REORDER"
-
-[node name="ArrivalLabel" type="Label" parent="Display"]
-layout_mode = 0
-offset_left = 356.0
-offset_right = 538.0
-offset_bottom = 13.0
-theme_override_font_sizes/font_size = 9
-text = "ARRIVAL VARIATION"
-
-[node name="OutputClip" type="Control" parent="Display"]
+[node name="OutputClip" type="Control" parent="Display" unique_id=918146596]
+z_index = 2
 clip_contents = true
-layout_mode = 0
+anchors_preset = 0
 offset_left = 4.0
-offset_top = 15.0
-offset_right = 274.0
-offset_bottom = 30.0
+offset_top = 10.0
+offset_right = 538.0
+offset_bottom = 16.0
 
-[node name="OutputCells" type="HBoxContainer" parent="Display/OutputClip"]
+[node name="OutputCells" type="HBoxContainer" parent="Display/OutputClip" unique_id=1899011489]
 layout_mode = 0
-offset_right = 286.0
+offset_right = 534.0
 offset_bottom = 15.0
 theme_override_constants/separation = 1
 
-[node name="Cell00" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell00" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1716715871]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0, 0, 0, 0)
+
+[node name="Cell01" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=814345664]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell01" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell02" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1363281708]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell02" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell03" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=915682030]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell03" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell04" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=469324431]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell04" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell05" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=735669987]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell05" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell06" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=830153648]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell06" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell07" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=405223242]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell07" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell08" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1586724182]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell08" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell09" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=797957929]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell09" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell10" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=56405409]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell10" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell11" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1668788316]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell11" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell12" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1828607579]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell12" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell13" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1133035034]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell13" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell14" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=903714874]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell14" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell15" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1157218008]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell15" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell16" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=79798513]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell16" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell17" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=48315583]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell17" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell18" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1463511675]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell18" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell19" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=352939182]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell19" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell20" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1653719964]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell20" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell21" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=891777373]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell21" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell22" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=2045792141]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell22" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell23" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1790129950]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell23" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell24" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=574814846]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell24" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell25" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1123703914]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Cell25" type="ColorRect" parent="Display/OutputClip/OutputCells"]
-custom_minimum_size = Vector2(10, 15)
+[node name="Cell26" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1728215017]
+custom_minimum_size = Vector2(8, 15)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="TargetBufferHighlight" type="ColorRect" parent="Display/OutputClip"]
+[node name="Cell27" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=686203534]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell28" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=637606315]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell29" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=177603614]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell30" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=2132800578]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell31" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=201386797]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell32" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1415355587]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell33" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=330110123]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell34" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1690944648]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell35" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=133634484]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell36" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=664812272]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell37" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1793968169]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell38" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=458220852]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell39" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1627465277]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell40" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=427955150]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell41" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=315561428]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell42" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1233475924]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell43" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=541911574]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell44" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1369720318]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell45" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=716620479]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell46" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=97846684]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell47" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=500234155]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell48" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1100434756]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell49" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=1465003931]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell50" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=320870566]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Cell51" type="ColorRect" parent="Display/OutputClip/OutputCells" unique_id=949788094]
+custom_minimum_size = Vector2(8, 15)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="AudibleHead" type="ColorRect" parent="Display/OutputClip" unique_id=544849783]
 layout_mode = 0
-offset_right = 1.0
-offset_bottom = 15.0
-mouse_filter = 2
-color = Color(0, 1, 1, 0.12)
-
-[node name="AudibleHead" type="ColorRect" parent="Display/OutputClip"]
-layout_mode = 0
-offset_right = 0.0
 offset_bottom = 15.0
 mouse_filter = 2
 color = Color(1, 0.25, 0.25, 0.72)
 
-[node name="ReorderSlots" type="HBoxContainer" parent="Display"]
+[node name="AudibleDeadline" type="ColorRect" parent="Display/OutputClip" unique_id=1633518106]
 layout_mode = 0
-offset_left = 286.0
-offset_top = 15.0
-offset_right = 344.0
-offset_bottom = 30.0
+offset_right = 2.0
+offset_bottom = 15.0
+mouse_filter = 2
+color = Color(1, 0.15, 0.15, 1)
+
+[node name="AudibleLevel" type="ColorRect" parent="Display" unique_id=1302021234]
+visible = false
+z_index = 4
+layout_mode = 0
+offset_top = 2.0
+offset_right = 7.0
+offset_bottom = 24.0
+mouse_filter = 2
+color = Color(0.18, 0.35, 0.55, 0.75)
+
+[node name="ReorderSlots" type="HBoxContainer" parent="Display" unique_id=1911553549]
+z_index = 3
+layout_mode = 0
+offset_left = 484.0
+offset_top = 10.0
+offset_right = 542.0
+offset_bottom = 16.0
 theme_override_constants/separation = 1
 
-[node name="Slot0" type="ColorRect" parent="Display/ReorderSlots"]
-custom_minimum_size = Vector2(13, 15)
+[node name="Slot0" type="ColorRect" parent="Display/ReorderSlots" unique_id=1913366294]
+custom_minimum_size = Vector2(13, 7)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Slot1" type="ColorRect" parent="Display/ReorderSlots"]
-custom_minimum_size = Vector2(13, 15)
+[node name="Slot1" type="ColorRect" parent="Display/ReorderSlots" unique_id=2048574371]
+custom_minimum_size = Vector2(13, 7)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Slot2" type="ColorRect" parent="Display/ReorderSlots"]
-custom_minimum_size = Vector2(13, 15)
+[node name="Slot2" type="ColorRect" parent="Display/ReorderSlots" unique_id=996917564]
+custom_minimum_size = Vector2(13, 7)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Slot3" type="ColorRect" parent="Display/ReorderSlots"]
-custom_minimum_size = Vector2(13, 15)
+[node name="Slot3" type="ColorRect" parent="Display/ReorderSlots" unique_id=25217774]
+custom_minimum_size = Vector2(13, 7)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Arrival" type="ColorRect" parent="Display"]
+[node name="Arrival" type="ColorRect" parent="Display" unique_id=790889473]
 clip_contents = true
 layout_mode = 0
-offset_left = 356.0
-offset_top = 15.0
+offset_left = 4.0
+offset_top = 2.0
 offset_right = 538.0
-offset_bottom = 30.0
-tooltip_text = "Capture-to-arrival time contains an unknown fixed difference between the source and receiver clocks. The meter subtracts the minimum observed value, showing variation above the fastest observed arrival: blue range, green average, yellow current (red when an outlier), cyan configured playout target."
+offset_bottom = 24.0
+tooltip_text = "Shared source timeline. The intentional empty span left of the white marker is 300 ms of pre-source time, used to reveal a buffer crossing before the microphone/source moment. Blue is acquisition and yellow bins are packet arrivals. Output cells remain virtually visible after passing the ring read index while their audio crosses the output pipeline. The left edge of the shrinking red bar is physically audible now; the small rectangle to its right brightens with that audio. Reference markers turn green and remain fixed while idle."
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Range" type="ColorRect" parent="Display/Arrival"]
+[node name="SourceEvent" type="ColorRect" parent="Display/Arrival" unique_id=1491529812]
 layout_mode = 0
-offset_top = 4.0
+offset_right = 2.0
+offset_bottom = 22.0
+color = Color(0.9, 0.9, 0.95, 1)
+
+[node name="Acquisition" type="ColorRect" parent="Display/Arrival" unique_id=605538666]
+layout_mode = 0
 offset_right = 1.0
-offset_bottom = 11.0
-color = Color(0.3, 0.65, 1, 0.75)
+offset_bottom = 22.0
+color = Color(0.2, 0.55, 1, 0.8)
 
-[node name="Average" type="ColorRect" parent="Display/Arrival"]
+[node name="ArrivalSparks" type="HBoxContainer" parent="Display/Arrival" unique_id=242222663]
 layout_mode = 0
-offset_right = 2.0
-offset_bottom = 15.0
-color = Color(0.25, 1, 0.45, 1)
+offset_right = 534.0
+offset_bottom = 22.0
+mouse_filter = 2
+theme_override_constants/separation = 0
 
-[node name="Current" type="ColorRect" parent="Display/Arrival"]
-layout_mode = 0
-offset_right = 3.0
-offset_bottom = 15.0
-color = Color(1, 1, 0, 1)
-
-[node name="Target" type="ColorRect" parent="Display/Arrival"]
-layout_mode = 0
-offset_right = 2.0
-offset_bottom = 15.0
-color = Color(0, 1, 1, 1)
-
-[node name="TriggerBackground" type="ColorRect" parent="Display"]
-layout_mode = 0
-offset_left = 4.0
-offset_top = 36.0
-offset_right = 538.0
-offset_bottom = 53.0
-color = Color(1, 0.72, 0.28, 0.25)
-
-[node name="TriggerLabel" type="Label" parent="Display"]
-layout_mode = 0
-offset_left = 7.0
-offset_top = 35.0
-offset_right = 535.0
-offset_bottom = 54.0
-theme_override_font_sizes/font_size = 10
-text = "TRIGGER  idle   | restart 0  drop 0  queued 0"
+[node name="SparkTemplate" type="ColorRect" parent="Display/Arrival/ArrivalSparks" unique_id=986014928]
+visible = false
+custom_minimum_size = Vector2(1, 22)
+layout_mode = 2
+mouse_filter = 2
+color = Color(1, 0.8, 0.1, 0)

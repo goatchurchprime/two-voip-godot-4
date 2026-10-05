@@ -20,6 +20,15 @@ var permembersubscribe = true # the subscriptions can come in too late for perme
 const logfile = "user://mqttlogging.dat"
 var flogfile : FileAccess = null
 var logfilepackcount = 0
+var recording_start_ticks_msec = 0
+
+func encode_log_payload(msg: PackedByteArray) -> String:
+	return "b64:%s" % Marshalls.raw_to_base64(msg)
+
+func decode_log_payload(encoded: String) -> PackedByteArray:
+	if encoded.begins_with("b64:"):
+		return Marshalls.base64_to_raw(encoded.substr(4))
+	return encoded.to_ascii_buffer()
 
 func _ready():
 	if $GridContainer/presets.selected == -1:
@@ -31,7 +40,9 @@ func _on_mqtt_broker_item_selected(index):
 	$GridContainer/mqttuser.text = ""
 	$GridContainer/mqttpassword.text = ""
 	$GridContainer/topic.text = "godot/twovoip/room1"
-	if preset == "hivemq":
+	if preset == "local" or preset == "local.broker":
+		$GridContainer/broker.text = "127.0.0.1"
+	elif preset == "hivemq":
 		$GridContainer/broker.text = "broker.hivemq.com"
 	elif preset == "m.org":
 		$GridContainer/broker.text = "test.mosquitto.org"
@@ -41,8 +52,13 @@ func _on_mqtt_broker_item_selected(index):
 		$GridContainer/mqttpassword.text = "mqttpwd"
 	else:
 		$GridContainer/broker.text = "mosquitto.doesliverpool.xyz"
-	if OS.has_feature("web"):
-		$GridContainer/broker.text = "test.mosquitto.org"
+	#if OS.has_feature("web"):
+	#	$GridContainer/broker.text = "test.mosquitto.org"
+
+	if preset == "local.broker":
+		$MQTTSimulatedBroker.start()
+	elif $MQTTSimulatedBroker._server:
+		$MQTTSimulatedBroker.stop()
 
 func transportaudiopacket(packet: PackedByteArray, dithertype: int, meta_recipient := ""):
 	var topic = audioouttopicmeta if TwoVoipPacket.is_control_packet(packet) else audioouttopic
@@ -58,10 +74,19 @@ func transportaudiopacket(packet: PackedByteArray, dithertype: int, meta_recipie
 	$MQTT.publish(topic, packet)
 
 
-func received_mqtt(topic, msg):
+func received_mqtt(topic, msg, transport_debug_context: Dictionary = {}):
+	var arrival_ticks_msec := Time.get_ticks_msec()
+	var packet_context := transport_debug_context.duplicate(true)
+	packet_context["arrival_ticks_msec"] = arrival_ticks_msec
+	packet_context["topic"] = topic
 	if flogfile != null:
-		flogfile.store_line("%d %s %s" % [Time.get_ticks_msec(), topic, msg.get_string_from_ascii()]) 
+		# Base64 keeps arbitrary binary Opus/control payloads byte-exact. Replay
+		# still accepts the former plain-ASCII third field for existing logs.
+		flogfile.store_line("%d %s %s" % [arrival_ticks_msec, topic,
+				encode_log_payload(msg)])
 		logfilepackcount += 1
+		packet_context["record_packet_index"] = logfilepackcount
+		packet_context["recording_start_ticks_msec"] = recording_start_ticks_msec
 		get_node("../HBoxLogging/PacketCount").text = str(logfilepackcount)
 	var stopic = topic.split("/", true, roomtopicwords+1)
 	if len(stopic) == roomtopicwords + 2:
@@ -102,12 +127,12 @@ func received_mqtt(topic, msg):
 					get_node("../TwoVoipMic").receive_audio_hash_response(membername, control_packet)
 					return
 				if stopic[roomtopicwords+1] == "audio":
-					member.receivemqttaudio(msg)
+					member.receivemqttaudio(msg, packet_context)
 				else:
 					var atopic = stopic[roomtopicwords+1].split("/", true, 3)
 					if len(atopic) >= 2 and atopic[1] == "meta":
 						if (len(atopic) == 2) or (atopic[2] == myname):
-							member.receivemqttaudiometa(msg)
+							member.receivemqttaudiometa(msg, packet_context)
 					else:
 						assert(false)
 			else:
@@ -166,6 +191,7 @@ func _on_connect_toggled(toggled_on):
 			flogfile = FileAccess.open("user://mqttlogging.dat", FileAccess.WRITE)
 			print("Opening mqtt logfile ", flogfile.get_path_absolute())
 			logfilepackcount = 0
+			recording_start_ticks_msec = Time.get_ticks_msec()
 		$MQTT.received_message.connect(received_mqtt)
 		$MQTT.broker_connected.connect(on_broker_connect)
 		$MQTT.broker_disconnected.connect(on_broker_disconnect)
@@ -175,7 +201,7 @@ func _on_connect_toggled(toggled_on):
 		$MQTT.client_id = "c%d" % (2 + (randi()%0x7fffff8))
 		SelfMember.setname(myname)
 		if flogfile != null:
-			flogfile.store_line("%d %s" % [Time.get_ticks_msec(), myname]) 
+			flogfile.store_line("%d %s" % [recording_start_ticks_msec, myname])
 		SelfMember.color = FriendlyName.get("theme_override_styles/normal").bg_color
 		$GridContainer/topic.editable = false
 		$GridContainer/broker.editable = false
@@ -236,8 +262,18 @@ func _on_replay_button_toggled(toggled_on):
 	print("*** Begin replay")
 	var ReplayButton = get_node("../HBoxLogging/ReplayButton")
 	var flogfileR : FileAccess = FileAccess.open("user://mqttlogging.dat", FileAccess.READ)
-	var sl0 = flogfileR.get_line().split(" ")
+	if flogfileR == null:
+		push_warning("No MQTT recording found at %s" % logfile)
+		ReplayButton.button_pressed = false
+		return
+	var sl0 = flogfileR.get_line().split(" ", false, 1)
+	if sl0.size() < 2:
+		push_warning("Malformed MQTT recording header")
+		ReplayButton.button_pressed = false
+		flogfileR.close()
+		return
 	var timediff0 = int(sl0[0]) - Time.get_ticks_msec()
+	var replay_recording_start_ticks_msec := int(sl0[0])
 	myname = sl0[1]
 	SelfMember.setname(myname)
 	roomtopic = $GridContainer/topic.text
@@ -249,7 +285,12 @@ func _on_replay_button_toggled(toggled_on):
 	var l = flogfileR.get_line()
 	var loglinenumber = 1
 	while ReplayButton.button_pressed and l:
-		var sl = l.split(" ")
+		var sl = l.split(" ", false, 2)
+		if sl.size() < 3:
+			push_warning("Skipping malformed MQTT recording line %d" % loglinenumber)
+			l = flogfileR.get_line()
+			loglinenumber += 1
+			continue
 		var timediff = int(sl[0]) - Time.get_ticks_msec()
 		var dtms = timediff - timediff0
 		if dtms > 1000:
@@ -262,7 +303,13 @@ func _on_replay_button_toggled(toggled_on):
 			timediff0 = timediff
 		print(l)
 		if flogfile == null:
-			received_mqtt(sl[1], sl[2].to_ascii_buffer())
+			var recorded_payload := decode_log_payload(sl[2])
+			received_mqtt(sl[1], recorded_payload, {
+					"record_packet_index": loglinenumber,
+					"recording_start_ticks_msec": replay_recording_start_ticks_msec,
+					"recorded_ticks_msec": int(sl[0]),
+					"replay": true,
+			})
 		get_node("../HBoxLogging/PacketCount").text = str(logfilepackcount)
 		l = flogfileR.get_line()
 		loglinenumber += 1

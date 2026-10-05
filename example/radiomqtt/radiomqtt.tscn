@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://d0sl15xev22ac" path="res://radiomqtt/MQTTnetwork.gd" id="2_y485j"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 [ext_resource type="Shader" uid="uid://bq3uv3u8jhu77" path="res://addons/twovoip/voiphelper/voxshader.gdshader" id="5_7rbsf"]
+[ext_resource type="Script" uid="uid://bvc0jl61su4fd" path="res://addons/mqtt/simulated_broker.gd" id="6_qfww3"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kcsl6"]
 bg_color = Color(0.0705882, 0.0235294, 0.564706, 1)
@@ -588,12 +589,17 @@ size_flags_horizontal = 3
 item_count = 4
 popup/item_0/text = "doesliverpool"
 popup/item_0/id = 0
-popup/item_1/text = "hivemq"
+popup/item_1/text = "local"
 popup/item_1/id = 1
-popup/item_2/text = "m.org"
+popup/item_2/text = "local.broker"
 popup/item_2/id = 2
-popup/item_3/text = "hass"
+popup/item_3/text = "m.org"
 popup/item_3/id = 3
+
+[node name="MQTTSimulatedBroker" type="Node" parent="MQTTnetwork" unique_id=673122746]
+process_mode = 1
+script = ExtResource("6_qfww3")
+metadata/_custom_type_script = "uid://bvc0jl61su4fd"
 
 [node name="HBoxMosquitto" type="HBoxContainer" parent="." unique_id=1644933476]
 layout_mode = 2
@@ -645,7 +651,7 @@ layout_mode = 2
 
 [node name="LogButton" type="CheckButton" parent="HBoxLogging" unique_id=1687608625]
 layout_mode = 2
-tooltip_text = "Log all events from connection to disconnection."
+tooltip_text = "Log every MQTT packet byte-for-byte from connection to disconnection. Timing-anomaly snapshots include the corresponding recording packet index for offline replay."
 text = "LogAll Rec"
 
 [node name="Label" type="Label" parent="HBoxLogging" unique_id=1125675589]

@@ -41,34 +41,24 @@ var runninglagtimeminimum = -1.0
 var decoded_frame_max_values := PackedFloat32Array()
 var playback_padding_end_frame = 0
 var playback_restart_count = 0
+var playback_clock_anchor_ticks_usec = 0
+var playback_clock_anchor_speaker_frame = 0
+var playback_underflow_baseline = 0
+var playout_delay_extension_usec = 0
 var dropped_packet_count = 0
-var diagnostic_trigger := "idle"
-var offset_sample_count := 0
-var offset_current_ms := 0.0
-var offset_average_ms := 0.0
-var offset_minimum_ms := 0.0
-var offset_maximum_ms := 0.0
-var offset_m2 := 0.0
-
-const FRAME_KIND_AUDIO := "audio"
-const FRAME_KIND_FEC := "fec"
-const FRAME_KIND_SOURCE_GAP := "source gap"
-const FRAME_KIND_RESERVE := "reserve"
+var duplicate_packet_count = 0
+var rejected_mid_count = 0
+var delayed_mid_audio_count = 0
+var pending_mid_frame_count = -1
+var pending_mid_arrival_usec = 0
+var last_mid_to_audio_usec = -1
+const PLAYBACK_CLOCK_STALL_TOLERANCE_USEC := 80000
 const DISPLAY_EMPTY := -1.0
 const DISPLAY_RESERVE := -2.0
 const DISPLAY_SOURCE_GAP := -3.0
 const DISPLAY_FEC := -4.0
 
-var timing_meter: Control = null
-var timing_output_cells: Array[ColorRect] = []
-var timing_reorder_slots: Array[ColorRect] = []
-var timing_trigger_flash := 0.0
-
-const TIMING_AUDIO := Color(0.32, 0.68, 1.0, 1.0)
-const TIMING_RESERVE := Color(0.72, 0.75, 0.8, 1.0)
-const TIMING_SOURCE_GAP := Color(0.76, 0.4, 0.95, 1.0)
-const TIMING_FEC := Color(1.0, 0.58, 0.18, 1.0)
-const TIMING_EMPTY := Color(0.12, 0.14, 0.18, 1.0)
+var timing_meter: TwoVoipTimingMeter = null
 
 func _ready():
 	audioplayeropus = get_parent().findaudioplayer() if get_parent().has_method("findaudioplayer") else get_parent()
@@ -98,54 +88,21 @@ func setrecopusvalues(new_opus_sample_rate, new_opus_channels, new_opus_frame_si
 	opus_sample_rate = new_opus_sample_rate
 	opus_channels = new_opus_channels
 	opusframesize = new_opus_frame_size
-	decoded_frame_max_values.resize(max(1, ceili(max(2.0, audio_buffer_length)*opus_sample_rate/opusframesize)))
+	decoded_frame_max_values.resize(max(1,
+			ceili(max(2.0, audio_buffer_length) * opus_sample_rate / opusframesize)))
 	decoded_frame_max_values.fill(DISPLAY_EMPTY)
+	if timing_meter:
+		timing_meter.configure(opus_sample_rate, opusframesize)
 	create_episode_playback()
 
 func _set_diagnostic_trigger(trigger: String):
-	diagnostic_trigger = trigger
-	timing_trigger_flash = 1.0
+	if timing_meter:
+		timing_meter.set_trigger(trigger)
 
-func init_voip_speaker(p_timing_meter: Control = null):
+func init_voip_speaker(p_timing_meter: TwoVoipTimingMeter = null):
 	timing_meter = p_timing_meter
-	timing_output_cells.clear()
-	timing_reorder_slots.clear()
-	if timing_meter == null:
-		return
-	var output_cells = timing_meter.get_node_or_null("Display/OutputClip/OutputCells")
-	if output_cells:
-		for child in output_cells.get_children():
-			if child is ColorRect:
-				timing_output_cells.append(child)
-	var reorder_slots = timing_meter.get_node_or_null("Display/ReorderSlots")
-	if reorder_slots:
-		for child in reorder_slots.get_children():
-			if child is ColorRect:
-				timing_reorder_slots.append(child)
-	_update_timing_meter(0.0)
-
-func _reset_offset_statistics():
-	offset_sample_count = 0
-	offset_current_ms = 0.0
-	offset_average_ms = 0.0
-	offset_minimum_ms = 0.0
-	offset_maximum_ms = 0.0
-	offset_m2 = 0.0
-
-func _record_packet_arrival(arrival_time_usec: int, capture_time_usec: int):
-	var offset_ms := (arrival_time_usec - capture_time_usec) / 1000.0
-	offset_current_ms = offset_ms
-	offset_sample_count += 1
-	if offset_sample_count == 1:
-		offset_average_ms = offset_ms
-		offset_minimum_ms = offset_ms
-		offset_maximum_ms = offset_ms
-	else:
-		var previous_average := offset_average_ms
-		offset_average_ms += (offset_ms - offset_average_ms) / offset_sample_count
-		offset_m2 += (offset_ms - previous_average) * (offset_ms - offset_average_ms)
-		offset_minimum_ms = minf(offset_minimum_ms, offset_ms)
-		offset_maximum_ms = maxf(offset_maximum_ms, offset_ms)
+	if timing_meter:
+		timing_meter.bind_speaker(self)
 
 func queue_playout_delay(next_frame_time_usec: int) -> int:
 	var now_usec := int(Time.get_unix_time_from_system() * 1000000.0)
@@ -159,6 +116,52 @@ func queue_playout_delay(next_frame_time_usec: int) -> int:
 		push_error("Could not queue Opus playout delay")
 		return 0
 	return padding_frames
+
+func get_effective_playout_lag_target() -> float:
+	return audio_buffer_lag_time_target + playout_delay_extension_usec / 1000000.0
+
+func _reset_playback_clock_anchor():
+	playback_clock_anchor_ticks_usec = Time.get_ticks_usec()
+	playback_clock_anchor_speaker_frame = \
+			audio_stream_playback_opus.get_frame_number_actually_in_speaker() \
+			if audio_stream_playback_opus else 0
+
+func _reset_playback_underflow_baseline():
+	playback_underflow_baseline = audio_stream_playback_opus.get_underflow_frames() \
+			if audio_stream_playback_opus else 0
+
+func _account_playback_underflow():
+	if audio_stream_playback_opus == null:
+		return
+	var underflow_total: int = audio_stream_playback_opus.get_underflow_frames()
+	var new_underflow_frames := maxi(0, underflow_total - playback_underflow_baseline)
+	playback_underflow_baseline = underflow_total
+	if new_underflow_frames == 0:
+		return
+	var mix_rate := AudioServer.get_mix_rate()
+	if mix_rate <= 0.0:
+		return
+	var extension_usec := roundi(new_underflow_frames * 1000000.0 / mix_rate)
+	playout_delay_extension_usec += extension_usec
+	_set_diagnostic_trigger("input starvation → extend playout %.0f ms" %
+			(extension_usec / 1000.0))
+
+func _playback_clock_stall_usec() -> int:
+	if audio_stream_playback_opus == null or playback_clock_anchor_ticks_usec == 0:
+		return 0
+	# With no decoded input available, a stationary source-frame position is
+	# normal starvation, not proof that local playback paused. Start a fresh
+	# comparison when input resumes.
+	if audio_stream_playback_opus.queue_length_frames() == 0:
+		_reset_playback_clock_anchor()
+		return 0
+	var elapsed_usec: int = Time.get_ticks_usec() - playback_clock_anchor_ticks_usec
+	var elapsed_speaker_frames: int = \
+			audio_stream_playback_opus.get_frame_number_actually_in_speaker() \
+			- playback_clock_anchor_speaker_frame
+	var speaker_elapsed_usec := roundi(
+			elapsed_speaker_frames * 1000000.0 / opus_sample_rate)
+	return maxi(0, elapsed_usec - speaker_elapsed_usec)
 
 func restart_episode_playback(reason := "playback stopped") -> bool:
 	if not inopusstream:
@@ -174,12 +177,18 @@ func restart_episode_playback(reason := "playback stopped") -> bool:
 	playbackstartframenumber = tailframenumber - padding_frames
 	playback_padding_end_frame = tailframenumber
 	playback_restart_count += 1
+	_reset_playback_clock_anchor()
+	_reset_playback_underflow_baseline()
 	_set_diagnostic_trigger("local %s → replace playback" % reason)
 	return true
 
 func ensure_episode_playback(required_space_frames := 0) -> bool:
+	_account_playback_underflow()
 	if audio_stream_playback_opus == null or not audio_stream_playback_opus.is_playing():
 		return restart_episode_playback("starvation")
+	var stalled_usec := _playback_clock_stall_usec()
+	if stalled_usec > PLAYBACK_CLOCK_STALL_TOLERANCE_USEC:
+		return restart_episode_playback("clock stalled %.0f ms" % (stalled_usec / 1000.0))
 	if required_space_frames > audio_stream_playback_opus.available_space_frames():
 		# A local pause can release more queued packets than this bounded playback
 		# can hold. Replace the local backlog, but retain the wire episode, source
@@ -195,6 +204,8 @@ func start_playback_timeline(next_frame_count: int, next_frame_time_usec: int):
 	playbackstartframenumber = tailframenumber - padding_frames
 	playback_padding_end_frame = tailframenumber
 	source_next_frame_time_usec = next_frame_time_usec
+	_reset_playback_clock_anchor()
+	_reset_playback_underflow_baseline()
 
 func push_silent_opus_frames(frame_count: int) -> bool:
 	if frame_count <= 0:
@@ -204,7 +215,8 @@ func push_silent_opus_frames(frame_count: int) -> bool:
 		push_warning("Not enough playback buffer space for %d silent Opus frames" % frame_count)
 		return false
 	for frame in range(opusframecount, opusframecount + frame_count):
-		decoded_frame_max_values[frame % decoded_frame_max_values.size()] = DISPLAY_SOURCE_GAP
+		decoded_frame_max_values[frame % decoded_frame_max_values.size()] = \
+				DISPLAY_SOURCE_GAP
 	opusframecount += frame_count
 	tailframenumber += silent_sample_frames
 	_set_diagnostic_trigger("MID → insert %d source-gap chunk%s" % [frame_count, "" if frame_count == 1 else "s"])
@@ -227,7 +239,8 @@ func push_opus_packet(packet: PackedByteArray, begin: int, decode_fec: bool):
 	else:
 		assert (tailframenumber == opusframecount*opusframesize)
 		var chunk_index = int(tailframenumber / opusframesize)
-		decoded_frame_max_values[chunk_index % decoded_frame_max_values.size()] = DISPLAY_FEC if decode_fec \
+		decoded_frame_max_values[chunk_index % decoded_frame_max_values.size()] = \
+				DISPLAY_FEC if decode_fec \
 				else audio_stream_playback_opus.get_tail_max(opusframesize)
 		outputsumsquares += audio_stream_playback_opus.get_tail_sum_squares(opusframesize)
 		tailframenumber += decoded_frames
@@ -239,24 +252,9 @@ func get_frame_max(frame_number: int) -> float:
 	if frame_number < episodefirstframenumber or opusframesize <= 0 \
 			or decoded_frame_max_values.is_empty():
 		return 0.0
-	var chunk_index = int(frame_number / opusframesize)
-	return maxf(0.0, decoded_frame_max_values[chunk_index % decoded_frame_max_values.size()])
-
-func _get_frame_kind(frame_number: int) -> String:
-	if frame_number >= playbackstartframenumber and frame_number < playback_padding_end_frame:
-		return FRAME_KIND_RESERVE
-	if frame_number < episodefirstframenumber or frame_number >= tailframenumber \
-			or opusframesize <= 0 or decoded_frame_max_values.is_empty():
-		return ""
 	var chunk_index := int(frame_number / opusframesize)
-	var display_value := decoded_frame_max_values[chunk_index % decoded_frame_max_values.size()]
-	if display_value == DISPLAY_SOURCE_GAP:
-		return FRAME_KIND_SOURCE_GAP
-	if display_value == DISPLAY_FEC:
-		return FRAME_KIND_FEC
-	if display_value == DISPLAY_RESERVE:
-		return FRAME_KIND_RESERVE
-	return FRAME_KIND_AUDIO if display_value >= 0.0 else ""
+	return maxf(0.0,
+			decoded_frame_max_values[chunk_index % decoded_frame_max_values.size()])
 
 func get_incoming_bitrate() -> int:
 	return source_bitrate
@@ -267,127 +265,36 @@ func get_playout_lag_time() -> float:
 	return audioserveroutputlatency \
 			+ audio_stream_playback_opus.queue_length_frames() * 1.0 / opus_sample_rate
 
-func _timing_frame_colour(kind: String) -> Color:
-	match kind:
-		FRAME_KIND_AUDIO:
-			return TIMING_AUDIO
-		FRAME_KIND_RESERVE:
-			return TIMING_RESERVE
-		FRAME_KIND_SOURCE_GAP:
-			return TIMING_SOURCE_GAP
-		FRAME_KIND_FEC:
-			return TIMING_FEC
-	return TIMING_EMPTY
-
-func _update_timing_meter(delta: float):
-	if timing_meter == null:
-		return
-	timing_trigger_flash = maxf(0.0, timing_trigger_flash - delta * 1.5)
-	var playback = audio_stream_playback_opus
-	if playback == null or not playback.is_playing() \
-			or (audioplayeropus and not audioplayeropus.playing):
-		_clear_timing_meter()
-		return
-	var audible_frame: int = playbackstartframenumber
-	audible_frame += playback.get_frame_number_actually_in_speaker()
-	var frame_size := maxi(1, opusframesize)
-	var first_frame := floori(float(audible_frame) / frame_size) * frame_size
-	var phase := float(audible_frame - first_frame) / frame_size
-	var output_cells_node = timing_meter.get_node_or_null("Display/OutputClip/OutputCells")
-	var cell_width := 0.0
-	if output_cells_node and not timing_output_cells.is_empty():
-		cell_width = timing_output_cells[0].custom_minimum_size.x + 1.0
-		output_cells_node.position.x = 0.0
-	for index in range(timing_output_cells.size()):
-		var frame_number := first_frame + index * frame_size
-		var kind := _get_frame_kind(frame_number)
-		var colour := _timing_frame_colour(kind)
-		if kind == FRAME_KIND_AUDIO:
-			colour = colour.lerp(Color.WHITE,
-					clampf(get_frame_max(frame_number) * 2.0, 0.0, 0.65))
-		timing_output_cells[index].color = colour
-	var audible_head: ColorRect = timing_meter.get_node_or_null("Display/OutputClip/AudibleHead")
-	if audible_head:
-		audible_head.size.x = (1.0 - phase) * cell_width
-	var target_highlight: ColorRect = timing_meter.get_node_or_null("Display/OutputClip/TargetBufferHighlight")
-	if target_highlight:
-		var packet_time: float = frame_size * 1.0 / opus_sample_rate
-		target_highlight.size.x = minf(target_highlight.get_parent().size.x,
-				audio_buffer_lag_time_target / packet_time * cell_width)
-	for index in range(timing_reorder_slots.size()):
-		var occupied := index < outoforderchunkqueue.size() \
-				and outoforderchunkqueue[index] != null
-		timing_reorder_slots[index].color = TIMING_AUDIO if occupied else TIMING_EMPTY
-
-	var variation_current_ms := maxf(0.0, offset_current_ms - offset_minimum_ms)
-	var variation_average_ms := maxf(0.0, offset_average_ms - offset_minimum_ms)
-	var variation_maximum_ms := maxf(0.0, offset_maximum_ms - offset_minimum_ms)
-	var standard_deviation := sqrt(offset_m2 / maxi(1, offset_sample_count - 1))
-	var target_ms: float = audio_buffer_lag_time_target * 1000.0
-	var queue_ms: float = get_playout_lag_time() * 1000.0
-	var lag_text: Label = timing_meter.get_node_or_null("LagText")
-	if lag_text:
-		lag_text.text = "offset %.1f ms   bounds %.1f–%.1f   samples %d   bitrate %.1f kb/s\nvariation %.1f/%.1f ms   avg %.1f   σ %.1f   playout %.0f/%.0f ms" % [
-				offset_current_ms, offset_minimum_ms, offset_maximum_ms,
-				offset_sample_count, source_bitrate / 1000.0,
-				variation_current_ms, variation_maximum_ms, variation_average_ms,
-				standard_deviation, queue_ms, target_ms]
-	var arrival = timing_meter.get_node_or_null("Display/Arrival")
-	if arrival:
-		arrival.get_node("Average").visible = true
-		arrival.get_node("Current").visible = true
-		arrival.get_node("Target").visible = true
-		var scale_max: float = maxf(100.0, maxf(target_ms * 1.2, variation_maximum_ms * 1.1))
-		var scale: float = arrival.size.x / scale_max
-		arrival.get_node("Range").size.x = maxf(1.0, variation_maximum_ms * scale)
-		arrival.get_node("Average").position.x = variation_average_ms * scale - 1.0
-		arrival.get_node("Current").position.x = minf(variation_current_ms, scale_max) * scale - 1.5
-		arrival.get_node("Target").position.x = minf(target_ms, scale_max) * scale - 1.0
-		var is_outlier: bool = offset_sample_count > 10 \
-				and abs(offset_current_ms - offset_average_ms) > maxf(20.0, standard_deviation * 3.0)
-		arrival.get_node("Current").color = Color.RED if is_outlier else Color.YELLOW
-	var trigger_background: ColorRect = timing_meter.get_node_or_null("Display/TriggerBackground")
-	if trigger_background:
-		trigger_background.color = Color(1.0, 0.72, 0.28,
-				0.25 + timing_trigger_flash * 0.45)
-	var trigger_label: Label = timing_meter.get_node_or_null("Display/TriggerLabel")
-	if trigger_label:
-		trigger_label.text = "TRIGGER  %s   | restart %d  drop %d  queued %d" % [
-				diagnostic_trigger, playback_restart_count, dropped_packet_count,
-				opusframequeuecount]
-
-func _clear_timing_meter():
-	for cell in timing_output_cells:
-		cell.color = TIMING_EMPTY
-	for slot in timing_reorder_slots:
-		slot.color = TIMING_EMPTY
-	var audible_head = timing_meter.get_node_or_null("Display/OutputClip/AudibleHead")
-	if audible_head:
-		audible_head.size.x = 0.0
-	var target_highlight = timing_meter.get_node_or_null("Display/OutputClip/TargetBufferHighlight")
-	if target_highlight:
-		target_highlight.size.x = 0.0
-	var arrival = timing_meter.get_node_or_null("Display/Arrival")
-	if arrival:
-		arrival.get_node("Range").size.x = 0.0
-		arrival.get_node("Average").visible = false
-		arrival.get_node("Current").visible = false
-		arrival.get_node("Target").visible = false
-	var lag_text = timing_meter.get_node_or_null("LagText")
-	if lag_text:
-		lag_text.text = ""
-	var trigger_background = timing_meter.get_node_or_null("Display/TriggerBackground")
-	if trigger_background:
-		trigger_background.color = Color.TRANSPARENT
-	var trigger_label = timing_meter.get_node_or_null("Display/TriggerLabel")
-	if trigger_label:
-		trigger_label.text = ""
-
 func external_end_stream():
 	if inopusstream:
 		print(":externally ending the stream at cutout")
 		var footer := TwoVoipPacket.make_footer(opusstreamcount, opusframecount, 0.0, -1.0)
 		receive_audio_packet(TwoVoipPacket.encode_control_packet(footer))
+
+func _mid_timeline_is_coherent(next_frame_count: int, next_frame_time_usec: int) -> bool:
+	if source_next_frame_time_usec == 0 or next_frame_count < source_next_frame_count:
+		return source_next_frame_time_usec == 0
+	var frame_usec := roundi(opusframesize * 1000000.0 / opus_sample_rate)
+	var expected_time_usec := source_next_frame_time_usec \
+			+ (next_frame_count - source_next_frame_count) * frame_usec
+	return absi(next_frame_time_usec - expected_time_usec) <= maxi(1, frame_usec / 2)
+
+func _check_pending_mid_audio(arrival_time_usec: int, frame_count: int):
+	if pending_mid_frame_count < 0 or frame_count < pending_mid_frame_count:
+		return
+	if frame_count == pending_mid_frame_count:
+		last_mid_to_audio_usec = arrival_time_usec - pending_mid_arrival_usec
+		var frame_usec := roundi(opusframesize * 1000000.0 / opus_sample_rate)
+		if last_mid_to_audio_usec > maxi(50000, frame_usec * 2):
+			delayed_mid_audio_count += 1
+			_set_diagnostic_trigger("MID-to-audio delivery delay")
+			push_warning("TwoVoIP MID preceded frame %d by %.1f ms on the reliable path" % [
+					frame_count, last_mid_to_audio_usec / 1000.0])
+	else:
+		delayed_mid_audio_count += 1
+		_set_diagnostic_trigger("MID target packet missing")
+	pending_mid_frame_count = -1
+	pending_mid_arrival_usec = 0
 
 func receive_audio_control_packet(control_packet: Array):
 	if control_packet.is_empty():
@@ -423,8 +330,16 @@ func receive_audio_control_packet(control_packet: Array):
 		runninglagtimeminimum = -1.0
 		inopusstream = true
 		playback_restart_count = 0
+		playout_delay_extension_usec = 0
 		dropped_packet_count = 0
-		_reset_offset_statistics()
+		duplicate_packet_count = 0
+		rejected_mid_count = 0
+		delayed_mid_audio_count = 0
+		pending_mid_frame_count = -1
+		pending_mid_arrival_usec = 0
+		last_mid_to_audio_usec = -1
+		if timing_meter:
+			timing_meter.begin_episode()
 		start_playback_timeline(
 				source_next_frame_count,
 				source_next_frame_time_usec)
@@ -437,9 +352,23 @@ func receive_audio_control_packet(control_packet: Array):
 			return
 		if not ensure_episode_playback():
 			return
-		source_next_frame_count = int(control_packet[TwoVoipPacket.MidField.NEXT_FRAME_COUNT])
-		source_next_frame_time_usec = int(control_packet[TwoVoipPacket.MidField.NEXT_FRAME_TIME_USEC])
+		var mid_next_frame_count := int(control_packet[TwoVoipPacket.MidField.NEXT_FRAME_COUNT])
+		var mid_next_frame_time_usec := int(control_packet[TwoVoipPacket.MidField.NEXT_FRAME_TIME_USEC])
+		if mid_next_frame_count < opusframecount:
+			_set_diagnostic_trigger("stale MID → ignore")
+			return
+		if not _mid_timeline_is_coherent(mid_next_frame_count, mid_next_frame_time_usec):
+			rejected_mid_count += 1
+			_set_diagnostic_trigger("incoherent MID → reject")
+			push_warning("TwoVoIP rejected MID frame %d: source timestamp does not continue frame %d timeline" % [
+					mid_next_frame_count, source_next_frame_count])
+			return
+		source_next_frame_count = mid_next_frame_count
+		source_next_frame_time_usec = mid_next_frame_time_usec
 		source_bitrate = int(control_packet[TwoVoipPacket.MidField.OPUS_BITRATE])
+		if source_next_frame_count > opusframecount:
+			pending_mid_frame_count = source_next_frame_count
+			pending_mid_arrival_usec = int(Time.get_unix_time_from_system() * 1000000.0)
 		if source_next_frame_count > opusframecount:
 			push_silent_opus_frames(source_next_frame_count - opusframecount)
 	elif packet_type == TwoVoipPacket.TYPE_END:
@@ -453,8 +382,9 @@ func receive_audio_control_packet(control_packet: Array):
 		var outputframecount = tailframenumber - episodefirstframenumber
 		outputrms = sqrt(outputsumsquares/outputframecount) if outputframecount > 0 else 0.0
 		control_packet[TwoVoipPacket.FooterField.RMS] = outputrms
-		print("TwoVoIP speaker END stream=%d minimum_buffer=%.3f s target=%.3f s restarts=%d drops=%d" % [
-				opusstreamcount, runninglagtimeminimum, audio_buffer_lag_time_target,
+		print("TwoVoIP speaker END stream=%d minimum_buffer=%.3f s target=%.3f s blank_extension=%.3f s restarts=%d drops=%d" % [
+				opusstreamcount, runninglagtimeminimum, get_effective_playout_lag_target(),
+				playout_delay_extension_usec / 1000000.0,
 				playback_restart_count, dropped_packet_count])
 		inopusstream = false
 		_set_diagnostic_trigger("END → drain episode")
@@ -477,7 +407,9 @@ func receive_audio_control_packet(control_packet: Array):
 	else:
 		push_warning("Unknown TwoVoIP control packet type: %s" % packet_type)
 
-func receive_audio_packet(packet):
+func receive_audio_packet(packet, transport_debug_context: Dictionary = {}):
+	if timing_meter and not transport_debug_context.is_empty():
+		timing_meter.set_transport_context(transport_debug_context)
 	if audiostreamopus == null:
 		return
 	if TwoVoipPacket.is_control_packet(packet):
@@ -499,7 +431,10 @@ func receive_audio_packet(packet):
 		source_packet_first_frame_time_usec = source_next_frame_time_usec \
 				+ int((opusframecount - source_next_frame_count) * opusframesize \
 				* 1000000.0 / opus_sample_rate)
-		_record_packet_arrival(arrival_time_usec, source_packet_first_frame_time_usec)
+		if timing_meter:
+			timing_meter.record_packet_arrival(
+					arrival_time_usec, source_packet_first_frame_time_usec)
+		_check_pending_mid_audio(arrival_time_usec, opusframecount)
 		push_opus_packet(packet, lenchunkprefix, false)
 		opusframecount += 1
 
@@ -515,7 +450,10 @@ func receive_audio_packet(packet):
 		source_packet_first_frame_time_usec = source_next_frame_time_usec \
 				+ int((unwrapped_frame_count - source_next_frame_count) * opusframesize \
 				* 1000000.0 / opus_sample_rate)
-		_record_packet_arrival(arrival_time_usec, source_packet_first_frame_time_usec)
+		if timing_meter:
+			timing_meter.record_packet_arrival(
+					arrival_time_usec, source_packet_first_frame_time_usec)
+		_check_pending_mid_audio(arrival_time_usec, unwrapped_frame_count)
 		var opusframecountR = unwrapped_frame_count - opusframecount
 		while opusframecountR >= Noutoforderqueue:
 			print("shifting outoforderqueue ", unwrapped_frame_count, " ", ("null" if outoforderchunkqueue[0] == null else len(outoforderchunkqueue[0])))
@@ -535,6 +473,10 @@ func receive_audio_packet(packet):
 			opusframecount += 1
 			assert (opusframequeuecount >= 0)
 
+		if outoforderchunkqueue[opusframecountR] != null:
+			duplicate_packet_count += 1
+			_set_diagnostic_trigger("duplicate packet → ignore")
+			return
 		outoforderchunkqueue[opusframecountR] = packet
 		opusframequeuecount += 1
 		while outoforderchunkqueue[0] != null and opusframecount + opusframequeuecount >= Npacketinitialbatching:
@@ -544,10 +486,10 @@ func receive_audio_packet(packet):
 			opusframequeuecount -= 1
 			assert (opusframequeuecount >= 0)
 var playingrecording = false
-func _physics_process(delta):
-	_update_timing_meter(delta)
+func _physics_process(_delta):
 	if audio_stream_playback_opus == null:
 		return
+	_account_playback_underflow()
 	if not audio_stream_playback_opus.is_playing(): # could use the finished signal
 		audio_stream_playback_opus = null
 		return

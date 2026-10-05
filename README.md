@@ -169,13 +169,36 @@ control packets. The function `external_end_stream()`
 will auto-generate an end stream if one is missing because the network has been interrupted so that it doesn't
 try to retain the buffers.
 
-The `TwoVoipSpeaker` has two important settings, `audio_buffer_lag_time_target` and `audio_buffer_lag_time_target_tolerance`
-that set a target buffer size in seconds and is responsible for the audio delay
-that makes sure there are no gaps in the playback when packets get delayed by up to the lag time target.
-The buffer is maintained by pausing the playback until the target is reached,
-of speeding up the playback when the lag buffer has increased by more than the tolerance, which
-can happen if an individual packet is held back a long time and not skipped or the game stalls, such as when
-it is compiling shaders.
+`TwoVoipSpeaker.audio_buffer_lag_time_target` sets the source-to-audible delay in seconds.
+The optional passive `TwoVoipTimingMeter` scene owns arrival statistics,
+anomaly logging, and drawing state. `TwoVoipSpeaker` owns the decoded-frame
+kind/maximum ring because those source-gap cells can later drive playout-delay
+recovery; the meter only observes that ring and never changes playback
+decisions. It draws the target on a fixed
+`display_span` timeline (1.2 seconds by default), rather than rescaling the
+graph when the target changes. Its position is simply the target divided by
+that span, after the configurable `display_before_source` region; neither
+the display position nor these default spans are synchronization policy. The
+negative-time region makes buffer overruns past the source event visible. This
+common time axis can also be used to compare players or to give
+receivers in one room the same presentation deadline. Acquisition is a configured estimate and tolerance;
+yellow arrival bins flash for new packets and fade into a recent density plot.
+Their position is acquisition plus transport variation above the fastest
+observed capture-to-arrival sample, not an absolute one-way network latency.
+The thin output-buffer row is overlaid on the same scale, so a healthy arrival
+appears directly above the decoded buffer tail it extends. Cells remain
+virtually visible after their ring slots pass the read index while that audio
+crosses the mixer and device buffers. The left edge of the shrinking red
+sub-chunk bar is the frame physically audible now.
+
+In the MQTT example, `LogAll Rec` stores the complete arrival sequence and
+timing in `user://mqttlogging.dat`; new recordings encode payloads losslessly
+and the replay reader remains compatible with older text logs. Timing anomaly
+records in `user://two_voip_timing_anomalies.jsonl` identify the speaker,
+recording session, and most recently delivered LogAll packet index. Source-time
+origin overruns are recorded at their first crossing and at subsequent 100 ms
+high-water steps, allowing the existing Replay button to reproduce and locate
+the packet/control transition that preceded the growth.
 
 Obviously the system needs to know when a stream has ended (a footer has been received) so it can consume the buffer down to zero.
 
