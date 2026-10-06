@@ -11,15 +11,17 @@ const TIMING_RESERVE := Color(0.72, 0.75, 0.8, 1.0)
 const TIMING_SOURCE_GAP := Color(0.76, 0.4, 0.95, 1.0)
 const TIMING_FEC := Color(1.0, 0.58, 0.18, 1.0)
 const TIMING_EMPTY := Color(0.0, 0.0, 0.0, 0.0)
+const TIMING_UNKNOWN := Color(1.0, 0.1, 0.85, 1.0)
 const TIMING_REORDER_EMPTY := Color(0.12, 0.14, 0.18, 1.0)
 const TIMING_ACQUISITION := Color(0.2, 0.9, 0.42, 0.9)
 const TIMING_AUDIBLE_DEADLINE := Color(1.0, 0.15, 0.15, 1.0)
+const TIMING_TARGET := Color(1.0, 0.65, 0.68, 0.48)
 const TIMING_ANOMALY_LOG_PATH := "user://two_voip_timing_anomalies.jsonl"
 
 # These define one stable time coordinate system for the arrival graph, PCM
 # cells, target marker, and (eventually) shader uniforms.
-@export var acquisition_time_estimate := 0.03
 @export var acquisition_time_tolerance := 0.01
+@export var timing_buffer_tolerance := 0.025
 @export var display_span := 1.2
 @export var display_before_source := 0.3
 @export var capture_timing_anomalies := true
@@ -34,6 +36,8 @@ var reorder_slots: Array[ColorRect] = []
 var arrival_sparks: Array[ColorRect] = []
 var arrival_spark_density := PackedFloat32Array()
 var arrival_spark_flash := PackedFloat32Array()
+var arrival_spark_offscreen_left_count := 0
+var arrival_spark_offscreen_right_count := 0
 
 var offset_sample_count := 0
 var offset_current_ms := 0.0
@@ -43,9 +47,20 @@ var offset_maximum_ms := 0.0
 var offset_m2 := 0.0
 var transport_current_ms := 0.0
 var transport_maximum_ms := 0.0
+var tail_alignment_sample_count := 0
+var tail_alignment_current_ms := 0.0
+var tail_alignment_average_ms := 0.0
+var tail_alignment_minimum_ms := 0.0
+var tail_alignment_maximum_ms := 0.0
 var buffer_left_overflow_count := 0
 var buffer_left_overflowing := false
 var buffer_left_overflow_logged_ms := 0.0
+var timing_buffer_mismatch_count := 0
+var timing_buffer_mismatching := false
+var audible_timeline_aligned := false
+var initial_alignment_residual_ms := 0.0
+var audible_timeline_offscreen_right := false
+var audible_timeline_offscreen_right_count := 0
 
 
 func _ready():
@@ -67,9 +82,22 @@ func configure(sample_rate: int, frame_size: int):
 
 func begin_episode():
 	_reset_offset_statistics()
+	tail_alignment_sample_count = 0
+	tail_alignment_current_ms = 0.0
+	tail_alignment_average_ms = 0.0
+	tail_alignment_minimum_ms = 0.0
+	tail_alignment_maximum_ms = 0.0
 	buffer_left_overflow_count = 0
 	buffer_left_overflowing = false
 	buffer_left_overflow_logged_ms = 0.0
+	timing_buffer_mismatch_count = 0
+	timing_buffer_mismatching = false
+	audible_timeline_aligned = false
+	initial_alignment_residual_ms = 0.0
+	audible_timeline_offscreen_right = false
+	audible_timeline_offscreen_right_count = 0
+	arrival_spark_offscreen_left_count = 0
+	arrival_spark_offscreen_right_count = 0
 
 
 func set_trigger(trigger: String):
@@ -80,7 +108,20 @@ func set_transport_context(context: Dictionary):
 	last_transport_debug_context = context.duplicate(true)
 
 
-func record_packet_arrival(arrival_time_usec: int, sample_time_usec: int):
+func record_local_playback_stall():
+	if speaker == null or speaker.playingrecording:
+		return
+	var playback = speaker.audio_stream_playback_opus
+	if playback == null:
+		return
+	var ring_queue_frames: int = playback.queue_length_frames()
+	_capture_anomaly("local playback clock stalled",
+			speaker.get_playout_lag_time() * 1000.0,
+			ring_queue_frames, speaker.tailframenumber - ring_queue_frames)
+
+
+func record_packet_arrival(arrival_time_usec: int, sample_time_usec: int,
+		arrival_timeline_usec: int):
 	var offset_ms := (arrival_time_usec - sample_time_usec) / 1000.0
 	offset_current_ms = offset_ms
 	offset_sample_count += 1
@@ -94,9 +135,69 @@ func record_packet_arrival(arrival_time_usec: int, sample_time_usec: int):
 		offset_m2 += (offset_ms - previous_average) * (offset_ms - offset_average_ms)
 		offset_minimum_ms = minf(offset_minimum_ms, offset_ms)
 		offset_maximum_ms = maxf(offset_maximum_ms, offset_ms)
-	transport_current_ms = maxf(0.0, offset_current_ms - offset_minimum_ms)
+	# Do not clamp an implied negative transport time to the acquisition edge.
+	# Cyan is deliberately allowed left of the source origin to expose a bad
+	# timeline; yellow must show the same evidence instead of hiding it in green.
+	transport_current_ms = arrival_timeline_usec / 1000.0 \
+			- TwoVoipPacket.ACQUISITION_TIME_ESTIMATE * 1000.0
 	transport_maximum_ms = maxf(transport_maximum_ms, transport_current_ms)
-	_record_arrival_spark(acquisition_time_estimate * 1000.0 + transport_current_ms)
+	_record_arrival_spark(TwoVoipPacket.ACQUISITION_TIME_ESTIMATE * 1000.0 \
+			+ transport_current_ms)
+
+
+func get_current_arrival_timeline_seconds() -> float:
+	return TwoVoipPacket.ACQUISITION_TIME_ESTIMATE \
+			+ transport_current_ms / 1000.0
+
+
+func commit_packet_to_playout():
+	if speaker == null or speaker.audio_stream_playback_opus == null:
+		return
+	# Yellow is when the complete packet becomes available. The left edge of the
+	# reversed PCM strip is that same packet's tail boundary, so these compare
+	# directly without a one-chunk correction.
+	var displayed_audible_timeline_ms := _get_audible_timeline_ms()
+	var queue_ms: float = speaker.get_playout_lag_time() * 1000.0
+	var arrival_ms := TwoVoipPacket.ACQUISITION_TIME_ESTIMATE * 1000.0 \
+			+ transport_current_ms
+	var measured_audible_timeline_ms := queue_ms + arrival_ms
+	var tail_timeline_ms := displayed_audible_timeline_ms - queue_ms
+	tail_alignment_current_ms = tail_timeline_ms - arrival_ms
+	tail_alignment_sample_count += 1
+	if tail_alignment_sample_count == 1:
+		tail_alignment_average_ms = tail_alignment_current_ms
+		tail_alignment_minimum_ms = tail_alignment_current_ms
+		tail_alignment_maximum_ms = tail_alignment_current_ms
+	else:
+		tail_alignment_average_ms += (tail_alignment_current_ms \
+				- tail_alignment_average_ms) / tail_alignment_sample_count
+		tail_alignment_minimum_ms = minf(
+				tail_alignment_minimum_ms, tail_alignment_current_ms)
+		tail_alignment_maximum_ms = maxf(
+				tail_alignment_maximum_ms, tail_alignment_current_ms)
+	if audible_timeline_aligned:
+		return
+	initial_alignment_residual_ms = measured_audible_timeline_ms \
+			- displayed_audible_timeline_ms
+	audible_timeline_aligned = true
+	var clean_episode_start: bool = speaker.mid_time_error_count == 0 \
+			and speaker.dropped_packet_count == 0 \
+			and speaker.duplicate_packet_count == 0 \
+			and speaker.playback_restart_count == 0 \
+			and speaker.playback_clock_stall_count == 0 \
+			and speaker.playout_delay_extension_usec == 0 \
+			and speaker.source_clock_offset_revision_count \
+					== speaker.initial_source_clock_offset_revision_count \
+			and speaker.source_next_frame_count == 0
+	if clean_episode_start and not speaker.playingrecording \
+			and absf(initial_alignment_residual_ms) \
+			> acquisition_time_tolerance * 1000.0:
+		var ring_queue_frames: int = \
+				speaker.audio_stream_playback_opus.queue_length_frames()
+		_capture_anomaly("initial playout padding mismatch", queue_ms,
+				ring_queue_frames, speaker.tailframenumber - ring_queue_frames)
+		set_trigger("initial padding mismatch (%+.1f ms)" \
+				% initial_alignment_residual_ms)
 
 
 func _process(delta: float):
@@ -114,9 +215,10 @@ func _collect_scene_nodes():
 				output_cells.append(child)
 	var slots = get_node_or_null("Display/ReorderSlots")
 	if slots:
-		for child in slots.get_children():
-			if child is ColorRect:
-				reorder_slots.append(child)
+		for index in range(speaker.Noutoforderqueue if speaker else 4):
+			var slot: ColorRect = slots.get_node_or_null("Slot%d" % index)
+			if slot:
+				reorder_slots.append(slot)
 
 
 func _rebuild_arrival_sparks(sample_rate: int, frame_size: int):
@@ -163,8 +265,14 @@ func _record_arrival_spark(timeline_ms: float):
 		return
 	var before_source_ms := display_before_source * 1000.0
 	var display_ms := maxf(1.0, (display_before_source + display_span) * 1000.0)
-	var bin := clampi(floori((before_source_ms + timeline_ms) / display_ms \
-			* arrival_sparks.size()), 0, arrival_sparks.size() - 1)
+	var bin := floori((before_source_ms + timeline_ms) / display_ms \
+			* arrival_sparks.size())
+	if bin < 0:
+		arrival_spark_offscreen_left_count += 1
+		return
+	if bin >= arrival_sparks.size():
+		arrival_spark_offscreen_right_count += 1
+		return
 	arrival_spark_density[bin] = minf(1.0, arrival_spark_density[bin] + 0.16)
 	arrival_spark_flash[bin] = 1.0
 
@@ -172,7 +280,9 @@ func _record_arrival_spark(timeline_ms: float):
 func _get_frame_kind(frame_number: int) -> String:
 	if frame_number >= speaker.playbackstartframenumber \
 			and frame_number < speaker.playback_padding_end_frame:
-		return FRAME_KIND_RESERVE
+		# Deliberately inserted timeline silence has the same meaning as silence
+		# inserted by a MID counter advance, so both are shown as purple packing.
+		return FRAME_KIND_SOURCE_GAP
 	if frame_number < speaker.episodefirstframenumber \
 			or frame_number >= speaker.tailframenumber \
 			or speaker.opusframesize <= 0 \
@@ -220,22 +330,30 @@ func _layout_reference_markers():
 		acquisition.visible = true
 		acquisition.position.x = source_position
 		acquisition.size.x = minf(arrival.size.x,
-				acquisition_time_estimate * 1000.0 * arrival_scale)
+				TwoVoipPacket.ACQUISITION_TIME_ESTIMATE * 1000.0 * arrival_scale)
 		acquisition.color = TIMING_ACQUISITION
 	var output_clip: Control = get_node_or_null("Display/OutputClip")
 	if output_clip:
 		var output_scale := output_clip.size.x / display_duration_ms
-		var audible_target_x := clampf((before_source_ms
-				+ speaker.get_effective_playout_lag_target() * 1000.0) * output_scale,
-				0.0, output_clip.size.x)
+		var audible_target_x := (before_source_ms \
+				+ _get_audible_timeline_ms()) * output_scale
 		var audible_deadline: ColorRect = output_clip.get_node("AudibleDeadline")
 		audible_deadline.visible = true
 		audible_deadline.position.x = audible_target_x - audible_deadline.size.x
 		audible_deadline.color = TIMING_AUDIBLE_DEADLINE
+		var target_deadline: ColorRect = output_clip.get_node("TargetDeadline")
+		target_deadline.visible = true
+		target_deadline.position.x = (before_source_ms \
+				+ _get_target_timeline_ms()) * output_scale \
+				- target_deadline.size.x / 2.0
+		target_deadline.color = TIMING_TARGET
 
 
 func anomaly_snapshot(reason: String, queue_ms: float,
 		ring_queue_frames: int, ring_read_frame: int) -> Dictionary:
+	var audible_timeline_ms := _get_audible_timeline_ms()
+	var pcm_tail_boundary_ms: float = audible_timeline_ms - queue_ms
+	var committed_packet_time_ms: float = pcm_tail_boundary_ms
 	return {
 		"reason": reason,
 		"unix_time_usec": int(Time.get_unix_time_from_system() * 1000000.0),
@@ -243,11 +361,84 @@ func anomaly_snapshot(reason: String, queue_ms: float,
 		"speaker": str(get_parent().name) if get_parent() else str(get_path()),
 		"in_stream": speaker.inopusstream,
 		"queue_ms": queue_ms,
-		"target_ms": speaker.get_effective_playout_lag_target() * 1000.0,
-		"base_target_ms": speaker.audio_buffer_lag_time_target * 1000.0,
+		"target_ms": _get_target_timeline_ms(),
+		"effective_playout_lag_ms": \
+				speaker.get_effective_playout_lag_target() * 1000.0,
+		"audible_timeline_ms": audible_timeline_ms,
+		"initial_alignment_residual_ms": initial_alignment_residual_ms,
+		"source_clock_offset_estimate_ms": \
+				speaker.source_clock_offset_estimate_usec / 1000.0,
+		"source_clock_offset_lower_bound_ms": \
+				speaker.source_clock_offset_lower_bound_usec / 1000.0,
+		"source_clock_offset_upper_bound_ms": \
+				speaker.source_clock_offset_upper_bound_usec / 1000.0,
+		"source_clock_offset_uncertainty_ms": \
+				speaker.source_clock_offset_uncertainty_usec / 1000.0,
+		"source_clock_probe_rtt_ms": speaker.source_clock_probe_rtt_usec / 1000.0,
+		"source_clock_revision_reason": speaker.source_clock_revision_reason,
+		"source_clock_offset_observations": \
+				speaker.source_clock_offset_observation_count,
+		"source_clock_offset_revisions": \
+				speaker.source_clock_offset_revision_count,
+		"source_clock_last_revision_ms": \
+				speaker.source_clock_last_revision_usec / 1000.0,
+		"source_clock_reference_deviation_ms": \
+				speaker.source_clock_reference_deviation_usec / 1000.0,
+		"source_clock_reference_max_deviation_ms": \
+				speaker.source_clock_reference_max_deviation_usec / 1000.0,
+		"source_clock_reference_large_changes": \
+				speaker.source_clock_reference_large_change_count,
+		"yellow_timeline_ms": TwoVoipPacket.ACQUISITION_TIME_ESTIMATE * 1000.0 \
+				+ transport_current_ms,
+		"cyan_tail_timeline_ms": pcm_tail_boundary_ms,
+		"tail_alignment_current_ms": tail_alignment_current_ms,
+		"tail_alignment_average_ms": tail_alignment_average_ms,
+		"tail_alignment_minimum_ms": tail_alignment_minimum_ms,
+		"tail_alignment_maximum_ms": tail_alignment_maximum_ms,
+		"tail_alignment_sample_count": tail_alignment_sample_count,
+		"initial_declared_lead_frames": speaker.initial_playout_declared_lead_frame_count,
+		"initial_retained_lead_frames": speaker.initial_playout_lead_frame_count,
+		"initial_skipped_lead_frames": speaker.initial_playout_skipped_frame_count,
+		"initial_start_arrival_timeline_ms": \
+				speaker.initial_start_arrival_timeline_usec / 1000.0,
+		"initial_padding_frames": speaker.playback_padding_end_frame \
+				- speaker.playbackstartframenumber,
+		"initial_padding_ms": (speaker.playback_padding_end_frame \
+				- speaker.playbackstartframenumber) * 1000.0 \
+				/ speaker.opus_sample_rate,
 		"playout_extension_ms": speaker.playout_delay_extension_usec / 1000.0,
-		"origin_overrun_ms": maxf(0.0,
-				queue_ms - speaker.get_effective_playout_lag_target() * 1000.0),
+		"playout_recovery_target_ms": speaker.playout_recovery_target_frames \
+				* 1000.0 / speaker.opus_sample_rate,
+		"recovery_pending_ms": speaker.audio_stream_playback_opus.get_playout_recovery_remaining_frames()
+				* 1000.0 / speaker.opus_sample_rate
+				if speaker.audio_stream_playback_opus else 0.0,
+		"silence_recovery_ms": speaker.audio_stream_playback_opus.get_silence_recovery_frames()
+				* 1000.0 / speaker.opus_sample_rate
+				if speaker.audio_stream_playback_opus else 0.0,
+		"speedup_recovery_ms": speaker.audio_stream_playback_opus.get_speedup_recovery_frames()
+				* 1000.0 / speaker.opus_sample_rate
+				if speaker.audio_stream_playback_opus else 0.0,
+		"playout_timeline_offset_ms": speaker.playout_timeline_offset_usec / 1000.0,
+		"playout_timeline_base_offset_ms": \
+				speaker.playout_timeline_base_offset_usec / 1000.0,
+		"playout_timeline_candidate_deviation_ms": \
+				speaker.playout_timeline_candidate_deviation_usec / 1000.0,
+		"playout_timeline_max_deviation_ms": \
+				speaker.playout_timeline_max_deviation_usec / 1000.0,
+		"source_tail_time_usec": speaker.get_source_tail_time_usec(),
+		"expected_queue_ms": speaker.get_expected_playout_lag_usec() / 1000.0,
+		"usec_buffer_residual_ms": speaker.get_timing_buffer_residual_usec() / 1000.0,
+		"origin_overrun_ms": maxf(0.0, -committed_packet_time_ms),
+		"arrival_sparks_offscreen_left": arrival_spark_offscreen_left_count,
+		"arrival_sparks_offscreen_right": arrival_spark_offscreen_right_count,
+		"audible_timeline_offscreen_right": audible_timeline_offscreen_right,
+		"audible_timeline_offscreen_right_count": \
+				audible_timeline_offscreen_right_count,
+		"pcm_tail_boundary_ms": pcm_tail_boundary_ms,
+		"committed_packet_time_ms": committed_packet_time_ms,
+		"buffer_left_time_ms": committed_packet_time_ms,
+		"acquisition_width_ms": TwoVoipPacket.ACQUISITION_TIME_ESTIMATE * 1000.0,
+		"acquisition_tolerance_ms": acquisition_time_tolerance * 1000.0,
 		"output_latency_ms": speaker.audioserveroutputlatency * 1000.0,
 		"queue_frames": ring_queue_frames,
 		"available_frames": speaker.audio_stream_playback_opus.available_space_frames()
@@ -261,9 +452,12 @@ func anomaly_snapshot(reason: String, queue_ms: float,
 		"source_next_frame_time_usec": speaker.source_next_frame_time_usec,
 		"source_packet_first_frame_time_usec": speaker.source_packet_first_frame_time_usec,
 		"restart_count": speaker.playback_restart_count,
+		"playback_clock_stall_count": speaker.playback_clock_stall_count,
+		"playback_clock_stall_total_ms": speaker.playback_clock_stall_total_usec / 1000.0,
+		"playback_clock_last_stall_ms": speaker.playback_clock_last_stall_usec / 1000.0,
 		"drop_count": speaker.dropped_packet_count,
 		"duplicate_count": speaker.duplicate_packet_count,
-		"rejected_mid_count": speaker.rejected_mid_count,
+		"mid_time_error_count": speaker.mid_time_error_count,
 		"delayed_mid_audio_count": speaker.delayed_mid_audio_count,
 		"player_playing": bool(speaker.audioplayeropus and speaker.audioplayeropus.playing),
 		"playback_playing": bool(speaker.audio_stream_playback_opus
@@ -307,7 +501,7 @@ func update_display(delta: float):
 	var phase := float(audible_frame - audible_chunk_frame) / frame_size
 	var output_cells_node = get_node_or_null("Display/OutputClip/OutputCells")
 	var cell_width := 0.0
-	var target_ms: float = speaker.get_effective_playout_lag_target() * 1000.0
+	var audible_timeline_ms: float = _get_audible_timeline_ms()
 	var before_source_ms: float = display_before_source * 1000.0
 	var audible_target_x := 0.0
 	var queue_ms: float = speaker.get_playout_lag_time() * 1000.0
@@ -321,9 +515,13 @@ func update_display(delta: float):
 		var component_width := maxf(1.0, cell_width - separation)
 		for cell in output_cells:
 			cell.custom_minimum_size.x = component_width
-		audible_target_x = clampf((before_source_ms + target_ms) * time_scale,
-				0.0, output_cells_node.get_parent().size.x)
+		audible_target_x = (before_source_ms + audible_timeline_ms) * time_scale
 		output_cells_node.position.x = audible_target_x - output_cells.size() * cell_width
+		var is_offscreen_right: bool = audible_target_x \
+				> output_cells_node.get_parent().size.x
+		if is_offscreen_right and not audible_timeline_offscreen_right:
+			audible_timeline_offscreen_right_count += 1
+		audible_timeline_offscreen_right = is_offscreen_right
 	_update_sparks(delta)
 	for index in range(output_cells.size()):
 		var frame_number := audible_chunk_frame \
@@ -333,7 +531,9 @@ func update_display(delta: float):
 				and frame_number < speaker.tailframenumber
 		var colour := _frame_colour(kind) if frame_is_buffered else TIMING_EMPTY
 		if frame_is_buffered and kind.is_empty():
-			colour = TIMING_RESERVE
+			# Missing metadata for a supposedly buffered frame is evidence, not
+			# reserve PCM. Keep it conspicuous instead of making the strip look valid.
+			colour = TIMING_UNKNOWN
 		if kind == FRAME_KIND_AUDIO:
 			colour = colour.lerp(Color.WHITE,
 					clampf(speaker.get_frame_max(frame_number) * 2.0, 0.0, 0.65))
@@ -361,7 +561,25 @@ func update_display(delta: float):
 		var occupied: bool = index < speaker.outoforderchunkqueue.size() \
 				and speaker.outoforderchunkqueue[index] != null
 		reorder_slots[index].color = TIMING_AUDIO if occupied else TIMING_REORDER_EMPTY
-	_update_overflow(queue_ms, target_ms, ring_queue_frames, ring_read_frame)
+	_update_overflow(queue_ms, audible_timeline_ms,
+			ring_queue_frames, ring_read_frame)
+	_update_usec_consistency(queue_ms, ring_queue_frames, ring_read_frame)
+
+
+func _get_audible_timeline_ms() -> float:
+	if speaker.playout_timeline_base_offset_valid \
+			and speaker.source_clock_offset_bound_valid:
+		# The playout offset contains both the inter-computer clock relation and
+		# the source-to-audible journey. Subtracting the current clock estimate
+		# leaves the measured red timeline. A clock-bound revision therefore moves
+		# red and yellow together while the independently drawn target stays fixed.
+		return (speaker.playout_timeline_offset_usec \
+				- speaker.source_clock_offset_estimate_usec) / 1000.0
+	return _get_target_timeline_ms()
+
+
+func _get_target_timeline_ms() -> float:
+	return speaker.audio_buffer_lag_time_target * 1000.0
 
 
 func _update_sparks(delta: float):
@@ -383,17 +601,30 @@ func _update_sparks(delta: float):
 				0.08 + brightness * 0.5, alpha)
 
 
-func _update_overflow(queue_ms: float, target_ms: float,
+func _update_overflow(queue_ms: float, audible_timeline_ms: float,
 		ring_queue_frames: int, ring_read_frame: int):
-	var overflowing_left: bool = speaker.inopusstream and queue_ms \
-			> target_ms + speaker.opusframesize * 1000.0 / speaker.opus_sample_rate
+	# The reversed strip's left edge and the yellow arrival both describe the
+	# boundary at which the complete newest packet is available.
+	var buffer_left_time_ms: float = audible_timeline_ms - queue_ms
+	var acquisition_end_time_ms := \
+			TwoVoipPacket.ACQUISITION_TIME_ESTIMATE * 1000.0
+	# The PCM tail cannot exist at the receiver during the green acquisition
+	# interval. Entry into it means the red audible reference, green duration,
+	# or their shared clock mapping is wrong; it is not a permissible overrun.
+	var entered_acquisition_interval: bool = buffer_left_time_ms \
+			< acquisition_end_time_ms
+	var crossed_source_start: bool = buffer_left_time_ms < 0.0
+	var overflowing_left: bool = speaker.inopusstream and not speaker.playingrecording \
+			and entered_acquisition_interval
 	if overflowing_left:
 		if not buffer_left_overflowing:
 			buffer_left_overflow_count += 1
 			buffer_left_overflow_logged_ms = queue_ms
-			_capture_anomaly("buffer crossed source-time origin", queue_ms,
+			var reason := "buffer crossed source-time origin" \
+					if crossed_source_start else "buffer entered acquisition interval"
+			_capture_anomaly(reason, queue_ms,
 					ring_queue_frames, ring_read_frame)
-			set_trigger("buffer crossed source-time origin")
+			set_trigger("%s (left %.1f ms)" % [reason, buffer_left_time_ms])
 		elif queue_ms >= buffer_left_overflow_logged_ms + 100.0:
 			buffer_left_overflow_logged_ms = queue_ms
 			_capture_anomaly("source-origin overrun grew", queue_ms,
@@ -401,6 +632,22 @@ func _update_overflow(queue_ms: float, target_ms: float,
 	elif buffer_left_overflowing:
 		buffer_left_overflow_logged_ms = 0.0
 	buffer_left_overflowing = overflowing_left
+
+
+func _update_usec_consistency(queue_ms: float,
+		ring_queue_frames: int, ring_read_frame: int):
+	if not speaker.inopusstream or speaker.playingrecording:
+		timing_buffer_mismatching = false
+		return
+	var residual_ms: float = speaker.get_timing_buffer_residual_usec() / 1000.0
+	var mismatching := absf(residual_ms) > timing_buffer_tolerance * 1000.0
+	if mismatching and not timing_buffer_mismatching:
+		timing_buffer_mismatch_count += 1
+		var reason := "PCM buffer longer than source usec timeline" \
+				if residual_ms > 0.0 else "PCM buffer shorter than source usec timeline"
+		_capture_anomaly(reason, queue_ms, ring_queue_frames, ring_read_frame)
+		set_trigger("%s (%+.1f ms)" % [reason, residual_ms])
+	timing_buffer_mismatching = mismatching
 
 
 func _clear_display():

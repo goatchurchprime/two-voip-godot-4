@@ -156,7 +156,6 @@ func _process(_delta: float) -> void:
 	for client in _clients.duplicate():
 		_poll_client(client)
 
-
 func _poll_client(client: Dictionary) -> void:
 	var peer: StreamPeerTCP = client.peer
 	peer.poll()

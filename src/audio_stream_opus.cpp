@@ -57,6 +57,11 @@ void AudioStreamPlaybackOpus::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_overflow_frames"), &AudioStreamPlaybackOpus::get_overflow_frames);
     ClassDB::bind_method(D_METHOD("get_decode_errors"), &AudioStreamPlaybackOpus::get_decode_errors);
     ClassDB::bind_method(D_METHOD("get_last_decode_error"), &AudioStreamPlaybackOpus::get_last_decode_error);
+    ClassDB::bind_method(D_METHOD("configure_playout_recovery", "target_queue_frames", "maximum_speed"), &AudioStreamPlaybackOpus::configure_playout_recovery);
+    ClassDB::bind_method(D_METHOD("request_playout_recovery", "frame_count"), &AudioStreamPlaybackOpus::request_playout_recovery);
+    ClassDB::bind_method(D_METHOD("get_playout_recovery_remaining_frames"), &AudioStreamPlaybackOpus::get_playout_recovery_remaining_frames);
+    ClassDB::bind_method(D_METHOD("get_silence_recovery_frames"), &AudioStreamPlaybackOpus::get_silence_recovery_frames);
+    ClassDB::bind_method(D_METHOD("get_speedup_recovery_frames"), &AudioStreamPlaybackOpus::get_speedup_recovery_frames);
     ClassDB::bind_method(D_METHOD("get_frame_hash", "first_frame", "frame_count"), &AudioStreamPlaybackOpus::get_frame_hash);
     ClassDB::bind_method(D_METHOD("set_sinewave_frames", "sinewaveframes", "volume"), &AudioStreamPlaybackOpus::set_sinewave_frames);
 }
@@ -124,13 +129,23 @@ Error AudioStreamPlaybackOpus::initialize(int p_opus_sample_rate, int p_opus_cha
     output_resampler = new_resampler;
     audiounpackedbuffer.resize(opus_frame_size * opus_channels);
     audiosamplebuffer.resize(std::max(opus_sample_rate * 2, std::max(1, static_cast<int>(p_buffer_length * opus_sample_rate))));
-    resampler_input_latency = speex_resampler_get_input_latency(output_resampler);
+    resampler_input_latency.store(speex_resampler_get_input_latency(output_resampler),
+            std::memory_order_relaxed);
     resampler_output_latency = speex_resampler_get_output_latency(output_resampler);
-    resampler_silence.resize(std::max(1, resampler_input_latency));
+    resampler_silence.resize(std::max(1,
+            resampler_input_latency.load(std::memory_order_relaxed)));
     for (uint32_t i = 0; i < resampler_silence.size(); i++) {
         resampler_silence[i] = { 0.0f, 0.0f };
     }
-    flush_input_frames_remaining = resampler_input_latency;
+    flush_input_frames_remaining = resampler_input_latency.load(std::memory_order_relaxed);
+
+    recovery_target_queue_frames.store(-1, std::memory_order_relaxed);
+    recovery_max_speed_permille.store(1000, std::memory_order_relaxed);
+    recovery_frames_remaining.store(0, std::memory_order_relaxed);
+    silence_recovery_frames.store(0, std::memory_order_relaxed);
+    speedup_recovery_frames.store(0, std::memory_order_relaxed);
+    resampler_speed_permille = 1000;
+    fractional_speedup_recovery_frames = 0.0;
 
     buffer_read_frame.store(0, std::memory_order_relaxed);
     buffer_write_frame.store(0, std::memory_order_relaxed);
@@ -178,6 +193,69 @@ int64_t AudioStreamPlaybackOpus::get_decode_errors() const {
 
 int AudioStreamPlaybackOpus::get_last_decode_error() const {
     return last_decode_error.load(std::memory_order_relaxed);
+}
+
+Error AudioStreamPlaybackOpus::configure_playout_recovery(int target_queue_frames, float maximum_speed) {
+    if (target_queue_frames < 0 || !std::isfinite(maximum_speed) || maximum_speed < 1.0f || maximum_speed > 2.0f) {
+        return ERR_INVALID_PARAMETER;
+    }
+    recovery_target_queue_frames.store(target_queue_frames, std::memory_order_release);
+    recovery_max_speed_permille.store(static_cast<int>(std::lround(maximum_speed * 1000.0f)),
+            std::memory_order_release);
+    return OK;
+}
+
+int64_t AudioStreamPlaybackOpus::request_playout_recovery(int frame_count) {
+    if (frame_count < 0 || episode_state.load(std::memory_order_acquire) != EPISODE_RECEIVING) {
+        return -1;
+    }
+    if (frame_count > 0) {
+        recovery_frames_remaining.fetch_add(frame_count, std::memory_order_acq_rel);
+    }
+    return recovery_frames_remaining.load(std::memory_order_acquire);
+}
+
+int64_t AudioStreamPlaybackOpus::get_playout_recovery_remaining_frames() const {
+    return recovery_frames_remaining.load(std::memory_order_acquire);
+}
+
+int64_t AudioStreamPlaybackOpus::get_silence_recovery_frames() const {
+    return silence_recovery_frames.load(std::memory_order_relaxed);
+}
+
+int64_t AudioStreamPlaybackOpus::get_speedup_recovery_frames() const {
+    return speedup_recovery_frames.load(std::memory_order_relaxed);
+}
+
+int64_t AudioStreamPlaybackOpus::consume_recovery_frames(int64_t frame_count) {
+    int64_t remaining = recovery_frames_remaining.load(std::memory_order_acquire);
+    while (remaining > 0) {
+        const int64_t consumed = std::min(frame_count, remaining);
+        if (recovery_frames_remaining.compare_exchange_weak(remaining, remaining - consumed,
+                    std::memory_order_acq_rel, std::memory_order_acquire)) {
+            return consumed;
+        }
+    }
+    return 0;
+}
+
+bool AudioStreamPlaybackOpus::set_resampler_speed(int speed_permille) {
+    speed_permille = std::max(1000, speed_permille);
+    if (output_resampler == nullptr || speed_permille == resampler_speed_permille) {
+        return output_resampler != nullptr;
+    }
+    const spx_uint32_t ratio_num = static_cast<spx_uint32_t>(opus_sample_rate * speed_permille);
+    const spx_uint32_t ratio_den = static_cast<spx_uint32_t>(output_mix_rate * 1000);
+    const int error = speex_resampler_set_rate_frac(output_resampler,
+            ratio_num, ratio_den, opus_sample_rate, output_mix_rate);
+    if (error != RESAMPLER_ERR_SUCCESS) {
+        UtilityFunctions::printerr("Speex recovery speed change failed code ", error);
+        return false;
+    }
+    resampler_speed_permille = speed_permille;
+    resampler_input_latency.store(speex_resampler_get_input_latency(output_resampler),
+            std::memory_order_release);
+    return true;
 }
 
 int AudioStreamPlaybackOpus::queue_length_frames() const {
@@ -363,7 +441,8 @@ int64_t AudioStreamPlaybackOpus::get_frame_number_actually_in_speaker() const {
                 output_frames_before_end * opus_sample_rate / output_mix_rate));
     }
     const int64_t read_frame = buffer_read_frame.load(std::memory_order_acquire);
-    const double audible_frame = read_frame - resampler_input_latency +
+    const double audible_frame = read_frame -
+            resampler_input_latency.load(std::memory_order_acquire) +
             (AudioServer::get_singleton()->get_time_since_last_mix() - output_latency_seconds) * opus_sample_rate;
     return static_cast<int64_t>(std::floor(audible_frame));
 }
@@ -436,6 +515,54 @@ int32_t AudioStreamPlaybackOpus::_mix(AudioFrame *buffer, float rate_scale, int3
     int64_t read_frame = buffer_read_frame.load(std::memory_order_relaxed);
     const int64_t write_frame = buffer_write_frame.load(std::memory_order_acquire);
 
+    const int target_queue_frames = recovery_target_queue_frames.load(std::memory_order_acquire);
+    int64_t recovery_remaining = recovery_frames_remaining.load(std::memory_order_acquire);
+    int64_t queue_excess = target_queue_frames >= 0 ?
+            std::max<int64_t>(0, write_frame - read_frame - target_queue_frames) : 0;
+
+    // Exact zeros are already observable in the PCM ring. Only jump a large
+    // run, so isolated zero crossings in ordinary decoded speech are never
+    // treated as a blank MID region.
+    if (recovery_remaining > 0 && queue_excess > 0) {
+        const int64_t scan_limit = std::min(recovery_remaining, queue_excess);
+        int64_t zero_run = 0;
+        while (zero_run < scan_limit) {
+            const AudioFrame &sample = audiosamplebuffer[(read_frame + zero_run) % audiosamplebuffer.size()];
+            if (sample.left != 0.0f || sample.right != 0.0f) {
+                break;
+            }
+            zero_run++;
+        }
+        const int minimum_zero_run = std::max(1, opus_frame_size / 2);
+        if (zero_run >= minimum_zero_run) {
+            const int64_t recovered = consume_recovery_frames(zero_run);
+            read_frame += recovered;
+            silence_recovery_frames.fetch_add(recovered, std::memory_order_relaxed);
+            // A long silent interval separates the old and resumed sound. Do
+            // not carry the pre-gap interpolation history across the jump.
+            speex_resampler_reset_mem(output_resampler);
+            recovery_remaining -= recovered;
+            queue_excess -= recovered;
+        }
+    }
+
+    int recovery_speed_permille = 1000;
+    if (recovery_remaining > 0 && queue_excess > 0) {
+        const int maximum_speed_permille = recovery_max_speed_permille.load(std::memory_order_acquire);
+        const double nominal_input_frames = frames * static_cast<double>(opus_sample_rate) / output_mix_rate;
+        if (nominal_input_frames > 0.0) {
+            const double required_scale = 1.0 +
+                    std::min(recovery_remaining, queue_excess) / nominal_input_frames;
+            recovery_speed_permille = std::min(maximum_speed_permille,
+                    std::max(1000, static_cast<int>(std::floor(required_scale * 1000.0))));
+        }
+    }
+    if (!set_resampler_speed(recovery_speed_permille)) {
+        episode_state.store(EPISODE_STOPPED, std::memory_order_release);
+        active.store(false, std::memory_order_release);
+        return 0;
+    }
+
     while (produced_total < frames) {
         int consumed = 0;
         int produced = 0;
@@ -470,6 +597,20 @@ int32_t AudioStreamPlaybackOpus::_mix(AudioFrame *buffer, float rate_scale, int3
         buffer_read_frame.store(read_frame, std::memory_order_release);
     }
 
+    if (recovery_speed_permille > 1000 && produced_total > 0) {
+        const double nominal_input_frames = produced_total *
+                static_cast<double>(opus_sample_rate) / output_mix_rate;
+        fractional_speedup_recovery_frames += nominal_input_frames *
+                (recovery_speed_permille - 1000) / 1000.0;
+        const int64_t requested_recovery = static_cast<int64_t>(
+                std::floor(fractional_speedup_recovery_frames));
+        if (requested_recovery > 0) {
+            fractional_speedup_recovery_frames -= requested_recovery;
+            const int64_t recovered = consume_recovery_frames(requested_recovery);
+            speedup_recovery_frames.fetch_add(recovered, std::memory_order_relaxed);
+        }
+    }
+
     state = episode_state.load(std::memory_order_acquire);
     if (state == EPISODE_RECEIVING && read_frame == write_frame) {
         const int64_t idle_start = last_packet_output_frame.load(std::memory_order_acquire);
@@ -500,6 +641,11 @@ void AudioStreamPlaybackOpus::_start(double p_from_pos) {
     overflow_frames.store(0, std::memory_order_relaxed);
     decode_errors.store(0, std::memory_order_relaxed);
     last_decode_error.store(OPUS_OK, std::memory_order_relaxed);
+    recovery_frames_remaining.store(0, std::memory_order_relaxed);
+    silence_recovery_frames.store(0, std::memory_order_relaxed);
+    speedup_recovery_frames.store(0, std::memory_order_relaxed);
+    fractional_speedup_recovery_frames = 0.0;
+    set_resampler_speed(1000);
     mixed_output_frames.store(0, std::memory_order_relaxed);
     last_packet_output_frame.store(0, std::memory_order_relaxed);
     active.store(true, std::memory_order_release);

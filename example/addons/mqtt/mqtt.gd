@@ -64,6 +64,7 @@ signal broker_connected()
 signal broker_disconnected()
 signal broker_connection_failed()
 signal publish_acknowledge(pid)
+signal subscribe_acknowledge(pid, result)
 
 var receivedbuffer : PackedByteArray = PackedByteArray()
 
@@ -516,8 +517,10 @@ func wait_msg():
 		if sz != 3:
 			return _protocol_error("SUBACK payload must be three bytes")
 		var apid = (receivedbuffer[i] << 8) + receivedbuffer[i+1]
+		var subscribe_result = receivedbuffer[i+2]
 		if verbose_level:
-			print("SUBACK[%d] ret=%02x" % [apid, receivedbuffer[i+2]])
+			print("SUBACK[%d] ret=%02x" % [apid, subscribe_result])
+		emit_signal("subscribe_acknowledge", apid, subscribe_result)
 
 	elif op == CP_UNSUBACK:
 		if sz != 2:

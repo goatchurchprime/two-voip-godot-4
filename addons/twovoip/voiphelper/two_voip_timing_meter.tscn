@@ -6,7 +6,7 @@
 custom_minimum_size = Vector2(542, 29)
 layout_mode = 3
 anchors_preset = 0
-tooltip_text = "PCM playout (blue audio, grey reserve, purple source-gap silence, orange FEC), packet reorder slots, arrival variation, and the most recent receiver state transition."
+tooltip_text = "PCM playout (blue audio, grey reserve, purple source-gap silence, orange FEC, magenta invalid metadata), packet reorder slots, arrival variation, and the most recent receiver state transition."
 mouse_filter = 1
 script = ExtResource("1_timing")
 
@@ -297,6 +297,13 @@ offset_bottom = 15.0
 mouse_filter = 2
 color = Color(1, 0.25, 0.25, 0.72)
 
+[node name="TargetDeadline" type="ColorRect" parent="Display/OutputClip"]
+layout_mode = 0
+offset_right = 3.0
+offset_bottom = 15.0
+mouse_filter = 2
+color = Color(1, 0.65, 0.68, 0.48)
+
 [node name="AudibleDeadline" type="ColorRect" parent="Display/OutputClip" unique_id=1633518106]
 layout_mode = 0
 offset_right = 2.0
@@ -317,18 +324,13 @@ color = Color(0.18, 0.35, 0.55, 0.75)
 [node name="ReorderSlots" type="HBoxContainer" parent="Display" unique_id=1911553549]
 z_index = 3
 layout_mode = 0
-offset_left = 484.0
-offset_top = 10.0
-offset_right = 542.0
-offset_bottom = 16.0
+offset_left = 52.0
+offset_top = 2.0
+offset_right = 110.0
+offset_bottom = 9.0
 theme_override_constants/separation = 1
 
-[node name="Slot0" type="ColorRect" parent="Display/ReorderSlots" unique_id=1913366294]
-custom_minimum_size = Vector2(13, 7)
-layout_mode = 2
-color = Color(0.12, 0.14, 0.18, 1)
-
-[node name="Slot1" type="ColorRect" parent="Display/ReorderSlots" unique_id=2048574371]
+[node name="Slot3" type="ColorRect" parent="Display/ReorderSlots" unique_id=25217774]
 custom_minimum_size = Vector2(13, 7)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
@@ -338,7 +340,12 @@ custom_minimum_size = Vector2(13, 7)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
 
-[node name="Slot3" type="ColorRect" parent="Display/ReorderSlots" unique_id=25217774]
+[node name="Slot1" type="ColorRect" parent="Display/ReorderSlots" unique_id=2048574371]
+custom_minimum_size = Vector2(13, 7)
+layout_mode = 2
+color = Color(0.12, 0.14, 0.18, 1)
+
+[node name="Slot0" type="ColorRect" parent="Display/ReorderSlots" unique_id=1913366294]
 custom_minimum_size = Vector2(13, 7)
 layout_mode = 2
 color = Color(0.12, 0.14, 0.18, 1)
@@ -350,7 +357,7 @@ offset_left = 4.0
 offset_top = 2.0
 offset_right = 538.0
 offset_bottom = 24.0
-tooltip_text = "Shared source timeline. The intentional empty span left of the white marker is 300 ms of pre-source time, used to reveal a buffer crossing before the microphone/source moment. Blue is acquisition and yellow bins are packet arrivals. Output cells remain virtually visible after passing the ring read index while their audio crosses the output pipeline. The left edge of the shrinking red bar is physically audible now; the small rectangle to its right brightens with that audio. Reference markers turn green and remain fixed while idle."
+tooltip_text = "Shared source timeline. The intentional empty span left of the white marker is 300 ms of pre-source time, used to reveal a buffer crossing before the microphone/source moment. Blue is acquisition and yellow bins are packet arrivals. Output cells remain virtually visible after passing the ring read index while their audio crosses the output pipeline. The left edge of the shrinking red bar is physically audible now; the faint pink line is the fixed target, and the small rectangle to the right of red brightens with audible audio. Reference markers turn green and remain fixed while idle."
 color = Color(0.12, 0.14, 0.18, 1)
 
 [node name="SourceEvent" type="ColorRect" parent="Display/Arrival" unique_id=1491529812]

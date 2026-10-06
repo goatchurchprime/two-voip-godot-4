@@ -83,7 +83,7 @@ class AudioStreamPlaybackOpus : public AudioStreamPlayback {
     int opus_frame_size = 0;
     int output_mix_rate = 0;
     double output_latency_seconds = 0.0;
-    int resampler_input_latency = 0;
+    std::atomic<int> resampler_input_latency{ 0 };
     int resampler_output_latency = 0;
     int flush_input_frames_remaining = 0;
 
@@ -106,9 +106,22 @@ class AudioStreamPlaybackOpus : public AudioStreamPlayback {
     std::atomic<int64_t> overflow_frames{ 0 };
     std::atomic<int64_t> decode_errors{ 0 };
     std::atomic<int> last_decode_error{ OPUS_OK };
+
+    // Receiver catch-up is requested by the main thread and performed only by
+    // the audio consumer. Large exact-zero runs are crossed immediately;
+    // other PCM is consumed through a temporarily faster Speex ratio.
+    std::atomic<int> recovery_target_queue_frames{ -1 };
+    std::atomic<int> recovery_max_speed_permille{ 1000 };
+    std::atomic<int64_t> recovery_frames_remaining{ 0 };
+    std::atomic<int64_t> silence_recovery_frames{ 0 };
+    std::atomic<int64_t> speedup_recovery_frames{ 0 };
+    int resampler_speed_permille = 1000;
+    double fractional_speedup_recovery_frames = 0.0;
     
     int queue_decoded_frames(const float *decoded_samples, int frame_count);
     int resample_frames(const AudioFrame *input, int input_frames, AudioFrame *output, int output_frames, int &consumed_frames);
+    int64_t consume_recovery_frames(int64_t frame_count);
+    bool set_resampler_speed(int speed_permille);
 
     // Used to maps a pure sound wave in place of incoming audio data to check if problems are in playback or the data
     int Dsinewaveframes = 0;
@@ -142,6 +155,11 @@ public:
     int64_t get_overflow_frames() const;
     int64_t get_decode_errors() const;
     int get_last_decode_error() const;
+    Error configure_playout_recovery(int target_queue_frames, float maximum_speed);
+    int64_t request_playout_recovery(int frame_count);
+    int64_t get_playout_recovery_remaining_frames() const;
+    int64_t get_silence_recovery_frames() const;
+    int64_t get_speedup_recovery_frames() const;
     int64_t get_frame_hash(int64_t first_frame, int frame_count) const;
     int64_t finish_episode();
     void set_sinewave_frames(int sinewaveframes, float volume);

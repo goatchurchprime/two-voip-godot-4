@@ -3,12 +3,16 @@ extends RefCounted
 
 
 const WIRE_VERSION := 5
+const ACQUISITION_TIME_ESTIMATE := 0.03
 
 const TYPE_START := "start"
 const TYPE_MID := "mid"
 const TYPE_END := "end"
 const TYPE_HASH_REQUEST := "hash?"
 const TYPE_HASH_RESPONSE := "hash"
+const TYPE_CLOCK_PING := "clock_ping"
+const TYPE_CLOCK_PONG := "clock_pong"
+const TYPE_CLOCK_ACK := "clock_ack"
 
 const ENCODING_BINARY := "binary"
 const ENCODING_BASE64 := "base64"
@@ -39,6 +43,7 @@ enum HeaderField {
 	NEXT_FRAME_TIME_USEC,
 	OPUS_BITRATE,
 	AUDIO_ENCODING,
+	LEAD_FRAME_COUNT,
 	SIZE,
 }
 
@@ -85,10 +90,43 @@ enum HashResponseField {
 }
 
 
+enum ClockPingField {
+	TYPE,
+	VERSION,
+	PROBE_ID,
+	T1_USEC,
+	SIZE,
+}
+
+
+enum ClockPongField {
+	TYPE,
+	VERSION,
+	PROBE_ID,
+	T1_USEC,
+	T2_USEC,
+	T3_USEC,
+	SIZE,
+}
+
+
+enum ClockAckField {
+	TYPE,
+	VERSION,
+	PROBE_ID,
+	T1_USEC,
+	T2_USEC,
+	T3_USEC,
+	T4_USEC,
+	SIZE,
+}
+
+
 static func make_header(packet_type: String, opus_frame_size: int,
 		opus_sample_rate: int, opus_channels: int, chunk_prefix_length: int,
 		opus_stream_count: int, next_frame_count: int,
-		next_frame_time_usec: int, opus_bitrate: int, encode_base64: bool) -> Array:
+		next_frame_time_usec: int, opus_bitrate: int, encode_base64: bool,
+		lead_frame_count: int = 0) -> Array:
 	assert(packet_type == TYPE_START)
 	var packet: Array = []
 	packet.resize(HeaderField.SIZE)
@@ -103,6 +141,7 @@ static func make_header(packet_type: String, opus_frame_size: int,
 	packet[HeaderField.NEXT_FRAME_TIME_USEC] = next_frame_time_usec
 	packet[HeaderField.OPUS_BITRATE] = opus_bitrate
 	packet[HeaderField.AUDIO_ENCODING] = ENCODING_BASE64 if encode_base64 else ENCODING_BINARY
+	packet[HeaderField.LEAD_FRAME_COUNT] = lead_frame_count
 	return packet
 
 
@@ -154,6 +193,22 @@ static func make_hash_response(opus_stream_count: int, first_frame: int, frame_c
 	packet[HashResponseField.HASH] = hash
 	return packet
 
+
+static func make_clock_ping(probe_id: String, t1_usec: int) -> Array:
+	return [TYPE_CLOCK_PING, WIRE_VERSION, probe_id, t1_usec]
+
+
+static func make_clock_pong(probe_id: String, t1_usec: int,
+		t2_usec: int, t3_usec: int) -> Array:
+	return [TYPE_CLOCK_PONG, WIRE_VERSION, probe_id,
+			t1_usec, t2_usec, t3_usec]
+
+
+static func make_clock_ack(probe_id: String, t1_usec: int,
+		t2_usec: int, t3_usec: int, t4_usec: int) -> Array:
+	return [TYPE_CLOCK_ACK, WIRE_VERSION, probe_id,
+			t1_usec, t2_usec, t3_usec, t4_usec]
+
 static func encode_control_packet(packet: Array) -> PackedByteArray:
 	return JSON.stringify(packet).to_ascii_buffer()
 
@@ -171,7 +226,8 @@ static func decode_control_packet(packet: PackedByteArray) -> Array:
 
 
 static func header_is_valid(packet: Array) -> bool:
-	return packet.size() == HeaderField.SIZE \
+	return packet.size() >= HeaderField.AUDIO_ENCODING + 1 \
+			and packet.size() <= HeaderField.SIZE \
 			and packet[HeaderField.TYPE] == TYPE_START \
 			and packet[HeaderField.VERSION] == WIRE_VERSION \
 			and packet[HeaderField.NEXT_FRAME_COUNT] >= 0 \
@@ -206,8 +262,37 @@ static func hash_response_is_valid(packet: Array) -> bool:
 			and packet[HashResponseField.FRAME_COUNT] > 0
 
 
+static func clock_ping_is_valid(packet: Array) -> bool:
+	return packet.size() == ClockPingField.SIZE \
+			and packet[ClockPingField.TYPE] == TYPE_CLOCK_PING \
+			and packet[ClockPingField.VERSION] == WIRE_VERSION \
+			and packet[ClockPingField.PROBE_ID] is String \
+			and not packet[ClockPingField.PROBE_ID].is_empty()
+
+
+static func clock_pong_is_valid(packet: Array) -> bool:
+	return packet.size() == ClockPongField.SIZE \
+			and packet[ClockPongField.TYPE] == TYPE_CLOCK_PONG \
+			and packet[ClockPongField.VERSION] == WIRE_VERSION \
+			and packet[ClockPongField.PROBE_ID] is String \
+			and not packet[ClockPongField.PROBE_ID].is_empty()
+
+
+static func clock_ack_is_valid(packet: Array) -> bool:
+	return packet.size() == ClockAckField.SIZE \
+			and packet[ClockAckField.TYPE] == TYPE_CLOCK_ACK \
+			and packet[ClockAckField.VERSION] == WIRE_VERSION \
+			and packet[ClockAckField.PROBE_ID] is String \
+			and not packet[ClockAckField.PROBE_ID].is_empty()
+
+
 static func header_uses_base64(packet: Array) -> bool:
 	return packet[HeaderField.AUDIO_ENCODING] == ENCODING_BASE64
+
+
+static func header_lead_frame_count(packet: Array) -> int:
+	return maxi(0, int(packet[HeaderField.LEAD_FRAME_COUNT])) \
+			if packet.size() > HeaderField.LEAD_FRAME_COUNT else 0
 
 
 static func make_timestamped_chunk_prefix() -> PackedByteArray:

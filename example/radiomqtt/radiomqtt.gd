@@ -315,6 +315,8 @@ func _on_pause_check_toggled(toggled_on):
 
 func _on_stall_in_1_toggled(toggled_on):
 	$MQTTnetwork/MQTT.set_process(not toggled_on)
+	if $MQTTnetwork/MQTTSimulatedBroker._server:
+		$MQTTnetwork/MQTTSimulatedBroker.set_process(not toggled_on)
 	if toggled_on:
 		await get_tree().create_timer(1.0).timeout
 		$HBoxNetManage/StallIn1.button_pressed = false

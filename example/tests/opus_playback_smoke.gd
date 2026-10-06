@@ -119,6 +119,31 @@ func run_tests() -> void:
 	assert(silence_episode.finish_episode() == 1440)
 	assert(drain_episode(silence_episode))
 
+	var zero_recovery := AudioStreamPlaybackOpus.new()
+	zero_recovery.start()
+	assert(zero_recovery.initialize(48000, 1, 960, 0.1, 2.0) == OK)
+	assert(zero_recovery.configure_playout_recovery(960, 1.08) == OK)
+	assert(zero_recovery.push_silence(2880) == 2880)
+	assert(zero_recovery.request_playout_recovery(960) == 960)
+	zero_recovery.mix_audio(1.0, 256)
+	assert(zero_recovery.get_silence_recovery_frames() == 960)
+	assert(zero_recovery.get_speedup_recovery_frames() == 0)
+	assert(zero_recovery.get_playout_recovery_remaining_frames() == 0)
+
+	var speech_recovery := AudioStreamPlaybackOpus.new()
+	speech_recovery.start()
+	assert(speech_recovery.initialize(48000, 1, 960, 0.5, 2.0) == OK)
+	assert(speech_recovery.configure_playout_recovery(960, 1.20) == OK)
+	for packet_index in range(20):
+		assert(speech_recovery.push_opus_packet(packet, 0, 0) == 960)
+	assert(speech_recovery.request_playout_recovery(960) == 960)
+	for mix_index in range(24):
+		speech_recovery.mix_audio(1.0, 256)
+	assert(speech_recovery.get_silence_recovery_frames() == 0)
+	assert(speech_recovery.get_speedup_recovery_frames() > 0)
+	assert(speech_recovery.get_playout_recovery_remaining_frames() \
+			< 960)
+
 	var player := AudioStreamPlayer.new()
 	get_root().add_child(player)
 	player.stream = stream
@@ -143,6 +168,8 @@ func run_tests() -> void:
 	first_episode = null
 	second_episode = null
 	silence_episode = null
+	zero_recovery = null
+	speech_recovery = null
 	playback = null
 	reference = null
 	comparison = null
