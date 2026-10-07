@@ -31,6 +31,7 @@ var clock_probe_sequence := 0
 var pending_clock_probes := {}
 var sent_clock_responses := {}
 var clock_estimates := {}
+var clock_domain_id := ""
 
 const logfile = "user://mqttlogging.dat"
 var flogfile : FileAccess = null
@@ -55,6 +56,14 @@ func send_midstream_start(membername: String):
 
 func _now_usec() -> int:
 	return int(Time.get_unix_time_from_system() * 1000000.0)
+
+
+func _get_clock_domain_id() -> String:
+	if clock_domain_id.is_empty() and OS.has_method("get_unique_id"):
+		var unique_id := str(OS.call("get_unique_id"))
+		if not unique_id.is_empty():
+			clock_domain_id = ("twovoip-clock-domain:" + unique_id).sha256_text()
+	return clock_domain_id
 
 
 func _ensure_member(membername: String):
@@ -99,10 +108,10 @@ func _store_clock_estimate(membername: String, estimate_usec: int,
 		"probe_id": probe_id,
 	}
 	_apply_clock_estimate(membername)
-	print("TwoVoIP clock %s local-peer=%+.3f ms bounds=[%+.3f,%+.3f] ms RTT=%.3f ms" % [
+	print("TwoVoIP clock %s local-peer=%+.3f ms bounds=[%+.3f,%+.3f] ms RTT=%.3f ms (%s)" % [
 			membername, estimate_usec / 1000.0,
 			lower_bound_usec / 1000.0, upper_bound_usec / 1000.0,
-			round_trip_usec / 1000.0])
+			round_trip_usec / 1000.0, reason])
 
 
 func _send_clock_probe():
@@ -111,7 +120,8 @@ func _send_clock_probe():
 	var t1_usec := _now_usec()
 	pending_clock_probes[probe_id] = t1_usec
 	transportaudiopacket(TwoVoipPacket.encode_control_packet(
-			TwoVoipPacket.make_clock_ping(probe_id, t1_usec)), 0)
+			TwoVoipPacket.make_clock_ping(
+					probe_id, t1_usec, _get_clock_domain_id())), 0)
 
 
 func _all_known_peers_clock_synced() -> bool:
@@ -157,6 +167,7 @@ func _handle_clock_control(membername: String, packet: Array,
 			return true
 		var probe_id: String = packet[TwoVoipPacket.ClockPingField.PROBE_ID]
 		var t1_usec := int(packet[TwoVoipPacket.ClockPingField.T1_USEC])
+		var peer_clock_domain_id := TwoVoipPacket.clock_ping_domain_id(packet)
 		var t2_usec := arrival_time_usec
 		var t3_usec := _now_usec()
 		sent_clock_responses[probe_id] = {
@@ -164,10 +175,13 @@ func _handle_clock_control(membername: String, packet: Array,
 			"t1_usec": t1_usec,
 			"t2_usec": t2_usec,
 			"t3_usec": t3_usec,
+			"shared_clock_domain": not peer_clock_domain_id.is_empty() \
+					and peer_clock_domain_id == _get_clock_domain_id(),
 		}
 		transportaudiopacket(TwoVoipPacket.encode_control_packet(
 				TwoVoipPacket.make_clock_pong(
-						probe_id, t1_usec, t2_usec, t3_usec)), 0, membername)
+						probe_id, t1_usec, t2_usec, t3_usec,
+						_get_clock_domain_id())), 0, membername)
 		return true
 	if TwoVoipPacket.clock_pong_is_valid(packet):
 		var probe_id: String = packet[TwoVoipPacket.ClockPongField.PROBE_ID]
@@ -177,17 +191,24 @@ func _handle_clock_control(membername: String, packet: Array,
 			return true
 		var t2_usec := int(packet[TwoVoipPacket.ClockPongField.T2_USEC])
 		var t3_usec := int(packet[TwoVoipPacket.ClockPongField.T3_USEC])
+		var peer_clock_domain_id := TwoVoipPacket.clock_pong_domain_id(packet)
 		var t4_usec := arrival_time_usec
 		var result: Dictionary = ClockSync.calculate_exchange(
 				t1_usec, t2_usec, t3_usec, t4_usec)
 		if not result.is_empty():
-			# The result is peer-minus-local; speakers need local-minus-source.
-			_store_clock_estimate(membername,
-					-int(result.remote_minus_local_usec),
-					-int(result.offset_upper_usec),
-					-int(result.offset_lower_usec),
-					int(result.round_trip_usec),
-					"connection clock pong", probe_id)
+			if not peer_clock_domain_id.is_empty() \
+					and peer_clock_domain_id == _get_clock_domain_id():
+				_store_clock_estimate(membername, 0, 0, 0,
+						int(result.round_trip_usec),
+						"shared system clock", probe_id)
+			else:
+				# The result is peer-minus-local; speakers need local-minus-source.
+				_store_clock_estimate(membername,
+						-int(result.remote_minus_local_usec),
+						-int(result.offset_upper_usec),
+						-int(result.offset_lower_usec),
+						int(result.round_trip_usec),
+						"connection clock pong", probe_id)
 		if not replay:
 			transportaudiopacket(TwoVoipPacket.encode_control_packet(
 					TwoVoipPacket.make_clock_ack(
@@ -208,12 +229,17 @@ func _handle_clock_control(membername: String, packet: Array,
 			var result: Dictionary = ClockSync.calculate_exchange(
 					t1_usec, t2_usec, t3_usec, t4_usec)
 			if not result.is_empty():
-				_store_clock_estimate(membername,
-						int(result.remote_minus_local_usec),
-						int(result.offset_lower_usec),
-						int(result.offset_upper_usec),
-						int(result.round_trip_usec),
-						"connection clock acknowledgement", probe_id)
+				if bool(sent.shared_clock_domain):
+					_store_clock_estimate(membername, 0, 0, 0,
+							int(result.round_trip_usec),
+							"shared system clock", probe_id)
+				else:
+					_store_clock_estimate(membername,
+							int(result.remote_minus_local_usec),
+							int(result.offset_lower_usec),
+							int(result.offset_upper_usec),
+							int(result.round_trip_usec),
+							"connection clock acknowledgement", probe_id)
 		sent_clock_responses.erase(probe_id)
 		return true
 	return false

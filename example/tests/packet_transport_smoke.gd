@@ -655,11 +655,18 @@ func run_tests() -> void:
 			TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, 7, 0,
 			1700000000000000, 12000, false, 9)
 	assert(TwoVoipPacket.header_lead_frame_count(lead_header) == 9)
-	var clock_ping := TwoVoipPacket.make_clock_ping("peer:1", 1000000)
+	var clock_ping := TwoVoipPacket.make_clock_ping(
+			"peer:1", 1000000, "clock-domain-a")
 	assert(TwoVoipPacket.clock_ping_is_valid(clock_ping))
+	assert(TwoVoipPacket.clock_ping_domain_id(clock_ping) == "clock-domain-a")
+	assert(TwoVoipPacket.clock_ping_is_valid(clock_ping.slice(0, 4)))
+	assert(TwoVoipPacket.clock_ping_domain_id(clock_ping.slice(0, 4)).is_empty())
 	var clock_pong := TwoVoipPacket.make_clock_pong(
-			"peer:1", 1000000, 1010000, 1011000)
+			"peer:1", 1000000, 1010000, 1011000, "clock-domain-b")
 	assert(TwoVoipPacket.clock_pong_is_valid(clock_pong))
+	assert(TwoVoipPacket.clock_pong_domain_id(clock_pong) == "clock-domain-b")
+	assert(TwoVoipPacket.clock_pong_is_valid(clock_pong.slice(0, 6)))
+	assert(TwoVoipPacket.clock_pong_domain_id(clock_pong.slice(0, 6)).is_empty())
 	var clock_ack := TwoVoipPacket.make_clock_ack(
 			"peer:1", 1000000, 1010000, 1011000, 1021000)
 	assert(TwoVoipPacket.clock_ack_is_valid(clock_ack))

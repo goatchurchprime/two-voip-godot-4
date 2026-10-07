@@ -95,6 +95,7 @@ enum ClockPingField {
 	VERSION,
 	PROBE_ID,
 	T1_USEC,
+	CLOCK_DOMAIN_ID,
 	SIZE,
 }
 
@@ -106,6 +107,7 @@ enum ClockPongField {
 	T1_USEC,
 	T2_USEC,
 	T3_USEC,
+	CLOCK_DOMAIN_ID,
 	SIZE,
 }
 
@@ -194,14 +196,15 @@ static func make_hash_response(opus_stream_count: int, first_frame: int, frame_c
 	return packet
 
 
-static func make_clock_ping(probe_id: String, t1_usec: int) -> Array:
-	return [TYPE_CLOCK_PING, WIRE_VERSION, probe_id, t1_usec]
+static func make_clock_ping(probe_id: String, t1_usec: int,
+		clock_domain_id: String) -> Array:
+	return [TYPE_CLOCK_PING, WIRE_VERSION, probe_id, t1_usec, clock_domain_id]
 
 
 static func make_clock_pong(probe_id: String, t1_usec: int,
-		t2_usec: int, t3_usec: int) -> Array:
+		t2_usec: int, t3_usec: int, clock_domain_id: String) -> Array:
 	return [TYPE_CLOCK_PONG, WIRE_VERSION, probe_id,
-			t1_usec, t2_usec, t3_usec]
+			t1_usec, t2_usec, t3_usec, clock_domain_id]
 
 
 static func make_clock_ack(probe_id: String, t1_usec: int,
@@ -263,19 +266,35 @@ static func hash_response_is_valid(packet: Array) -> bool:
 
 
 static func clock_ping_is_valid(packet: Array) -> bool:
-	return packet.size() == ClockPingField.SIZE \
+	return packet.size() >= ClockPingField.CLOCK_DOMAIN_ID \
+			and packet.size() <= ClockPingField.SIZE \
 			and packet[ClockPingField.TYPE] == TYPE_CLOCK_PING \
 			and packet[ClockPingField.VERSION] == WIRE_VERSION \
 			and packet[ClockPingField.PROBE_ID] is String \
-			and not packet[ClockPingField.PROBE_ID].is_empty()
+			and not packet[ClockPingField.PROBE_ID].is_empty() \
+			and (packet.size() == ClockPingField.CLOCK_DOMAIN_ID \
+					or packet[ClockPingField.CLOCK_DOMAIN_ID] is String)
 
 
 static func clock_pong_is_valid(packet: Array) -> bool:
-	return packet.size() == ClockPongField.SIZE \
+	return packet.size() >= ClockPongField.CLOCK_DOMAIN_ID \
+			and packet.size() <= ClockPongField.SIZE \
 			and packet[ClockPongField.TYPE] == TYPE_CLOCK_PONG \
 			and packet[ClockPongField.VERSION] == WIRE_VERSION \
 			and packet[ClockPongField.PROBE_ID] is String \
-			and not packet[ClockPongField.PROBE_ID].is_empty()
+			and not packet[ClockPongField.PROBE_ID].is_empty() \
+			and (packet.size() == ClockPongField.CLOCK_DOMAIN_ID \
+					or packet[ClockPongField.CLOCK_DOMAIN_ID] is String)
+
+
+static func clock_ping_domain_id(packet: Array) -> String:
+	return str(packet[ClockPingField.CLOCK_DOMAIN_ID]) \
+			if packet.size() > ClockPingField.CLOCK_DOMAIN_ID else ""
+
+
+static func clock_pong_domain_id(packet: Array) -> String:
+	return str(packet[ClockPongField.CLOCK_DOMAIN_ID]) \
+			if packet.size() > ClockPongField.CLOCK_DOMAIN_ID else ""
 
 
 static func clock_ack_is_valid(packet: Array) -> bool:

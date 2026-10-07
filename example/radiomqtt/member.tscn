@@ -58,6 +58,16 @@ offset_bottom = 35.0
 min_value = -80.0
 max_value = 24.0
 
+[node name="ClockOffset" type="Label" parent="."]
+layout_mode = 0
+offset_left = 300.0
+offset_top = 7.0
+offset_right = 546.0
+offset_bottom = 30.0
+mouse_filter = 1
+text = "clock pending"
+horizontal_alignment = 2
+
 [node name="TimingMeter" parent="." instance=ExtResource("3_timing")]
 layout_mode = 1
 anchors_preset = 10
