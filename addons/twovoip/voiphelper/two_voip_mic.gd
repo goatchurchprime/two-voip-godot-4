@@ -6,7 +6,6 @@ var chunkprefix := TwoVoipPacket.make_sequence_chunk_prefix()
 var lead_time : float = 0.15
 var hang_time : float  = 0.7
 var input_gap_threshold : float = 0.1
-var input_gap_restart_threshold : float = 1.0
 var vox_threshhold = 0.07
 var currentlytalking = false
 var opusframecount = 0
@@ -337,7 +336,7 @@ func plan_audio_input_gap(frameCusec: int) -> Dictionary:
 			"missing_frame_count": missing_frame_count,
 			"next_frame_time_usec": next_frame_time_usec,
 			"discard_input_frames": discard_input_frames,
-			"restart": gap_usec >= input_gap_restart_threshold * 1000000.0,
+			"end_episode": gap_usec > hang_time * 1000000.0,
 		}
 	elif gap_usec <= -input_gap_threshold*1000000.0:
 		push_error("impossible big negative gap in the audio stream timing %f" % (gap_usec/1000000.0))
@@ -348,6 +347,14 @@ func apply_audio_input_gap(gap_plan: Dictionary):
 		return
 	var missing_frame_count: int = gap_plan.missing_frame_count
 	var next_frame_time_usec: int = gap_plan.next_frame_time_usec
+	if gap_plan.end_episode:
+		print("TwoVoIP mic input gap %.3f ms exceeded %.3f ms hang: end episode" % [
+				gap_plan.gap_usec / 1000.0, hang_time * 1000.0])
+		processtalkstreamends(false)
+		if voxbutton != null and voxbutton.button_pressed:
+			pttbutton.button_pressed = false
+			hangchunkscountup = hangchunks + 1
+		return
 	print("TwoVoIP mic input gap %.3f ms: insert %d chunks, discard %d input frames" % [
 			gap_plan.gap_usec / 1000.0, missing_frame_count,
 			gap_plan.discard_input_frames])
@@ -359,13 +366,7 @@ func apply_audio_input_gap(gap_plan: Dictionary):
 				input_chunk_number % input_chunk_first_frame_times_usec.size()] = \
 				next_frame_time_usec \
 				- (stored_silent_chunks - chunk) * opusframedurationms * 1000
-	if gap_plan.restart:
-		processtalkstreamends(false)
-		if voxbutton != null and voxbutton.button_pressed:
-			pttbutton.button_pressed = false
-			hangchunkscountup = hangchunks + 1
-	else:
-		notify_audio_input_gap(missing_frame_count, next_frame_time_usec)
+	notify_audio_input_gap(missing_frame_count, next_frame_time_usec)
 
 func detect_audio_input_gap(frameCusec: int):
 	# Kept as a direct diagnostic/test entry point. Live capture plans first so
@@ -412,10 +413,11 @@ func _process(_delta):
 	processtalkstreamends(pttbutton.button_pressed and not resumed_this_process)
 	while true:
 		var input_frames_available := AudioServer.get_input_frames_available()
-		var first_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0 - input_frames_available * 1000000.0 / input_mix_rate)
+		var first_frame_time_usec := Time.get_ticks_usec() \
+				- roundi(input_frames_available * 1000000.0 / input_mix_rate)
 		var gap_plan := plan_audio_input_gap(first_frame_time_usec)
 		if not gap_plan.is_empty():
-			var discard_input_frames: int = 0 if gap_plan.restart \
+			var discard_input_frames: int = 0 if gap_plan.end_episode \
 					else gap_plan.discard_input_frames
 			if input_frames_available < discard_input_frames:
 				break

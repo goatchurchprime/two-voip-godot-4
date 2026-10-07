@@ -3,6 +3,7 @@ extends Control
 
 const FRAME_KIND_AUDIO := "audio"
 const FRAME_KIND_FEC := "fec"
+const FRAME_KIND_LOSS := "loss silence"
 const FRAME_KIND_SOURCE_GAP := "source gap"
 const FRAME_KIND_RESERVE := "reserve"
 
@@ -10,6 +11,7 @@ const TIMING_AUDIO := Color(0.32, 0.68, 1.0, 1.0)
 const TIMING_RESERVE := Color(0.72, 0.75, 0.8, 1.0)
 const TIMING_SOURCE_GAP := Color(0.76, 0.4, 0.95, 1.0)
 const TIMING_FEC := Color(1.0, 0.58, 0.18, 1.0)
+const TIMING_LOSS := Color(1.0, 0.22, 0.18, 1.0)
 const TIMING_EMPTY := Color(0.0, 0.0, 0.0, 0.0)
 const TIMING_UNKNOWN := Color(1.0, 0.1, 0.85, 1.0)
 const TIMING_REORDER_EMPTY := Color(0.12, 0.14, 0.18, 1.0)
@@ -24,6 +26,9 @@ const TIMING_ANOMALY_LOG_PATH := "user://two_voip_timing_anomalies.jsonl"
 @export var timing_buffer_tolerance := 0.025
 @export var display_span := 1.2
 @export var display_before_source := 0.3
+# Keep the console report compact. The detailed snapshot remains in the JSONL
+# file, where it does not make the Godot debugger render several kilobytes for
+# every detected condition.
 @export var capture_timing_anomalies := true
 
 var speaker: Node = null
@@ -295,6 +300,8 @@ func _get_frame_kind(frame_number: int) -> String:
 		return FRAME_KIND_SOURCE_GAP
 	if display_value == speaker.DISPLAY_FEC:
 		return FRAME_KIND_FEC
+	if display_value == speaker.DISPLAY_LOSS:
+		return FRAME_KIND_LOSS
 	if display_value == speaker.DISPLAY_RESERVE:
 		return FRAME_KIND_RESERVE
 	return FRAME_KIND_AUDIO if display_value >= 0.0 else ""
@@ -310,6 +317,8 @@ func _frame_colour(kind: String) -> Color:
 			return TIMING_SOURCE_GAP
 		FRAME_KIND_FEC:
 			return TIMING_FEC
+		FRAME_KIND_LOSS:
+			return TIMING_LOSS
 	return TIMING_EMPTY
 
 
@@ -375,6 +384,17 @@ func anomaly_snapshot(reason: String, queue_ms: float,
 		"source_clock_offset_uncertainty_ms": \
 				speaker.source_clock_offset_uncertainty_usec / 1000.0,
 		"source_clock_probe_rtt_ms": speaker.source_clock_probe_rtt_usec / 1000.0,
+		"source_clock_unix_estimate_valid": speaker.source_clock_unix_estimate_valid,
+		"source_clock_unix_estimate_ms": \
+				speaker.source_clock_unix_estimate_usec / 1000.0,
+		"source_clock_estimate_minus_unix_ms": \
+				speaker.source_clock_estimate_minus_unix_usec / 1000.0,
+		"source_clock_last_selected_timeline_ms": \
+				speaker.source_clock_last_selected_timeline_usec / 1000.0,
+		"source_clock_last_unix_timeline_ms": \
+				speaker.source_clock_last_unix_timeline_usec / 1000.0,
+		"source_clock_pre_send_packet_count": \
+				speaker.source_clock_pre_send_packet_count,
 		"source_clock_revision_reason": speaker.source_clock_revision_reason,
 		"source_clock_offset_observations": \
 				speaker.source_clock_offset_observation_count,
@@ -457,6 +477,12 @@ func anomaly_snapshot(reason: String, queue_ms: float,
 		"playback_clock_last_stall_ms": speaker.playback_clock_last_stall_usec / 1000.0,
 		"drop_count": speaker.dropped_packet_count,
 		"duplicate_count": speaker.duplicate_packet_count,
+		"missing_packet_count": speaker.missing_packet_count,
+		"fec_recovery_count": speaker.fec_recovery_count,
+		"loss_silence_count": speaker.loss_silence_count,
+		"preheader_held_count": speaker.preheader_audio_packets.size(),
+		"preheader_wrong_parity_discards": \
+				speaker.preheader_wrong_parity_discard_count,
 		"mid_time_error_count": speaker.mid_time_error_count,
 		"delayed_mid_audio_count": speaker.delayed_mid_audio_count,
 		"player_playing": bool(speaker.audioplayeropus and speaker.audioplayeropus.playing),
@@ -469,17 +495,19 @@ func anomaly_snapshot(reason: String, queue_ms: float,
 
 func _capture_anomaly(reason: String, queue_ms: float,
 		ring_queue_frames: int, ring_read_frame: int):
-	var snapshot := anomaly_snapshot(reason, queue_ms, ring_queue_frames, ring_read_frame)
-	push_warning("TwoVoIP timing anomaly: %s" % JSON.stringify(snapshot))
+	print("TwoVoIP timing anomaly: %s stream=%d queue=%.1f ms after %s" % [
+			reason, speaker.opusstreamcount, queue_ms, diagnostic_trigger])
 	if not capture_timing_anomalies:
 		return
+	var snapshot := anomaly_snapshot(reason, queue_ms, ring_queue_frames, ring_read_frame)
+	var snapshot_json := JSON.stringify(snapshot)
 	var file := FileAccess.open(TIMING_ANOMALY_LOG_PATH, FileAccess.READ_WRITE)
 	if file:
 		file.seek_end()
 	else:
 		file = FileAccess.open(TIMING_ANOMALY_LOG_PATH, FileAccess.WRITE)
 	if file:
-		file.store_line(JSON.stringify(snapshot))
+		file.store_line(snapshot_json)
 	else:
 		push_warning("Could not write TwoVoIP timing anomaly log: %s" \
 				% TIMING_ANOMALY_LOG_PATH)

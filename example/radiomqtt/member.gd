@@ -36,7 +36,7 @@ func _update_clock_offset_display():
 		$ClockOffset.text = "clock +0.0 ms · local"
 		$ClockOffset.modulate = Color(0.45, 1.0, 0.58)
 		$ClockOffset.tooltip_text = \
-				"This member owns the local system clock; its offset is exactly zero."
+				"This member owns the local monotonic clock; its offset is exactly zero."
 		return
 	if not displayed_clock_valid:
 		$ClockOffset.text = "clock pending"
@@ -45,15 +45,17 @@ func _update_clock_offset_display():
 		return
 	var estimate_ms: float = twovoipspeaker.source_clock_offset_estimate_usec / 1000.0
 	var uncertainty_ms: float = twovoipspeaker.source_clock_offset_uncertainty_usec / 1000.0
-	var exact_shared_clock: bool = twovoipspeaker.source_clock_revision_reason \
-			== "shared system clock"
-	$ClockOffset.text = "clock %+.1f ms · r%d" % [
-			estimate_ms, displayed_clock_revision]
-	$ClockOffset.modulate = Color(0.45, 1.0, 0.58) if exact_shared_clock \
-			else Color(1.0, 0.82, 0.35)
+	var unix_ms: float = twovoipspeaker.source_clock_unix_estimate_usec / 1000.0
+	$ClockOffset.text = "clock %+.1f · u%+.1f · r%d" % [
+			estimate_ms, unix_ms, displayed_clock_revision] \
+			if twovoipspeaker.source_clock_unix_estimate_valid \
+			else "clock %+.1f ms · r%d" % [estimate_ms, displayed_clock_revision]
+	$ClockOffset.modulate = Color(1.0, 0.82, 0.35)
 	$ClockOffset.tooltip_text = \
-			"Source clock offset: %+.3f ms\nBounds: [%+.3f, %+.3f] ms\nUncertainty: %.3f ms\nRTT: %.3f ms\nRevision: %d\nReason: %s" % [
+			"Source clock offset: %+.3f ms\nUnix-derived offset: %+.3f ms\nSelected minus Unix: %+.3f ms\nBounds: [%+.3f, %+.3f] ms\nUncertainty: %.3f ms\nRTT: %.3f ms\nRevision: %d\nReason: %s" % [
 				estimate_ms,
+				unix_ms,
+				twovoipspeaker.source_clock_estimate_minus_unix_usec / 1000.0,
 				twovoipspeaker.source_clock_offset_lower_bound_usec / 1000.0,
 				twovoipspeaker.source_clock_offset_upper_bound_usec / 1000.0,
 				uncertainty_ms,

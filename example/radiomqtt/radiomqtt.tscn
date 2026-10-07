@@ -707,6 +707,16 @@ layout_mode = 2
 toggle_mode = true
 text = "Stall In 5"
 
+[node name="BadOrder" type="Button" parent="HBoxNetManage" unique_id=396443504]
+layout_mode = 2
+toggle_mode = true
+text = "BadOrder"
+
+[node name="DropPackets" type="Button" parent="HBoxNetManage" unique_id=1002553173]
+layout_mode = 2
+toggle_mode = true
+text = "Drops"
+
 [node name="ScrollMembers" type="ScrollContainer" parent="." unique_id=1053756819]
 layout_mode = 2
 size_flags_vertical = 3
@@ -749,3 +759,5 @@ text = "sil"
 [connection signal="toggled" from="HBoxNetManage/PauseCheck" to="." method="_on_pause_check_toggled"]
 [connection signal="toggled" from="HBoxNetManage/StallIn1" to="." method="_on_stall_in_1_toggled"]
 [connection signal="toggled" from="HBoxNetManage/StallIn5" to="." method="_on_stall_in_5_toggled"]
+[connection signal="toggled" from="HBoxNetManage/BadOrder" to="." method="_on_bad_order_toggled"]
+[connection signal="toggled" from="HBoxNetManage/DropPackets" to="." method="_on_drop_packets_toggled"]

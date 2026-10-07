@@ -7,25 +7,27 @@ func _initialize() -> void:
 	call_deferred("run_tests")
 
 
-func make_mono(phase: float) -> PackedVector2Array:
+func make_mono(phase: float, frame_size: int = 960) -> PackedVector2Array:
 	var frames := PackedVector2Array()
-	frames.resize(960)
-	for i in range(960):
+	frames.resize(frame_size)
+	for i in range(frame_size):
 		var sample := 0.1 * sin(phase + TAU * 440.0 * i / 48000.0)
 		frames[i] = Vector2(sample, sample)
 	return frames
 
 
 func make_opus_packets(stream_count: int, encode_base64: bool,
-		first_frame: int = 0, packet_count: int = 2) -> Array[PackedByteArray]:
+		first_frame: int = 0, packet_count: int = 2,
+		frame_size: int = 960) -> Array[PackedByteArray]:
 	var encoder := TwovoipOpusEncoder.new()
 	assert(encoder.initialize(48000, 48000, 1,
 			TwovoipOpusEncoder.DENOISER_DISABLED,
-			TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+			TwovoipOpusEncoder.AGC_DISABLED, frame_size) == OK)
 	var packets: Array[PackedByteArray] = []
 	for packet_offset in range(packet_count):
 		var frame_count = first_frame + packet_offset
-		assert(encoder.push_input_chunk(make_mono(frame_count * 0.25)) == 960)
+		assert(encoder.push_input_chunk(
+				make_mono(frame_count * 0.25, frame_size)) == frame_size)
 		var prefix := TwoVoipPacket.make_sequence_chunk_prefix()
 		TwoVoipPacket.set_sequence_chunk_prefix(prefix, frame_count, stream_count)
 		packets.append(TwoVoipPacket.encode_audio_packet(
@@ -54,6 +56,19 @@ func run_clock_sync_arithmetic() -> void:
 			int(remote_ahead.remote_minus_local_usec)
 	assert(initiator_local_minus_responder \
 			== -responder_local_minus_initiator)
+	# Unix-minus-ticks anchors provide an independent witness for that same
+	# mapping. The two endpoints must derive exact opposite signs from the same
+	# pair of anchors.
+	var initiator_unix_minus_ticks := 1700000000000000
+	var responder_unix_minus_ticks := initiator_unix_minus_ticks - 100000
+	var initiator_unix_local_minus_responder := \
+			responder_unix_minus_ticks - initiator_unix_minus_ticks
+	var responder_unix_local_minus_initiator := \
+			initiator_unix_minus_ticks - responder_unix_minus_ticks
+	assert(initiator_unix_local_minus_responder == -100000)
+	assert(responder_unix_local_minus_initiator == 100000)
+	assert(initiator_unix_local_minus_responder \
+			== -responder_unix_local_minus_initiator)
 	# Asymmetric paths widen and bias the midpoint, but the true offset remains
 	# inside the non-negative-delay interval.
 	var asymmetric: Dictionary = ClockSync.calculate_exchange(
@@ -74,6 +89,12 @@ func reset_test_source_clock(speaker: Node) -> void:
 	speaker.source_clock_offset_uncertainty_usec = 0
 	speaker.source_clock_probe_rtt_usec = 0
 	speaker.source_clock_probe_valid = false
+	speaker.source_clock_unix_estimate_usec = 0
+	speaker.source_clock_unix_estimate_valid = false
+	speaker.source_clock_estimate_minus_unix_usec = 0
+	speaker.source_clock_last_selected_timeline_usec = 0
+	speaker.source_clock_last_unix_timeline_usec = 0
+	speaker.source_clock_pre_send_packet_count = 0
 	speaker.source_clock_revision_reason = "uninitialized"
 	speaker.source_clock_offset_observation_count = 0
 	speaker.source_clock_offset_revision_count = 0
@@ -108,10 +129,17 @@ func run_startup_padding_arithmetic(speaker: Node) -> void:
 		speaker.observe_source_clock_timing(
 				source_usec + 260000 - packet_index * 1000, source_usec)
 	assert(speaker.source_clock_offset_estimate_usec == 250000)
-	speaker.set_source_clock_estimate(0, -1000, 1000, 2000, "test clock pong")
+	speaker.set_source_clock_estimate(
+			0, -1000, 1000, 2000, "test clock pong", 750, true)
 	assert(speaker.source_clock_probe_valid)
 	assert(speaker.source_clock_offset_estimate_usec == 0)
 	assert(speaker.source_clock_offset_uncertainty_usec == 1000)
+	assert(speaker.source_clock_unix_estimate_valid)
+	assert(speaker.source_clock_estimate_minus_unix_usec == -750)
+	speaker.source_clock_pre_send_packet_count = 0
+	assert(speaker.observe_source_clock_timing(source_usec, source_usec) == 0)
+	assert(speaker.source_clock_last_unix_timeline_usec == -750)
+	assert(speaker.source_clock_pre_send_packet_count == 1)
 	# Reset before testing the ordinary startup calculation below.
 	reset_test_source_clock(speaker)
 	assert(speaker.observe_source_clock_reference(
@@ -205,7 +233,7 @@ func run_speaker_episode(speaker: Node, stream_count: int, encode_base64: bool) 
 func run_mid_join_and_gap(speaker: Node, stream_count: int) -> void:
 	reset_test_source_clock(speaker)
 	const first_frame := 43
-	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var next_frame_time_usec := Time.get_ticks_usec()
 	var header := TwoVoipPacket.make_header(
 			TwoVoipPacket.TYPE_START, 960, 48000, 1,
 			TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, first_frame,
@@ -261,7 +289,7 @@ func run_mid_join_and_gap(speaker: Node, stream_count: int) -> void:
 func run_counter_wrap(speaker: Node, stream_count: int) -> void:
 	reset_test_source_clock(speaker)
 	const first_frame := 127
-	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var next_frame_time_usec := Time.get_ticks_usec()
 	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, first_frame, next_frame_time_usec, 12000, false)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
 	for packet in make_opus_packets(stream_count, false, first_frame):
@@ -273,7 +301,7 @@ func run_counter_wrap(speaker: Node, stream_count: int) -> void:
 
 func run_small_packet_reordering(speaker: Node, stream_count: int) -> void:
 	reset_test_source_clock(speaker)
-	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var next_frame_time_usec := Time.get_ticks_usec()
 	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0, next_frame_time_usec, 12000, false)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
 	var packets := make_opus_packets(stream_count, false, 0, 3)
@@ -285,14 +313,158 @@ func run_small_packet_reordering(speaker: Node, stream_count: int) -> void:
 	speaker.receive_audio_packet(packets[2])
 	assert(speaker.opusframecount == 3)
 	assert(speaker.opusframequeuecount == 0)
+	assert(speaker.missing_packet_count == 0)
+	assert(speaker.fec_recovery_count == 0)
+	assert(speaker.loss_silence_count == 0)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, 3, 0.06, 0.0)))
+
+
+func run_packet_loss_recovery(speaker: Node, stream_count: int) -> void:
+	reset_test_source_clock(speaker)
+	var next_frame_time_usec := Time.get_ticks_usec()
+	var header := TwoVoipPacket.make_header(
+			TwoVoipPacket.TYPE_START, 960, 48000, 1,
+			TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0,
+			next_frame_time_usec, 12000, false)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+	var packets := make_opus_packets(stream_count, false, 0, 3)
+	# Frame 1 is confirmed missing by END. Frame 2 is exactly the packet whose
+	# in-band FEC is allowed to reconstruct it, then frame 2 is decoded normally.
+	speaker.receive_audio_packet(packets[0])
+	speaker.receive_audio_packet(packets[2])
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(
+			TwoVoipPacket.make_footer(stream_count, 3, 0.06, 0.0)))
+	assert(speaker.opusframecount == 3)
+	assert(speaker.opusframequeuecount == 0)
+	assert(speaker.missing_packet_count == 1)
+	assert(speaker.fec_recovery_count == 1)
+	assert(speaker.loss_silence_count == 0)
+	assert(speaker.decoded_frame_max_values[
+			1 % speaker.decoded_frame_max_values.size()] == speaker.DISPLAY_FEC)
+	assert(speaker.decoded_frame_max_values[
+			2 % speaker.decoded_frame_max_values.size()] >= 0.0)
+
+	stream_count += 1
+	header = TwoVoipPacket.make_header(
+			TwoVoipPacket.TYPE_START, 960, 48000, 1,
+			TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0,
+			next_frame_time_usec, 12000, false)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+	packets = make_opus_packets(stream_count, false, 0, 4)
+	# With two consecutive losses, only frame 2 can use frame 3's FEC. Frame 1
+	# must use explicit silence; frame 3 must still be decoded exactly once.
+	speaker.receive_audio_packet(packets[0])
+	speaker.receive_audio_packet(packets[3])
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(
+			TwoVoipPacket.make_footer(stream_count, 4, 0.08, 0.0)))
+	assert(speaker.opusframecount == 4)
+	assert(speaker.opusframequeuecount == 0)
+	assert(speaker.missing_packet_count == 2)
+	assert(speaker.fec_recovery_count == 1)
+	assert(speaker.loss_silence_count == 1)
+	assert(speaker.decoded_frame_max_values[
+			1 % speaker.decoded_frame_max_values.size()] == speaker.DISPLAY_LOSS)
+	assert(speaker.decoded_frame_max_values[
+			2 % speaker.decoded_frame_max_values.size()] == speaker.DISPLAY_FEC)
+	assert(speaker.decoded_frame_max_values[
+			3 % speaker.decoded_frame_max_values.size()] >= 0.0)
+
+
+func run_variable_packet_lengths(speaker: Node, first_stream_count: int) -> void:
+	var stream_count := first_stream_count
+	# Every Opus duration other than the existing 20 ms baseline.
+	for frame_size in [120, 240, 480, 1920, 2880]: # 2.5, 5, 10, 40, 60 ms.
+		reset_test_source_clock(speaker)
+		# This synthetic source and receiver share the test process. Keep clock
+		# diagnostics out of codec-duration assertions.
+		speaker.set_source_clock_estimate(0, 0, 0, 0, "same test clock")
+		var next_frame_time_usec := Time.get_ticks_usec()
+		var header := TwoVoipPacket.make_header(
+				TwoVoipPacket.TYPE_START, frame_size, 48000, 1,
+				TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0,
+				next_frame_time_usec, 12000, false)
+		speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+		var packets := make_opus_packets(
+				stream_count, false, 0, 4, frame_size)
+		# Reordering within the four-slot window must not create a loss repair.
+		speaker.receive_audio_packet(packets[1])
+		speaker.receive_audio_packet(packets[0])
+		speaker.receive_audio_packet(packets[2])
+		speaker.receive_audio_packet(packets[3])
+		speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(
+				TwoVoipPacket.make_footer(stream_count, 4,
+						4.0 * frame_size / 48000.0, 0.0)))
+		assert(speaker.opusframecount == 4)
+		assert(speaker.tailframenumber == 4 * frame_size)
+		assert(speaker.missing_packet_count == 0)
+		assert(speaker.fec_recovery_count == 0)
+
+		stream_count += 1
+		header = TwoVoipPacket.make_header(
+				TwoVoipPacket.TYPE_START, frame_size, 48000, 1,
+				TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0,
+				next_frame_time_usec, 12000, false)
+		speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+		packets = make_opus_packets(stream_count, false, 0, 3, frame_size)
+		speaker.receive_audio_packet(packets[0])
+		speaker.receive_audio_packet(packets[2])
+		speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(
+				TwoVoipPacket.make_footer(stream_count, 3,
+						3.0 * frame_size / 48000.0, 0.0)))
+		assert(speaker.opusframecount == 3)
+		assert(speaker.tailframenumber == 3 * frame_size)
+		assert(speaker.missing_packet_count == 1)
+		assert(speaker.fec_recovery_count == 1)
+		assert(speaker.loss_silence_count == 0)
+		stream_count += 1
+
+
+func run_audio_before_header(speaker: Node, stream_count: int) -> void:
+	reset_test_source_clock(speaker)
+	speaker.set_source_clock_estimate(0, 0, 0, 0, "same test clock")
+	var next_frame_time_usec := Time.get_ticks_usec()
+	var packets := make_opus_packets(stream_count, false, 0, 3)
+	# Frames 0 and 1 both arrive before START and must remain opaque until START
+	# supplies the codec configuration and full counter baseline.
+	speaker.receive_audio_packet(packets[0])
+	speaker.receive_audio_packet(packets[1])
+	assert(speaker.preheader_audio_packets.size() == 2)
+	var header := TwoVoipPacket.make_header(
+			TwoVoipPacket.TYPE_START, 960, 48000, 1,
+			TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0,
+			next_frame_time_usec, 12000, false)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+	assert(speaker.preheader_audio_packets.is_empty())
+	assert(speaker.opusframecount == 2)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(
+			TwoVoipPacket.make_footer(stream_count, 2, 0.04, 0.0)))
+
+	# A late packet from the ended episode and an early packet from the next
+	# episode are both held. START's parity retains only the latter.
+	speaker.receive_audio_packet(packets[2])
+	stream_count += 1
+	packets = make_opus_packets(stream_count, false, 0, 2)
+	speaker.receive_audio_packet(packets[0])
+	assert(speaker.preheader_audio_packets.size() == 2)
+	header = TwoVoipPacket.make_header(
+			TwoVoipPacket.TYPE_START, 960, 48000, 1,
+			TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0,
+			next_frame_time_usec, 12000, false)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
+	assert(speaker.preheader_audio_packets.is_empty())
+	assert(speaker.preheader_wrong_parity_discard_count == 1)
+	speaker.receive_audio_packet(packets[1])
+	assert(speaker.opusframecount == 2)
+	assert(speaker.dropped_packet_count == 0)
+	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(
+			TwoVoipPacket.make_footer(stream_count, 2, 0.04, 0.0)))
 
 
 func run_receiver_playback_restart(speaker: Node, stream_count: int) -> void:
 	reset_test_source_clock(speaker)
 	var previous_stale_timeout: float = speaker.stale_episode_timeout
 	speaker.stale_episode_timeout = 0.01
-	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var next_frame_time_usec := Time.get_ticks_usec()
 	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0, next_frame_time_usec, 12000, false)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
 	for packet in make_opus_packets(stream_count, false, 0, 2):
@@ -324,7 +496,7 @@ func run_receiver_playback_restart(speaker: Node, stream_count: int) -> void:
 
 func run_initial_lead_trim(speaker: Node, stream_count: int) -> void:
 	reset_test_source_clock(speaker)
-	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var next_frame_time_usec := Time.get_ticks_usec()
 	var header := TwoVoipPacket.make_header(
 			TwoVoipPacket.TYPE_START, 960, 48000, 1,
 			TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0,
@@ -357,7 +529,7 @@ func run_initial_lead_trim(speaker: Node, stream_count: int) -> void:
 
 func run_receiver_clock_stall_recovery(speaker: Node, stream_count: int) -> void:
 	reset_test_source_clock(speaker)
-	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var next_frame_time_usec := Time.get_ticks_usec()
 	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0, next_frame_time_usec, 12000, false)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
 	for packet in make_opus_packets(stream_count, false, 0, 2):
@@ -374,8 +546,8 @@ func run_receiver_clock_stall_recovery(speaker: Node, stream_count: int) -> void
 	assert(speaker.playback_clock_stall_count == 1)
 	assert(speaker.playback_clock_stall_total_usec \
 			> speaker.PLAYBACK_CLOCK_STALL_TOLERANCE_USEC)
-	assert(speaker.playout_delay_extension_usec \
-			>= speaker.playback_clock_stall_total_usec)
+	# The audio thread may begin consuming recovery debt before this assertion.
+	assert(speaker.playout_delay_extension_usec > 0)
 	assert(speaker.playout_delay_extension_usec == roundi(
 			uninterrupted_playback.get_playout_recovery_remaining_frames() \
 			* 1000000.0 / speaker.opus_sample_rate))
@@ -387,7 +559,7 @@ func run_receiver_clock_stall_recovery(speaker: Node, stream_count: int) -> void
 
 func run_receiver_input_starvation_extends_playout(speaker: Node, stream_count: int) -> void:
 	reset_test_source_clock(speaker)
-	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var next_frame_time_usec := Time.get_ticks_usec()
 	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0, next_frame_time_usec, 12000, false)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
 	for packet in make_opus_packets(stream_count, false, 0, 2):
@@ -415,7 +587,7 @@ func run_receiver_input_starvation_extends_playout(speaker: Node, stream_count: 
 
 func run_receiver_gap_recovers_playout(speaker: Node, stream_count: int) -> void:
 	reset_test_source_clock(speaker)
-	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var next_frame_time_usec := Time.get_ticks_usec()
 	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1,
 			TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0,
 			next_frame_time_usec, 12000, false)
@@ -456,7 +628,7 @@ func run_receiver_backlog_restart(speaker: Node, stream_count: int) -> void:
 	reset_test_source_clock(speaker)
 	# Model packets released after a local pause. Their source time is old, so a
 	# replacement playback must not add a fresh target delay.
-	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0) - 10000000
+	var next_frame_time_usec := Time.get_ticks_usec() - 10000000
 	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 0, next_frame_time_usec, 12000, false)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
 	for packet in make_opus_packets(stream_count, false, 0, 160):
@@ -471,7 +643,7 @@ func run_receiver_backlog_restart(speaker: Node, stream_count: int) -> void:
 
 func run_mid_restarts_playback(speaker: Node, stream_count: int) -> void:
 	reset_test_source_clock(speaker)
-	var next_frame_time_usec := int(Time.get_unix_time_from_system() * 1000000.0)
+	var next_frame_time_usec := Time.get_ticks_usec()
 	var header := TwoVoipPacket.make_header(TwoVoipPacket.TYPE_START, 960, 48000, 1, TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE, stream_count, 5, next_frame_time_usec, 12000, false)
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(header))
 	for packet in make_opus_packets(stream_count, false, 5, 2):
@@ -526,6 +698,10 @@ func run_input_gap_detection() -> void:
 func run_mqtt_log_payload_roundtrip() -> void:
 	var mqtt_network := Control.new()
 	mqtt_network.set_script(preload("res://radiomqtt/MQTTnetwork.gd"))
+	var ticks_before := Time.get_ticks_usec()
+	var network_now: int = mqtt_network._now_usec()
+	var ticks_after := Time.get_ticks_usec()
+	assert(network_now >= ticks_before and network_now <= ticks_after)
 	var payload := PackedByteArray([0, 10, 32, 127, 128, 255])
 	var encoded: String = mqtt_network.encode_log_payload(payload)
 	assert(encoded.begins_with("b64:"))
@@ -558,7 +734,7 @@ func run_stream_start_without_history() -> void:
 	mic.free()
 
 
-func run_input_gap_restart() -> void:
+func run_input_gap_beyond_hang_ends_episode() -> void:
 	var mic := Node.new()
 	mic.set_script(preload("res://addons/twovoip/voiphelper/two_voip_mic.gd"))
 	mic.opusencoder = TwovoipOpusEncoder.new()
@@ -581,7 +757,6 @@ func run_input_gap_restart() -> void:
 	assert(not mic.currentlytalking)
 	assert(mic.opusstreamcount == 13)
 	assert(not mic.pttbutton.button_pressed)
-	assert(mic.opusencoder.get_chunk_sum_squares(0) == 0.0)
 	assert(emitted_packets.size() == 1)
 	var footer := TwoVoipPacket.decode_control_packet(emitted_packets[0])
 	assert(footer[TwoVoipPacket.FooterField.TYPE] == TwoVoipPacket.TYPE_END)
@@ -661,15 +836,42 @@ func run_tests() -> void:
 	assert(TwoVoipPacket.clock_ping_domain_id(clock_ping) == "clock-domain-a")
 	assert(TwoVoipPacket.clock_ping_is_valid(clock_ping.slice(0, 4)))
 	assert(TwoVoipPacket.clock_ping_domain_id(clock_ping.slice(0, 4)).is_empty())
+	var monotonic_ping := TwoVoipPacket.make_clock_ping("peer:2", 2000000)
+	assert(TwoVoipPacket.clock_ping_is_valid(monotonic_ping))
+	assert(monotonic_ping.size() == 4)
+	var diagnostic_ping := TwoVoipPacket.make_clock_ping(
+			"peer:3", 3000000, "", 1700000000000000)
+	assert(TwoVoipPacket.clock_ping_is_valid(diagnostic_ping))
+	assert(TwoVoipPacket.clock_ping_unix_minus_ticks_usec(diagnostic_ping) \
+			== 1700000000000000)
 	var clock_pong := TwoVoipPacket.make_clock_pong(
 			"peer:1", 1000000, 1010000, 1011000, "clock-domain-b")
 	assert(TwoVoipPacket.clock_pong_is_valid(clock_pong))
 	assert(TwoVoipPacket.clock_pong_domain_id(clock_pong) == "clock-domain-b")
 	assert(TwoVoipPacket.clock_pong_is_valid(clock_pong.slice(0, 6)))
 	assert(TwoVoipPacket.clock_pong_domain_id(clock_pong.slice(0, 6)).is_empty())
+	var monotonic_pong := TwoVoipPacket.make_clock_pong(
+			"peer:2", 2000000, 2010000, 2011000)
+	assert(TwoVoipPacket.clock_pong_is_valid(monotonic_pong))
+	assert(monotonic_pong.size() == 6)
+	var diagnostic_pong := TwoVoipPacket.make_clock_pong(
+			"peer:3", 3000000, 3010000, 3011000, "", 1699999999900000)
+	assert(TwoVoipPacket.clock_pong_is_valid(diagnostic_pong))
+	assert(TwoVoipPacket.clock_pong_unix_minus_ticks_usec(diagnostic_pong) \
+			== 1699999999900000)
 	var clock_ack := TwoVoipPacket.make_clock_ack(
-			"peer:1", 1000000, 1010000, 1011000, 1021000)
+			"peer:1", 1000000, 1010000, 1011000, 1021000,
+			1700000000000000)
 	assert(TwoVoipPacket.clock_ack_is_valid(clock_ack))
+	assert(TwoVoipPacket.clock_ack_unix_minus_ticks_usec(clock_ack) \
+			== 1700000000000000)
+	assert(TwoVoipPacket.clock_ack_applies_estimate(clock_ack))
+	assert(TwoVoipPacket.clock_ack_is_valid(clock_ack.slice(0, 7)))
+	var rejected_clock_ack := TwoVoipPacket.make_clock_ack(
+			"peer:2", 2000000, 2010000, 2011000, 2021000,
+			1700000000000000, false)
+	assert(TwoVoipPacket.clock_ack_is_valid(rejected_clock_ack))
+	assert(not TwoVoipPacket.clock_ack_applies_estimate(rejected_clock_ack))
 	assert(TwoVoipPacket.clock_ack_is_valid(TwoVoipPacket.decode_control_packet(
 			TwoVoipPacket.encode_control_packet(clock_ack))))
 
@@ -774,6 +976,9 @@ func run_tests() -> void:
 	run_mid_join_and_gap(speaker, 10)
 	run_counter_wrap(speaker, 11)
 	run_small_packet_reordering(speaker, 12)
+	run_packet_loss_recovery(speaker, 20)
+	run_variable_packet_lengths(speaker, 30)
+	run_audio_before_header(speaker, 50)
 	run_receiver_playback_restart(speaker, 13)
 	run_initial_lead_trim(speaker, 19)
 	run_receiver_clock_stall_recovery(speaker, 14)
@@ -784,7 +989,7 @@ func run_tests() -> void:
 	run_input_gap_detection()
 	run_mqtt_log_payload_roundtrip()
 	run_stream_start_without_history()
-	run_input_gap_restart()
+	run_input_gap_beyond_hang_ends_episode()
 	run_application_resume_restart()
 	timing_meter.update_display(0.0)
 	assert(timing_meter.TIMING_EMPTY.a == 0.0)

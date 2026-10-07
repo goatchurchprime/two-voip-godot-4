@@ -310,7 +310,7 @@ func _on_hash_check_button_toggled(toggled_on):
 func _on_pause_check_toggled(toggled_on):
 	get_tree().paused = toggled_on
 	if toggled_on:
-		await get_tree().create_timer(3.0).timeout
+		await get_tree().create_timer(0.4).timeout
 		$HBoxNetManage/PauseCheck.button_pressed = false
 
 func _on_stall_in_1_toggled(toggled_on):
@@ -318,7 +318,7 @@ func _on_stall_in_1_toggled(toggled_on):
 	if $MQTTnetwork/MQTTSimulatedBroker._server:
 		$MQTTnetwork/MQTTSimulatedBroker.set_process(not toggled_on)
 	if toggled_on:
-		await get_tree().create_timer(1.0).timeout
+		await get_tree().create_timer(0.3).timeout
 		$HBoxNetManage/StallIn1.button_pressed = false
 
 func _on_stall_in_5_toggled(toggled_on):
@@ -326,3 +326,28 @@ func _on_stall_in_5_toggled(toggled_on):
 	if toggled_on:
 		await get_tree().create_timer(5.0).timeout
 		$HBoxNetManage/StallIn5.button_pressed = false
+
+
+func _on_bad_order_toggled(toggled_on):
+	if toggled_on:
+		$MQTTnetwork/MQTTSimulatedBroker.configure_faults({
+			"enabled": true, "seed": 7, "reorder_ms": 120,
+			"topic_filters": ["godot/twovoip/room1/+/audio"],
+		})
+	else:
+		$MQTTnetwork/MQTTSimulatedBroker.clear_faults()
+	if toggled_on:
+		await get_tree().create_timer(1.0).timeout
+		$HBoxNetManage/BadOrder.button_pressed = false
+
+func _on_drop_packets_toggled(toggled_on):
+	if toggled_on:
+		$MQTTnetwork/MQTTSimulatedBroker.configure_faults({
+			"enabled": true, "seed": 7, "loss_rate": 0.1,
+			"topic_filters": ["godot/twovoip/room1/+/audio"],
+		})
+	else:
+		$MQTTnetwork/MQTTSimulatedBroker.clear_faults()
+	if toggled_on:
+		await get_tree().create_timer(1.0).timeout
+		$HBoxNetManage/DropPackets.button_pressed = false

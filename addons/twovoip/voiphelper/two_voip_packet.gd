@@ -96,6 +96,7 @@ enum ClockPingField {
 	PROBE_ID,
 	T1_USEC,
 	CLOCK_DOMAIN_ID,
+	UNIX_MINUS_TICKS_USEC,
 	SIZE,
 }
 
@@ -108,6 +109,7 @@ enum ClockPongField {
 	T2_USEC,
 	T3_USEC,
 	CLOCK_DOMAIN_ID,
+	UNIX_MINUS_TICKS_USEC,
 	SIZE,
 }
 
@@ -120,6 +122,8 @@ enum ClockAckField {
 	T2_USEC,
 	T3_USEC,
 	T4_USEC,
+	UNIX_MINUS_TICKS_USEC,
+	APPLY_ESTIMATE,
 	SIZE,
 }
 
@@ -197,20 +201,37 @@ static func make_hash_response(opus_stream_count: int, first_frame: int, frame_c
 
 
 static func make_clock_ping(probe_id: String, t1_usec: int,
-		clock_domain_id: String) -> Array:
-	return [TYPE_CLOCK_PING, WIRE_VERSION, probe_id, t1_usec, clock_domain_id]
+		clock_domain_id: String = "", unix_minus_ticks_usec: int = 0) -> Array:
+	var packet := [TYPE_CLOCK_PING, WIRE_VERSION, probe_id, t1_usec]
+	if not clock_domain_id.is_empty() or unix_minus_ticks_usec != 0:
+		packet.append(clock_domain_id)
+	if unix_minus_ticks_usec != 0:
+		packet.append(unix_minus_ticks_usec)
+	return packet
 
 
 static func make_clock_pong(probe_id: String, t1_usec: int,
-		t2_usec: int, t3_usec: int, clock_domain_id: String) -> Array:
-	return [TYPE_CLOCK_PONG, WIRE_VERSION, probe_id,
-			t1_usec, t2_usec, t3_usec, clock_domain_id]
+		t2_usec: int, t3_usec: int, clock_domain_id: String = "",
+		unix_minus_ticks_usec: int = 0) -> Array:
+	var packet := [TYPE_CLOCK_PONG, WIRE_VERSION, probe_id,
+			t1_usec, t2_usec, t3_usec]
+	if not clock_domain_id.is_empty() or unix_minus_ticks_usec != 0:
+		packet.append(clock_domain_id)
+	if unix_minus_ticks_usec != 0:
+		packet.append(unix_minus_ticks_usec)
+	return packet
 
 
 static func make_clock_ack(probe_id: String, t1_usec: int,
-		t2_usec: int, t3_usec: int, t4_usec: int) -> Array:
-	return [TYPE_CLOCK_ACK, WIRE_VERSION, probe_id,
+		t2_usec: int, t3_usec: int, t4_usec: int,
+		unix_minus_ticks_usec: int = 0, apply_estimate := true) -> Array:
+	var packet := [TYPE_CLOCK_ACK, WIRE_VERSION, probe_id,
 			t1_usec, t2_usec, t3_usec, t4_usec]
+	if unix_minus_ticks_usec != 0 or not apply_estimate:
+		packet.append(unix_minus_ticks_usec)
+	if not apply_estimate:
+		packet.append(false)
+	return packet
 
 static func encode_control_packet(packet: Array) -> PackedByteArray:
 	return JSON.stringify(packet).to_ascii_buffer()
@@ -273,7 +294,10 @@ static func clock_ping_is_valid(packet: Array) -> bool:
 			and packet[ClockPingField.PROBE_ID] is String \
 			and not packet[ClockPingField.PROBE_ID].is_empty() \
 			and (packet.size() == ClockPingField.CLOCK_DOMAIN_ID \
-					or packet[ClockPingField.CLOCK_DOMAIN_ID] is String)
+					or packet[ClockPingField.CLOCK_DOMAIN_ID] is String) \
+			and (packet.size() <= ClockPingField.UNIX_MINUS_TICKS_USEC \
+					or packet[ClockPingField.UNIX_MINUS_TICKS_USEC] is float \
+					or packet[ClockPingField.UNIX_MINUS_TICKS_USEC] is int)
 
 
 static func clock_pong_is_valid(packet: Array) -> bool:
@@ -284,7 +308,10 @@ static func clock_pong_is_valid(packet: Array) -> bool:
 			and packet[ClockPongField.PROBE_ID] is String \
 			and not packet[ClockPongField.PROBE_ID].is_empty() \
 			and (packet.size() == ClockPongField.CLOCK_DOMAIN_ID \
-					or packet[ClockPongField.CLOCK_DOMAIN_ID] is String)
+					or packet[ClockPongField.CLOCK_DOMAIN_ID] is String) \
+			and (packet.size() <= ClockPongField.UNIX_MINUS_TICKS_USEC \
+					or packet[ClockPongField.UNIX_MINUS_TICKS_USEC] is float \
+					or packet[ClockPongField.UNIX_MINUS_TICKS_USEC] is int)
 
 
 static func clock_ping_domain_id(packet: Array) -> String:
@@ -297,12 +324,38 @@ static func clock_pong_domain_id(packet: Array) -> String:
 			if packet.size() > ClockPongField.CLOCK_DOMAIN_ID else ""
 
 
+static func clock_ping_unix_minus_ticks_usec(packet: Array) -> int:
+	return int(packet[ClockPingField.UNIX_MINUS_TICKS_USEC]) \
+			if packet.size() > ClockPingField.UNIX_MINUS_TICKS_USEC else 0
+
+
+static func clock_pong_unix_minus_ticks_usec(packet: Array) -> int:
+	return int(packet[ClockPongField.UNIX_MINUS_TICKS_USEC]) \
+			if packet.size() > ClockPongField.UNIX_MINUS_TICKS_USEC else 0
+
+
+static func clock_ack_unix_minus_ticks_usec(packet: Array) -> int:
+	return int(packet[ClockAckField.UNIX_MINUS_TICKS_USEC]) \
+			if packet.size() > ClockAckField.UNIX_MINUS_TICKS_USEC else 0
+
+
+static func clock_ack_applies_estimate(packet: Array) -> bool:
+	return bool(packet[ClockAckField.APPLY_ESTIMATE]) \
+			if packet.size() > ClockAckField.APPLY_ESTIMATE else true
+
+
 static func clock_ack_is_valid(packet: Array) -> bool:
-	return packet.size() == ClockAckField.SIZE \
+	return packet.size() >= ClockAckField.UNIX_MINUS_TICKS_USEC \
+			and packet.size() <= ClockAckField.SIZE \
 			and packet[ClockAckField.TYPE] == TYPE_CLOCK_ACK \
 			and packet[ClockAckField.VERSION] == WIRE_VERSION \
 			and packet[ClockAckField.PROBE_ID] is String \
-			and not packet[ClockAckField.PROBE_ID].is_empty()
+			and not packet[ClockAckField.PROBE_ID].is_empty() \
+			and (packet.size() == ClockAckField.UNIX_MINUS_TICKS_USEC \
+					or packet[ClockAckField.UNIX_MINUS_TICKS_USEC] is float \
+					or packet[ClockAckField.UNIX_MINUS_TICKS_USEC] is int) \
+			and (packet.size() <= ClockAckField.APPLY_ESTIMATE \
+					or packet[ClockAckField.APPLY_ESTIMATE] is bool)
 
 
 static func header_uses_base64(packet: Array) -> bool:

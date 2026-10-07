@@ -31,13 +31,12 @@ var clock_probe_sequence := 0
 var pending_clock_probes := {}
 var sent_clock_responses := {}
 var clock_estimates := {}
-var clock_domain_id := ""
 
 const logfile = "user://mqttlogging.dat"
 var flogfile : FileAccess = null
 var logfilepackcount = 0
 var recording_start_ticks_msec = 0
-var recording_start_unix_usec = 0
+var recording_start_clock_usec = 0
 var replay_recording_key := ""
 var replay_arrival_epoch_usec := 0
 
@@ -55,15 +54,11 @@ func send_midstream_start(membername: String):
 
 
 func _now_usec() -> int:
-	return int(Time.get_unix_time_from_system() * 1000000.0)
+	return Time.get_ticks_usec()
 
 
-func _get_clock_domain_id() -> String:
-	if clock_domain_id.is_empty() and OS.has_method("get_unique_id"):
-		var unique_id := str(OS.call("get_unique_id"))
-		if not unique_id.is_empty():
-			clock_domain_id = ("twovoip-clock-domain:" + unique_id).sha256_text()
-	return clock_domain_id
+func _unix_minus_ticks_usec(ticks_usec: int) -> int:
+	return int(Time.get_unix_time_from_system() * 1000000.0) - ticks_usec
 
 
 func _ensure_member(membername: String):
@@ -90,15 +85,19 @@ func _apply_clock_estimate(membername: String):
 			int(estimate.lower_bound_usec),
 			int(estimate.upper_bound_usec),
 			int(estimate.round_trip_usec),
-			str(estimate.reason))
+			str(estimate.reason),
+			int(estimate.get("unix_local_minus_peer_usec", 0)),
+			bool(estimate.get("unix_offset_valid", false)))
 
 
 func _store_clock_estimate(membername: String, estimate_usec: int,
 		lower_bound_usec: int, upper_bound_usec: int, round_trip_usec: int,
-		reason: String, probe_id: String):
-	if clock_estimates.has(membername) \
+		reason: String, probe_id: String,
+		unix_local_minus_peer_usec: int = 0, unix_offset_valid := false,
+		force_selection := false) -> bool:
+	if not force_selection and clock_estimates.has(membername) \
 			and int(clock_estimates[membername].round_trip_usec) <= round_trip_usec:
-		return
+		return false
 	clock_estimates[membername] = {
 		"local_minus_peer_usec": estimate_usec,
 		"lower_bound_usec": lower_bound_usec,
@@ -106,22 +105,34 @@ func _store_clock_estimate(membername: String, estimate_usec: int,
 		"round_trip_usec": round_trip_usec,
 		"reason": reason,
 		"probe_id": probe_id,
+		"unix_local_minus_peer_usec": unix_local_minus_peer_usec,
+		"unix_offset_valid": unix_offset_valid,
 	}
 	_apply_clock_estimate(membername)
-	print("TwoVoIP clock %s local-peer=%+.3f ms bounds=[%+.3f,%+.3f] ms RTT=%.3f ms (%s)" % [
+	var unix_diagnostic := ""
+	if unix_offset_valid:
+		unix_diagnostic = " unix=%+.3f ms selected-unix=%+.3f ms" % [
+				unix_local_minus_peer_usec / 1000.0,
+				(estimate_usec - unix_local_minus_peer_usec) / 1000.0]
+	print("TwoVoIP clock %s local-peer=%+.3f ms bounds=[%+.3f,%+.3f] ms RTT=%.3f ms%s (%s)" % [
 			membername, estimate_usec / 1000.0,
 			lower_bound_usec / 1000.0, upper_bound_usec / 1000.0,
-			round_trip_usec / 1000.0, reason])
+			round_trip_usec / 1000.0, unix_diagnostic, reason])
+	return true
 
 
 func _send_clock_probe():
 	clock_probe_sequence += 1
 	var probe_id := "%s:%d" % [myname, clock_probe_sequence]
 	var t1_usec := _now_usec()
-	pending_clock_probes[probe_id] = t1_usec
+	var unix_minus_ticks_usec := _unix_minus_ticks_usec(t1_usec)
+	pending_clock_probes[probe_id] = {
+		"t1_usec": t1_usec,
+		"unix_minus_ticks_usec": unix_minus_ticks_usec,
+	}
 	transportaudiopacket(TwoVoipPacket.encode_control_packet(
 			TwoVoipPacket.make_clock_ping(
-					probe_id, t1_usec, _get_clock_domain_id())), 0)
+					probe_id, t1_usec, "", unix_minus_ticks_usec)), 0)
 
 
 func _all_known_peers_clock_synced() -> bool:
@@ -167,52 +178,58 @@ func _handle_clock_control(membername: String, packet: Array,
 			return true
 		var probe_id: String = packet[TwoVoipPacket.ClockPingField.PROBE_ID]
 		var t1_usec := int(packet[TwoVoipPacket.ClockPingField.T1_USEC])
-		var peer_clock_domain_id := TwoVoipPacket.clock_ping_domain_id(packet)
 		var t2_usec := arrival_time_usec
 		var t3_usec := _now_usec()
+		var local_unix_minus_ticks_usec := _unix_minus_ticks_usec(t3_usec)
 		sent_clock_responses[probe_id] = {
 			"membername": membername,
 			"t1_usec": t1_usec,
 			"t2_usec": t2_usec,
 			"t3_usec": t3_usec,
-			"shared_clock_domain": not peer_clock_domain_id.is_empty() \
-					and peer_clock_domain_id == _get_clock_domain_id(),
+			"peer_unix_minus_ticks_usec": \
+					TwoVoipPacket.clock_ping_unix_minus_ticks_usec(packet),
+			"local_unix_minus_ticks_usec": local_unix_minus_ticks_usec,
 		}
 		transportaudiopacket(TwoVoipPacket.encode_control_packet(
 				TwoVoipPacket.make_clock_pong(
-						probe_id, t1_usec, t2_usec, t3_usec,
-						_get_clock_domain_id())), 0, membername)
+						probe_id, t1_usec, t2_usec, t3_usec, "",
+						local_unix_minus_ticks_usec)), 0, membername)
 		return true
 	if TwoVoipPacket.clock_pong_is_valid(packet):
 		var probe_id: String = packet[TwoVoipPacket.ClockPongField.PROBE_ID]
 		var t1_usec := int(packet[TwoVoipPacket.ClockPongField.T1_USEC])
 		if not replay and (not pending_clock_probes.has(probe_id) \
-				or int(pending_clock_probes[probe_id]) != t1_usec):
+				or int(pending_clock_probes[probe_id].t1_usec) != t1_usec):
 			return true
 		var t2_usec := int(packet[TwoVoipPacket.ClockPongField.T2_USEC])
 		var t3_usec := int(packet[TwoVoipPacket.ClockPongField.T3_USEC])
-		var peer_clock_domain_id := TwoVoipPacket.clock_pong_domain_id(packet)
 		var t4_usec := arrival_time_usec
 		var result: Dictionary = ClockSync.calculate_exchange(
 				t1_usec, t2_usec, t3_usec, t4_usec)
+		var local_unix_minus_ticks_usec := int(
+				pending_clock_probes[probe_id].unix_minus_ticks_usec) \
+				if pending_clock_probes.has(probe_id) else 0
+		var peer_unix_minus_ticks_usec := \
+				TwoVoipPacket.clock_pong_unix_minus_ticks_usec(packet)
+		var unix_offset_valid := local_unix_minus_ticks_usec != 0 \
+				and peer_unix_minus_ticks_usec != 0
+		var unix_local_minus_peer_usec := peer_unix_minus_ticks_usec \
+				- local_unix_minus_ticks_usec
+		var selected_estimate := false
 		if not result.is_empty():
-			if not peer_clock_domain_id.is_empty() \
-					and peer_clock_domain_id == _get_clock_domain_id():
-				_store_clock_estimate(membername, 0, 0, 0,
-						int(result.round_trip_usec),
-						"shared system clock", probe_id)
-			else:
-				# The result is peer-minus-local; speakers need local-minus-source.
-				_store_clock_estimate(membername,
-						-int(result.remote_minus_local_usec),
-						-int(result.offset_upper_usec),
-						-int(result.offset_lower_usec),
-						int(result.round_trip_usec),
-						"connection clock pong", probe_id)
+			# The result is peer-minus-local; speakers need local-minus-source.
+			selected_estimate = _store_clock_estimate(membername,
+					-int(result.remote_minus_local_usec),
+					-int(result.offset_upper_usec),
+					-int(result.offset_lower_usec),
+					int(result.round_trip_usec),
+					"connection clock pong", probe_id,
+					unix_local_minus_peer_usec, unix_offset_valid)
 		if not replay:
 			transportaudiopacket(TwoVoipPacket.encode_control_packet(
 					TwoVoipPacket.make_clock_ack(
-							probe_id, t1_usec, t2_usec, t3_usec, t4_usec)),
+							probe_id, t1_usec, t2_usec, t3_usec, t4_usec,
+							local_unix_minus_ticks_usec, selected_estimate)),
 					0, membername)
 		return true
 	if TwoVoipPacket.clock_ack_is_valid(packet):
@@ -228,18 +245,23 @@ func _handle_clock_control(membername: String, packet: Array,
 				and int(sent.t2_usec) == t2_usec and int(sent.t3_usec) == t3_usec:
 			var result: Dictionary = ClockSync.calculate_exchange(
 					t1_usec, t2_usec, t3_usec, t4_usec)
-			if not result.is_empty():
-				if bool(sent.shared_clock_domain):
-					_store_clock_estimate(membername, 0, 0, 0,
-							int(result.round_trip_usec),
-							"shared system clock", probe_id)
-				else:
-					_store_clock_estimate(membername,
-							int(result.remote_minus_local_usec),
-							int(result.offset_lower_usec),
-							int(result.offset_upper_usec),
-							int(result.round_trip_usec),
-							"connection clock acknowledgement", probe_id)
+			var peer_unix_minus_ticks_usec := \
+					TwoVoipPacket.clock_ack_unix_minus_ticks_usec(packet)
+			var local_unix_minus_ticks_usec := int(
+					sent.local_unix_minus_ticks_usec)
+			var unix_offset_valid := peer_unix_minus_ticks_usec != 0 \
+					and local_unix_minus_ticks_usec != 0
+			var unix_local_minus_peer_usec := peer_unix_minus_ticks_usec \
+					- local_unix_minus_ticks_usec
+			if not result.is_empty() \
+					and TwoVoipPacket.clock_ack_applies_estimate(packet):
+				_store_clock_estimate(membername,
+						int(result.remote_minus_local_usec),
+						int(result.offset_lower_usec),
+						int(result.offset_upper_usec),
+						int(result.round_trip_usec),
+						"connection clock acknowledgement", probe_id,
+						unix_local_minus_peer_usec, unix_offset_valid, true)
 		sent_clock_responses.erase(probe_id)
 		return true
 	return false
@@ -434,8 +456,7 @@ func _on_connect_toggled(toggled_on):
 			print("Opening mqtt logfile ", flogfile.get_path_absolute())
 			logfilepackcount = 0
 			recording_start_ticks_msec = Time.get_ticks_msec()
-			recording_start_unix_usec = \
-					int(Time.get_unix_time_from_system() * 1000000.0)
+			recording_start_clock_usec = Time.get_ticks_usec()
 		$MQTT.received_message.connect(received_mqtt)
 		$MQTT.broker_connected.connect(on_broker_connect)
 		$MQTT.broker_disconnected.connect(on_broker_disconnect)
@@ -446,9 +467,9 @@ func _on_connect_toggled(toggled_on):
 		$MQTT.client_id = "c%d" % (2 + (randi()%0x7fffff8))
 		SelfMember.setname(myname)
 		if flogfile != null:
-			flogfile.store_line("%d %s %d" % [
+			flogfile.store_line("%d %s ticks %d" % [
 					recording_start_ticks_msec, myname,
-					recording_start_unix_usec])
+					recording_start_clock_usec])
 		SelfMember.color = FriendlyName.get("theme_override_styles/normal").bg_color
 		$GridContainer/topic.editable = false
 		$GridContainer/broker.editable = false
@@ -524,7 +545,12 @@ func _on_replay_button_toggled(toggled_on):
 	var replay_recording_start_ticks_msec := int(sl0[0])
 	myname = sl0[1]
 	var recording_key := "%d:%s" % [replay_recording_start_ticks_msec, myname]
-	if sl0.size() >= 3:
+	if sl0.size() >= 4 and sl0[2] == "ticks":
+		replay_arrival_epoch_usec = int(sl0[3])
+		replay_recording_key = recording_key
+	elif sl0.size() >= 3:
+		# Older recordings used a Unix epoch. START's provisional offset keeps
+		# their source and receiver timestamps in one replay coordinate system.
 		replay_arrival_epoch_usec = int(sl0[2])
 		replay_recording_key = recording_key
 	elif replay_recording_key != recording_key:
