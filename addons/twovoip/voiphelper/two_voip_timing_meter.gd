@@ -220,7 +220,7 @@ func _collect_scene_nodes():
 				output_cells.append(child)
 	var slots = get_node_or_null("Display/ReorderSlots")
 	if slots:
-		for index in range(speaker.Noutoforderqueue if speaker else 4):
+		for index in range(speaker.REORDER_DISPLAY_SLOT_COUNT if speaker else 4):
 			var slot: ColorRect = slots.get_node_or_null("Slot%d" % index)
 			if slot:
 				reorder_slots.append(slot)
@@ -480,7 +480,7 @@ func anomaly_snapshot(reason: String, queue_ms: float,
 		"missing_packet_count": speaker.missing_packet_count,
 		"fec_recovery_count": speaker.fec_recovery_count,
 		"loss_silence_count": speaker.loss_silence_count,
-		"preheader_held_count": speaker.preheader_audio_packets.size(),
+		"preheader_held_count": speaker.get_preheader_packet_count(),
 		"preheader_wrong_parity_discards": \
 				speaker.preheader_wrong_parity_discard_count,
 		"mid_time_error_count": speaker.mid_time_error_count,
@@ -586,8 +586,7 @@ func update_display(delta: float):
 		audible_level.color = Color(0.18, 0.35, 0.55, 0.75).lerp(
 				Color(0.92, 0.96, 1.0, 1.0), audible_level_brightness)
 	for index in range(reorder_slots.size()):
-		var occupied: bool = index < speaker.outoforderchunkqueue.size() \
-				and speaker.outoforderchunkqueue[index] != null
+		var occupied: bool = speaker.get_reorder_slot_occupied(index)
 		reorder_slots[index].color = TIMING_AUDIO if occupied else TIMING_REORDER_EMPTY
 	_update_overflow(queue_ms, audible_timeline_ms,
 			ring_queue_frames, ring_read_frame)

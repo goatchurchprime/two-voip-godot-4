@@ -2,6 +2,29 @@ extends Node
 
 signal hash_response_ready(packet: PackedByteArray)
 
+enum ReceivedPacketKind {
+	UNRESOLVED_AUDIO,
+	START,
+	MID,
+	AUDIO,
+	END,
+}
+
+class ReceivedPacket extends RefCounted:
+	var kind: int = ReceivedPacketKind.UNRESOLVED_AUDIO
+	var control: Array = []
+	var audio := PackedByteArray()
+	var wire := PackedByteArray()
+	var context: Dictionary = {}
+	var arrival_time_usec := 0
+	var stream_count := -1
+	var parity := -1
+	var sequence_7bit := -1
+	var frame_count := -1
+	var source_time_usec := 0
+	var arrival_timeline_usec := 0
+	var timing_observed := false
+
 var audioplayeropus = null
 var audiostreamopus : AudioStreamOpus = null
 var audio_stream_playback_opus : AudioStreamPlaybackOpus = null
@@ -32,13 +55,10 @@ var source_next_frame_count: int = 0
 var source_next_frame_time_usec: int = 0
 var source_packet_first_frame_time_usec: int = 0
 var source_bitrate = 0
-const Noutoforderqueue = 4
-const Npacketinitialbatching = 2
-var outoforderchunkqueue = [ ]
-var opusframequeuecount = 0
-var preheader_audio_packets: Array[Dictionary] = []
+const REORDER_DISPLAY_SLOT_COUNT := 4
+const MAX_PENDING_PACKET_COUNT := TwoVoipPacket.CHUNK_SEQUENCE_MODULUS / 2
+var ordered_packet_queue: Array[ReceivedPacket] = []
 var preheader_wrong_parity_discard_count = 0
-const PREHEADER_PACKET_LIMIT := TwoVoipPacket.CHUNK_SEQUENCE_MODULUS / 2
 var opus_sample_rate = 48000
 var opus_channels = 2
 var runninglagtimeminimum = -1.0
@@ -550,11 +570,6 @@ func push_opus_packet(packet: PackedByteArray, begin: int, decode_fec: bool):
 	return decoded_frames
 
 
-func _shift_reorder_queue():
-	outoforderchunkqueue.pop_front()
-	outoforderchunkqueue.push_back(null)
-
-
 func _push_missing_frame(recovery_packet) -> bool:
 	missing_packet_count += 1
 	if recovery_packet != null:
@@ -574,61 +589,206 @@ func _push_missing_frame(recovery_packet) -> bool:
 	return true
 
 
-func _consume_reorder_head(confirm_missing := false) -> bool:
-	if outoforderchunkqueue[0] != null:
-		if push_opus_packet(outoforderchunkqueue[0], lenchunkprefix, false) < 0:
-			return false
-		opusframequeuecount -= 1
-	elif confirm_missing:
-		# Opus in-band FEC in packet N can only reconstruct packet N-1. Never
-		# reuse an arbitrary future packet for several older holes.
-		var recovery_packet = outoforderchunkqueue[1] \
-				if outoforderchunkqueue.size() > 1 else null
-		if not _push_missing_frame(recovery_packet):
-			return false
-	else:
+func _packet_priority(received: ReceivedPacket) -> int:
+	if received.kind == ReceivedPacketKind.MID:
+		return 0
+	if received.kind == ReceivedPacketKind.AUDIO:
+		return 1
+	return 2 # END follows every audio frame below its final frame count.
+
+
+func _insert_ordered_packet(received: ReceivedPacket):
+	for queued in ordered_packet_queue:
+		if queued.kind == received.kind \
+				and queued.frame_count == received.frame_count \
+				and queued.stream_count == received.stream_count:
+			duplicate_packet_count += 1
+			_set_diagnostic_trigger("duplicate packet → ignore")
+			return
+	var insert_at := ordered_packet_queue.size()
+	for index in range(ordered_packet_queue.size()):
+		var queued := ordered_packet_queue[index]
+		if queued.kind == ReceivedPacketKind.UNRESOLVED_AUDIO \
+				or (inopusstream and received.stream_count == opusstreamcount \
+				and queued.stream_count != opusstreamcount) \
+				or (received.stream_count == queued.stream_count \
+				and (received.frame_count < queued.frame_count \
+				or (received.frame_count == queued.frame_count \
+				and _packet_priority(received) < _packet_priority(queued)))):
+			insert_at = index
+			break
+	ordered_packet_queue.insert(insert_at, received)
+	while ordered_packet_queue.size() > MAX_PENDING_PACKET_COUNT:
+		ordered_packet_queue.pop_back()
+		dropped_packet_count += 1
+
+
+func _complete_audio_sequence(sequence_7bit: int, reference_frame: int) -> int:
+	var offset := (sequence_7bit - reference_frame \
+			% TwoVoipPacket.CHUNK_SEQUENCE_MODULUS \
+			+ TwoVoipPacket.CHUNK_SEQUENCE_MODULUS) \
+			% TwoVoipPacket.CHUNK_SEQUENCE_MODULUS
+	if offset >= TwoVoipPacket.CHUNK_SEQUENCE_MODULUS / 2:
+		offset -= TwoVoipPacket.CHUNK_SEQUENCE_MODULUS
+	return reference_frame + offset
+
+
+func _resolve_audio_packet(received: ReceivedPacket) -> bool:
+	if received.audio.is_empty():
+		received.audio = TwoVoipPacket.decode_audio_packet(
+				received.wire, audio_packets_base64)
+	if received.audio.size() <= lenchunkprefix:
+		push_warning("Bad TwoVoIP audio packet: too short")
 		return false
-	_shift_reorder_queue()
-	opusframecount += 1
-	assert(opusframequeuecount >= 0)
+	if lenchunkprefix < TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE:
+		received.kind = ReceivedPacketKind.AUDIO
+		received.stream_count = opusstreamcount
+		received.parity = opusstreamcount % 2
+		received.frame_count = opusframecount
+		return true
+	received.sequence_7bit = received.audio[0] & TwoVoipPacket.CHUNK_SEQUENCE_MASK
+	received.parity = 1 if received.audio[0] \
+			& TwoVoipPacket.CHUNK_STREAM_PARITY_MASK else 0
+	if received.parity != opusstreamcount % 2:
+		return false
+	received.kind = ReceivedPacketKind.AUDIO
+	received.stream_count = opusstreamcount
+	received.frame_count = _complete_audio_sequence(
+			received.sequence_7bit, opusframecount)
 	return true
 
 
-func _flush_reorder_through(final_frame_count: int):
-	while opusframecount < final_frame_count:
-		if not _consume_reorder_head(true):
-			break
+func _discard_initial_lead_packet(received: ReceivedPacket) -> bool:
+	if initial_wire_packets_to_skip <= 0 \
+			or received.frame_count >= source_next_frame_count:
+		return false
+	initial_wire_packets_to_skip -= 1
+	return true
 
 
-func _hold_preheader_audio(packet: PackedByteArray,
-		transport_debug_context: Dictionary):
-	if preheader_audio_packets.size() >= PREHEADER_PACKET_LIMIT:
-		preheader_audio_packets.pop_front()
+func _observe_audio_arrival(received: ReceivedPacket) -> bool:
+	if received.timing_observed:
+		return true
+	received.source_time_usec = source_next_frame_time_usec \
+			+ int((received.frame_count - source_next_frame_count) * opusframesize \
+			* 1000000.0 / opus_sample_rate)
+	var first_timeline_packet := not initial_playout_timeline_started
+	if first_timeline_packet and not start_initial_playback_from_packet(
+			received.arrival_time_usec, received.source_time_usec,
+			received.frame_count):
+		return false
+	received.arrival_timeline_usec = initial_packet_arrival_timeline_usec \
+			if first_timeline_packet else observe_source_clock_timing(
+			received.arrival_time_usec, received.source_time_usec)
+	received.timing_observed = true
+	if timing_meter:
+		timing_meter.record_packet_arrival(
+				received.arrival_time_usec, received.source_time_usec,
+				received.arrival_timeline_usec)
+	_check_pending_mid_audio(received.arrival_time_usec, received.frame_count)
+	return true
+
+
+func _hold_received_audio(received: ReceivedPacket):
+	received.kind = ReceivedPacketKind.UNRESOLVED_AUDIO
+	if ordered_packet_queue.size() >= MAX_PENDING_PACKET_COUNT:
+		ordered_packet_queue.pop_front()
 		dropped_packet_count += 1
-	preheader_audio_packets.append({
-		"packet": packet.duplicate(),
-		"context": transport_debug_context.duplicate(true),
-	})
+	ordered_packet_queue.append(received)
 	_set_diagnostic_trigger("audio before START → hold")
 
 
-func _replay_matching_preheader_audio():
-	if preheader_audio_packets.is_empty():
+func _hold_unresolved_audio(packet: PackedByteArray,
+		transport_debug_context: Dictionary):
+	var received := ReceivedPacket.new()
+	received.wire = packet
+	received.context = transport_debug_context.duplicate(true)
+	received.arrival_time_usec = int(transport_debug_context.get(
+			"arrival_time_usec", Time.get_ticks_usec()))
+	_hold_received_audio(received)
+
+
+func _start_ordered_episode(start_packet: ReceivedPacket):
+	var held_packets := ordered_packet_queue
+	ordered_packet_queue = []
+	_receive_audio_control_packet_in_order(start_packet.control, start_packet.context)
+	if not inopusstream:
 		return
-	var held_packets := preheader_audio_packets
-	preheader_audio_packets = []
 	for held in held_packets:
-		var wire_packet: PackedByteArray = held.packet
-		var decoded_packet := TwoVoipPacket.decode_audio_packet(
-				wire_packet, audio_packets_base64)
-		if lenchunkprefix >= TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE \
-				and decoded_packet.size() >= TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE \
-				and decoded_packet[0] & TwoVoipPacket.CHUNK_STREAM_PARITY_MASK \
-						!= (opusstreamcount % 2) \
-						* TwoVoipPacket.CHUNK_STREAM_PARITY_MASK:
+		if held.kind == ReceivedPacketKind.UNRESOLVED_AUDIO:
+			if not _resolve_audio_packet(held):
+				preheader_wrong_parity_discard_count += 1
+				continue
+			if _discard_initial_lead_packet(held):
+				continue
+			if not _observe_audio_arrival(held):
+				continue
+		elif held.stream_count != opusstreamcount:
 			preheader_wrong_parity_discard_count += 1
 			continue
-		receive_audio_packet(wire_packet, held.context)
+		_insert_ordered_packet(held)
+	_drain_ordered_packets()
+
+
+func _force_gap_before(received: ReceivedPacket) -> bool:
+	if received.kind == ReceivedPacketKind.MID:
+		return true # MID declares the intervening source frames to be silent.
+	while opusframecount < received.frame_count:
+		var recovery_packet = received.audio \
+				if received.kind == ReceivedPacketKind.AUDIO \
+				and opusframecount == received.frame_count - 1 else null
+		if not _push_missing_frame(recovery_packet):
+			return false
+		opusframecount += 1
+	return true
+
+
+func _drain_ordered_packets(force_gap := false):
+	while inopusstream and not ordered_packet_queue.is_empty():
+		var received := ordered_packet_queue[0]
+		if received.kind == ReceivedPacketKind.UNRESOLVED_AUDIO:
+			return
+		if received.stream_count != opusstreamcount:
+			return
+		if received.frame_count < opusframecount:
+			ordered_packet_queue.pop_front()
+			dropped_packet_count += 1
+			_set_diagnostic_trigger("stale packet → drop")
+			continue
+		if received.frame_count > opusframecount:
+			if not force_gap or not _force_gap_before(received):
+				return
+		ordered_packet_queue.pop_front()
+		if received.kind == ReceivedPacketKind.AUDIO:
+			_receive_audio_packet_in_order(received)
+		elif received.kind == ReceivedPacketKind.MID \
+				or received.kind == ReceivedPacketKind.END:
+			_receive_audio_control_packet_in_order(
+					received.control, received.context)
+
+
+func get_pending_packet_count() -> int:
+	return ordered_packet_queue.size()
+
+
+func get_preheader_packet_count() -> int:
+	var count := 0
+	for received in ordered_packet_queue:
+		if received.kind == ReceivedPacketKind.UNRESOLVED_AUDIO:
+			count += 1
+	return count
+
+
+func get_reorder_slot_occupied(offset: int) -> bool:
+	for received in ordered_packet_queue:
+		if received.kind == ReceivedPacketKind.AUDIO \
+				and received.frame_count == opusframecount + offset:
+			return true
+	return false
+
+
+func force_pending_packet_deadline():
+	_drain_ordered_packets(true)
 
 func get_frame_max(frame_number: int) -> float:
 	if frame_number < episodefirstframenumber or opusframesize <= 0 \
@@ -740,7 +900,7 @@ func _check_pending_mid_audio(arrival_time_usec: int, frame_count: int):
 	pending_mid_frame_count = -1
 	pending_mid_arrival_usec = 0
 
-func receive_audio_control_packet(control_packet: Array,
+func _receive_audio_control_packet_in_order(control_packet: Array,
 		transport_debug_context: Dictionary = {}):
 	if control_packet.is_empty():
 		push_warning("Invalid TwoVoIP control packet")
@@ -778,11 +938,6 @@ func receive_audio_control_packet(control_packet: Array,
 		tailframenumber = 0
 		playbackstartframenumber = 0
 		episodefirstframenumber = 0
-		outoforderchunkqueue.clear()
-		for i in range(Noutoforderqueue):
-			outoforderchunkqueue.push_back(null)
-		opusframequeuecount = 0
-		assert(Npacketinitialbatching < Noutoforderqueue)
 		runninglagtimeminimum = -1.0
 		inopusstream = true
 		playback_restart_count = 0
@@ -822,7 +977,6 @@ func receive_audio_control_packet(control_packet: Array,
 		if timing_meter:
 			timing_meter.begin_episode()
 		_set_diagnostic_trigger("START → await first audio")
-		_replay_matching_preheader_audio()
 	elif packet_type == TwoVoipPacket.TYPE_MID:
 		if not TwoVoipPacket.mid_is_valid(control_packet):
 			push_warning("Malformed TwoVoIP mid-stream update")
@@ -862,10 +1016,6 @@ func receive_audio_control_packet(control_packet: Array,
 			return
 		if int(control_packet[TwoVoipPacket.FooterField.OPUS_STREAM_COUNT]) != opusstreamcount:
 			return
-		var final_frame_count := int(
-				control_packet[TwoVoipPacket.FooterField.OPUS_FRAME_COUNT])
-		if final_frame_count > opusframecount:
-			_flush_reorder_through(final_frame_count)
 		if audio_stream_playback_opus:
 			audio_stream_playback_opus.finish_episode()
 		var outputframecount = tailframenumber - episodefirstframenumber
@@ -901,6 +1051,22 @@ func receive_audio_control_packet(control_packet: Array,
 	else:
 		push_warning("Unknown TwoVoIP control packet type: %s" % packet_type)
 
+func _receive_audio_packet_in_order(received: ReceivedPacket):
+	var packet := received.audio
+	var frame_count := received.frame_count
+	source_packet_first_frame_time_usec = received.source_time_usec
+	if not received.timing_observed and not _observe_audio_arrival(received):
+		return
+	if not ensure_episode_playback(opusframesize):
+		return
+	if frame_count >= initial_playout_lead_end_frame_count:
+		mark_initial_playout_padding_aligned()
+	if push_opus_packet(packet, lenchunkprefix, false) >= 0:
+		opusframecount += 1
+		if timing_meter:
+			timing_meter.commit_packet_to_playout()
+
+
 func receive_audio_packet(packet, transport_debug_context: Dictionary = {}):
 	replaying_transport = bool(transport_debug_context.get("replay", false))
 	if timing_meter and not transport_debug_context.is_empty():
@@ -908,115 +1074,88 @@ func receive_audio_packet(packet, transport_debug_context: Dictionary = {}):
 	if audiostreamopus == null:
 		return
 	if TwoVoipPacket.is_control_packet(packet):
-		return receive_audio_control_packet(
-				TwoVoipPacket.decode_control_packet(packet),
-				transport_debug_context)
+		var control_packet := TwoVoipPacket.decode_control_packet(packet)
+		if control_packet.is_empty():
+			return _receive_audio_control_packet_in_order(
+					control_packet, transport_debug_context)
+		var packet_type = control_packet[0]
+		if packet_type != TwoVoipPacket.TYPE_START \
+				and packet_type != TwoVoipPacket.TYPE_MID \
+				and packet_type != TwoVoipPacket.TYPE_END:
+			return _receive_audio_control_packet_in_order(
+					control_packet, transport_debug_context)
+		var received := ReceivedPacket.new()
+		received.control = control_packet
+		received.context = transport_debug_context.duplicate(true)
+		received.arrival_time_usec = int(transport_debug_context.get(
+				"arrival_time_usec", Time.get_ticks_usec()))
+		if packet_type == TwoVoipPacket.TYPE_START:
+			if not TwoVoipPacket.header_is_valid(control_packet):
+				return _receive_audio_control_packet_in_order(
+						control_packet, transport_debug_context)
+			received.kind = ReceivedPacketKind.START
+			received.stream_count = int(control_packet[
+					TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT])
+			received.frame_count = int(control_packet[
+					TwoVoipPacket.HeaderField.NEXT_FRAME_COUNT])
+			return _start_ordered_episode(received)
+		if packet_type == TwoVoipPacket.TYPE_MID:
+			if not TwoVoipPacket.mid_is_valid(control_packet):
+				return _receive_audio_control_packet_in_order(
+						control_packet, transport_debug_context)
+			received.kind = ReceivedPacketKind.MID
+			received.stream_count = int(control_packet[
+					TwoVoipPacket.MidField.OPUS_STREAM_COUNT])
+			received.frame_count = int(control_packet[
+					TwoVoipPacket.MidField.NEXT_FRAME_COUNT])
+		else:
+			if not TwoVoipPacket.footer_is_valid(control_packet):
+				return _receive_audio_control_packet_in_order(
+						control_packet, transport_debug_context)
+			received.kind = ReceivedPacketKind.END
+			received.stream_count = int(control_packet[
+					TwoVoipPacket.FooterField.OPUS_STREAM_COUNT])
+			received.frame_count = int(control_packet[
+					TwoVoipPacket.FooterField.OPUS_FRAME_COUNT])
+		if not inopusstream or received.stream_count != opusstreamcount:
+			_insert_ordered_packet(received)
+			return
+		_insert_ordered_packet(received)
+		_drain_ordered_packets()
+		return control_packet if packet_type == TwoVoipPacket.TYPE_END \
+				and not inopusstream else null
+
 	if not inopusstream:
-		_hold_preheader_audio(packet, transport_debug_context)
+		_hold_unresolved_audio(packet, transport_debug_context)
 		return
-	var wire_packet: PackedByteArray = packet
-	packet = TwoVoipPacket.decode_audio_packet(wire_packet, audio_packets_base64)
-	var arrival_time_usec := int(transport_debug_context.get(
-			"arrival_time_usec",
-			Time.get_ticks_usec()))
-	if len(packet) <= lenchunkprefix:
-		print("Bad audio packet too short")
+	var received := ReceivedPacket.new()
+	received.wire = packet
+	received.context = transport_debug_context.duplicate(true)
+	received.arrival_time_usec = int(transport_debug_context.get(
+			"arrival_time_usec", Time.get_ticks_usec()))
+	if not _resolve_audio_packet(received):
+		_hold_received_audio(received)
 		return
-	if initial_wire_packets_to_skip > 0:
-		initial_wire_packets_to_skip -= 1
+	if _discard_initial_lead_packet(received):
 		return
-	if lenchunkprefix == -1:
-		pass
-
-	elif lenchunkprefix == 0:
-		source_packet_first_frame_time_usec = source_next_frame_time_usec \
-				+ int((opusframecount - source_next_frame_count) * opusframesize \
-				* 1000000.0 / opus_sample_rate)
-		var first_timeline_packet := not initial_playout_timeline_started
-		if first_timeline_packet and not start_initial_playback_from_packet(
-				arrival_time_usec, source_packet_first_frame_time_usec,
-				opusframecount):
-			return
-		if not ensure_episode_playback(opusframesize):
-			return
-		var arrival_timeline_usec := initial_packet_arrival_timeline_usec \
-				if first_timeline_packet else observe_source_clock_timing(
-				arrival_time_usec, source_packet_first_frame_time_usec)
-		if timing_meter:
-			timing_meter.record_packet_arrival(
-					arrival_time_usec, source_packet_first_frame_time_usec,
-					arrival_timeline_usec)
-		if opusframecount >= initial_playout_lead_end_frame_count:
-			mark_initial_playout_padding_aligned()
-		_check_pending_mid_audio(arrival_time_usec, opusframecount)
-		if push_opus_packet(packet, lenchunkprefix, false) >= 0:
-			opusframecount += 1
-			if timing_meter:
-				timing_meter.commit_packet_to_playout()
-
-	else:
-		assert (lenchunkprefix >= TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE)
-		var unwrapped_frame_count := TwoVoipPacket.decode_sequence_chunk_prefix(packet, opusframecount, opusstreamcount)
-		if unwrapped_frame_count < 0:
-			if packet[0] & TwoVoipPacket.CHUNK_STREAM_PARITY_MASK \
-					!= (opusstreamcount % 2) \
-					* TwoVoipPacket.CHUNK_STREAM_PARITY_MASK:
-				_hold_preheader_audio(wire_packet, transport_debug_context)
-				return
-			dropped_packet_count += 1
-			_set_diagnostic_trigger("stale/wrong episode packet → drop")
-			return
-		source_packet_first_frame_time_usec = source_next_frame_time_usec \
-				+ int((unwrapped_frame_count - source_next_frame_count) * opusframesize \
-				* 1000000.0 / opus_sample_rate)
-		var first_timeline_packet := not initial_playout_timeline_started
-		if first_timeline_packet and not start_initial_playback_from_packet(
-				arrival_time_usec, source_packet_first_frame_time_usec,
-				unwrapped_frame_count):
-			return
-		if not ensure_episode_playback():
-			return
-		var arrival_timeline_usec := initial_packet_arrival_timeline_usec \
-				if first_timeline_packet else observe_source_clock_timing(
-				arrival_time_usec, source_packet_first_frame_time_usec)
-		if timing_meter:
-			timing_meter.record_packet_arrival(
-					arrival_time_usec, source_packet_first_frame_time_usec,
-					arrival_timeline_usec)
-		_check_pending_mid_audio(arrival_time_usec, unwrapped_frame_count)
-		var opusframecountR = unwrapped_frame_count - opusframecount
-		while opusframecountR >= Noutoforderqueue:
-			if outoforderchunkqueue[0] == null:
-				push_error("TwoVoIP packet gap on reliable transport stream=%d expected=%d received=%d" % [
-						opusstreamcount, opusframecount, unwrapped_frame_count])
-			if not _consume_reorder_head(true):
-				return
-			opusframecountR -= 1
-
-		if outoforderchunkqueue[opusframecountR] != null:
-			duplicate_packet_count += 1
-			_set_diagnostic_trigger("duplicate packet → ignore")
-			return
-		outoforderchunkqueue[opusframecountR] = packet
-		opusframequeuecount += 1
-		var initial_received_frame_count: int = opusframecount \
-				- source_next_frame_count + opusframequeuecount
-		if unwrapped_frame_count >= initial_playout_lead_end_frame_count \
-				and outoforderchunkqueue[0] != null \
-				and initial_received_frame_count >= Npacketinitialbatching:
-			mark_initial_playout_padding_aligned()
-		while outoforderchunkqueue[0] != null \
-				and opusframecount - source_next_frame_count \
-						+ opusframequeuecount >= Npacketinitialbatching:
-			if not _consume_reorder_head():
-				return
-		if timing_meter and initial_playout_padding_aligned \
-				and unwrapped_frame_count < opusframecount:
-			timing_meter.commit_packet_to_playout()
+	if received.frame_count < opusframecount:
+		dropped_packet_count += 1
+		_set_diagnostic_trigger("stale packet → drop")
+		return
+	if not _observe_audio_arrival(received):
+		return
+	_insert_ordered_packet(received)
+	_drain_ordered_packets()
 var playingrecording = false
 func _physics_process(_delta):
 	if audio_stream_playback_opus == null:
 		return
+	if inopusstream and not ordered_packet_queue.is_empty() \
+			and audio_stream_playback_opus.queue_length_frames() \
+			<= opusframesize * 2:
+		# A gap stays reorderable while PCM reserve exists. Only the playback
+		# deadline turns it into an actual loss/source-gap decision.
+		_drain_ordered_packets(true)
 	if not replaying_transport:
 		_account_playback_underflow()
 	if not audio_stream_playback_opus.is_playing(): # could use the finished signal
