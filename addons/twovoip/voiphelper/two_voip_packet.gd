@@ -151,6 +151,18 @@ static func make_header(packet_type: String, opus_frame_size: int,
 	return packet
 
 
+static func make_header_from_config(config: Array, opus_stream_count: int,
+		next_frame_count: int, next_frame_time_usec: int, opus_bitrate: int) -> Array:
+	assert(header_is_valid(config))
+	return make_header(TYPE_START,
+			int(config[HeaderField.OPUS_FRAME_SIZE]),
+			int(config[HeaderField.OPUS_SAMPLE_RATE]),
+			int(config[HeaderField.OPUS_CHANNELS]),
+			int(config[HeaderField.CHUNK_PREFIX_LENGTH]),
+			opus_stream_count, next_frame_count, next_frame_time_usec, opus_bitrate,
+			header_uses_base64(config))
+
+
 static func make_mid(opus_stream_count: int, next_frame_count: int,
 		next_frame_time_usec: int, opus_bitrate: int) -> Array:
 	var packet: Array = []
