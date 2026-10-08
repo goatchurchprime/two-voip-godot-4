@@ -483,6 +483,11 @@ func anomaly_snapshot(reason: String, queue_ms: float,
 		"preheader_held_count": speaker.get_preheader_packet_count(),
 		"preheader_wrong_parity_discards": \
 				speaker.preheader_wrong_parity_discard_count,
+		"fabricated_start_active": speaker.fabricated_start_active,
+		"fabricated_start_count": speaker.fabricated_start_count,
+		"fabricated_start_confirmation_count": \
+				speaker.fabricated_start_confirmation_count,
+		"missing_footer_timeout_count": speaker.missing_footer_timeout_count,
 		"mid_time_error_count": speaker.mid_time_error_count,
 		"delayed_mid_audio_count": speaker.delayed_mid_audio_count,
 		"player_playing": bool(speaker.audioplayeropus and speaker.audioplayeropus.playing),

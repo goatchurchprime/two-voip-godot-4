@@ -15,10 +15,7 @@ func setname(lname):
 	set_name(lname)
 	$Label.text = name
 	
-func receivemqttaudiometa(msg, transport_debug_context: Dictionary = {}):
-	twovoipspeaker.receive_audio_packet(msg, transport_debug_context)
-
-func receivemqttaudio(msg, transport_debug_context: Dictionary = {}):
+func receive_mqtt_audio_packet(msg, transport_debug_context: Dictionary = {}):
 	twovoipspeaker.receive_audio_packet(msg, transport_debug_context)
 
 func _process(_delta):

@@ -329,25 +329,19 @@ func _on_stall_in_5_toggled(toggled_on):
 
 
 func _on_bad_order_toggled(toggled_on):
-	if toggled_on:
-		$MQTTnetwork/MQTTSimulatedBroker.configure_faults({
-			"enabled": true, "seed": 7, "reorder_ms": 120,
-			"topic_filters": ["godot/twovoip/room1/+/audio"],
-		})
-	else:
-		$MQTTnetwork/MQTTSimulatedBroker.clear_faults()
+	$MQTTnetwork/AudioPacketFilter.set_random_delay(
+			toggled_on, _selected_fault_packet_kind())
 	if toggled_on:
 		await get_tree().create_timer(1.0).timeout
 		$HBoxNetManage/BadOrder.button_pressed = false
 
-func _on_drop_packets_toggled(toggled_on):
-	if toggled_on:
-		$MQTTnetwork/MQTTSimulatedBroker.configure_faults({
-			"enabled": true, "seed": 7, "loss_rate": 0.1,
-			"topic_filters": ["godot/twovoip/room1/+/audio"],
-		})
-	else:
-		$MQTTnetwork/MQTTSimulatedBroker.clear_faults()
-	if toggled_on:
-		await get_tree().create_timer(1.0).timeout
-		$HBoxNetManage/DropPackets.button_pressed = false
+func _on_drop_packets_pressed():
+	var packet_kind := _selected_fault_packet_kind()
+	var count := int($HBoxNetManage/FaultRunLength.value) \
+			if packet_kind == "audio" else 1
+	$MQTTnetwork/AudioPacketFilter.drop_next(packet_kind, count)
+
+
+func _selected_fault_packet_kind() -> String:
+	return $HBoxNetManage/FaultPacketKind.get_item_text(
+			$HBoxNetManage/FaultPacketKind.selected).to_lower()

@@ -15,6 +15,7 @@ var statustopic = ""
 
 @onready var Members = get_node("../ScrollMembers/Members")
 @onready var SelfMember = get_node("../ScrollMembers/Members/Self")
+@onready var AudioPacketFilter = $AudioPacketFilter
 
 @onready var Mstatusconnected = "connected".to_ascii_buffer()
 @onready var Mstatusconnecting = "connecting".to_ascii_buffer()
@@ -386,12 +387,14 @@ func received_mqtt(topic, msg, transport_debug_context: Dictionary = {}):
 								membername, control_packet)
 						return
 					if stopic[roomtopicwords+1] == "audio":
-						member.receivemqttaudio(msg, packet_context)
+						AudioPacketFilter.receive_audio_packet(
+								member, msg, packet_context)
 					else:
 						var atopic = stopic[roomtopicwords+1].split("/", true, 3)
 						if len(atopic) >= 2 and atopic[1] == "meta":
 							if len(atopic) == 2 or atopic[2] == myname:
-								member.receivemqttaudiometa(msg, packet_context)
+								AudioPacketFilter.receive_audio_packet(
+										member, msg, packet_context)
 						else:
 							assert(false)
 				else:

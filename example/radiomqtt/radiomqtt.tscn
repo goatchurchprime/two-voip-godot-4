@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 [ext_resource type="Shader" uid="uid://bq3uv3u8jhu77" path="res://addons/twovoip/voiphelper/voxshader.gdshader" id="5_7rbsf"]
 [ext_resource type="Script" uid="uid://bvc0jl61su4fd" path="res://addons/mqtt/simulated_broker.gd" id="6_qfww3"]
+[ext_resource type="Script" uid="uid://rr8tydt33rex" path="res://radiomqtt/mqtt_audio_packet_filter.gd" id="7_audio_filter"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kcsl6"]
 bg_color = Color(0.0705882, 0.0235294, 0.564706, 1)
@@ -601,6 +602,9 @@ process_mode = 1
 script = ExtResource("6_qfww3")
 metadata/_custom_type_script = "uid://bvc0jl61su4fd"
 
+[node name="AudioPacketFilter" type="Node" parent="MQTTnetwork" unique_id=65113499]
+script = ExtResource("7_audio_filter")
+
 [node name="HBoxMosquitto" type="HBoxContainer" parent="." unique_id=1644933476]
 layout_mode = 2
 
@@ -683,11 +687,13 @@ vertical_alignment = 1
 layout_mode = 2
 
 [node name="HashCheckButton" type="Button" parent="HBoxNetManage" unique_id=615118235]
+visible = false
 layout_mode = 2
 toggle_mode = true
 text = "Hash check "
 
 [node name="HashErrors" type="SpinBox" parent="HBoxNetManage" unique_id=333100909]
+visible = false
 layout_mode = 2
 max_value = 1000.0
 
@@ -700,22 +706,45 @@ text = "Pause"
 [node name="StallIn1" type="Button" parent="HBoxNetManage" unique_id=2109303552]
 layout_mode = 2
 toggle_mode = true
-text = "Stall In 1"
+text = "Stal1"
 
 [node name="StallIn5" type="Button" parent="HBoxNetManage" unique_id=1600103267]
 layout_mode = 2
 toggle_mode = true
-text = "Stall In 5"
+text = "Stall5"
+
+[node name="FaultPacketKind" type="OptionButton" parent="HBoxNetManage" unique_id=300295578]
+layout_mode = 2
+tooltip_text = "Choose whether the next fault affects ordinary audio, START, MID, or END packets."
+selected = 0
+item_count = 4
+popup/item_0/text = "audio"
+popup/item_0/id = 0
+popup/item_1/text = "START"
+popup/item_1/id = 1
+popup/item_2/text = "MID"
+popup/item_2/id = 2
+popup/item_3/text = "END"
+popup/item_3/id = 3
 
 [node name="BadOrder" type="Button" parent="HBoxNetManage" unique_id=396443504]
 layout_mode = 2
+tooltip_text = "For one second, give some selected packets seeded random 30-160 ms delays."
 toggle_mode = true
-text = "BadOrder"
+text = "Reorder"
+
+[node name="FaultRunLength" type="SpinBox" parent="HBoxNetManage" unique_id=311685418]
+layout_mode = 2
+size_flags_horizontal = 0
+tooltip_text = "Number of consecutive ordinary audio packets dropped by Drop. Control packets always drop one."
+min_value = 1.0
+max_value = 50.0
+value = 5.0
 
 [node name="DropPackets" type="Button" parent="HBoxNetManage" unique_id=1002553173]
 layout_mode = 2
-toggle_mode = true
-text = "Drops"
+tooltip_text = "Arm an exact drop: one selected control packet, or the selected run of audio packets."
+text = "Drop"
 
 [node name="ScrollMembers" type="ScrollContainer" parent="." unique_id=1053756819]
 layout_mode = 2
@@ -760,4 +789,4 @@ text = "sil"
 [connection signal="toggled" from="HBoxNetManage/StallIn1" to="." method="_on_stall_in_1_toggled"]
 [connection signal="toggled" from="HBoxNetManage/StallIn5" to="." method="_on_stall_in_5_toggled"]
 [connection signal="toggled" from="HBoxNetManage/BadOrder" to="." method="_on_bad_order_toggled"]
-[connection signal="toggled" from="HBoxNetManage/DropPackets" to="." method="_on_drop_packets_toggled"]
+[connection signal="pressed" from="HBoxNetManage/DropPackets" to="." method="_on_drop_packets_pressed"]
