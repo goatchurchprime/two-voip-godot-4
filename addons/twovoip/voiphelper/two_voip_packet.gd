@@ -31,6 +31,84 @@ const CHUNK_FIRST_FRAME_TIME_SIZE := 8
 const TIMESTAMPED_CHUNK_PREFIX_SIZE := CHUNK_SEQUENCE_PREFIX_SIZE + CHUNK_FIRST_FRAME_TIME_SIZE
 
 
+enum ReceivedPacketKind {
+	UNRESOLVED_AUDIO,
+	START,
+	MID,
+	AUDIO,
+	END,
+}
+
+
+class ReceivedPacket extends RefCounted:
+	var kind: int = ReceivedPacketKind.UNRESOLVED_AUDIO
+	var is_control := false
+	var control: Array = []
+	var audio := PackedByteArray()
+	var wire := PackedByteArray()
+	var context: Dictionary = {}
+	var arrival_time_usec := 0
+	var stream_count := -1
+	var parity := -1
+	var sequence_7bit := -1
+	var frame_count := -1
+	var source_time_usec := 0
+	var arrival_timeline_usec := 0
+	var playout_arrival_time_usec := 0
+	var timing_observed := false
+
+
+	func _init(packet: PackedByteArray = PackedByteArray(), packet_context: Dictionary = {}):
+		wire = packet
+		context = packet_context.duplicate(true)
+		arrival_time_usec = int(context.get("arrival_time_usec", Time.get_ticks_usec()))
+		is_control = TwoVoipPacket.is_control_packet(wire)
+		if not is_control:
+			return
+		control = TwoVoipPacket.decode_control_packet(wire)
+		if control.is_empty():
+			return
+		var packet_type = control[0]
+		if packet_type == TwoVoipPacket.TYPE_START and TwoVoipPacket.header_is_valid(control):
+			kind = ReceivedPacketKind.START
+			stream_count = int(control[HeaderField.OPUS_STREAM_COUNT])
+			frame_count = int(control[HeaderField.NEXT_FRAME_COUNT])
+		elif packet_type == TwoVoipPacket.TYPE_MID and TwoVoipPacket.mid_is_valid(control):
+			kind = ReceivedPacketKind.MID
+			stream_count = int(control[MidField.OPUS_STREAM_COUNT])
+			frame_count = int(control[MidField.NEXT_FRAME_COUNT])
+		elif packet_type == TwoVoipPacket.TYPE_END and TwoVoipPacket.footer_is_valid(control):
+			kind = ReceivedPacketKind.END
+			stream_count = int(control[FooterField.OPUS_STREAM_COUNT])
+			frame_count = int(control[FooterField.OPUS_FRAME_COUNT])
+
+
+	func resolve_audio(encode_base64: bool, chunk_prefix_length: int,
+			current_stream_count: int, expected_frame_count: int) -> bool:
+		if is_control:
+			return false
+		if audio.is_empty():
+			audio = TwoVoipPacket.decode_audio_packet(wire, encode_base64)
+		if audio.size() <= chunk_prefix_length:
+			return false
+		kind = ReceivedPacketKind.AUDIO
+		stream_count = current_stream_count
+		parity = current_stream_count % 2
+		if chunk_prefix_length < TwoVoipPacket.CHUNK_SEQUENCE_PREFIX_SIZE:
+			frame_count = expected_frame_count
+			return true
+		sequence_7bit = audio[0] & TwoVoipPacket.CHUNK_SEQUENCE_MASK
+		parity = 1 if audio[0] & TwoVoipPacket.CHUNK_STREAM_PARITY_MASK else 0
+		if parity != current_stream_count % 2:
+			return false
+		var offset := (sequence_7bit - expected_frame_count % TwoVoipPacket.CHUNK_SEQUENCE_MODULUS \
+				+ TwoVoipPacket.CHUNK_SEQUENCE_MODULUS) % TwoVoipPacket.CHUNK_SEQUENCE_MODULUS
+		if offset >= TwoVoipPacket.CHUNK_SEQUENCE_MODULUS / 2:
+			offset -= TwoVoipPacket.CHUNK_SEQUENCE_MODULUS
+		frame_count = expected_frame_count + offset
+		return true
+
+
 enum HeaderField {
 	TYPE,
 	VERSION,

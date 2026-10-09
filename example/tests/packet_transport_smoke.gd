@@ -1111,8 +1111,7 @@ func run_tests() -> void:
 
 	var player := AudioStreamPlayer.new()
 	get_root().add_child(player)
-	var speaker := Node.new()
-	speaker.set_script(preload("res://addons/twovoip/voiphelper/two_voip_speaker.gd"))
+	var speaker := preload("res://addons/twovoip/voiphelper/two_voip_speaker.tscn").instantiate()
 	player.add_child(speaker)
 	var timing_meter := preload("res://addons/twovoip/voiphelper/two_voip_timing_meter.tscn").instantiate()
 	get_root().add_child(timing_meter)
@@ -1142,6 +1141,10 @@ func run_tests() -> void:
 	speaker.playout_timeline_offset_usec = 0
 	timing_meter._reset_offset_statistics()
 	run_startup_padding_arithmetic(speaker)
+	speaker.packet_orderer.enabled = false
+	run_speaker_episode(speaker, 7, false)
+	assert(speaker.get_pending_packet_count() == 0)
+	speaker.packet_orderer.enabled = true
 	run_speaker_episode(speaker, 8, false)
 	assert(timing_meter.audible_timeline_aligned)
 	# This transport smoke emits both timestamped chunks in one process turn, so

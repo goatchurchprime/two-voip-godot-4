@@ -2,8 +2,6 @@ extends Node
 
 signal hash_response_ready(packet: PackedByteArray)
 
-const PacketOrderer = preload("res://addons/twovoip/voiphelper/two_voip_packet_orderer.gd")
-
 var audioplayeropus = null
 var audiostreamopus : AudioStreamOpus = null
 var audio_stream_playback_opus : AudioStreamPlaybackOpus = null
@@ -36,11 +34,12 @@ var source_next_frame_time_usec: int = 0
 var source_packet_first_frame_time_usec: int = 0
 var source_bitrate = 0
 const REORDER_DISPLAY_SLOT_COUNT := 4
-var packet_orderer
+@onready var packet_orderer = get_node_or_null("PacketOrderer")
 var preheader_wrong_parity_discard_count = 0
 var cached_stream_header: Array = []
 var fabricated_start_active := false
 var fabricated_start_draining := false
+var fabricated_start_commit_pending := false
 var fabricated_start_count := 0
 var fabricated_start_confirmation_count := 0
 var missing_footer_timeout_count := 0
@@ -119,7 +118,6 @@ var initial_packet_arrival_timeline_usec := 0
 var replaying_transport := false
 
 func _ready():
-	packet_orderer = PacketOrderer.new(self)
 	audioplayeropus = get_parent().findaudioplayer() if get_parent().has_method("findaudioplayer") else get_parent()
 	if audioplayeropus.has_method("set_stream"):
 		audiostreamopus = AudioStreamOpus.new()
@@ -133,7 +131,6 @@ func _ready():
 func _exit_tree():
 	if packet_orderer:
 		packet_orderer.clear()
-		packet_orderer.speaker = null
 		packet_orderer = null
 	audio_stream_playback_opus = null
 	audiostreamopus = null
@@ -587,7 +584,7 @@ func _push_missing_frame(recovery_packet) -> bool:
 	return true
 
 
-func _discard_initial_lead_packet(received: PacketOrderer.ReceivedPacket) -> bool:
+func _discard_initial_lead_packet(received: TwoVoipPacket.ReceivedPacket) -> bool:
 	if initial_wire_packets_to_skip <= 0 \
 			or received.frame_count >= source_next_frame_count:
 		return false
@@ -595,7 +592,7 @@ func _discard_initial_lead_packet(received: PacketOrderer.ReceivedPacket) -> boo
 	return true
 
 
-func _observe_audio_arrival(received: PacketOrderer.ReceivedPacket) -> bool:
+func _observe_audio_arrival(received: TwoVoipPacket.ReceivedPacket) -> bool:
 	if received.timing_observed:
 		return true
 	received.source_time_usec = source_next_frame_time_usec \
@@ -621,19 +618,25 @@ func _observe_audio_arrival(received: PacketOrderer.ReceivedPacket) -> bool:
 
 
 func get_pending_packet_count() -> int:
-	return packet_orderer.pending_count()
+	return packet_orderer.pending_count() if packet_orderer else 0
 
 
 func get_preheader_packet_count() -> int:
-	return packet_orderer.preheader_count()
+	return packet_orderer.preheader_count() if packet_orderer else 0
 
 
 func get_reorder_slot_occupied(offset: int) -> bool:
-	return packet_orderer.reorder_slot_occupied(offset)
+	return packet_orderer.reorder_slot_occupied(offset) if packet_orderer else false
 
 
 func force_pending_packet_deadline():
-	packet_orderer.drain(true)
+	if packet_orderer:
+		_update_packet_orderer_state()
+		while packet_orderer.has_next_packet_order(true):
+			receive_audio_packet_ordered(packet_orderer.next_packet_order())
+			_update_packet_orderer_state()
+		_apply_packet_orderer_diagnostic()
+		_finish_fabricated_start_drain()
 
 func get_frame_max(frame_number: int) -> float:
 	if frame_number < episodefirstframenumber or opusframesize <= 0 \
@@ -898,7 +901,7 @@ func _receive_audio_control_packet_in_order(control_packet: Array,
 	else:
 		push_warning("Unknown TwoVoIP control packet type: %s" % packet_type)
 
-func _receive_audio_packet_in_order(received: PacketOrderer.ReceivedPacket):
+func _receive_audio_packet_in_order(received: TwoVoipPacket.ReceivedPacket):
 	var packet := received.audio
 	var frame_count := received.frame_count
 	source_packet_first_frame_time_usec = received.source_time_usec
@@ -915,13 +918,103 @@ func _receive_audio_packet_in_order(received: PacketOrderer.ReceivedPacket):
 			timing_meter.commit_packet_to_playout()
 
 
+func receive_audio_packet_ordered(received: TwoVoipPacket.ReceivedPacket):
+	if received.is_control:
+		if received.kind == TwoVoipPacket.ReceivedPacketKind.START:
+			if bool(received.context.get("fabricated_start_confirmation", false)):
+				cached_stream_header = received.control.duplicate(true)
+				fabricated_start_active = false
+				fabricated_start_confirmation_count += 1
+				_set_diagnostic_trigger("START RECOVERY: confirmed by late START")
+				return
+			cached_stream_header = received.control.duplicate(true)
+			fabricated_start_active = bool(received.context.get("fabricated_start", false))
+			fabricated_start_draining = fabricated_start_active
+			fabricated_start_commit_pending = bool(received.context.get(
+					"fabricated_run_has_audio", false))
+			if fabricated_start_active:
+				fabricated_start_count += 1
+		var result = _receive_audio_control_packet_in_order(received.control, received.context)
+		if fabricated_start_active:
+			_set_diagnostic_trigger("START RECOVERY: %s" % received.context.get(
+					"fabricated_start_reason", "fabricated START"))
+		return result
+	if not inopusstream:
+		_set_diagnostic_trigger("audio without START → drop")
+		dropped_packet_count += 1
+		return
+	if received.kind == TwoVoipPacket.ReceivedPacketKind.UNRESOLVED_AUDIO \
+			and not received.resolve_audio(audio_packets_base64, lenchunkprefix,
+				opusstreamcount, opusframecount):
+		push_warning("Bad or wrong-episode TwoVoIP audio packet")
+		return
+	if _discard_initial_lead_packet(received):
+		return
+	if received.frame_count < opusframecount:
+		dropped_packet_count += 1
+		_set_diagnostic_trigger("stale packet → drop")
+		return
+	if not received.timing_observed and not _observe_audio_arrival(received):
+		return
+	last_episode_packet_arrival_usec = Time.get_ticks_usec()
+	while opusframecount < received.frame_count:
+		var recovery_packet = received.audio if opusframecount == received.frame_count - 1 else null
+		if not _push_missing_frame(recovery_packet):
+			return
+		opusframecount += 1
+	_receive_audio_packet_in_order(received)
+
+
+func _finish_fabricated_start_drain():
+	if not fabricated_start_draining:
+		return
+	fabricated_start_draining = false
+	mark_initial_playout_padding_aligned()
+	if timing_meter and fabricated_start_commit_pending:
+		timing_meter.commit_packet_to_playout()
+	fabricated_start_commit_pending = false
+
+
+func _apply_packet_orderer_diagnostic():
+	var counts: PackedInt32Array = packet_orderer.take_counts()
+	dropped_packet_count += counts[0]
+	duplicate_packet_count += counts[1]
+	preheader_wrong_parity_discard_count += counts[2]
+	var trigger: String = packet_orderer.take_diagnostic_trigger()
+	if not trigger.is_empty():
+		_set_diagnostic_trigger(trigger)
+
+
+func _update_packet_orderer_state():
+	packet_orderer.update_receiver_state(inopusstream, opusstreamcount, opusframecount,
+			audio_packets_base64, lenchunkprefix, cached_stream_header,
+			audio_buffer_lag_time_target, source_clock_offset_estimate_usec,
+			initial_wire_packets_to_skip, source_next_frame_count, fabricated_start_active)
+
+
 func receive_audio_packet(packet, transport_debug_context: Dictionary = {}):
 	replaying_transport = bool(transport_debug_context.get("replay", false))
 	if timing_meter and not transport_debug_context.is_empty():
 		timing_meter.set_transport_context(transport_debug_context)
 	if audiostreamopus == null:
 		return
-	return packet_orderer.receive(packet, transport_debug_context)
+	var received := TwoVoipPacket.ReceivedPacket.new(packet, transport_debug_context)
+	if not (packet_orderer and packet_orderer.enabled):
+		return receive_audio_packet_ordered(received)
+	_update_packet_orderer_state()
+	var result = null
+	if packet_orderer.in_order_or_push(received):
+		result = receive_audio_packet_ordered(received)
+		_update_packet_orderer_state()
+	while packet_orderer.has_next_packet_order():
+		var queued_result = receive_audio_packet_ordered(packet_orderer.next_packet_order())
+		if queued_result != null:
+			result = queued_result
+		_update_packet_orderer_state()
+	_apply_packet_orderer_diagnostic()
+	_finish_fabricated_start_drain()
+	return result
+
 var playingrecording = false
 func _physics_process(_delta):
 	if inopusstream and last_episode_packet_arrival_usec != 0 \
@@ -929,19 +1022,20 @@ func _physics_process(_delta):
 			>= roundi(missing_footer_timeout * 1000000.0):
 		if audio_stream_playback_opus:
 			audio_stream_playback_opus.finish_episode()
-		packet_orderer.clear()
+		if packet_orderer:
+			packet_orderer.clear()
 		inopusstream = false
 		fabricated_start_active = false
 		missing_footer_timeout_count += 1
 		_set_diagnostic_trigger("missing END → episode timeout")
 	if audio_stream_playback_opus == null:
 		return
-	if inopusstream and packet_orderer.has_pending() \
+	if inopusstream and packet_orderer and packet_orderer.enabled and packet_orderer.has_pending() \
 			and audio_stream_playback_opus.queue_length_frames() \
 			<= opusframesize * 2:
 		# A gap stays reorderable while PCM reserve exists. Only the playback
 		# deadline turns it into an actual loss/source-gap decision.
-		packet_orderer.drain(true)
+		force_pending_packet_deadline()
 	if not replaying_transport:
 		_account_playback_underflow()
 	if not audio_stream_playback_opus.is_playing(): # could use the finished signal
