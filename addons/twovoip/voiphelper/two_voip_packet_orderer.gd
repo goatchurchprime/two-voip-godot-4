@@ -177,13 +177,11 @@ func _start_fabricated_episode(header: Array, run: Array[ReceivedPacket], reason
 	received.control = header
 	received.stream_count = int(header[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT])
 	received.frame_count = int(header[TwoVoipPacket.HeaderField.NEXT_FRAME_COUNT])
-	received.context = {
-		"arrival_time_usec": int(header[TwoVoipPacket.HeaderField.NEXT_FRAME_TIME_USEC]) \
-				+ clock_offset_usec,
-		"fabricated_start": true,
-		"fabricated_start_reason": reason,
-		"fabricated_run_has_audio": not run.is_empty(),
-	}
+	received.arrival_time_usec = int(header[TwoVoipPacket.HeaderField.NEXT_FRAME_TIME_USEC]) \
+			+ clock_offset_usec
+	received.fabricated_start = true
+	received.fabricated_start_reason = reason
+	received.fabricated_run_has_audio = not run.is_empty()
 	queue.push_front(received)
 
 
@@ -292,7 +290,7 @@ func _receive_control(received: ReceivedPacket):
 				push_error("TwoVoIP late START contradicts fabricated episode configuration")
 				return false
 			cached_header = received.control
-			received.context["fabricated_start_confirmation"] = true
+			received.fabricated_start_confirmation = true
 			diagnostic_trigger = "START RECOVERY: confirmed by late START"
 			return true
 		cached_header = received.control

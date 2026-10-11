@@ -115,7 +115,6 @@ var initial_start_arrival_timeline_usec := 0
 var initial_source_clock_offset_revision_count := 0
 var initial_playout_timeline_started := false
 var initial_packet_arrival_timeline_usec := 0
-var replaying_transport := false
 
 func _ready():
 	audioplayeropus = get_parent().findaudioplayer() if get_parent().has_method("findaudioplayer") else get_parent()
@@ -460,14 +459,12 @@ func restart_episode_playback(reason := "playback stopped") -> bool:
 	return true
 
 func ensure_episode_playback(required_space_frames := 0) -> bool:
-	if not replaying_transport:
-		_account_playback_underflow()
+	_account_playback_underflow()
 	if audio_stream_playback_opus == null or not audio_stream_playback_opus.is_playing():
 		return restart_episode_playback("starvation")
-	if not replaying_transport:
-		var stalled_usec := _playback_clock_stall_usec()
-		if stalled_usec > PLAYBACK_CLOCK_STALL_TOLERANCE_USEC:
-			_account_playback_clock_stall(stalled_usec)
+	var stalled_usec := _playback_clock_stall_usec()
+	if stalled_usec > PLAYBACK_CLOCK_STALL_TOLERANCE_USEC:
+		_account_playback_clock_stall(stalled_usec)
 	# Each packet gives us a fresh short comparison between monotonic time and
 	# the independently advancing audio clock. This prevents harmless fractional
 	# rate error from accumulating until it resembles a pause.
@@ -748,8 +745,7 @@ func _check_pending_mid_audio(arrival_time_usec: int, frame_count: int):
 	pending_mid_frame_count = -1
 	pending_mid_arrival_usec = 0
 
-func _receive_audio_control_packet_in_order(control_packet: Array,
-		transport_debug_context: Dictionary = {}):
+func _receive_audio_control_packet_in_order(control_packet: Array, arrival_time_usec: int):
 	if control_packet.is_empty():
 		push_warning("Invalid TwoVoIP control packet")
 		return
@@ -809,15 +805,12 @@ func _receive_audio_control_packet_in_order(control_packet: Array,
 		pending_mid_frame_count = -1
 		pending_mid_arrival_usec = 0
 		last_mid_to_audio_usec = -1
-		var start_arrival_usec := int(transport_debug_context.get(
-				"arrival_time_usec",
-				Time.get_ticks_usec()))
 		last_episode_packet_arrival_usec = Time.get_ticks_usec()
 		# START announces the first sample timestamp before that audio packet has
 		# completed acquisition. It is therefore the zero-delay clock reference;
 		# the first real packet measures acquisition plus delivery from that point.
 		observe_source_clock_reference(
-				start_arrival_usec, source_next_frame_time_usec, 0,
+				arrival_time_usec, source_next_frame_time_usec, 0,
 				not source_clock_probe_valid)
 		trim_initial_lead_to_target()
 		opusframecount = source_next_frame_count
@@ -921,23 +914,22 @@ func _receive_audio_packet_in_order(received: TwoVoipPacket.ReceivedPacket):
 func receive_audio_packet_ordered(received: TwoVoipPacket.ReceivedPacket):
 	if received.is_control:
 		if received.kind == TwoVoipPacket.ReceivedPacketKind.START:
-			if bool(received.context.get("fabricated_start_confirmation", false)):
+			if received.fabricated_start_confirmation:
 				cached_stream_header = received.control.duplicate(true)
 				fabricated_start_active = false
 				fabricated_start_confirmation_count += 1
 				_set_diagnostic_trigger("START RECOVERY: confirmed by late START")
 				return
 			cached_stream_header = received.control.duplicate(true)
-			fabricated_start_active = bool(received.context.get("fabricated_start", false))
+			fabricated_start_active = received.fabricated_start
 			fabricated_start_draining = fabricated_start_active
-			fabricated_start_commit_pending = bool(received.context.get(
-					"fabricated_run_has_audio", false))
+			fabricated_start_commit_pending = received.fabricated_run_has_audio
 			if fabricated_start_active:
 				fabricated_start_count += 1
-		var result = _receive_audio_control_packet_in_order(received.control, received.context)
+		var result = _receive_audio_control_packet_in_order(
+				received.control, received.arrival_time_usec)
 		if fabricated_start_active:
-			_set_diagnostic_trigger("START RECOVERY: %s" % received.context.get(
-					"fabricated_start_reason", "fabricated START"))
+			_set_diagnostic_trigger("START RECOVERY: %s" % received.fabricated_start_reason)
 		return result
 	if not inopusstream:
 		_set_diagnostic_trigger("audio without START → drop")
@@ -992,13 +984,10 @@ func _update_packet_orderer_state():
 			initial_wire_packets_to_skip, source_next_frame_count, fabricated_start_active)
 
 
-func receive_audio_packet(packet, transport_debug_context: Dictionary = {}):
-	replaying_transport = bool(transport_debug_context.get("replay", false))
-	if timing_meter and not transport_debug_context.is_empty():
-		timing_meter.set_transport_context(transport_debug_context)
+func receive_audio_packet(packet, arrival_time_usec := 0):
 	if audiostreamopus == null:
 		return
-	var received := TwoVoipPacket.ReceivedPacket.new(packet, transport_debug_context)
+	var received := TwoVoipPacket.ReceivedPacket.new(packet, arrival_time_usec)
 	if not (packet_orderer and packet_orderer.enabled):
 		return receive_audio_packet_ordered(received)
 	_update_packet_orderer_state()
@@ -1036,8 +1025,7 @@ func _physics_process(_delta):
 		# A gap stays reorderable while PCM reserve exists. Only the playback
 		# deadline turns it into an actual loss/source-gap decision.
 		force_pending_packet_deadline()
-	if not replaying_transport:
-		_account_playback_underflow()
+	_account_playback_underflow()
 	if not audio_stream_playback_opus.is_playing(): # could use the finished signal
 		audio_stream_playback_opus = null
 		return

@@ -3,6 +3,9 @@
 [sub_resource type="AudioEffectPitchShift" id="AudioEffectPitchShift_urnej"]
 resource_name = "PitchShift"
 
+[sub_resource type="AudioEffectPitchShift" id="AudioEffectPitchShift_j3pel"]
+resource_name = "PitchShift"
+
 [resource]
 bus/1/name = &"SpeechBus"
 bus/1/solo = false
@@ -18,3 +21,5 @@ bus/2/mute = false
 bus/2/bypass_fx = false
 bus/2/volume_db = 0.0
 bus/2/send = &"Master"
+bus/2/effect/0/effect = SubResource("AudioEffectPitchShift_j3pel")
+bus/2/effect/0/enabled = true

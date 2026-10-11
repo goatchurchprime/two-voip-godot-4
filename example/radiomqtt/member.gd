@@ -15,8 +15,8 @@ func setname(lname):
 	set_name(lname)
 	$Label.text = name
 	
-func receive_mqtt_audio_packet(msg, transport_debug_context: Dictionary = {}):
-	twovoipspeaker.receive_audio_packet(msg, transport_debug_context)
+func receive_mqtt_audio_packet(msg, arrival_time_usec := 0):
+	twovoipspeaker.receive_audio_packet(msg, arrival_time_usec)
 
 func _process(_delta):
 	if displayed_clock_revision != twovoipspeaker.source_clock_offset_revision_count \

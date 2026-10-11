@@ -7,12 +7,11 @@ const MQTTAudioPacketFilter = preload(
 
 class PacketFilterSink extends RefCounted:
 	var packets := []
-	var contexts := []
+	var arrival_times := []
 
-	func receive_mqtt_audio_packet(packet,
-			transport_debug_context: Dictionary = {}) -> void:
+	func receive_mqtt_audio_packet(packet, arrival_time_usec := 0) -> void:
 		packets.append(packet)
-		contexts.append(transport_debug_context)
+		arrival_times.append(arrival_time_usec)
 
 
 func _initialize() -> void:
@@ -96,17 +95,13 @@ func run_mqtt_audio_packet_filter() -> void:
 	root.add_child(packet_filter)
 	var sink := PacketFilterSink.new()
 	packet_filter.set_random_delay(true, "audio", 7, 1.0, 20, 20)
-	packet_filter.receive_audio_packet(sink, PackedByteArray([1]), {
-		"arrival_time_usec": 10,
-	})
+	packet_filter.receive_audio_packet(sink, PackedByteArray([1]), 10)
 	packet_filter.set_random_delay(false)
 	packet_filter.receive_audio_packet(sink, PackedByteArray([2]))
 	assert(sink.packets == [PackedByteArray([2])])
 	await create_timer(0.03).timeout
 	assert(sink.packets == [PackedByteArray([2]), PackedByteArray([1])])
-	assert(sink.contexts[1].fault_input_arrival_time_usec == 10)
-	assert(sink.contexts[1].fault_delay_ms == 20)
-	assert(sink.contexts[1].arrival_time_usec > 10)
+	assert(sink.arrival_times[1] > 10)
 
 	var start_packet := TwoVoipPacket.encode_control_packet(
 			TwoVoipPacket.make_header(
@@ -587,9 +582,8 @@ func run_missing_episode_controls(speaker: Node, stream_count: int) -> void:
 	var packets := make_opus_packets(
 			stream_count, false, 0, required_packets)
 	for index in range(required_packets):
-		speaker.receive_audio_packet(packets[index], {
-			"arrival_time_usec": next_frame_time_usec + (index + 1) * 20000,
-		})
+		speaker.receive_audio_packet(
+				packets[index], next_frame_time_usec + (index + 1) * 20000)
 		if index + 1 < required_packets:
 			assert(not speaker.inopusstream)
 	assert(speaker.inopusstream)
@@ -1012,6 +1006,7 @@ func run_tests() -> void:
 	assert(binary_header[TwoVoipPacket.HeaderField.AUDIO_ENCODING] == TwoVoipPacket.ENCODING_BINARY)
 	var control_wire := TwoVoipPacket.encode_control_packet(binary_header)
 	assert(TwoVoipPacket.is_control_packet(control_wire))
+	assert(not TwoVoipPacket.is_audio_packet(control_wire))
 	var decoded_header := TwoVoipPacket.decode_control_packet(control_wire)
 	assert(TwoVoipPacket.header_is_valid(decoded_header))
 	assert(int(decoded_header[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE]) == 960)
@@ -1074,6 +1069,7 @@ func run_tests() -> void:
 	var ordinary_wire := TwoVoipPacket.encode_audio_packet(ordinary_audio, false)
 	assert(ordinary_wire == ordinary_audio)
 	assert(not TwoVoipPacket.is_control_packet(ordinary_wire))
+	assert(TwoVoipPacket.is_audio_packet(ordinary_wire))
 	assert(TwoVoipPacket.decode_audio_packet(ordinary_wire, false) == ordinary_audio)
 
 	# This raw packet would look exactly like a JSON string array without the
@@ -1082,6 +1078,7 @@ func run_tests() -> void:
 	var escaped_wire := TwoVoipPacket.encode_audio_packet(ambiguous_audio, false)
 	assert(escaped_wire == PackedByteArray([91, 34, 17, 93, 0]))
 	assert(not TwoVoipPacket.is_control_packet(escaped_wire))
+	assert(TwoVoipPacket.is_audio_packet(escaped_wire))
 	assert(TwoVoipPacket.decode_audio_packet(escaped_wire, false) == ambiguous_audio)
 
 	var base64_header := TwoVoipPacket.make_header(
@@ -1092,6 +1089,7 @@ func run_tests() -> void:
 	assert(TwoVoipPacket.header_uses_base64(base64_header))
 	var base64_wire := TwoVoipPacket.encode_audio_packet(ambiguous_audio, true)
 	assert(not TwoVoipPacket.is_control_packet(base64_wire))
+	assert(TwoVoipPacket.is_audio_packet(base64_wire))
 	assert(TwoVoipPacket.decode_audio_packet(base64_wire, true) == ambiguous_audio)
 
 	var mid := TwoVoipPacket.make_mid(7, 43, 1700000000000000, 24000)
@@ -1237,13 +1235,6 @@ func run_tests() -> void:
 	assert(anomaly_snapshot.reason == "test")
 	assert(anomaly_snapshot.queue_ms == 621.0)
 	assert(anomaly_snapshot.queue_frames == 29000)
-	timing_meter.set_transport_context({
-		"record_packet_index": 123,
-		"recorded_ticks_msec": 456,
-		"replay": true,
-	})
-	anomaly_snapshot = timing_meter.anomaly_snapshot("context test", 621.0, 29000, 1200)
-	assert(anomaly_snapshot.transport_context.record_packet_index == 123)
 	assert(anomaly_snapshot.buffer_left_time_ms \
 			== timing_meter._get_audible_timeline_ms() - 621.0)
 	var previous_capture_setting: bool = timing_meter.capture_timing_anomalies

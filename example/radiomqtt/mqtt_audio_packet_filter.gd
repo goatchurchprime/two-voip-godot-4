@@ -39,8 +39,7 @@ func drop_next(packet_kind: String, count: int = 1) -> void:
 	_drop_member_id = 0
 
 
-func receive_audio_packet(member: Object, packet,
-		transport_debug_context: Dictionary = {}) -> void:
+func receive_audio_packet(member: Object, packet, arrival_time_usec := 0) -> void:
 	if not is_instance_valid(member):
 		return
 	var member_id := member.get_instance_id()
@@ -58,7 +57,7 @@ func receive_audio_packet(member: Object, packet,
 	var received := {
 		"member": member,
 		"packet": packet,
-		"context": transport_debug_context,
+		"arrival_time_usec": arrival_time_usec,
 	}
 	if packet_kind != delayed_kind or _delay_rng.randf() >= delay_chance:
 		_deliver(received)
@@ -86,12 +85,7 @@ func _deliver(received: Dictionary) -> void:
 	var member: Object = received.member
 	if not is_instance_valid(member):
 		return
-	var context: Dictionary = received.context.duplicate(true)
 	if received.has("delay_ms"):
-		context["fault_input_arrival_time_usec"] = context.get(
-				"arrival_time_usec", 0)
-		context["fault_delay_ms"] = received.delay_ms
-		context["arrival_time_usec"] = Time.get_ticks_usec()
-		context["arrival_ticks_msec"] = Time.get_ticks_msec()
+		received.arrival_time_usec = Time.get_ticks_usec()
 	forwarded_count += 1
-	member.receive_mqtt_audio_packet(received.packet, context)
+	member.receive_mqtt_audio_packet(received.packet, received.arrival_time_usec)

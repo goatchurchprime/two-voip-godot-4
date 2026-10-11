@@ -319,11 +319,11 @@ func _on_mqtt_broker_item_selected(index):
 		$MQTTSimulatedBroker.stop()
 
 func transportaudiopacket(packet: PackedByteArray, dithertype: int, meta_recipient := ""):
-	var topic = audioouttopicmeta if TwoVoipPacket.is_control_packet(packet) else audioouttopic
+	var topic = audioouttopic if TwoVoipPacket.is_audio_packet(packet) else audioouttopicmeta
 	if topic.is_empty():
 		return
 	if not meta_recipient.is_empty():
-		assert(TwoVoipPacket.is_control_packet(packet))
+		assert(not TwoVoipPacket.is_audio_packet(packet))
 		topic += "/%s" % meta_recipient
 	if dithertype and randf() < 0.2:
 		var tt = abs(randfn(0.0, 0.1))
@@ -332,21 +332,16 @@ func transportaudiopacket(packet: PackedByteArray, dithertype: int, meta_recipie
 	$MQTT.publish(topic, packet)
 
 
-func received_mqtt(topic, msg, transport_debug_context: Dictionary = {}):
+func received_mqtt(topic, msg, packet_arrival_time_usec := 0, replay := false):
 	var arrival_ticks_msec := Time.get_ticks_msec()
-	var packet_context := transport_debug_context.duplicate(true)
-	var arrival_time_usec := int(packet_context.get("arrival_time_usec", _now_usec()))
-	packet_context["arrival_ticks_msec"] = arrival_ticks_msec
-	packet_context["arrival_time_usec"] = arrival_time_usec
-	packet_context["topic"] = topic
+	var arrival_time_usec := packet_arrival_time_usec \
+			if packet_arrival_time_usec > 0 else _now_usec()
 	if flogfile != null:
 		# Base64 keeps arbitrary binary Opus/control payloads byte-exact. Replay
 		# still accepts the former plain-ASCII third field for existing logs.
 		flogfile.store_line("%d %s %s" % [arrival_ticks_msec, topic,
 				encode_log_payload(msg)])
 		logfilepackcount += 1
-		packet_context["record_packet_index"] = logfilepackcount
-		packet_context["recording_start_ticks_msec"] = recording_start_ticks_msec
 		get_node("../HBoxLogging/PacketCount").text = str(logfilepackcount)
 	var stopic = topic.split("/", true, roomtopicwords+1)
 	if len(stopic) == roomtopicwords + 2:
@@ -377,7 +372,7 @@ func received_mqtt(topic, msg, transport_debug_context: Dictionary = {}):
 			else:
 				var control_packet := TwoVoipPacket.decode_control_packet(msg)
 				if _handle_clock_control(membername, control_packet,
-						arrival_time_usec, bool(packet_context.get("replay", false))):
+						arrival_time_usec, replay):
 					return
 				if not connection_announced:
 					return
@@ -388,13 +383,13 @@ func received_mqtt(topic, msg, transport_debug_context: Dictionary = {}):
 						return
 					if stopic[roomtopicwords+1] == "audio":
 						AudioPacketFilter.receive_audio_packet(
-								member, msg, packet_context)
+								member, msg, arrival_time_usec)
 					else:
 						var atopic = stopic[roomtopicwords+1].split("/", true, 3)
 						if len(atopic) >= 2 and atopic[1] == "meta":
 							if len(atopic) == 2 or atopic[2] == myname:
 								AudioPacketFilter.receive_audio_packet(
-										member, msg, packet_context)
+										member, msg, arrival_time_usec)
 						else:
 							assert(false)
 				else:
@@ -598,15 +593,9 @@ func _on_replay_button_toggled(toggled_on):
 		if flogfile == null:
 			var recorded_payload := decode_log_payload(sl[2])
 			var recorded_ticks_msec := int(sl[0])
-			received_mqtt(sl[1], recorded_payload, {
-					"record_packet_index": loglinenumber,
-					"recording_start_ticks_msec": replay_recording_start_ticks_msec,
-					"recorded_ticks_msec": recorded_ticks_msec,
-					"arrival_time_usec": replay_arrival_epoch_usec \
-							+ (recorded_ticks_msec \
-							- replay_recording_start_ticks_msec) * 1000,
-					"replay": true,
-			})
+			received_mqtt(sl[1], recorded_payload, replay_arrival_epoch_usec \
+					+ (recorded_ticks_msec - replay_recording_start_ticks_msec) * 1000,
+					true)
 		get_node("../HBoxLogging/PacketCount").text = str(logfilepackcount)
 		l = flogfileR.get_line()
 		loglinenumber += 1

@@ -33,7 +33,6 @@ const TIMING_ANOMALY_LOG_PATH := "user://two_voip_timing_anomalies.jsonl"
 
 var speaker: Node = null
 var diagnostic_trigger := "idle"
-var last_transport_debug_context: Dictionary = {}
 var audible_level_brightness := 0.0
 
 var output_cells: Array[ColorRect] = []
@@ -107,10 +106,6 @@ func begin_episode():
 
 func set_trigger(trigger: String):
 	diagnostic_trigger = trigger
-
-
-func set_transport_context(context: Dictionary):
-	last_transport_debug_context = context.duplicate(true)
 
 
 func record_local_playback_stall():
@@ -494,7 +489,6 @@ func anomaly_snapshot(reason: String, queue_ms: float,
 		"playback_playing": bool(speaker.audio_stream_playback_opus
 				and speaker.audio_stream_playback_opus.is_playing()),
 		"previous_trigger": diagnostic_trigger,
-		"transport_context": last_transport_debug_context.duplicate(true),
 	}
 
 

@@ -35,6 +35,10 @@ window/handheld/orientation=1
 
 project/assembly_name="Two-voip-godot-4"
 
+[physics]
+
+3d/physics_engine="Jolt Physics"
+
 [rendering]
 
 renderer/rendering_method="mobile"

@@ -46,7 +46,6 @@ class ReceivedPacket extends RefCounted:
 	var control: Array = []
 	var audio := PackedByteArray()
 	var wire := PackedByteArray()
-	var context: Dictionary = {}
 	var arrival_time_usec := 0
 	var stream_count := -1
 	var parity := -1
@@ -56,12 +55,16 @@ class ReceivedPacket extends RefCounted:
 	var arrival_timeline_usec := 0
 	var playout_arrival_time_usec := 0
 	var timing_observed := false
+	var fabricated_start := false
+	var fabricated_start_reason := ""
+	var fabricated_run_has_audio := false
+	var fabricated_start_confirmation := false
 
 
-	func _init(packet: PackedByteArray = PackedByteArray(), packet_context: Dictionary = {}):
+	func _init(packet: PackedByteArray = PackedByteArray(), packet_arrival_time_usec := 0):
 		wire = packet
-		context = packet_context.duplicate(true)
-		arrival_time_usec = int(context.get("arrival_time_usec", Time.get_ticks_usec()))
+		arrival_time_usec = packet_arrival_time_usec \
+				if packet_arrival_time_usec > 0 else Time.get_ticks_usec()
 		is_control = TwoVoipPacket.is_control_packet(wire)
 		if not is_control:
 			return
@@ -331,6 +334,13 @@ static func is_control_packet(packet: PackedByteArray) -> bool:
 			and packet[0] == ASCII_OPEN_BRACKET \
 			and packet[1] == ASCII_QUOTE \
 			and packet[-1] == ASCII_CLOSE_BRACKET
+
+
+# Shallow wire-envelope test for transports which route audio and metadata
+# separately. It never parses the control JSON or identifies its control type.
+static func is_audio_packet(packet: PackedByteArray) -> bool:
+	return not is_control_packet(packet)
+
 
 static func decode_control_packet(packet: PackedByteArray) -> Array:
 	if not is_control_packet(packet):
