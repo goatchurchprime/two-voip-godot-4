@@ -1,10 +1,5 @@
 extends Control
 
-const ClockSync = preload("res://addons/twovoip/voiphelper/two_voip_clock_sync.gd")
-const CLOCK_PROBE_COUNT := 4
-const CLOCK_PROBE_LIMIT := 20
-const CLOCK_PROBE_INTERVAL_SECONDS := 0.05
-
 var myname = ""
 var roomtopic = ""
 var roomtopicwords = 0
@@ -27,11 +22,6 @@ var pending_mid_recipients := {}
 var network_ready := false
 var network_ready_failed := false
 var connection_announced := false
-var clock_connection_generation := 0
-var clock_probe_sequence := 0
-var pending_clock_probes := {}
-var sent_clock_responses := {}
-var clock_estimates := {}
 
 const logfile = "user://mqttlogging.dat"
 var flogfile : FileAccess = null
@@ -58,10 +48,6 @@ func _now_usec() -> int:
 	return Time.get_ticks_usec()
 
 
-func _unix_minus_ticks_usec(ticks_usec: int) -> int:
-	return int(Time.get_unix_time_from_system() * 1000000.0) - ticks_usec
-
-
 func _ensure_member(membername: String):
 	var member = Members.get_node_or_null(membername)
 	if member == null:
@@ -70,202 +56,9 @@ func _ensure_member(membername: String):
 		Members.add_child(member)
 		member.get_node("AudioStreamPlayer/TwoVoipSpeaker").hash_response_ready.connect(
 				func(packet): transportaudiopacket(packet, 0, membername))
-	_apply_clock_estimate(membername)
+	get_node("../TwoVoipMic").register_peer(
+			membername, member.get_node("AudioStreamPlayer/TwoVoipSpeaker"))
 	return member
-
-
-func _apply_clock_estimate(membername: String):
-	if not clock_estimates.has(membername):
-		return
-	var member = Members.get_node_or_null(membername)
-	if member == null:
-		return
-	var estimate: Dictionary = clock_estimates[membername]
-	member.get_node("AudioStreamPlayer/TwoVoipSpeaker").set_source_clock_estimate(
-			int(estimate.local_minus_peer_usec),
-			int(estimate.lower_bound_usec),
-			int(estimate.upper_bound_usec),
-			int(estimate.round_trip_usec),
-			str(estimate.reason),
-			int(estimate.get("unix_local_minus_peer_usec", 0)),
-			bool(estimate.get("unix_offset_valid", false)))
-
-
-func _store_clock_estimate(membername: String, estimate_usec: int,
-		lower_bound_usec: int, upper_bound_usec: int, round_trip_usec: int,
-		reason: String, probe_id: String,
-		unix_local_minus_peer_usec: int = 0, unix_offset_valid := false,
-		force_selection := false) -> bool:
-	if not force_selection and clock_estimates.has(membername) \
-			and int(clock_estimates[membername].round_trip_usec) <= round_trip_usec:
-		return false
-	clock_estimates[membername] = {
-		"local_minus_peer_usec": estimate_usec,
-		"lower_bound_usec": lower_bound_usec,
-		"upper_bound_usec": upper_bound_usec,
-		"round_trip_usec": round_trip_usec,
-		"reason": reason,
-		"probe_id": probe_id,
-		"unix_local_minus_peer_usec": unix_local_minus_peer_usec,
-		"unix_offset_valid": unix_offset_valid,
-	}
-	_apply_clock_estimate(membername)
-	var unix_diagnostic := ""
-	if unix_offset_valid:
-		unix_diagnostic = " unix=%+.3f ms selected-unix=%+.3f ms" % [
-				unix_local_minus_peer_usec / 1000.0,
-				(estimate_usec - unix_local_minus_peer_usec) / 1000.0]
-	print("TwoVoIP clock %s local-peer=%+.3f ms bounds=[%+.3f,%+.3f] ms RTT=%.3f ms%s (%s)" % [
-			membername, estimate_usec / 1000.0,
-			lower_bound_usec / 1000.0, upper_bound_usec / 1000.0,
-			round_trip_usec / 1000.0, unix_diagnostic, reason])
-	return true
-
-
-func _send_clock_probe():
-	clock_probe_sequence += 1
-	var probe_id := "%s:%d" % [myname, clock_probe_sequence]
-	var t1_usec := _now_usec()
-	var unix_minus_ticks_usec := _unix_minus_ticks_usec(t1_usec)
-	pending_clock_probes[probe_id] = {
-		"t1_usec": t1_usec,
-		"unix_minus_ticks_usec": unix_minus_ticks_usec,
-	}
-	transportaudiopacket(TwoVoipPacket.encode_control_packet(
-			TwoVoipPacket.make_clock_ping(
-					probe_id, t1_usec, "", unix_minus_ticks_usec)), 0)
-
-
-func _all_known_peers_clock_synced() -> bool:
-	for membername in pending_mid_recipients:
-		if not clock_estimates.has(membername):
-			return false
-	return true
-
-
-func _clock_sync_before_connected(generation: int):
-	var probes_sent := 0
-	while probes_sent < CLOCK_PROBE_COUNT \
-			or (not _all_known_peers_clock_synced() \
-			and probes_sent < CLOCK_PROBE_LIMIT):
-		if generation != clock_connection_generation or not network_ready:
-			return
-		_send_clock_probe()
-		probes_sent += 1
-		await get_tree().create_timer(CLOCK_PROBE_INTERVAL_SECONDS).timeout
-	if generation != clock_connection_generation or not network_ready:
-		return
-	if not _all_known_peers_clock_synced():
-		var missing_peers: Array[String] = []
-		for membername in pending_mid_recipients:
-			if not clock_estimates.has(membername):
-				missing_peers.append(membername)
-		push_error("TwoVoIP remains connecting: no clock pong from %s" \
-				% ", ".join(missing_peers))
-		return
-	pending_clock_probes.clear()
-	connection_announced = true
-	$MQTT.publish(statustopic, Mstatusconnected, true)
-	$Connect/ColorRectConnecting.visible = false
-	for membername in pending_mid_recipients:
-		send_midstream_start(membername)
-	pending_mid_recipients.clear()
-
-
-func _handle_clock_control(membername: String, packet: Array,
-		arrival_time_usec: int, replay: bool) -> bool:
-	if TwoVoipPacket.clock_ping_is_valid(packet):
-		if replay:
-			return true
-		var probe_id: String = packet[TwoVoipPacket.ClockPingField.PROBE_ID]
-		var t1_usec := int(packet[TwoVoipPacket.ClockPingField.T1_USEC])
-		var t2_usec := arrival_time_usec
-		var t3_usec := _now_usec()
-		var local_unix_minus_ticks_usec := _unix_minus_ticks_usec(t3_usec)
-		sent_clock_responses[probe_id] = {
-			"membername": membername,
-			"t1_usec": t1_usec,
-			"t2_usec": t2_usec,
-			"t3_usec": t3_usec,
-			"peer_unix_minus_ticks_usec": \
-					TwoVoipPacket.clock_ping_unix_minus_ticks_usec(packet),
-			"local_unix_minus_ticks_usec": local_unix_minus_ticks_usec,
-		}
-		transportaudiopacket(TwoVoipPacket.encode_control_packet(
-				TwoVoipPacket.make_clock_pong(
-						probe_id, t1_usec, t2_usec, t3_usec, "",
-						local_unix_minus_ticks_usec)), 0, membername)
-		return true
-	if TwoVoipPacket.clock_pong_is_valid(packet):
-		var probe_id: String = packet[TwoVoipPacket.ClockPongField.PROBE_ID]
-		var t1_usec := int(packet[TwoVoipPacket.ClockPongField.T1_USEC])
-		if not replay and (not pending_clock_probes.has(probe_id) \
-				or int(pending_clock_probes[probe_id].t1_usec) != t1_usec):
-			return true
-		var t2_usec := int(packet[TwoVoipPacket.ClockPongField.T2_USEC])
-		var t3_usec := int(packet[TwoVoipPacket.ClockPongField.T3_USEC])
-		var t4_usec := arrival_time_usec
-		var result: Dictionary = ClockSync.calculate_exchange(
-				t1_usec, t2_usec, t3_usec, t4_usec)
-		var local_unix_minus_ticks_usec := int(
-				pending_clock_probes[probe_id].unix_minus_ticks_usec) \
-				if pending_clock_probes.has(probe_id) else 0
-		var peer_unix_minus_ticks_usec := \
-				TwoVoipPacket.clock_pong_unix_minus_ticks_usec(packet)
-		var unix_offset_valid := local_unix_minus_ticks_usec != 0 \
-				and peer_unix_minus_ticks_usec != 0
-		var unix_local_minus_peer_usec := peer_unix_minus_ticks_usec \
-				- local_unix_minus_ticks_usec
-		var selected_estimate := false
-		if not result.is_empty():
-			# The result is peer-minus-local; speakers need local-minus-source.
-			selected_estimate = _store_clock_estimate(membername,
-					-int(result.remote_minus_local_usec),
-					-int(result.offset_upper_usec),
-					-int(result.offset_lower_usec),
-					int(result.round_trip_usec),
-					"connection clock pong", probe_id,
-					unix_local_minus_peer_usec, unix_offset_valid)
-		if not replay:
-			transportaudiopacket(TwoVoipPacket.encode_control_packet(
-					TwoVoipPacket.make_clock_ack(
-							probe_id, t1_usec, t2_usec, t3_usec, t4_usec,
-							local_unix_minus_ticks_usec, selected_estimate)),
-					0, membername)
-		return true
-	if TwoVoipPacket.clock_ack_is_valid(packet):
-		var probe_id: String = packet[TwoVoipPacket.ClockAckField.PROBE_ID]
-		if not sent_clock_responses.has(probe_id):
-			return true
-		var sent: Dictionary = sent_clock_responses[probe_id]
-		var t1_usec := int(packet[TwoVoipPacket.ClockAckField.T1_USEC])
-		var t2_usec := int(packet[TwoVoipPacket.ClockAckField.T2_USEC])
-		var t3_usec := int(packet[TwoVoipPacket.ClockAckField.T3_USEC])
-		var t4_usec := int(packet[TwoVoipPacket.ClockAckField.T4_USEC])
-		if sent.membername == membername and int(sent.t1_usec) == t1_usec \
-				and int(sent.t2_usec) == t2_usec and int(sent.t3_usec) == t3_usec:
-			var result: Dictionary = ClockSync.calculate_exchange(
-					t1_usec, t2_usec, t3_usec, t4_usec)
-			var peer_unix_minus_ticks_usec := \
-					TwoVoipPacket.clock_ack_unix_minus_ticks_usec(packet)
-			var local_unix_minus_ticks_usec := int(
-					sent.local_unix_minus_ticks_usec)
-			var unix_offset_valid := peer_unix_minus_ticks_usec != 0 \
-					and local_unix_minus_ticks_usec != 0
-			var unix_local_minus_peer_usec := peer_unix_minus_ticks_usec \
-					- local_unix_minus_ticks_usec
-			if not result.is_empty() \
-					and TwoVoipPacket.clock_ack_applies_estimate(packet):
-				_store_clock_estimate(membername,
-						int(result.remote_minus_local_usec),
-						int(result.offset_lower_usec),
-						int(result.offset_upper_usec),
-						int(result.round_trip_usec),
-						"connection clock acknowledgement", probe_id,
-						unix_local_minus_peer_usec, unix_offset_valid, true)
-		sent_clock_responses.erase(probe_id)
-		return true
-	return false
 
 func subscribe_ready_channel(topic_filter: String):
 	var packet_id: int = $MQTT.subscribe(topic_filter)
@@ -286,9 +79,28 @@ func on_subscribe_acknowledge(packet_id: int, result: int):
 	network_ready = true
 	audioouttopic = "%s/%s/audio" % [roomtopic, myname]
 	audioouttopicmeta = "%s/%s/audio/meta" % [roomtopic, myname]
-	_clock_sync_before_connected(clock_connection_generation)
+	get_node("../TwoVoipMic").transport_connected(myname)
+
+
+func _on_clock_synchronization_finished(success: bool, missing_peers: Array[String]):
+	if not network_ready:
+		return
+	if not success:
+		push_error("TwoVoIP remains connecting: no clock pong from %s" \
+				% ", ".join(missing_peers))
+		return
+	connection_announced = true
+	$MQTT.publish(statustopic, Mstatusconnected, true)
+	$Connect/ColorRectConnecting.visible = false
+	for membername in pending_mid_recipients:
+		send_midstream_start(membername)
+	pending_mid_recipients.clear()
 
 func _ready():
+	var mic = get_node("../TwoVoipMic")
+	mic.transmit_control_packet.connect(
+			func(packet, recipient): transportaudiopacket(packet, 0, recipient))
+	mic.clock_synchronization_finished.connect(_on_clock_synchronization_finished)
 	if $GridContainer/presets.selected == -1:
 		$GridContainer/presets.select(0)
 	_on_mqtt_broker_item_selected($GridContainer/presets.selected)
@@ -359,7 +171,7 @@ func received_mqtt(topic, msg, packet_arrival_time_usec := 0, replay := false):
 					
 				elif msg == Mstatusdisconnected or msg == MstatusdisconnectedLW:
 					pending_mid_recipients.erase(membername)
-					clock_estimates.erase(membername)
+					get_node("../TwoVoipMic").unregister_peer(membername)
 					var member = Members.get_node_or_null(membername)
 					if member:
 						Members.remove_child(member)
@@ -370,13 +182,13 @@ func received_mqtt(topic, msg, packet_arrival_time_usec := 0, replay := false):
 			if membername == myname:
 				pass
 			else:
-				var control_packet := TwoVoipPacket.decode_control_packet(msg)
-				if _handle_clock_control(membername, control_packet,
+				if get_node("../TwoVoipMic").receive_control_packet(membername, msg,
 						arrival_time_usec, replay):
 					return
 				if not connection_announced:
 					return
 				if member:
+					var control_packet := TwoVoipPacket.decode_control_packet(msg)
 					if TwoVoipPacket.hash_response_is_valid(control_packet):
 						get_node("../TwoVoipMic").receive_audio_hash_response(
 								membername, control_packet)
@@ -398,15 +210,12 @@ func received_mqtt(topic, msg, packet_arrival_time_usec := 0, replay := false):
 			print("Unrecognized topic ", stopic)
 			
 func on_broker_connect():
+	get_node("../TwoVoipMic").transport_disconnected()
 	network_ready = false
 	network_ready_failed = false
 	connection_announced = false
-	clock_connection_generation += 1
 	pending_ready_subscriptions.clear()
 	pending_mid_recipients.clear()
-	pending_clock_probes.clear()
-	sent_clock_responses.clear()
-	clock_estimates.clear()
 	audioouttopic = ""
 	audioouttopicmeta = ""
 	$MQTT.publish(statustopic, Mstatusconnecting, true)
@@ -416,9 +225,9 @@ func on_broker_connect():
 	subscribe_ready_channel("%s/+/audio/meta/%s" % [roomtopic, myname])
 
 func on_broker_disconnect():
+	get_node("../TwoVoipMic").transport_disconnected()
 	network_ready = false
 	connection_announced = false
-	clock_connection_generation += 1
 	print("MQTT broker disconnected")
 
 func DDconn():

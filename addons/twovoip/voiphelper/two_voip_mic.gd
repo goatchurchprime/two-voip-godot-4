@@ -21,6 +21,8 @@ var audiosampleframetexture : ImageTexture
 var audiosampleframematerial = null
 
 signal transmit_audio_packet(opuspacket : PackedByteArray)
+signal transmit_control_packet(packet: PackedByteArray, recipient: String)
+signal clock_synchronization_finished(success: bool, missing_peers: Array[String])
 
 const rootmeansquaremaxmeasurement = false
 var encode_base64 = false
@@ -112,6 +114,35 @@ var voxbutton: Button = null
 
 func _ready():
 	set_process(false)
+	$ClockSync.transmit_packet.connect(
+			func(packet, recipient): transmit_control_packet.emit(packet, recipient))
+	$ClockSync.synchronization_finished.connect(
+			func(success, missing): clock_synchronization_finished.emit(success, missing))
+
+
+func transport_connected(peer_id: String):
+	$ClockSync.transport_connected(peer_id)
+
+
+func transport_disconnected():
+	$ClockSync.transport_disconnected()
+
+
+func register_peer(peer_id: String, speaker: Node):
+	$ClockSync.register_peer(peer_id, speaker)
+
+
+func unregister_peer(peer_id: String):
+	$ClockSync.unregister_peer(peer_id)
+
+
+func receive_control_packet(peer_id: String, packet: PackedByteArray,
+		arrival_time_usec: int = 0, replay := false) -> bool:
+	return $ClockSync.receive_packet(peer_id, packet, arrival_time_usec, replay)
+
+
+func get_peer_timing(peer_id: String) -> Dictionary:
+	return $ClockSync.get_estimate(peer_id)
 
 func _on_miconbutton(toggled_on):
 	if toggled_on:
