@@ -387,12 +387,29 @@ files at that revision, so TwoVoIP supplies a small CMake adapter in
 the adapter downloads model revision `0b50c45` from Xiph and verifies its
 SHA-256 checksum before compiling it.
 
-The sequence of commands to build the system locally on NixOS are:
+GitHub Actions is the authoritative source of distributable native binaries.
+The Linux debug and release libraries are built together on Ubuntu 22.04. The
+workflow rejects either library if it requires a glibc newer than 2.35 or
+contains a Nix store runtime path, and repeats that check after collecting the
+release package. Each stripped binary is also loaded separately by the official
+Godot 4.6 editor and must instantiate `TwovoipOpusEncoder` before it can be
+packaged. This keeps the editor/debug library and exported/release library on
+the same tested Linux compatibility floor.
+
+The sequence of commands for a local development build on NixOS is:
 ```bash
 nix-shell -p scons cmake ninja autoreconfHook
 scons apply_patches  # apply the pinned portability and size patches
 scons build_opus     # build opus using cmake
 scons build_rnnoise  # build RNNoise using cmake
 scons                # build this library
+scripts/check_linux_abi.sh addons/twovoip/libs/libtwovoip.linux.*.so
 cp addons/twovoip/libs/*.so example/addons/twovoip/libs/
 ```
+
+A direct local build inherits its compiler and libc environment. It is useful
+for development but is not automatically a portable release artifact. In
+particular, a Nix build may retain a `/nix/store` runtime path or require a
+newer glibc than Godot uses. Do not copy such a library into another project;
+use the matched GitHub Actions package or rebuild it in the supported CI
+environment. The ABI check above fails explicitly in that situation.

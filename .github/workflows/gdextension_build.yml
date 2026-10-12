@@ -6,7 +6,9 @@ on:
         src/**,
         .github/**,
         "!.github/**/util_*",
+        "example/tests/**",
         "patches/**",
+        "scripts/**",
         "thirdparty/**",
         .gitmodules,
         rnnoise,
@@ -21,7 +23,9 @@ on:
         src/**,
         .github/**,
         "!.github/**/util_*",
+        "example/tests/**",
         "patches/**",
+        "scripts/**",
         "thirdparty/**",
         .gitmodules,
         rnnoise,
@@ -117,6 +121,28 @@ jobs:
           additional: lto=full
           output_libs_path: ${{env.OUTPUT_LIBS_PATH}}
           use_cache: ${{env.USE_CACHE}}
+
+      - name: Verify Linux ABI compatibility
+        run: scripts/check_linux_abi.sh "${OUTPUT_LIBS_PATH}"/libtwovoip.linux.*.x86_64.so
+
+      - name: Set up official Godot 4.6
+        id: setup_godot
+        uses: ./.github/actions/setup_godot
+        with:
+          tag: 4.6-stable
+          file_suffix: linux.x86_64.zip
+
+      - name: Load packaged Linux binary in Godot
+        env:
+          XDG_DATA_HOME: ${{runner.temp}}/twovoip-smoke/data
+          XDG_CONFIG_HOME: ${{runner.temp}}/twovoip-smoke/config
+          XDG_CACHE_HOME: ${{runner.temp}}/twovoip-smoke/cache
+        run: |
+          mkdir -p addons/twovoip/libs
+          cp "${OUTPUT_LIBS_PATH}"/libtwovoip.linux.*.x86_64.so \
+            addons/twovoip/libs/libtwovoip.linux.template_debug.x86_64.so
+          "${{steps.setup_godot.outputs.godot}}" --headless --path example \
+            --script res://tests/native_load_smoke.gd
 
 # ============================================
 
@@ -320,6 +346,13 @@ jobs:
           else
             echo "is_lipsync_compiled=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Verify packaged Linux binaries
+        if: steps.check_compiled_files.outputs.is_base_compiled == 'true'
+        run: |
+          test -f extracted_base/libtwovoip.linux.template_debug.x86_64.so
+          test -f extracted_base/libtwovoip.linux.template_release.x86_64.so
+          scripts/check_linux_abi.sh extracted_base/libtwovoip.linux.*.x86_64.so
 
       - name: List all base libs
         if: steps.check_compiled_files.outputs.is_base_compiled == 'true'
