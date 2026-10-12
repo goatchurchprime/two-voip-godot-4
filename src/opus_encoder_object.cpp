@@ -603,6 +603,9 @@ Error TwovoipOpusEncoder::denoise_chunk(int p_chunk_offset_back) {
 
 PackedVector2Array TwovoipOpusEncoder::get_current_chunk() const {
     PackedVector2Array frames;
+    if (opus_encoder == NULL || output_chunk_size <= 0 || audio_ringbuffer_size_chunks <= 0 || prepared_audio_ringbuffer.is_empty()) {
+        return frames;
+    }
     const float* prepared_audio_chunk = (const float*)prepared_audio_ringbuffer.ptr() + (audio_ringbuffer_index % audio_ringbuffer_size_chunks) * output_chunk_size * channels;
     frames.resize(output_chunk_size);
     for (int frame = 0; frame < output_chunk_size; frame++) {
