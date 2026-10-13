@@ -138,7 +138,9 @@ jobs:
           XDG_CONFIG_HOME: ${{runner.temp}}/twovoip-smoke/config
           XDG_CACHE_HOME: ${{runner.temp}}/twovoip-smoke/cache
         run: |
-          mkdir -p addons/twovoip/libs
+          mkdir -p addons/twovoip/libs example/.godot
+          printf '%s\n' 'res://addons/twovoip/twovoip.gdextension' \
+            > example/.godot/extension_list.cfg
           cp "${OUTPUT_LIBS_PATH}"/libtwovoip.linux.*.x86_64.so \
             addons/twovoip/libs/libtwovoip.linux.template_debug.x86_64.so
           "${{steps.setup_godot.outputs.godot}}" --headless --path example \
@@ -429,6 +431,17 @@ jobs:
           mkdir -p upload_base/project/addons
           mv addons/${{env.LIBRARY_NAME}} upload_base/project/addons/${{env.LIBRARY_NAME}}
 
+      - name: Verify complete base addon
+        if: needs.collect-gdextension.outputs.is_base_compiled == 'true'
+        run: |
+          addon=upload_base/project/addons/${LIBRARY_NAME}
+          test -f "${addon}/twovoip.gdextension"
+          test -f "${addon}/voiphelper/two_voip_mic.tscn"
+          test -f "${addon}/voiphelper/two_voip_speaker.tscn"
+          test -f "${addon}/voiphelper/two_voip_clock_sync.gd"
+          test -f "${addon}/libs/libtwovoip.linux.template_debug.x86_64.so"
+          test -f "${addon}/libs/libtwovoip.linux.template_release.x86_64.so"
+
       - name: Move LipSync addon to the new root folders
         if: needs.collect-gdextension.outputs.is_lipsync_compiled == 'true'
         run: |
@@ -445,7 +458,7 @@ jobs:
         if: needs.collect-gdextension.outputs.is_base_compiled == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: ".${{env.PROJECT_NAME}}"
+          name: "${{env.PROJECT_NAME}}"
           retention-days: 7
           path: upload_base/*
 
