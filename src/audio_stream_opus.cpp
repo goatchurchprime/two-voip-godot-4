@@ -307,16 +307,28 @@ int AudioStreamPlaybackOpus::push_opus_packet(const PackedByteArray& opusbytepac
     }
 
     const unsigned char *opus_data = opusbytepacket.ptr() + begin;
-    const int opus_data_size = opusbytepacket.size() - begin;
-    const int packet_frame_size = opus_decoder_get_nb_samples(opusdecoder, opus_data, opus_data_size);
+    int opus_data_size = opusbytepacket.size() - begin;
+    int packet_frame_size = opus_decoder_get_nb_samples(opusdecoder, opus_data, opus_data_size);
     if (packet_frame_size != opus_frame_size) {
         last_decode_error.store(OPUS_INVALID_PACKET, std::memory_order_relaxed);
         decode_errors.fetch_add(1, std::memory_order_relaxed);
         return OPUS_INVALID_PACKET; // negative
     }
 
-    int decodedsamples = opus_decode_float(opusdecoder, opus_data, opus_data_size,
-                audiounpackedbuffer.ptrw(), opus_frame_size, decode_fec != 0);
+    const int has_lbrr = opus_packet_has_lbrr(opus_data, opus_data_size);
+    if (has_lbrr < 0) {
+        UtilityFunctions::printerr("opus_packet_has_lbrr error: ", has_lbrr);
+    } else if (decode_fec == 1 && has_lbrr == 0) {
+        UtilityFunctions::printerr("FEC requested but packet contains no LBRR");
+    }
+    
+    // implement PLC (packet loss)
+    if (decode_fec == 2) {
+        opus_data = NULL;
+        opus_data_size = 0;
+    }
+
+    int decodedsamples = opus_decode_float(opusdecoder, opus_data, opus_data_size, audiounpackedbuffer.ptrw(), opus_frame_size, (decode_fec == 1));
     if (decodedsamples < 0) {
         last_decode_error.store(decodedsamples, std::memory_order_relaxed);
         decode_errors.fetch_add(1, std::memory_order_relaxed);

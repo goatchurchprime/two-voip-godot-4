@@ -273,7 +273,7 @@ func _on_play_pressed():
 		audioeffectpitchshift.pitch_scale = 1.0/speedup
 
 	if TwoVoipPacket.header_is_valid(recordedheader) and TwoVoipPacket.footer_is_valid(recordedfooter):
-		SelfMember.twovoipspeaker.replayrecording($VBoxPlayback/HBoxStream/StreamSpeedup.value, recordedheader, recordedopuspackets, recordedfooter)
+		SelfMember.twovoipspeaker.replayrecording($VBoxPlayback/HBoxStream/StreamSpeedup.value, recordedheader, recordedopuspackets, recordedfooter, $VBoxPlayback/HBoxStream/PacketDropOption.selected)
 
 var saveplaybackfile = "user://savedplayback.dat"
 func _on_sav_options_item_selected(index):

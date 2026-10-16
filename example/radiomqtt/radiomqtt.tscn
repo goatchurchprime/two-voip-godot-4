@@ -297,7 +297,6 @@ text = "Gain"
 
 [node name="GainSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=250327984]
 layout_mode = 2
-theme = ExtResource("4_7rbsf")
 max_value = 50.0
 step = 0.001
 value = 1.0
@@ -521,6 +520,21 @@ text = "Chunk max:"
 [node name="ChunkMax" type="LineEdit" parent="VBoxPlayback/HBoxStream" unique_id=171220039]
 layout_mode = 2
 editable = false
+
+[node name="Label" type="Label" parent="VBoxPlayback/HBoxStream" unique_id=1549362740]
+layout_mode = 2
+text = "Drop packets:"
+
+[node name="PacketDropOption" type="OptionButton" parent="VBoxPlayback/HBoxStream" unique_id=2034828633]
+layout_mode = 2
+selected = 0
+item_count = 3
+popup/item_0/text = "None"
+popup/item_0/id = 0
+popup/item_1/text = "Fifth"
+popup/item_1/id = 1
+popup/item_2/text = "Fifth Pairs"
+popup/item_2/id = 2
 
 [node name="HSeparator5" type="HSeparator" parent="." unique_id=1578073327]
 layout_mode = 2

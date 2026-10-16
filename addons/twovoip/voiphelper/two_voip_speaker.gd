@@ -543,10 +543,10 @@ func report_opus_error(opus_err):
 	else:
 		push_error("OPUS_ERR")
 
-func push_opus_packet(packet: PackedByteArray, begin: int, decode_fec: bool):
+func push_opus_packet(packet: PackedByteArray, begin: int, decode_fec: int):
 	if not ensure_episode_playback(opusframesize):
 		return -1
-	var decoded_frames = audio_stream_playback_opus.push_opus_packet(packet, begin, 1 if decode_fec else 0)
+	var decoded_frames = audio_stream_playback_opus.push_opus_packet(packet, begin, decode_fec)
 	if decoded_frames < 0:
 		report_opus_error(decoded_frames)
 	else:
@@ -562,10 +562,10 @@ func push_opus_packet(packet: PackedByteArray, begin: int, decode_fec: bool):
 	return decoded_frames
 
 
-func _push_missing_frame(recovery_packet) -> bool:
+func _push_missing_frame(recovery_packet, truefec) -> bool:
 	missing_packet_count += 1
 	if recovery_packet != null:
-		if push_opus_packet(recovery_packet, lenchunkprefix, true) < 0:
+		if push_opus_packet(recovery_packet, lenchunkprefix, 1 if truefec else 2) < 0:
 			return false
 		fec_recovery_count += 1
 		return true
@@ -573,8 +573,7 @@ func _push_missing_frame(recovery_packet) -> bool:
 			or audio_stream_playback_opus.push_silence(opusframesize) != opusframesize:
 		return false
 	assert(tailframenumber == opusframecount * opusframesize)
-	decoded_frame_max_values[opusframecount \
-			% decoded_frame_max_values.size()] = DISPLAY_LOSS
+	decoded_frame_max_values[opusframecount % decoded_frame_max_values.size()] = DISPLAY_LOSS
 	tailframenumber += opusframesize
 	loss_silence_count += 1
 	_set_diagnostic_trigger("missing packet → silence")
@@ -905,7 +904,7 @@ func _receive_audio_packet_in_order(received: TwoVoipPacket.ReceivedPacket):
 	if not fabricated_start_draining \
 			and frame_count >= initial_playout_lead_end_frame_count:
 		mark_initial_playout_padding_aligned()
-	if push_opus_packet(packet, lenchunkprefix, false) >= 0:
+	if push_opus_packet(packet, lenchunkprefix, 0) >= 0:
 		opusframecount += 1
 		if timing_meter and not fabricated_start_draining:
 			timing_meter.commit_packet_to_playout()
@@ -950,8 +949,7 @@ func receive_audio_packet_ordered(received: TwoVoipPacket.ReceivedPacket):
 		return
 	last_episode_packet_arrival_usec = Time.get_ticks_usec()
 	while opusframecount < received.frame_count:
-		var recovery_packet = received.audio if opusframecount == received.frame_count - 1 else null
-		if not _push_missing_frame(recovery_packet):
+		if not _push_missing_frame(received.audio, (opusframecount == received.frame_count - 1)):
 			return
 		opusframecount += 1
 	_receive_audio_packet_in_order(received)
@@ -1037,14 +1035,19 @@ func _physics_process(_delta):
 		runninglagtimeminimum = bufferlengthtime
 
 
-func replayrecording(_speedup, recordedheader, recordedopuspackets, recordedfooter):
+func replayrecording(_speedup, recordedheader, recordedopuspackets, recordedfooter, packetdropoption):
 	playingrecording = true
 	receive_audio_packet(TwoVoipPacket.encode_control_packet(recordedheader))
-	for x in recordedopuspackets:
+	
+	for i in range(len(recordedopuspackets)):
 		if audio_stream_playback_opus and recordedheader[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE] > audio_stream_playback_opus.available_space_frames():
 			var tmm = audio_stream_playback_opus.queue_length_frames()*0.5/opus_sample_rate
 			await get_tree().create_timer(tmm).timeout
-		receive_audio_packet(x)
+		if packetdropoption == 1 and ((i%5) == 4):
+			continue
+		if packetdropoption == 2 and ((i%5) == 4 or (i%5) == 3):
+			continue
+		receive_audio_packet(recordedopuspackets[i])
 	receive_audio_packet(TwoVoipPacket.encode_control_packet(recordedfooter))
 	playingrecording = false
 
