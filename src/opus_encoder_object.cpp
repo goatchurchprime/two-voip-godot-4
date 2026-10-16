@@ -437,6 +437,8 @@ void TwovoipOpusEncoder::process_denoiser(float* prepared_audio_chunk) {
 
 PackedVector2Array TwovoipOpusEncoder::get_current_chunk() const {
     PackedVector2Array frames;
+    if (!initialized)
+        return frames;  // the editor reads this property on a default-constructed instance
     const float* prepared_audio_chunk = (const float*)prepared_audio_ringbuffer.ptr() + (audio_ringbuffer_index % audio_ringbuffer_size_chunks) * output_chunk_size * channels;
     frames.resize(output_chunk_size);
     for (int frame = 0; frame < output_chunk_size; frame++) {
@@ -505,6 +507,10 @@ PackedFloat32Array TwovoipOpusEncoder::get_current_chunk_16khz(bool p_reset_samp
 PackedByteArray TwovoipOpusEncoder::encode_chunk(const PackedByteArray& prefix_bytes, int chunk_offset_back) {
     if (opus_encoder == NULL) {
         godot::UtilityFunctions::printerr("Error: opusencoder is null");
+        return PackedByteArray();
+    }
+    if (!initialized) {
+        UtilityFunctions::printerr("TwovoipOpusEncoder not initialized");
         return PackedByteArray();
     }
     if (chunk_offset_back < 0) {
