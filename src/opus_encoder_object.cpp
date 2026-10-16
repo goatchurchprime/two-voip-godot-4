@@ -91,6 +91,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_complexity"), &TwovoipOpusEncoder::get_complexity);
     ClassDB::bind_method(D_METHOD("set_signal_type", "signal_type"), &TwovoipOpusEncoder::set_signal_type);
     ClassDB::bind_method(D_METHOD("get_signal_type"), &TwovoipOpusEncoder::get_signal_type);
+    ClassDB::bind_method(D_METHOD("set_inband_perc", "packet_loss_perc"), &TwovoipOpusEncoder::set_inband_perc);
     ClassDB::bind_method(D_METHOD("reset_opus_encoder"), &TwovoipOpusEncoder::reset_opus_encoder);
     ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes", "chunk_offset_back"), &TwovoipOpusEncoder::encode_chunk, DEFVAL(PackedByteArray()), DEFVAL(0));
 
@@ -428,6 +429,27 @@ Error TwovoipOpusEncoder::set_signal_type(SignalType p_signal_type) {
         return ERR_INVALID_PARAMETER;
     }
     signal_type = p_signal_type;
+    return OK;
+}
+
+Error TwovoipOpusEncoder::set_inband_perc(int p_packet_loss_perc) {
+    if (opus_encoder == NULL) {
+        return ERR_UNCONFIGURED;
+    }
+    if (p_packet_loss_perc < -1 || p_packet_loss_perc > 100) {
+        return ERR_INVALID_PARAMETER;
+    }
+    const bool enabled = p_packet_loss_perc >= 0;
+    int opuserror = opus_encoder_ctl(opus_encoder,
+            OPUS_SET_PACKET_LOSS_PERC(enabled ? p_packet_loss_perc : 0));
+    if (opuserror == OPUS_OK) {
+        opuserror = opus_encoder_ctl(opus_encoder,
+                OPUS_SET_INBAND_FEC(enabled ? 1 : 0));
+    }
+    if (opuserror != OPUS_OK) {
+        UtilityFunctions::printerr("opus_encoder_ctl in-band FEC error ", opuserror);
+        return ERR_INVALID_PARAMETER;
+    }
     return OK;
 }
 

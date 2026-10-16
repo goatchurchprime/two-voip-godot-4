@@ -162,6 +162,7 @@ public:
     int get_complexity() const { return complexity; }
     Error set_signal_type(SignalType p_signal_type);
     SignalType get_signal_type() const { return signal_type; }
+    Error set_inband_perc(int p_packet_loss_perc);
     void reset_opus_encoder();
     PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes=PackedByteArray(), int chunk_offset_back=0);
 

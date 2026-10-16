@@ -15,6 +15,18 @@ for library in "$@"; do
 		exit 1
 	fi
 
+	case "$library" in
+		*.arm64.so) expected_machine="AArch64" ;;
+		*.x86_64.so) expected_machine="Advanced Micro Devices X86-64" ;;
+		*) expected_machine="" ;;
+	esac
+	actual_machine="$(readelf --file-header --wide "$library" \
+		| sed -n 's/^[[:space:]]*Machine:[[:space:]]*//p')"
+	if [[ -n "$expected_machine" && "$actual_machine" != "$expected_machine" ]]; then
+		echo "TwoVoIP ABI check: $library is $actual_machine; expected $expected_machine" >&2
+		exit 1
+	fi
+
 	required_glibc="$({
 		readelf --version-info --wide "$library" \
 			| sed -n 's/.*Name: GLIBC_\([0-9][0-9.]*\).*/\1/p'
@@ -38,6 +50,11 @@ for library in "$@"; do
 		echo "$dynamic_section" | grep '/nix/store/' >&2
 		exit 1
 	fi
+	if grep -Eq 'Shared library: \[(libstdc\+\+|libgcc_s)\.so' <<<"$dynamic_section"; then
+		echo "TwoVoIP ABI check: $library does not statically link its GCC runtimes" >&2
+		echo "$dynamic_section" | grep -E 'Shared library: \[(libstdc\+\+|libgcc_s)\.so' >&2
+		exit 1
+	fi
 
-	echo "TwoVoIP ABI check: $library requires GLIBC_$required_glibc (limit GLIBC_$maximum_glibc)"
+	echo "TwoVoIP ABI check: $library is $actual_machine and requires GLIBC_$required_glibc (limit GLIBC_$maximum_glibc)"
 done

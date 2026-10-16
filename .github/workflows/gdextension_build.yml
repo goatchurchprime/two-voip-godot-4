@@ -97,13 +97,20 @@ jobs:
 
   linux-gdextension:
     name: 🐧 Linux
-    runs-on: ubuntu-22.04
+    runs-on: ${{matrix.runner}}
 
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64]
+        arch: [x86_64, arm64]
         target: [template_debug, template_release]
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+            godot_suffix: linux.x86_64.zip
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+            godot_suffix: linux.arm64.zip
 
     steps:
       - name: Checkout
@@ -123,16 +130,18 @@ jobs:
           use_cache: ${{env.USE_CACHE}}
 
       - name: Verify Linux ABI compatibility
-        run: scripts/check_linux_abi.sh "${OUTPUT_LIBS_PATH}"/libtwovoip.linux.*.x86_64.so
+        run: scripts/check_linux_abi.sh "${OUTPUT_LIBS_PATH}"/libtwovoip.linux.*.${{matrix.arch}}.so
 
       - name: Set up official Godot 4.6
+        if: matrix.target == 'template_debug'
         id: setup_godot
         uses: ./.github/actions/setup_godot
         with:
           tag: 4.6-stable
-          file_suffix: linux.x86_64.zip
+          file_suffix: ${{matrix.godot_suffix}}
 
       - name: Load packaged Linux binary in Godot
+        if: matrix.target == 'template_debug'
         env:
           XDG_DATA_HOME: ${{runner.temp}}/twovoip-smoke/data
           XDG_CONFIG_HOME: ${{runner.temp}}/twovoip-smoke/config
@@ -141,8 +150,8 @@ jobs:
           mkdir -p addons/twovoip/libs example/.godot
           printf '%s\n' 'res://addons/twovoip/twovoip.gdextension' \
             > example/.godot/extension_list.cfg
-          cp "${OUTPUT_LIBS_PATH}"/libtwovoip.linux.*.x86_64.so \
-            addons/twovoip/libs/libtwovoip.linux.template_debug.x86_64.so
+          cp "${OUTPUT_LIBS_PATH}"/libtwovoip.linux.*.${{matrix.arch}}.so \
+            addons/twovoip/libs/libtwovoip.linux.template_debug.${{matrix.arch}}.so
           "${{steps.setup_godot.outputs.godot}}" --headless --path example \
             --script res://tests/native_load_smoke.gd
 
@@ -354,7 +363,9 @@ jobs:
         run: |
           test -f extracted_base/libtwovoip.linux.template_debug.x86_64.so
           test -f extracted_base/libtwovoip.linux.template_release.x86_64.so
-          scripts/check_linux_abi.sh extracted_base/libtwovoip.linux.*.x86_64.so
+          test -f extracted_base/libtwovoip.linux.template_debug.arm64.so
+          test -f extracted_base/libtwovoip.linux.template_release.arm64.so
+          scripts/check_linux_abi.sh extracted_base/libtwovoip.linux.*.so
 
       - name: List all base libs
         if: steps.check_compiled_files.outputs.is_base_compiled == 'true'
@@ -441,6 +452,8 @@ jobs:
           test -f "${addon}/voiphelper/two_voip_clock_sync.gd"
           test -f "${addon}/libs/libtwovoip.linux.template_debug.x86_64.so"
           test -f "${addon}/libs/libtwovoip.linux.template_release.x86_64.so"
+          test -f "${addon}/libs/libtwovoip.linux.template_debug.arm64.so"
+          test -f "${addon}/libs/libtwovoip.linux.template_release.arm64.so"
 
       - name: Move LipSync addon to the new root folders
         if: needs.collect-gdextension.outputs.is_lipsync_compiled == 'true'

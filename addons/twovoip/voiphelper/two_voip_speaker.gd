@@ -1041,7 +1041,7 @@ func replayrecording(_speedup, recordedheader, recordedopuspackets, recordedfoot
 	playingrecording = true
 	receive_audio_packet(TwoVoipPacket.encode_control_packet(recordedheader))
 	for x in recordedopuspackets:
-		if recordedheader[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE] > audio_stream_playback_opus.available_space_frames():
+		if audio_stream_playback_opus and recordedheader[TwoVoipPacket.HeaderField.OPUS_FRAME_SIZE] > audio_stream_playback_opus.available_space_frames():
 			var tmm = audio_stream_playback_opus.queue_length_frames()*0.5/opus_sample_rate
 			await get_tree().create_timer(tmm).timeout
 		receive_audio_packet(x)

@@ -50,7 +50,7 @@ runs:
       uses: actions/setup-python@v5
       with:
         python-version: "3.x"
-        architecture: "x64"
+        architecture: ${{runner.arch == 'ARM64' && 'arm64' || 'x64'}}
 
     - name: Configuring Python packages
       shell: bash

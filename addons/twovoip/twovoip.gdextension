@@ -13,6 +13,7 @@ reloadable = false
 macos = { }
 windows.x86_64 = { }
 linux.x86_64 = { }
+linux.arm64 = { }
 
 ; by default godot is using threads
 web.wasm32.nothreads = {}
@@ -31,6 +32,7 @@ ios = {}
 macos.template_release = { }
 windows.template_release.x86_64 = { }
 linux.template_release.x86_64 = { }
+linux.template_release.arm64 = { }
 
 web.template_release.wasm32.nothreads = { }
 web.template_release.wasm32 = { }
@@ -50,6 +52,7 @@ ios.template_release = {}
 macos = "libs/libtwovoip.macos.template_debug.universal.framework"
 windows.x86_64 = "libs/libtwovoip.windows.template_debug.x86_64.dll"
 linux.x86_64 = "libs/libtwovoip.linux.template_debug.x86_64.so"
+linux.arm64 = "libs/libtwovoip.linux.template_debug.arm64.so"
 
 web.wasm32.nothreads = "libs/libtwovoip.web.template_debug.wasm32.wasm"
 web.wasm32 = "libs/libtwovoip.web.template_debug.wasm32.threads.wasm"
@@ -67,6 +70,7 @@ ios = "libs/libtwovoip.ios.template_debug.universal.dylib"
 macos.template_release = "libs/libtwovoip.macos.template_release.universal.framework"
 windows.template_release.x86_64 = "libs/libtwovoip.windows.template_release.x86_64.dll"
 linux.template_release.x86_64 = "libs/libtwovoip.linux.template_release.x86_64.so"
+linux.template_release.arm64 = "libs/libtwovoip.linux.template_release.arm64.so"
 
 web.template_release.wasm32.nothreads = "libs/libtwovoip.web.template_release.wasm32.wasm"
 web.template_release.wasm32 = "libs/libtwovoip.web.template_release.wasm32.threads.wasm"
