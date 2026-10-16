@@ -34,7 +34,7 @@ func _ready():
 
 	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxAudioFrame/SampleRate, $VBoxFrameLength/HBoxOpusFrame/OptionChannels, $HBoxBigButtons/VBoxPTT/Denoise ]:
 		h.connect("item_selected", func (_item_selected): updatesamplerates())
-	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusExtra/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
+	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusExtra/FecSpinBox, $VBoxFrameLength/HBoxOpusExtra/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
 		h.connect("value_changed", func (_value): updatesamplerates())
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxMosquitto/base64, $VBoxFrameLength/HBoxOpusFrame/AutoGainControl ]:
 		h.connect("toggled", func (_toggled_on): updatesamplerates())
@@ -140,6 +140,7 @@ func updatesamplerates():
 			int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), 
 			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value),
 			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed,
+			int($VBoxFrameLength/HBoxOpusExtra/FecSpinBox.value),
 			denoiser_mode, agc_mode)
 
 	$TwoVoipMic.lead_time = $HBoxBigButtons/VBoxVox/Leadtime.value
@@ -156,6 +157,7 @@ func reprocessoriginalchunks():
 
 	opusencoder_forreprocessing.bitrate = int($VBoxFrameLength/HBoxOpusExtra/BitRate.value)
 	opusencoder_forreprocessing.complexity = int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value)
+	opusencoder_forreprocessing.inband_perc = int($VBoxFrameLength/HBoxOpusExtra/FecSpinBox.value)
 	opusencoder_forreprocessing.signal_type = TwovoipOpusEncoder.SIGNAL_VOICE if $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed else TwovoipOpusEncoder.SIGNAL_MUSIC
 
 	opusencoder_forreprocessing.reset_opus_encoder()

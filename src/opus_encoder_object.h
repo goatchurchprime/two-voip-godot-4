@@ -114,6 +114,7 @@ private:
     OpusEncoder* opus_encoder = NULL;
     int bitrate = 0;
     int complexity = 0;
+    int packet_loss_perc = -1;
     SignalType signal_type = SIGNAL_AUTO;
 
     PackedByteArray opus_byte_buffer;
@@ -163,6 +164,7 @@ public:
     Error set_signal_type(SignalType p_signal_type);
     SignalType get_signal_type() const { return signal_type; }
     Error set_inband_perc(int p_packet_loss_perc);
+    int get_inband_perc() { return packet_loss_perc; }
     void reset_opus_encoder();
     PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes=PackedByteArray(), int chunk_offset_back=0);
 

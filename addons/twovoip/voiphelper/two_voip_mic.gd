@@ -69,14 +69,13 @@ func consume_application_resume() -> bool:
 		processtalkstreamends(false)
 	return true
 
-func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_denoiser_mode, p_agc_mode):
+func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_inband_perc, p_denoiser_mode, p_agc_mode):
 	input_mix_rate = AudioServer.get_input_mix_rate()
 	var bitrate_changed = opusencoder != null and opusencoder.get_bitrate() != p_opusbitrate
 	if opusencoder == null or opussamplerate != p_opussamplerate or opuschannels != p_channels or denoiser_mode != p_denoiser_mode or agc_mode != p_agc_mode or opusframedurationms != p_opusframedurationms:
 		opusencoder = TwovoipOpusEncoder.new()
 		opusframedurationms = p_opusframedurationms
-		input_chunk_first_frame_times_usec.resize(
-				ceili(INPUT_TIMESTAMP_HISTORY_SECONDS*1000.0/opusframedurationms) + 1)
+		input_chunk_first_frame_times_usec.resize(ceili(INPUT_TIMESTAMP_HISTORY_SECONDS*1000.0/opusframedurationms) + 1)
 		input_chunk_first_frame_times_usec.fill(0)
 		input_chunk_number = -1
 		opussamplerate = p_opussamplerate
@@ -92,6 +91,7 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 	opusencoder.bitrate = p_opusbitrate
 	opusencoder.complexity = p_opuscomplexity
 	opusencoder.signal_type = TwovoipOpusEncoder.SIGNAL_VOICE if p_opusoptimizeforvoice else TwovoipOpusEncoder.SIGNAL_MUSIC
+	opusencoder.inband_perc = p_inband_perc
 	if bitrate_changed and currentlytalking:
 		transmit_audio_packet.emit(make_audio_packet_midstream_update())
 

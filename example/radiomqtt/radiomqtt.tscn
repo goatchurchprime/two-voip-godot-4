@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://dvpkwo6h7y0sj" path="res://addons/twovoip/voiphelper/two_voip_mic.tscn" id="2_0f5ov"]
 [ext_resource type="PackedScene" uid="uid://ktm7k0co2o7l" path="res://addons/mqtt/mqtt.tscn" id="2_4wm5t"]
 [ext_resource type="Script" uid="uid://d0sl15xev22ac" path="res://radiomqtt/MQTTnetwork.gd" id="2_y485j"]
+[ext_resource type="Theme" uid="uid://c2vbx2cnwqepo" path="res://radiomqtt/smallspinbox.tres" id="4_7rbsf"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 [ext_resource type="Shader" uid="uid://bq3uv3u8jhu77" path="res://addons/twovoip/voiphelper/voxshader.gdshader" id="5_7rbsf"]
 [ext_resource type="Script" uid="uid://bvc0jl61su4fd" path="res://addons/mqtt/simulated_broker.gd" id="6_qfww3"]
@@ -296,6 +297,7 @@ text = "Gain"
 
 [node name="GainSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=250327984]
 layout_mode = 2
+theme = ExtResource("4_7rbsf")
 max_value = 50.0
 step = 0.001
 value = 1.0
@@ -304,6 +306,7 @@ editable = false
 [node name="GainManualSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=236570719]
 layout_mode = 2
 tooltip_text = "Manual gain"
+theme = ExtResource("4_7rbsf")
 min_value = 0.1
 max_value = 50.0
 step = 0.1
@@ -360,7 +363,7 @@ layout_mode = 2
 
 [node name="LabBitRate" type="Label" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=2139038166]
 layout_mode = 2
-text = "Opus Bit Rate"
+text = "Bit Rate"
 
 [node name="BitRate" type="SpinBox" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=1832636715]
 layout_mode = 2
@@ -371,17 +374,28 @@ value = 12000.0
 
 [node name="LabelComplexity" type="Label" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=154200874]
 layout_mode = 2
-text = "Complexity"
+text = "Cmplx"
 
 [node name="ComplexitySpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=2057587954]
 layout_mode = 2
+theme = ExtResource("4_7rbsf")
 max_value = 10.0
 value = 5.0
 
 [node name="OptimizeForVoice" type="CheckButton" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=355466006]
 layout_mode = 2
 button_pressed = true
-text = "Voice optimized"
+text = "Voice opt"
+
+[node name="LabelFec" type="Label" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=1640414962]
+layout_mode = 2
+text = "FecPerc"
+
+[node name="FecSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusExtra" unique_id=360284802]
+layout_mode = 2
+theme = ExtResource("4_7rbsf")
+min_value = -1.0
+value = -1.0
 
 [node name="HSeparator4" type="HSeparator" parent="." unique_id=1623262998]
 layout_mode = 2
@@ -494,6 +508,7 @@ layout_mode = 2
 size_flags_horizontal = 0
 tooltip_text = "Playback speed
 (experimental)"
+theme = ExtResource("4_7rbsf")
 min_value = 0.1
 max_value = 3.0
 step = 0.1

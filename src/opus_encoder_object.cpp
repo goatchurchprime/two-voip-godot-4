@@ -92,6 +92,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_signal_type", "signal_type"), &TwovoipOpusEncoder::set_signal_type);
     ClassDB::bind_method(D_METHOD("get_signal_type"), &TwovoipOpusEncoder::get_signal_type);
     ClassDB::bind_method(D_METHOD("set_inband_perc", "packet_loss_perc"), &TwovoipOpusEncoder::set_inband_perc);
+    ClassDB::bind_method(D_METHOD("get_inband_perc"), &TwovoipOpusEncoder::get_inband_perc);
     ClassDB::bind_method(D_METHOD("reset_opus_encoder"), &TwovoipOpusEncoder::reset_opus_encoder);
     ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes", "chunk_offset_back"), &TwovoipOpusEncoder::encode_chunk, DEFVAL(PackedByteArray()), DEFVAL(0));
 
@@ -101,6 +102,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::INT, "bitrate", PROPERTY_HINT_RANGE, "500,512000,500,suffix:bps"), "set_bitrate", "get_bitrate");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "complexity", PROPERTY_HINT_RANGE, "0,10,1"), "set_complexity", "get_complexity");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "signal_type", PROPERTY_HINT_ENUM, "Auto,Voice,Music"), "set_signal_type", "get_signal_type");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "inband_perc", PROPERTY_HINT_RANGE, "-1,100,1"), "set_inband_perc", "get_inband_perc");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "agc_gain", PROPERTY_HINT_NONE, "", read_only), "", "get_agc_gain");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "peak", PROPERTY_HINT_NONE, "", read_only), "", "get_peak");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rms", PROPERTY_HINT_NONE, "", read_only), "", "get_rms");
@@ -433,23 +435,24 @@ Error TwovoipOpusEncoder::set_signal_type(SignalType p_signal_type) {
 }
 
 Error TwovoipOpusEncoder::set_inband_perc(int p_packet_loss_perc) {
-    if (opus_encoder == NULL) {
+    if (opus_encoder == NULL) 
         return ERR_UNCONFIGURED;
-    }
-    if (p_packet_loss_perc < -1 || p_packet_loss_perc > 100) {
+    if (p_packet_loss_perc < -1 || p_packet_loss_perc > 100)
         return ERR_INVALID_PARAMETER;
-    }
-    const bool enabled = p_packet_loss_perc >= 0;
-    int opuserror = opus_encoder_ctl(opus_encoder,
-            OPUS_SET_PACKET_LOSS_PERC(enabled ? p_packet_loss_perc : 0));
-    if (opuserror == OPUS_OK) {
-        opuserror = opus_encoder_ctl(opus_encoder,
-                OPUS_SET_INBAND_FEC(enabled ? 1 : 0));
+
+    int opuserror;
+    if (p_packet_loss_perc == -1) {
+        opuserror = opus_encoder_ctl(opus_encoder, OPUS_SET_INBAND_FEC(0));
+    } else {
+        opuserror = opus_encoder_ctl(opus_encoder, OPUS_SET_INBAND_FEC(1));
+        if (opuserror == OPUS_OK)
+            opuserror = opus_encoder_ctl(opus_encoder, OPUS_SET_PACKET_LOSS_PERC(p_packet_loss_perc));
     }
     if (opuserror != OPUS_OK) {
         UtilityFunctions::printerr("opus_encoder_ctl in-band FEC error ", opuserror);
         return ERR_INVALID_PARAMETER;
     }
+    packet_loss_perc = p_packet_loss_perc;
     return OK;
 }
 
