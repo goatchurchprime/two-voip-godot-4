@@ -1,6 +1,7 @@
 #include "register_types.h"
 
 #include "audio_stream_opus.h"
+#include "echo_canceler_object.h"
 #include "opus_encoder_object.h"
 
 #include <gdextension_interface.h>
@@ -18,6 +19,7 @@ void initialize_two_voip_module(ModuleInitializationLevel p_level) {
     ClassDB::register_class<AudioStreamOpus>();
     ClassDB::register_class<AudioStreamPlaybackOpus>();
     ClassDB::register_class<TwovoipOpusEncoder>();
+    ClassDB::register_class<TwoVoipEchoCanceler>();
 
 }
 

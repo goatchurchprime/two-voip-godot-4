@@ -36,6 +36,7 @@
 #include <cmath>
 
 #include "opus_encoder_object.h"
+#include "version.h"
 
 using namespace godot;
 
@@ -70,6 +71,7 @@ int get_opus_signal_type(TwovoipOpusEncoder::SignalType p_signal_type) {
 } // namespace
 
 void TwovoipOpusEncoder::_bind_methods() {
+    ClassDB::bind_static_method("TwovoipOpusEncoder", D_METHOD("get_version_info"), &TwovoipOpusEncoder::get_version_info);
     ClassDB::bind_method(D_METHOD("initialize", "input_mix_rate", "opus_sample_rate", "channels", "denoiser_mode", "agc_mode", "output_chunk_size"), &TwovoipOpusEncoder::initialize);
     ClassDB::bind_method(D_METHOD("get_required_input_chunk_size"), &TwovoipOpusEncoder::get_required_input_chunk_size);
     ClassDB::bind_method(D_METHOD("push_input_chunk", "audio_frames"), &TwovoipOpusEncoder::push_input_chunk);
@@ -119,6 +121,10 @@ void TwovoipOpusEncoder::_bind_methods() {
     BIND_ENUM_CONSTANT(SIGNAL_AUTO);
     BIND_ENUM_CONSTANT(SIGNAL_VOICE);
     BIND_ENUM_CONSTANT(SIGNAL_MUSIC);
+}
+
+String TwovoipOpusEncoder::get_version_info() {
+    return TWOVOIP_VERSION_STR;
 }
 
 TwovoipOpusEncoder::TwovoipOpusEncoder() {}

@@ -142,6 +142,7 @@ protected:
     static void _bind_methods();
     
 public:
+    static String get_version_info();
     Error initialize(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, Denoiser p_denoiser_mode, AgcMode p_agc_mode, int p_output_chunk_size);
     int get_required_input_chunk_size() const { return required_input_chunk_size; }
     int push_input_chunk(const PackedVector2Array &audio_frames);

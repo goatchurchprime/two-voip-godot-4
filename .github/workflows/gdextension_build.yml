@@ -4,6 +4,7 @@ on:
     paths:
       [
         src/**,
+        addons/twovoip/**,
         .github/**,
         "!.github/**/util_*",
         "example/tests/**",
@@ -21,6 +22,7 @@ on:
     paths:
       [
         src/**,
+        addons/twovoip/**,
         .github/**,
         "!.github/**/util_*",
         "example/tests/**",
@@ -447,6 +449,7 @@ jobs:
         run: |
           addon=upload_base/project/addons/${LIBRARY_NAME}
           test -f "${addon}/twovoip.gdextension"
+          test -f "${addon}/two_voip.gd"
           test -f "${addon}/voiphelper/two_voip_mic.tscn"
           test -f "${addon}/voiphelper/two_voip_speaker.tscn"
           test -f "${addon}/voiphelper/two_voip_clock_sync.gd"
@@ -454,6 +457,7 @@ jobs:
           test -f "${addon}/libs/libtwovoip.linux.template_release.x86_64.so"
           test -f "${addon}/libs/libtwovoip.linux.template_debug.arm64.so"
           test -f "${addon}/libs/libtwovoip.linux.template_release.arm64.so"
+          python3 scripts/check_version_lock.py "${addon}"
 
       - name: Move LipSync addon to the new root folders
         if: needs.collect-gdextension.outputs.is_lipsync_compiled == 'true'

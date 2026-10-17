@@ -12,6 +12,9 @@ func _initialize() -> void:
 		push_error("TwoVoIP native smoke test: could not instantiate TwovoipOpusEncoder")
 		quit(1)
 		return
+	if not TwoVoip.native_version_is_compatible():
+		quit(1)
+		return
 
 	# Godot's editor reads registered properties while generating extension docs.
 	# Merely constructing the object does not exercise those getters.
@@ -21,5 +24,5 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	print("TwoVoIP native smoke test: loaded and read uninitialized encoder properties")
+	print("TwoVoIP %s native smoke test: loaded and read uninitialized encoder properties" % TwoVoip.get_version_info())
 	quit(0)

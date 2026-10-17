@@ -1,5 +1,8 @@
 [gd_resource type="AudioBusLayout" format=3 uid="uid://orx4iw038t0c"]
 
+[sub_resource type="AudioEffectCapture" id="AudioEffectCapture_j3pel"]
+resource_name = "Capture"
+
 [sub_resource type="AudioEffectPitchShift" id="AudioEffectPitchShift_urnej"]
 resource_name = "PitchShift"
 
@@ -7,6 +10,8 @@ resource_name = "PitchShift"
 resource_name = "PitchShift"
 
 [resource]
+bus/0/effect/0/effect = SubResource("AudioEffectCapture_j3pel")
+bus/0/effect/0/enabled = true
 bus/1/name = &"SpeechBus"
 bus/1/solo = false
 bus/1/mute = false

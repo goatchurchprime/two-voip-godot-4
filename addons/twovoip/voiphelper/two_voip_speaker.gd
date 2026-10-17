@@ -117,6 +117,8 @@ var initial_playout_timeline_started := false
 var initial_packet_arrival_timeline_usec := 0
 
 func _ready():
+	if not TwoVoip.native_version_is_compatible():
+		return
 	audioplayeropus = get_parent().findaudioplayer() if get_parent().has_method("findaudioplayer") else get_parent()
 	if audioplayeropus.has_method("set_stream"):
 		audiostreamopus = AudioStreamOpus.new()
