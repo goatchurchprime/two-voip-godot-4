@@ -153,7 +153,8 @@ extra_tags = ""
 
 output_path = env["addon_output_dir"]
 
-lib_utils.get_library_object(env, project_name, lib_name, extra_tags, output_path, src_folder, additional_src)
+library = lib_utils.get_library_object(env, project_name, lib_name, extra_tags, output_path, src_folder, additional_src)
+env.Clean(env.File(library), env.Dir("#build"))
 
 # Register console commands
 env.Command("apply_patches", [], apply_patches)

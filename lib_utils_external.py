@@ -11,19 +11,14 @@ import os, subprocess, shutil
 def get_cmake_build_dir_name(env: SConsEnvironment) -> str:
     if env.get("threads", True) and env["platform"] == "web":
         return f'{env["platform"]}_{env["arch"]}_threads'
-    return f'cmake_build_out/{env["platform"]}_{env["arch"]}'
+    return f'{env["platform"]}_{env["arch"]}'
 
 
 # Get a path to the build folder of the cmake library
 def get_cmake_build_dir(env: SConsEnvironment, lib_path: str) -> str:
     abs_scons_root = os.path.dirname(os.path.abspath(__file__))
-    # CMake doesn't seem to be able to work with the cache at all...
-    #
-    # scons_cache_path = os.environ.get("SCONS_CACHE")
-    # if scons_cache_path:
-    #    return os.path.join(abs_scons_root, scons_cache_path, "cmake", lib_path, get_cmake_build_dir_name(env))
-    # else:
-    return os.path.join(abs_scons_root, lib_path, get_cmake_build_dir_name(env))
+    project_name = os.path.basename(os.path.normpath(lib_path))
+    return os.path.join(abs_scons_root, "build", "cmake", project_name, get_cmake_build_dir_name(env))
 
 
 # Get a path to the output folder of the cmake library
@@ -150,13 +145,12 @@ def cmake_build_project(env: SConsEnvironment, lib_path: str, extra_args: list, 
     if len(linker_flags):
         platform_args += [f'-DCMAKE_EXE_LINKER_FLAGS={";".join(linker_flags)}']
 
-    curdir = os.curdir
-    os.chdir(lib_path)
+    source_dir = os.path.abspath(lib_path)
     try:
         build_dir = get_cmake_build_dir(env, lib_path)
 
         def config():
-            proc_args = ["cmake", f"-B{build_dir}"] + platform_args + extra_args
+            proc_args = ["cmake", f"-S{source_dir}", f"-B{build_dir}"] + platform_args + extra_args
             print()
             print("CMake configuration is run with the following arguments:", " ".join(proc_args))
             print()
@@ -195,8 +189,5 @@ def cmake_build_project(env: SConsEnvironment, lib_path: str, extra_args: list, 
         print_subprocess_result(e, "cmake")
         print(f"cmake can't build {lib_path}. Please fix the errors!")
         return 1
-    finally:
-        os.chdir(curdir)
-
     print()
     return 0

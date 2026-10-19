@@ -2,7 +2,7 @@ diff --git a/tools/godotcpp.py b/tools/godotcpp.py
 index 3077eaf..fb2b841 100644
 --- a/tools/godotcpp.py
 +++ b/tools/godotcpp.py
-@@ -574,6 +574,12 @@ def _godot_cpp(env):
+@@ -574,6 +574,14 @@ def _godot_cpp(env):
              "make_interface_header.py",
          ],
      )
@@ -10,7 +10,9 @@ index 3077eaf..fb2b841 100644
 +    sys.path.insert(0, "../patches")
 +    import unity_tools
 +    sys.path.pop(0)
-+    bindings = unity_tools.generate_unity_build(bindings, "godot-cpp_")
++    bindings = unity_tools.generate_unity_build(
++        bindings, "godot-cpp_", env.Dir("#build/unity/godot-cpp").abspath
++    )
 +
      # Forces bindings regeneration.
      if env["generate_bindings"]:

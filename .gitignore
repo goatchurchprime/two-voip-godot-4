@@ -4,6 +4,7 @@
 .vs/
 __pycache__/
 obj/
+/build/
 
 *.pyc
 *.so
@@ -21,5 +22,3 @@ addons/twovoip_lipsync/libs/*
 addons/twovoip_lipsync/OVRLipSyncNative/*
 example/addons/twovoip*
 example/android/*
-cmake_build_out/*
-thirdparty/rnnoise/cmake_build_out/

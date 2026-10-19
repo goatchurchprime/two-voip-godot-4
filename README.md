@@ -399,6 +399,7 @@ the same tested Linux compatibility floor.
 The sequence of commands for a local development build on NixOS is:
 ```bash
 nix-shell -p scons cmake ninja autoreconfHook
+scons -c              # optional: remove the previous extension and top-level build tree
 scons apply_patches  # apply the pinned portability and size patches
 scons build_opus     # build opus using cmake
 scons build_rnnoise  # build RNNoise using cmake

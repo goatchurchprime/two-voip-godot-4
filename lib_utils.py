@@ -12,7 +12,7 @@ def get_sources(src: list, src_folder: str = "", lib_name: str = "lib_"):
         res = [os.path.join(src_folder, file) for file in src]
     else:
         res = src.copy()
-    res = unity_tools.generate_unity_build(res, lib_name + "_")
+    res = unity_tools.generate_unity_build(res, lib_name + "_", os.path.join("build", "unity", lib_name))
     return res
 
 
