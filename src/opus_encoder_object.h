@@ -57,7 +57,10 @@
 
 
 namespace godot {
-    
+
+#ifdef WEBRTC_APM
+class WebRtcApmProcessor;
+#endif
 
 class TwovoipOpusEncoder : public RefCounted {
     GDCLASS(TwovoipOpusEncoder, RefCounted)
@@ -68,6 +71,7 @@ public:
         DENOISER_SPEEX,
         DENOISER_RNNOISE,
         DENOISER_RNNOISE_DEFERRED,
+        DENOISER_WEBRTC,
     };
 
     enum AgcMode {
@@ -131,6 +135,10 @@ private:
     Denoiser denoiser_mode = DENOISER_DISABLED;
     AgcMode agc_mode = AGC_DISABLED;
 
+#ifdef WEBRTC_APM
+    WebRtcApmProcessor *webrtc_apm_processor = NULL;
+#endif
+
     void destroy_audio_pipeline();
     void destroy_voice_processor();
     Error create_opus_encoder();
@@ -143,6 +151,9 @@ protected:
     
 public:
     static String get_version_info();
+#ifdef WEBRTC_APM
+    bool webrtc_apm_smoke_test();
+#endif
     Error initialize(int p_input_mix_rate, int p_opus_sample_rate, int p_channels, Denoiser p_denoiser_mode, AgcMode p_agc_mode, int p_output_chunk_size);
     int get_required_input_chunk_size() const { return required_input_chunk_size; }
     int push_input_chunk(const PackedVector2Array &audio_frames);

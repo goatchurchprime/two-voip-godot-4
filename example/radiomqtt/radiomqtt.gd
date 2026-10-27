@@ -126,15 +126,22 @@ func updatesamplerates():
 	var denoiser_mode = $HBoxBigButtons/VBoxPTT/Denoise.selected
 	var agc_mode = TwovoipOpusEncoder.AGC_APPLIED if $VBoxFrameLength/HBoxOpusFrame/AutoGainControl.button_pressed else TwovoipOpusEncoder.AGC_DISABLED
 	var channels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
+	var rnnoise_selected = denoiser_mode == TwovoipOpusEncoder.DENOISER_RNNOISE or denoiser_mode == TwovoipOpusEncoder.DENOISER_RNNOISE_DEFERRED
+	var webrtc_rate_supported = opussamplerate == 8000 or opussamplerate == 16000 or opussamplerate == 48000
+	var webrtc_frame_supported = fmod(frametimems, 10.0) == 0.0
+	var webrtc_available = TwovoipOpusEncoder.new().has_method("webrtc_apm_smoke_test")
 
 	assert ((channels == 1) or (denoiser_mode == TwovoipOpusEncoder.DENOISER_DISABLED))
 	assert ((channels == 1) or (agc_mode == TwovoipOpusEncoder.AGC_DISABLED))
-	assert ((opussamplerate == 48000) or (denoiser_mode != TwovoipOpusEncoder.DENOISER_RNNOISE))
+	assert ((opussamplerate == 48000) or not rnnoise_selected)
+	assert ((webrtc_rate_supported and webrtc_frame_supported and webrtc_available) or denoiser_mode != TwovoipOpusEncoder.DENOISER_WEBRTC)
 	$HBoxBigButtons/VBoxPTT/Denoise.disabled = (channels != 1)
 	$HBoxBigButtons/VBoxPTT/Denoise.set_item_disabled(2, (opussamplerate != 48000))
+	$HBoxBigButtons/VBoxPTT/Denoise.set_item_disabled(3, (opussamplerate != 48000))
+	$HBoxBigButtons/VBoxPTT/Denoise.set_item_disabled(4, not (webrtc_rate_supported and webrtc_frame_supported and webrtc_available))
 	$VBoxFrameLength/HBoxOpusFrame/AutoGainControl.disabled = (channels != 1)
 	$VBoxFrameLength/HBoxOpusFrame/OptionChannels.disabled = ((denoiser_mode != TwovoipOpusEncoder.DENOISER_DISABLED) or (agc_mode != TwovoipOpusEncoder.AGC_DISABLED))
-	$VBoxFrameLength/HBoxAudioFrame/SampleRate.disabled = (denoiser_mode == TwovoipOpusEncoder.DENOISER_RNNOISE)
+	$VBoxFrameLength/HBoxAudioFrame/SampleRate.disabled = rnnoise_selected
 
 	$TwoVoipMic.set_opus_values(opussamplerate, frametimems, channels,
 			int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), 

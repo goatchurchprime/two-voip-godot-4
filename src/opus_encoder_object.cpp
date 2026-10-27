@@ -37,6 +37,9 @@
 
 #include "opus_encoder_object.h"
 #include "version.h"
+#ifdef WEBRTC_APM
+#include "webrtc_apm_processor.h"
+#endif
 
 using namespace godot;
 
@@ -97,6 +100,9 @@ void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_inband_perc"), &TwovoipOpusEncoder::get_inband_perc);
     ClassDB::bind_method(D_METHOD("reset_opus_encoder"), &TwovoipOpusEncoder::reset_opus_encoder);
     ClassDB::bind_method(D_METHOD("encode_chunk", "prefix_bytes", "chunk_offset_back"), &TwovoipOpusEncoder::encode_chunk, DEFVAL(PackedByteArray()), DEFVAL(0));
+#ifdef WEBRTC_APM
+    ClassDB::bind_method(D_METHOD("webrtc_apm_smoke_test"), &TwovoipOpusEncoder::webrtc_apm_smoke_test);
+#endif
 
     uint32_t read_only = PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY;
     ADD_PROPERTY(PropertyInfo(Variant::INT, "required_input_chunk_size", PROPERTY_HINT_NONE, "", read_only), "", "get_required_input_chunk_size");
@@ -115,6 +121,7 @@ void TwovoipOpusEncoder::_bind_methods() {
     BIND_ENUM_CONSTANT(DENOISER_SPEEX);
     BIND_ENUM_CONSTANT(DENOISER_RNNOISE);
     BIND_ENUM_CONSTANT(DENOISER_RNNOISE_DEFERRED);
+    BIND_ENUM_CONSTANT(DENOISER_WEBRTC);
     BIND_ENUM_CONSTANT(AGC_DISABLED);
     BIND_ENUM_CONSTANT(AGC_APPLIED);
     BIND_ENUM_CONSTANT(AGC_MONITOR);
@@ -128,6 +135,20 @@ String TwovoipOpusEncoder::get_version_info() {
 }
 
 TwovoipOpusEncoder::TwovoipOpusEncoder() {}
+
+#ifdef WEBRTC_APM
+bool TwovoipOpusEncoder::webrtc_apm_smoke_test() {
+    constexpr int sample_rate_hz = 48000;
+    std::vector<float> frame(sample_rate_hz / 100, 0.0F);
+    WebRtcApmProcessor *processor = WebRtcApmProcessor::create(sample_rate_hz, true, false);
+    if (processor == NULL)
+        return false;
+    bool succeeded = processor->process_render_10ms(frame.data(), frame.size()) &&
+            processor->process_capture_10ms(frame.data(), frame.size());
+    delete processor;
+    return succeeded;
+}
+#endif
 
 void TwovoipOpusEncoder::destroy_audio_pipeline() {
     if (opus_encoder != NULL) {
@@ -169,6 +190,12 @@ void TwovoipOpusEncoder::destroy_voice_processor() {
     rnnoise_in.resize(0);
     rnnoise_out.resize(0);
 #endif
+#ifdef WEBRTC_APM
+    if (webrtc_apm_processor != NULL) {
+        delete webrtc_apm_processor;
+        webrtc_apm_processor = NULL;
+    }
+#endif
     preprocess_frame_size = 0;
     speex_frame.clear();
     agc_gain = 1.0F;
@@ -199,6 +226,23 @@ Error TwovoipOpusEncoder::create_voice_processor() {
         rnnoise_out.resize(frame_size);
 #else
         UtilityFunctions::printerr("This TwoVoIP build does not include RNNoise");
+        return ERR_UNAVAILABLE;
+#endif
+    }
+
+    if (denoiser_mode == DENOISER_WEBRTC) {
+#ifdef WEBRTC_APM
+        int frame_size = opus_sample_rate / 100;
+        if ((opus_sample_rate != 8000 && opus_sample_rate != 16000 && opus_sample_rate != 48000) ||
+                output_chunk_size < frame_size || output_chunk_size % frame_size != 0) {
+            UtilityFunctions::printerr("WebRTC noise suppression requires mono 8000, 16000, or 48000 Hz audio in whole 10 ms frames");
+            return ERR_INVALID_PARAMETER;
+        }
+        webrtc_apm_processor = WebRtcApmProcessor::create(opus_sample_rate, true, false);
+        if (webrtc_apm_processor == NULL)
+            return ERR_CANT_CREATE;
+#else
+        UtilityFunctions::printerr("This TwoVoIP build does not include WebRTC APM");
         return ERR_UNAVAILABLE;
 #endif
     }
@@ -251,7 +295,7 @@ Error TwovoipOpusEncoder::initialize(int p_input_mix_rate, int p_opus_sample_rat
     if (p_input_mix_rate <= 0 || !is_valid_opus_sample_rate(p_opus_sample_rate) ||
             !is_valid_opus_frame_size(p_opus_sample_rate, p_output_chunk_size) ||
             (p_channels != 1 && p_channels != 2) ||
-            p_denoiser_mode < DENOISER_DISABLED || p_denoiser_mode > DENOISER_RNNOISE_DEFERRED ||
+            p_denoiser_mode < DENOISER_DISABLED || p_denoiser_mode > DENOISER_WEBRTC ||
             p_agc_mode < AGC_DISABLED || p_agc_mode > AGC_MONITOR) {
         UtilityFunctions::printerr("Invalid audio pipeline configuration");
         return ERR_INVALID_PARAMETER;
@@ -611,6 +655,16 @@ Error TwovoipOpusEncoder::denoise_chunk(int p_chunk_offset_back) {
                 int k = j*rnnoise_get_frame_size() + i;
                 prepared_audio_chunk[k] = rnnoise_out[i]/32768.0F;
             }
+        }
+    }
+#endif
+
+#ifdef WEBRTC_APM
+    if (webrtc_apm_processor != NULL) {
+        int frame_size = opus_sample_rate / 100;
+        for (int offset = 0; offset < output_chunk_size; offset += frame_size) {
+            if (!webrtc_apm_processor->process_capture_10ms(prepared_audio_chunk + offset, frame_size))
+                return FAILED;
         }
     }
 #endif

@@ -10,13 +10,14 @@ for work on the github actions that are successfully building this plugin across
 
 ## Components of this library
 
-The following libraries from Xiph are compiled into this plugin:
+The following native libraries are used by this plugin:
 
 | Dependency | Version used | Pinned source | Release Date |
 | --- | --- | --- | --- |
 | [libopus](https://github.com/xiph/opus) | v1.5.2 | [`ddbe4838`](https://github.com/xiph/opus/commit/ddbe48383984d56acd9e1ab6a090c54ca6b735a6) | 10 April 2024 |
 | [RNNoise](https://github.com/xiph/rnnoise) | v0.2 + 1 commit | [`372f7b4b`](https://github.com/xiph/rnnoise/commit/372f7b4b76cde4ca1ec4605353dd17898a99de38) | 15 April 2024 |
 | [SpeexDSP](https://github.com/xiph/speexdsp) | 1.2.1 | [`1b28a0f6`](https://github.com/xiph/speexdsp/commit/1b28a0f61bc31162979e1f26f3981fc3637095c8) | 13 June 2022 |
+| [WebRTC APM](https://gitlab.freedesktop.org/pulseaudio/webrtc-audio-processing) (optional) | v2.1 | [`846fe90a`](https://gitlab.freedesktop.org/pulseaudio/webrtc-audio-processing/-/commit/846fe90a289f58b7c9303a635142aa2c7caa93e5) | 22 January 2025 |
 
 The core library, `libopus` is the industry standard for compressing voice packets, `RNNoise` is a hight quality denoiser that works at 48kHz, and `SpeexDSP`
 has a resampler, automatic gain control and an echo canceller (not yet used).
@@ -326,9 +327,10 @@ The denoiser mode is selected in `initialize()`. Speex AGC and Speex denoising
 use separate preprocessor states so that AGC can remain continuously warmed
 before the future rewind-buffer boundary while denoising follows that boundary.
 RNNoise requires mono 48 kHz audio and chunks divisible by its 480-sample
-(10 ms) frame. A core-only
-build returns `ERR_UNAVAILABLE` when RNNoise is selected; it never pretends that
-noise suppression succeeded. Stereo is left as a manual-gain music path. Voice
+(10 ms) frame. Optional `DENOISER_WEBRTC` uses the WebRTC APM moderate noise
+suppressor with mono 8, 16, or 48 kHz audio in whole 10 ms frames. A build
+without the selected optional denoiser returns `ERR_UNAVAILABLE`; it never
+pretends that noise suppression succeeded. Stereo is left as a manual-gain music path. Voice
 preprocessing modes are immutable audio-pipeline configuration. `initialize()`
 may succeed only once on an encoder object so that warmed denoiser and AGC state
 cannot be discarded accidentally. Create a new `TwovoipOpusEncoder` to begin an
@@ -386,6 +388,10 @@ files at that revision, so TwoVoIP supplies a small CMake adapter in
 `thirdparty/rnnoise`. RNNoise also keeps its large default model outside Git;
 the adapter downloads model revision `0b50c45` from Xiph and verifies its
 SHA-256 checksum before compiling it.
+
+**WebRTC APM** is an optional, default-off submodule. Its initial Linux-only
+build integration and runtime packaging contract are documented in
+[`docs/webrtc_apm.md`](docs/webrtc_apm.md).
 
 GitHub Actions is the authoritative source of distributable native binaries.
 The Linux debug and release libraries are built together on Ubuntu 22.04. The
