@@ -847,42 +847,6 @@ func run_mid_restarts_playback(speaker: Node, stream_count: int) -> void:
 	speaker.receive_audio_packet(TwoVoipPacket.encode_control_packet(TwoVoipPacket.make_footer(stream_count, 10, 0.1, 0.0)))
 
 
-func run_input_gap_detection() -> void:
-	var mic := Node.new()
-	mic.set_script(preload("res://addons/twovoip/voiphelper/two_voip_mic.gd"))
-	mic.opusencoder = TwovoipOpusEncoder.new()
-	assert(mic.opusencoder.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
-	mic.currentlytalking = true
-	mic.opusstreamcount = 12
-	mic.opusframecount = 30
-	mic.frame0usec = 1700000000000000
-	mic.input_mix_rate = 48000
-	mic.input_gap_threshold = 0.05
-	mic.input_chunk_first_frame_times_usec.resize(10)
-	var emitted_packets: Array[PackedByteArray] = []
-	mic.transmit_audio_packet.connect(func(packet): emitted_packets.append(packet))
-	var gap_plan: Dictionary = mic.plan_audio_input_gap(1700000000651556)
-	assert(gap_plan.missing_frame_count == 3)
-	assert(gap_plan.next_frame_time_usec == 1700000000660000)
-	assert(gap_plan.discard_input_frames == 406)
-	mic.apply_audio_input_gap(gap_plan)
-	assert(mic.input_chunk_number == 2)
-	assert(mic.get_input_chunk_first_frame_time_usec(0) == 1700000000640000)
-	assert(mic.opusencoder.push_input_chunk(make_mono(0.0)) == 960)
-	mic.input_chunk_number += 1
-	mic.input_chunk_first_frame_times_usec[mic.input_chunk_number] = 1700000000660000
-	mic.processopuschunk(0)
-	assert(mic.opusframecount == 34)
-	assert(mic.get_next_frame_time_usec() == 1700000000680000)
-	assert(emitted_packets.size() == 2)
-	assert(mic.opusencoder.get_chunk_sum_squares(1) == 0.0)
-	var mid := TwoVoipPacket.decode_control_packet(emitted_packets[0])
-	assert(int(mid[TwoVoipPacket.MidField.NEXT_FRAME_COUNT]) == 33)
-	assert(int(mid[TwoVoipPacket.MidField.NEXT_FRAME_TIME_USEC]) == 1700000000660000)
-	assert(TwoVoipPacket.decode_sequence_chunk_prefix(emitted_packets[1], 33, 12) == 33)
-	mic.free()
-
-
 func run_mqtt_log_payload_roundtrip() -> void:
 	var mqtt_network := Control.new()
 	mqtt_network.set_script(preload("res://radiomqtt/MQTTnetwork.gd"))
@@ -919,40 +883,6 @@ func run_stream_start_without_history() -> void:
 	var header := TwoVoipPacket.decode_control_packet(emitted_packets[0])
 	assert(int(header[TwoVoipPacket.HeaderField.NEXT_FRAME_TIME_USEC]) == 1700000000000000)
 	assert(TwoVoipPacket.header_lead_frame_count(header) == 0)
-	mic.free()
-
-
-func run_input_gap_beyond_hang_ends_episode() -> void:
-	var mic := Node.new()
-	mic.set_script(preload("res://addons/twovoip/voiphelper/two_voip_mic.gd"))
-	mic.opusencoder = TwovoipOpusEncoder.new()
-	assert(mic.opusencoder.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
-	mic.currentlytalking = true
-	mic.opusstreamcount = 12
-	mic.opusframecount = 30
-	mic.frame0usec = 1700000000000000
-	mic.talkingtimestart = Time.get_ticks_msec()*0.001 - 0.6
-	mic.input_chunk_first_frame_times_usec.resize(10)
-	mic.voxbutton = Button.new()
-	mic.voxbutton.toggle_mode = true
-	mic.voxbutton.button_pressed = true
-	mic.pttbutton = Button.new()
-	mic.pttbutton.toggle_mode = true
-	mic.pttbutton.button_pressed = true
-	var emitted_packets: Array[PackedByteArray] = []
-	mic.transmit_audio_packet.connect(func(packet): emitted_packets.append(packet))
-	mic.detect_audio_input_gap(1700000002700000)
-	assert(not mic.currentlytalking)
-	assert(mic.opusstreamcount == 13)
-	assert(not mic.pttbutton.button_pressed)
-	assert(emitted_packets.size() == 1)
-	var footer := TwoVoipPacket.decode_control_packet(emitted_packets[0])
-	assert(footer[TwoVoipPacket.FooterField.TYPE] == TwoVoipPacket.TYPE_END)
-	assert(int(footer[TwoVoipPacket.FooterField.OPUS_FRAME_COUNT]) == 30)
-	mic.processvox(1.0, 0.0, PackedVector2Array())
-	assert(mic.pttbutton.button_pressed)
-	mic.voxbutton.free()
-	mic.pttbutton.free()
 	mic.free()
 
 
@@ -1184,10 +1114,8 @@ func run_tests() -> void:
 	run_receiver_gap_recovers_playout(speaker, 16)
 	run_receiver_backlog_restart(speaker, 17)
 	run_mid_restarts_playback(speaker, 18)
-	run_input_gap_detection()
 	run_mqtt_log_payload_roundtrip()
 	run_stream_start_without_history()
-	run_input_gap_beyond_hang_ends_episode()
 	run_application_resume_restart()
 	timing_meter.update_display(0.0)
 	assert(timing_meter.TIMING_EMPTY.a == 0.0)

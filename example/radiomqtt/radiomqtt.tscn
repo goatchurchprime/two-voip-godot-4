@@ -825,6 +825,7 @@ stream = ExtResource("10_85ctl")
 [connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="gui_input" from="HBoxMicTalk/VoxThreshold" to="." method="_on_vox_threshold_gui_input"]
 [connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox" to="." method="_on_gain_manual_spin_box_value_changed"]
+[connection signal="toggled" from="VBoxFrameLength/HBoxEcho/Music" to="." method="_on_music_toggled"]
 [connection signal="pressed" from="VBoxPlayback/HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 [connection signal="item_selected" from="VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions" to="." method="_on_sav_options_item_selected"]
 [connection signal="broker_connection_failed" from="MQTTnetwork/MQTT" to="MQTTnetwork" method="_on_mqtt_broker_connection_failed"]

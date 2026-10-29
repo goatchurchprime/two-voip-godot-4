@@ -402,21 +402,24 @@ Godot 4.6 editor and must instantiate `TwovoipOpusEncoder` before it can be
 packaged. This keeps the editor/debug library and exported/release library on
 the same tested Linux compatibility floor.
 
-The sequence of commands for a local development build on NixOS is:
+The local development shell pins Godot 4.6, the compiler, and glibc to the same
+Nixpkgs revision. Enter it before building or running Godot so the extension and
+host process use one ABI environment:
 ```bash
-nix-shell -p scons cmake ninja autoreconfHook
+nix develop
 scons -c              # optional: remove the previous extension and top-level build tree
 scons apply_patches  # apply the pinned portability and size patches
 scons build_opus     # build opus using cmake
 scons build_rnnoise  # build RNNoise using cmake
 scons                # build this library
-scripts/check_linux_abi.sh addons/twovoip/libs/libtwovoip.linux.*.so
 cp addons/twovoip/libs/*.so example/addons/twovoip/libs/
+godot4 --headless --path example --script res://tests/native_load_smoke.gd
 ```
 
 A direct local build inherits its compiler and libc environment. It is useful
-for development but is not automatically a portable release artifact. In
-particular, a Nix build may retain a `/nix/store` runtime path or require a
-newer glibc than Godot uses. Do not copy such a library into another project;
-use the matched GitHub Actions package or rebuild it in the supported CI
-environment. The ABI check above fails explicitly in that situation.
+for development and is load-compatible with the Godot in `nix develop`, but it
+is not a portable release artifact. In particular, a Nix build retains
+`/nix/store` runtime paths and may exceed the release's glibc 2.35 floor. Do not
+copy such a library into another project; use the matched GitHub Actions
+package or rebuild it in the supported CI environment. The release workflow
+runs `scripts/check_linux_abi.sh` and rejects binaries that violate that floor.

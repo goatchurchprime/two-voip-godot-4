@@ -129,6 +129,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-dev": {
+      "locked": {
+        "lastModified": 1782847189,
+        "narHash": "sha256-twXPFqFsrrY5r28Zh7Homgcp2gUMBgQ6WDS98Q/3xFI=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "b6018f87da91d19d0ab4cf979885689b469cdd41",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "b6018f87da91d19d0ab4cf979885689b469cdd41",
+        "type": "github"
+      }
+    },
     "nixpkgs-lib": {
       "locked": {
         "dir": "lib",
@@ -186,6 +202,7 @@
         "flake-parts": "flake-parts",
         "godot-cpp": "godot-cpp",
         "nixpkgs": "nixpkgs_2",
+        "nixpkgs-dev": "nixpkgs-dev",
         "nixpkgs-old": "nixpkgs-old"
       }
     },

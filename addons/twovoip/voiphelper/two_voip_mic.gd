@@ -41,6 +41,9 @@ var frametimesecs = 0.02
 var opusframedurationms = 20
 var input_mix_rate = 44100
 var audio_chunk_size = 882
+var silent_chunk := PackedVector2Array()
+var next_input_chunk_time_usec := 0
+var missing_chunks := 0
 var opussamplerate = 48000
 var opus_chunk_size = 960
 var opuschannels = 2
@@ -72,7 +75,8 @@ func consume_application_resume() -> bool:
 func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_inband_perc, p_denoiser_mode, p_agc_mode):
 	input_mix_rate = AudioServer.get_input_mix_rate()
 	var bitrate_changed = opusencoder != null and opusencoder.get_bitrate() != p_opusbitrate
-	if opusencoder == null or opussamplerate != p_opussamplerate or opuschannels != p_channels or denoiser_mode != p_denoiser_mode or agc_mode != p_agc_mode or opusframedurationms != p_opusframedurationms:
+	var rebuild_encoder: bool = opusencoder == null or opussamplerate != p_opussamplerate or opuschannels != p_channels or denoiser_mode != p_denoiser_mode or agc_mode != p_agc_mode or opusframedurationms != p_opusframedurationms
+	if rebuild_encoder:
 		opusencoder = TwovoipOpusEncoder.new()
 		opusframedurationms = p_opusframedurationms
 		input_chunk_first_frame_times_usec.resize(ceili(INPUT_TIMESTAMP_HISTORY_SECONDS*1000.0/opusframedurationms) + 1)
@@ -96,6 +100,11 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 		transmit_audio_packet.emit(make_audio_packet_midstream_update())
 
 	audio_chunk_size = opusencoder.get_required_input_chunk_size()
+	if rebuild_encoder or silent_chunk.size() != audio_chunk_size:
+		silent_chunk = PackedVector2Array()
+		silent_chunk.resize(audio_chunk_size)
+		next_input_chunk_time_usec = 0
+		missing_chunks = 0
 	frametimesecs = p_opusframedurationms/1000.0
 	if audiosampleframematerial:
 		var audiosampleframedata = PackedVector2Array()
@@ -107,6 +116,7 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 		audiosampleframematerial.set_shader_parameter("chunktexture", audiosampleframetexture)
 
 	outdelaymax = -1
+	echocancelobject = null
 	return true
 
 var miconbutton: Button = null
@@ -119,7 +129,7 @@ var echocancelobject = null
 
 func set_echo_cancelling():
 	echocancelobject = TwoVoipEchoCanceler.new()
-	var echo_error = echocancelobject.initialize(AudioServer.get_input_mix_rate(), opusencoder.get_required_input_chunk_size())
+	var echo_error = echocancelobject.initialize(input_mix_rate, audio_chunk_size)
 	if echo_error != OK:
 		print("BAD")
 		echocancelobject = null
@@ -230,7 +240,6 @@ func init_voip_mic(p_encode_base64: bool,
 	assert(optioninputdevice.get_item_text(optioninputdevice.selected) == "Default")
 	optioninputdevice.connect("item_selected", _on_optioninputdevice)
 
-	echocancelobject = null
 	set_process(true)
 
 func set_encode_base64(p_encode_base64: bool):
@@ -296,13 +305,6 @@ func make_audio_packet_midstream_update() -> PackedByteArray:
 			opusencoder.get_bitrate())
 	return TwoVoipPacket.encode_control_packet(audiostreampacketmid)
 
-func notify_audio_input_gap(missing_frame_count: int, next_frame_time_usec: int):
-	assert(currentlytalking)
-	assert(missing_frame_count > 0)
-	opusframecount += missing_frame_count
-	var mid := TwoVoipPacket.make_mid(opusstreamcount, opusframecount, next_frame_time_usec, opusencoder.get_bitrate())
-	transmit_audio_packet.emit(TwoVoipPacket.encode_control_packet(mid))
-
 func request_audio_packet_midstream() -> Array[PackedByteArray]:
 	if not currentlytalking:
 		return []
@@ -362,69 +364,39 @@ func get_input_chunk_first_frame_time_usec(chunks_back: int) -> int:
 		return 0
 	return input_chunk_first_frame_times_usec[(input_chunk_number - chunks_back) % input_chunk_first_frame_times_usec.size()]
 
-func plan_audio_input_gap(frameCusec: int) -> Dictionary:
-	if not currentlytalking:
-		return {}
-	if frameCusec == 0 or frame0usec == 0:
-		push_error("Cannot detect an audio input gap without valid frame times")
-		return {}
+func align_missing_chunks() -> int:
+	var input_frames_available := AudioServer.get_input_frames_available()
+	if input_frames_available < audio_chunk_size:
+		return 0
+	var first_frame_time_usec := Time.get_ticks_usec() \
+			- roundi(input_frames_available * 1000000.0 / input_mix_rate)
+	if next_input_chunk_time_usec == 0:
+		next_input_chunk_time_usec = first_frame_time_usec
+		return 0
 	var frame_duration_usec: int = opusframedurationms * 1000
-	var frameCusec_predicted: int = frame0usec \
-			+ opusframecount * frame_duration_usec
-	var gap_usec: int = frameCusec - frameCusec_predicted
+	var gap_usec: int = first_frame_time_usec - next_input_chunk_time_usec
 	if gap_usec >= input_gap_threshold*1000000.0:
-		var missing_frame_count := ceili(float(gap_usec) / frame_duration_usec)
-		if missing_frame_count <= 0:
-			return {}
-		var next_frame_time_usec: int = frameCusec_predicted \
-				+ missing_frame_count * frame_duration_usec
-		var discard_input_frames: int = ceili(maxi(0,
-				next_frame_time_usec - frameCusec) * input_mix_rate / 1000000.0)
-		return {
-			"gap_usec": gap_usec,
-			"missing_frame_count": missing_frame_count,
-			"next_frame_time_usec": next_frame_time_usec,
-			"discard_input_frames": discard_input_frames,
-			"end_episode": gap_usec > hang_time * 1000000.0,
-		}
+		var count := ceili(float(gap_usec) / frame_duration_usec)
+		var aligned_time_usec := next_input_chunk_time_usec + count * frame_duration_usec
+		var discard_input_frames := ceili(maxi(0, aligned_time_usec - first_frame_time_usec) * input_mix_rate / 1000000.0)
+		if discard_input_frames > 0:
+			var discarded_audio := AudioServer.get_input_frames(discard_input_frames)
+			if discarded_audio.size() != discard_input_frames:
+				push_error("Could not discard the audio input alignment prefix")
+				return 0
+		if gap_usec > hang_time * 1000000.0:
+			print("TwoVoIP mic input gap %.3f ms exceeded %.3f ms hang: end episode" % [gap_usec / 1000.0, hang_time * 1000.0])
+			processtalkstreamends(false)
+			if voxbutton != null and voxbutton.button_pressed:
+				pttbutton.button_pressed = false
+				hangchunkscountup = hangchunks + 1
+			count = mini(count, input_chunk_first_frame_times_usec.size())
+			next_input_chunk_time_usec = aligned_time_usec - count * frame_duration_usec
+		print("TwoVoIP mic input gap %.3f ms: insert %d chunks, discard %d input frames" % [gap_usec / 1000.0, count, discard_input_frames])
+		return count
 	elif gap_usec <= -input_gap_threshold*1000000.0:
 		push_error("impossible big negative gap in the audio stream timing %f" % (gap_usec/1000000.0))
-	return {}
-
-func apply_audio_input_gap(gap_plan: Dictionary):
-	if gap_plan.is_empty():
-		return
-	var missing_frame_count: int = gap_plan.missing_frame_count
-	var next_frame_time_usec: int = gap_plan.next_frame_time_usec
-	if gap_plan.end_episode:
-		print("TwoVoIP mic input gap %.3f ms exceeded %.3f ms hang: end episode" % [
-				gap_plan.gap_usec / 1000.0, hang_time * 1000.0])
-		processtalkstreamends(false)
-		if voxbutton != null and voxbutton.button_pressed:
-			pttbutton.button_pressed = false
-			hangchunkscountup = hangchunks + 1
-		return
-	print("TwoVoIP mic input gap %.3f ms: insert %d chunks, discard %d input frames" % [
-			gap_plan.gap_usec / 1000.0, missing_frame_count,
-			gap_plan.discard_input_frames])
-	var stored_silent_chunks = opusencoder.push_silent_input_chunks(missing_frame_count)
-	assert(stored_silent_chunks >= 0)
-	for chunk in range(stored_silent_chunks):
-		input_chunk_number += 1
-		input_chunk_first_frame_times_usec[
-				input_chunk_number % input_chunk_first_frame_times_usec.size()] = \
-				next_frame_time_usec \
-				- (stored_silent_chunks - chunk) * opusframedurationms * 1000
-	notify_audio_input_gap(missing_frame_count, next_frame_time_usec)
-	if mastercapture:
-		print("gap so clearing mastercapture buffer")
-		mastercapture.clear_buffer()
-
-
-func detect_audio_input_gap(frameCusec: int):
-	# Kept as a direct diagnostic/test entry point. Live capture plans first so
-	# it can discard the fractional prefix before retaining more microphone data.
-	apply_audio_input_gap(plan_audio_input_gap(frameCusec))
+	return 0
 
 func processopuschunk(chunks_back):
 	assert(currentlytalking)
@@ -455,7 +427,10 @@ func receive_audio_hash_response(receiver_name: String, response: Array):
 		get_node("../HBoxNetManage/HashErrors").value += 1
 	recent_hash_code = 0
 
+var audio_chunk_raw = null
+var audio_chunk_echo = null
 var audio_chunk = null
+
 var last_chunkmax = 0.0
 var speechnoiseprobability = 0.0
 var outdelaymax = -1 
@@ -466,49 +441,41 @@ func _process(_delta):
 	# pre-suspend lead-time audio out of the new episode.
 	processtalkstreamends(pttbutton.button_pressed and not resumed_this_process)
 	while true:
-		var input_frames_available := AudioServer.get_input_frames_available()
-		var first_frame_time_usec := Time.get_ticks_usec() - roundi(input_frames_available * 1000000.0 / input_mix_rate)
-		var gap_plan := plan_audio_input_gap(first_frame_time_usec)
-		if not gap_plan.is_empty():
-			var discard_input_frames: int = 0 if gap_plan.end_episode else gap_plan.discard_input_frames
-			if input_frames_available < discard_input_frames:
+		if missing_chunks == 0:
+			missing_chunks = align_missing_chunks()
+		var first_frame_time_usec := next_input_chunk_time_usec
+		if missing_chunks == 0:
+			audio_chunk_raw = AudioServer.get_input_frames(audio_chunk_size)
+			if audio_chunk_raw.is_empty():
 				break
-			if discard_input_frames > 0:
-				var discarded_audio := AudioServer.get_input_frames(discard_input_frames)
-				if len(discarded_audio) != discard_input_frames:
-					push_error("Could not discard the planned audio input alignment prefix")
-					break
-				first_frame_time_usec = gap_plan.next_frame_time_usec
-			apply_audio_input_gap(gap_plan)
-			input_frames_available -= discard_input_frames
-		var required_input_frames := opusencoder.get_required_input_chunk_size()
-		if input_frames_available < required_input_frames:
-			break
-
-		audio_chunk = AudioServer.get_input_frames(required_input_frames)
-		if len(audio_chunk) == 0:
-			break
+		else:
+			audio_chunk_raw = silent_chunk
+			missing_chunks -= 1
 
 		if echocancelobject:
 			var a := mastercapture.get_frames_available()
-			var inputframebufferend : int = AudioServer.get_input_frames_available() + required_input_frames
+			var inputframebufferend : int = AudioServer.get_input_frames_available() + audio_chunk_size
 			var outputframebufferend : int = a - AudioServer.get_time_to_next_mix()*AudioServer.get_mix_rate()
 			var outdelay = (outputframebufferend - inputframebufferend)/AudioServer.get_mix_rate()*1000
 			if outdelay > outdelaymax:
 				prints("outdelay %.2f" % outdelay)
 				outdelaymax = outdelay
 
-			var outframes = mastercapture.get_buffer(min(required_input_frames, mastercapture.get_frames_available()))
-			if len(outframes) < required_input_frames:
-				outframes.resize(required_input_frames)
+			audio_chunk_echo = mastercapture.get_buffer(min(audio_chunk_size, mastercapture.get_frames_available()))
+			if len(audio_chunk_echo) < audio_chunk_size:
+				audio_chunk_echo.resize(audio_chunk_size)
 				prints("mastercapture cleared to 0 ")
-			audio_chunk = echocancelobject.cancel_echo(audio_chunk, outframes)
+				outdelaymax = -1
+			audio_chunk = echocancelobject.cancel_echo(audio_chunk_raw, audio_chunk_echo)
+		else:
+			audio_chunk = audio_chunk_raw
+			audio_chunk_echo = null
 
 		if opusencoder.push_input_chunk(audio_chunk) < 0:
 			break
 		input_chunk_number += 1
 		input_chunk_first_frame_times_usec[input_chunk_number % input_chunk_first_frame_times_usec.size()] = first_frame_time_usec
-		talking_first_frame_time_usec
+		next_input_chunk_time_usec += opusframedurationms * 1000
 		if denoiser_mode != TwovoipOpusEncoder.DENOISER_DISABLED and not (denoiser_mode == TwovoipOpusEncoder.DENOISER_RNNOISE_DEFERRED and not currentlytalking):
 			opusencoder.denoise_chunk(0)
 			speechnoiseprobability = opusencoder.get_speech_probability()

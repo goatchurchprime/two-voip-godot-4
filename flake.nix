@@ -2,6 +2,8 @@
   description = "A flake for Godot 4 Opus VoIP gdextension";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    # Keep the local compiler/libc and Godot 4.6 runtime in one ABI environment.
+    nixpkgs-dev.url = "github:NixOS/nixpkgs/b6018f87da91d19d0ab4cf979885689b469cdd41";
     nixpkgs-old = {
       url = "github:NixOS/nixpkgs/nixos-19.09";
       flake = false;
@@ -35,7 +37,20 @@
           };
         };
         stdenv-old = (pkgs.overrideCC pkgs.stdenv cc-old);
+        devPkgs = import inputs.nixpkgs-dev { inherit system; };
       in rec {
+        devShells.default = devPkgs.mkShell {
+          packages = with devPkgs; [
+            godot_4_6
+            scons
+            cmake
+            ninja
+            autoconf
+            automake
+            libtool
+            pkg-config
+          ];
+        };
         packages.android = packages.default.overrideAttrs {
           ANDROID_HOME = "${androidenv}/share/android-sdk";
           sconsFlags = [

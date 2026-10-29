@@ -11,6 +11,7 @@ var resampledchunkprefix := TwoVoipPacket.make_sequence_chunk_prefix()
 var audio_packets_base64 : bool = false
 
 var recordedsamples = [ ]
+var recordedecho = [ ]
 var recordedopuspackets = [ ]
 var recordedresampledpackets = null
 const maxrecordedsamples = 10*50
@@ -171,6 +172,11 @@ func reprocessoriginalchunks():
 	opusencoder_forreprocessing.signal_type = TwovoipOpusEncoder.SIGNAL_VOICE if $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed else TwovoipOpusEncoder.SIGNAL_MUSIC
 
 	opusencoder_forreprocessing.reset_opus_encoder()
+	var echocancelobject_forrepprocessing : TwoVoipEchoCanceler = null
+	if $VBoxFrameLength/HBoxEcho/EchoCancel.button_pressed:
+		echocancelobject_forrepprocessing = TwoVoipEchoCanceler.new()
+		echocancelobject_forrepprocessing.initialize(AudioServer.get_input_mix_rate(), $TwoVoipMic.audio_chunk_size)
+
 	var recorded_stream_count := 0
 	var recorded_first_frame_time_usec := 0
 	if TwoVoipPacket.header_is_valid(recordedheader):
@@ -195,6 +201,8 @@ func reprocessoriginalchunks():
 
 	if len(recordedsamples) != 0 and len(recordedsamples[0]) != $TwoVoipMic.audio_chunk_size:
 		recordedsamples = rechunkrecordedchunks(recordedsamples, $TwoVoipMic.audio_chunk_size)
+		if len(recordedecho) != 0:
+			recordedecho = rechunkrecordedchunks(recordedecho, $TwoVoipMic.audio_chunk_size)
 	recordedopuspacketsMemSize = 0
 	recordedchunkmax = 0.0
 	recordedopuspackets = null
@@ -203,7 +211,10 @@ func reprocessoriginalchunks():
 	recordedopuspackets = [ ]
 	#opusencoder_forreprocessing.resetencoder(true)
 	var resampledopusframecount = 0
-	for s in recordedsamples:
+	for i in range(len(recordedsamples)):
+		var s = recordedsamples[i]
+		if echocancelobject_forrepprocessing:
+			s = echocancelobject_forrepprocessing.cancel_echo(s, recordedecho[i])
 		if opusencoder_forreprocessing.push_input_chunk(s) < 0:
 			break
 		if denoiser != TwovoipOpusEncoder.DENOISER_DISABLED:
@@ -224,9 +235,11 @@ func reprocessoriginalchunks():
 	$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm if tm else 0))
 	$VBoxPlayback/HBoxStream/ChunkMax.text = str(recordedchunkmax)
 
-func recordoriginalchunks(audiosamples, chunkmax, opuspacket):
+func recordoriginalchunks(audiosamples, audiochunkecho, chunkmax, opuspacket):
 	if audiosamples != null:
 		recordedsamples.append(audiosamples)
+	if audiochunkecho:
+		recordedecho.append(audiochunkecho)
 	recordedopuspackets.append(opuspacket)
 	$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
 	recordedopuspacketsMemSize += opuspacket.size()
@@ -241,7 +254,7 @@ func on_transmit_audio_packet(opuspacket : PackedByteArray):
 	if TwoVoipPacket.is_control_packet(opuspacket):
 		intercept_transmit_audio_control_packet(TwoVoipPacket.decode_control_packet(opuspacket))
 	elif len(recordedsamples) < maxrecordedsamples:
-		recordoriginalchunks($TwoVoipMic.audio_chunk, $TwoVoipMic.last_chunkmax, opuspacket)
+		recordoriginalchunks($TwoVoipMic.audio_chunk_raw, $TwoVoipMic.audio_chunk_echo, $TwoVoipMic.last_chunkmax, opuspacket)
 	$MQTTnetwork.transportaudiopacket(opuspacket, max(0, $HBoxLogging/TransmissionNoise.selected))
 
 func hash_key(stream_count: int, first_frame: int, frame_count: int) -> String:
@@ -255,6 +268,7 @@ func intercept_transmit_audio_control_packet(control_packet: Array):
 	if control_packet[0] == TwoVoipPacket.TYPE_START:
 		assert(TwoVoipPacket.header_is_valid(control_packet))
 		recordedsamples = [ ]
+		recordedecho = [ ]
 		recordedopuspackets = [ ]
 		recordedresampledpackets = [ ]
 
