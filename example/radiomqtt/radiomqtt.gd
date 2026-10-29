@@ -36,7 +36,7 @@ func _ready():
 		h.connect("item_selected", func (_item_selected): updatesamplerates())
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusExtra/FecSpinBox, $VBoxFrameLength/HBoxOpusExtra/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
 		h.connect("value_changed", func (_value): updatesamplerates())
-	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxMosquitto/base64, $VBoxFrameLength/HBoxOpusFrame/AutoGainControl ]:
+	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxMosquitto/base64, $VBoxFrameLength/HBoxOpusFrame/AutoGainControl, $VBoxFrameLength/HBoxEcho/EchoCancel ]:
 		h.connect("toggled", func (_toggled_on): updatesamplerates())
 
 	audio_packets_base64 = $HBoxMosquitto/base64.button_pressed
@@ -149,6 +149,9 @@ func updatesamplerates():
 			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed,
 			int($VBoxFrameLength/HBoxOpusExtra/FecSpinBox.value),
 			denoiser_mode, agc_mode)
+
+	if $VBoxFrameLength/HBoxEcho/EchoCancel.button_pressed:
+		$TwoVoipMic.set_echo_cancelling()
 
 	$TwoVoipMic.lead_time = $HBoxBigButtons/VBoxVox/Leadtime.value
 	$TwoVoipMic.hang_time = $HBoxBigButtons/VBoxVox/Hangtime.value
@@ -354,3 +357,9 @@ func _on_drop_packets_pressed():
 func _selected_fault_packet_kind() -> String:
 	return $HBoxNetManage/FaultPacketKind.get_item_text(
 			$HBoxNetManage/FaultPacketKind.selected).to_lower()
+
+func _on_music_toggled(toggled_on):
+	if toggled_on:
+		$AudioStreamPlayer.play()
+	else:
+		$AudioStreamPlayer.stop()

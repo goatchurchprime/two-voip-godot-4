@@ -9,6 +9,7 @@
 [ext_resource type="Shader" uid="uid://bq3uv3u8jhu77" path="res://addons/twovoip/voiphelper/voxshader.gdshader" id="5_7rbsf"]
 [ext_resource type="Script" uid="uid://bvc0jl61su4fd" path="res://addons/mqtt/simulated_broker.gd" id="6_qfww3"]
 [ext_resource type="Script" uid="uid://rr8tydt33rex" path="res://radiomqtt/mqtt_audio_packet_filter.gd" id="7_audio_filter"]
+[ext_resource type="AudioStream" uid="uid://058n5hl2mobk" path="res://music-master-cc0.wav" id="10_85ctl"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kcsl6"]
 bg_color = Color(0.0705882, 0.0235294, 0.564706, 1)
@@ -78,7 +79,6 @@ grow_vertical = 2
 script = ExtResource("1_anot2")
 
 [node name="TwoVoipMic" parent="." unique_id=1643438198 instance=ExtResource("2_0f5ov")]
-check_unpack_hash_codes = null
 
 [node name="LabelTitle" type="Label" parent="." unique_id=1539758880]
 custom_minimum_size = Vector2(0, 50)
@@ -398,6 +398,18 @@ layout_mode = 2
 theme = ExtResource("4_7rbsf")
 min_value = -1.0
 value = -1.0
+
+[node name="HBoxEcho" type="HBoxContainer" parent="VBoxFrameLength" unique_id=2086919570]
+layout_mode = 2
+
+[node name="EchoCancel" type="CheckButton" parent="VBoxFrameLength/HBoxEcho" unique_id=87528402]
+layout_mode = 2
+text = "Echo cancel"
+
+[node name="Music" type="Button" parent="VBoxFrameLength/HBoxEcho" unique_id=339560720]
+layout_mode = 2
+toggle_mode = true
+text = "Music"
 
 [node name="HSeparator4" type="HSeparator" parent="." unique_id=1623262998]
 layout_mode = 2
@@ -806,6 +818,9 @@ offset_left = 2.0
 offset_right = 42.0
 offset_bottom = 23.0
 text = "sil"
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=336009757]
+stream = ExtResource("10_85ctl")
 
 [connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="gui_input" from="HBoxMicTalk/VoxThreshold" to="." method="_on_vox_threshold_gui_input"]
