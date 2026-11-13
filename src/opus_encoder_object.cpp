@@ -80,7 +80,6 @@ void TwovoipOpusEncoder::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "peak", PROPERTY_HINT_NONE, "", read_only), "", "get_peak");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rms", PROPERTY_HINT_NONE, "", read_only), "", "get_rms");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "speech_probability", PROPERTY_HINT_NONE, "", read_only), "", "get_speech_probability");
-    ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "current_chunk", PROPERTY_HINT_NONE, "", read_only), "", "get_current_chunk");
 
     BIND_ENUM_CONSTANT(DENOISER_DISABLED);
     BIND_ENUM_CONSTANT(DENOISER_SPEEX);
@@ -437,6 +436,10 @@ void TwovoipOpusEncoder::process_denoiser(float* prepared_audio_chunk) {
 
 PackedVector2Array TwovoipOpusEncoder::get_current_chunk() const {
     PackedVector2Array frames;
+    if (!initialized) {
+        UtilityFunctions::printerr("TwovoipOpusEncoder not initialized");
+        return frames;
+    }
     const float* prepared_audio_chunk = (const float*)prepared_audio_ringbuffer.ptr() + (audio_ringbuffer_index % audio_ringbuffer_size_chunks) * output_chunk_size * channels;
     frames.resize(output_chunk_size);
     for (int frame = 0; frame < output_chunk_size; frame++) {

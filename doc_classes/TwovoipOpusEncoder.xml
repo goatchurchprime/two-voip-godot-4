@@ -82,7 +82,6 @@
 	</methods>
 	<members>
 		<member name="agc_gain" type="float" setter="" getter="get_agc_gain">Latest linear gain reported by Speex AGC.</member>
-		<member name="current_chunk" type="PackedVector2Array" setter="" getter="get_current_chunk">Last processed output-rate PCM chunk as stereo frames.</member>
 		<member name="gain" type="float" setter="" getter="get_gain">Manual linear gain.</member>
 		<member name="peak" type="float" setter="" getter="get_peak">Pre-denoising peak magnitude used by VOX.</member>
 		<member name="required_input_chunk_size" type="int" setter="" getter="get_required_input_chunk_size">Required input frames per call.</member>
