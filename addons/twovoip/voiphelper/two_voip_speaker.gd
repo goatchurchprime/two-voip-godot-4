@@ -94,6 +94,8 @@ func receive_audio_packet(packet):
 				inopusstream = true
 
 			elif h.has("talkingtimeend"):
+				if audio_stream_playback_opus == null:
+					return
 				if playbackpausedonmark and audio_stream_playback_opus.queue_length_frames() == 0:
 					audio_stream_playback_opus.mark_end_opus_stream(true)
 				audio_stream_playback_opus.mark_end_opus_stream(false)
@@ -101,6 +103,9 @@ func receive_audio_packet(packet):
 				pausereached = false
 				print("runninglagtimeminimum: ", runninglagtimeminimum, " (target: ", audio_buffer_lag_time_target, ")")
 				inopusstream = true
+
+	elif not inopusstream or (lenchunkprefix == 2 and outoforderchunkqueue.size() != Noutoforderqueue):
+		return
 
 	elif lenchunkprefix == -1:
 		pass
