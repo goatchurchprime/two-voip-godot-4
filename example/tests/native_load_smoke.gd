@@ -12,7 +12,11 @@ func _initialize() -> void:
 		push_error("TwoVoIP native smoke test: could not instantiate TwovoipOpusEncoder")
 		quit(1)
 		return
-	if not TwoVoip.native_version_is_compatible():
+
+	# A clean headless checkout has no editor-generated global class cache, so
+	# load the GDScript side of the version contract explicitly.
+	var two_voip: Variant = load("res://addons/twovoip/two_voip.gd")
+	if two_voip == null or not two_voip.native_version_is_compatible():
 		quit(1)
 		return
 
@@ -24,5 +28,5 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	print("TwoVoIP %s native smoke test: loaded and read uninitialized encoder properties" % TwoVoip.get_version_info())
+	print("TwoVoIP %s native smoke test: loaded and read uninitialized encoder properties" % two_voip.get_version_info())
 	quit(0)
