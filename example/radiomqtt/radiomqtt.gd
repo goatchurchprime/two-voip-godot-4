@@ -155,10 +155,10 @@ func reprocessoriginalchunks():
 	opusencoder_forreprocessing.initialize(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoiser, TwovoipOpusEncoder.AGC_DISABLED, $TwoVoipMic.opus_chunk_size)
 	opusencoder_forreprocessing.set_gain($VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox.value * last_agc_gain)
 
-	opusencoder_forreprocessing.bitrate = int($VBoxFrameLength/HBoxOpusExtra/BitRate.value)
-	opusencoder_forreprocessing.complexity = int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value)
-	opusencoder_forreprocessing.inband_perc = int($VBoxFrameLength/HBoxOpusExtra/FecSpinBox.value)
-	opusencoder_forreprocessing.signal_type = TwovoipOpusEncoder.SIGNAL_VOICE if $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed else TwovoipOpusEncoder.SIGNAL_MUSIC
+	opusencoder_forreprocessing.set_bitrate(int($VBoxFrameLength/HBoxOpusExtra/BitRate.value))
+	opusencoder_forreprocessing.set_complexity(int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value))
+	opusencoder_forreprocessing.set_inband_perc(int($VBoxFrameLength/HBoxOpusExtra/FecSpinBox.value))
+	opusencoder_forreprocessing.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE if $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed else TwovoipOpusEncoder.SIGNAL_MUSIC)
 
 	opusencoder_forreprocessing.reset_opus_encoder()
 	var recorded_stream_count := 0

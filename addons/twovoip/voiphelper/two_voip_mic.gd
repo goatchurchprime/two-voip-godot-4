@@ -95,10 +95,10 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 		elif echocancel:
 			push_warning("Echo cancellation requires matching audio input and output mix rates")
 		opusencoder.target_agc_gain(5.0)
-	opusencoder.bitrate = p_opusbitrate
-	opusencoder.complexity = p_opuscomplexity
-	opusencoder.signal_type = TwovoipOpusEncoder.SIGNAL_VOICE if p_opusoptimizeforvoice else TwovoipOpusEncoder.SIGNAL_MUSIC
-	opusencoder.inband_perc = p_inband_perc
+	opusencoder.set_bitrate(p_opusbitrate)
+	opusencoder.set_complexity(p_opuscomplexity)
+	opusencoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE if p_opusoptimizeforvoice else TwovoipOpusEncoder.SIGNAL_MUSIC)
+	opusencoder.set_inband_perc(p_inband_perc)
 	if bitrate_changed and currentlytalking:
 		transmit_audio_packet.emit(make_audio_packet_midstream_update())
 

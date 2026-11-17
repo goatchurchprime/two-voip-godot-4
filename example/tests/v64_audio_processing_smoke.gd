@@ -27,17 +27,9 @@ func _initialize() -> void:
 	assert(not encoder.has_method("fetch_pre_encoded_chunk"))
 	for removed_method in ["create_sampler", "create_opus_encoder", "set_output_chunk_size", "get_output_chunk_size", "calc_audio_chunk_size", "process_pre_encoded_chunk", "get_denoiser", "get_agc_mode"]:
 		assert(not encoder.has_method(removed_method))
-	for property_name in ["required_input_chunk_size", "agc_gain", "peak", "rms", "speech_probability"]:
+	for property_name in ["required_input_chunk_size", "gain", "bitrate", "complexity", "signal_type", "inband_perc", "agc_gain", "peak", "rms", "speech_probability", "current_chunk"]:
 		var property = encoder.get_property_list().filter(func(item): return item.name == property_name)
-		assert(property.size() == 1)
-		assert(property[0].usage & PROPERTY_USAGE_READ_ONLY)
-	var gain_property = encoder.get_property_list().filter(func(item): return item.name == "gain")
-	assert(gain_property.size() == 1)
-	assert(not (gain_property[0].usage & PROPERTY_USAGE_READ_ONLY))
-	for property_name in ["bitrate", "complexity", "signal_type"]:
-		var property = encoder.get_property_list().filter(func(item): return item.name == property_name)
-		assert(property.size() == 1)
-		assert(not (property[0].usage & PROPERTY_USAGE_READ_ONLY))
+		assert(property.is_empty())
 	assert(encoder.set_bitrate(12000) == OK)
 	assert(encoder.set_complexity(5) == OK)
 	assert(encoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE) == OK)
@@ -45,7 +37,7 @@ func _initialize() -> void:
 	assert(encoder.get_complexity() == 5)
 	assert(encoder.get_signal_type() == TwovoipOpusEncoder.SIGNAL_VOICE)
 
-	encoder.gain = 0.5
+	encoder.set_gain(0.5)
 	var frames := make_stereo(882)
 	assert(encoder.push_input_chunk(frames) == 882)
 	assert(abs(encoder.get_gain() - 0.5) < 0.0001)

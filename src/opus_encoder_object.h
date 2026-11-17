@@ -165,7 +165,7 @@ public:
     Error set_signal_type(SignalType p_signal_type);
     SignalType get_signal_type() const { return signal_type; }
     Error set_inband_perc(int p_packet_loss_perc);
-    int get_inband_perc() { return packet_loss_perc; }
+    int get_inband_perc() const { return packet_loss_perc; }
     void reset_opus_encoder();
     PackedByteArray encode_chunk(const PackedByteArray& prefix_bytes=PackedByteArray(), int chunk_offset_back=0);
 

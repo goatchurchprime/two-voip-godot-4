@@ -34,6 +34,10 @@
 			<return type="float" />
 			<description>Returns the linear gain currently applied during processing.</description>
 		</method>
+		<method name="get_inband_perc" qualifiers="const">
+			<return type="int" />
+			<description>Returns the expected packet-loss percentage supplied to Opus, or -1 when in-band FEC is disabled.</description>
+		</method>
 		<method name="get_agc_gain" qualifiers="const">
 			<return type="float" />
 			<description>Returns the latest linear gain reported by the pre-denoising Speex AGC stage.</description>
@@ -104,24 +108,17 @@
 			<param index="0" name="complexity" type="int" />
 			<description>Changes Opus encoder complexity from 0 through 10 without recreating or resetting the encoder. A rejected value leaves the previous complexity active.</description>
 		</method>
+		<method name="set_inband_perc">
+			<return type="Error" />
+			<param index="0" name="packet_loss_perc" type="int" />
+			<description>Sets the expected packet-loss percentage used by Opus in-band FEC, or disables in-band FEC when set to -1.</description>
+		</method>
 		<method name="set_signal_type">
 			<return type="Error" />
 			<param index="0" name="signal_type" type="int" enum="TwovoipOpusEncoder.SignalType" />
 			<description>Changes the Opus signal hint without recreating or resetting the encoder. A rejected value leaves the previous signal type active.</description>
 		</method>
 	</methods>
-	<members>
-		<member name="agc_gain" type="float" setter="" getter="get_agc_gain">Latest linear gain reported by Speex AGC.</member>
-		<member name="bitrate" type="int" setter="set_bitrate" getter="get_bitrate">Current mutable Opus target bitrate in bits per second.</member>
-		<member name="complexity" type="int" setter="set_complexity" getter="get_complexity">Current mutable Opus encoder complexity from 0 through 10.</member>
-		<member name="current_chunk" type="PackedVector2Array" setter="" getter="get_current_chunk">Last processed output-rate PCM chunk as stereo frames.</member>
-		<member name="gain" type="float" setter="" getter="get_gain">Manual linear gain.</member>
-		<member name="peak" type="float" setter="" getter="get_peak">Pre-denoising peak magnitude used by VOX.</member>
-		<member name="required_input_chunk_size" type="int" setter="" getter="get_required_input_chunk_size">Required input frames per call.</member>
-		<member name="rms" type="float" setter="" getter="get_rms">Pre-denoising RMS level used by VOX.</member>
-		<member name="speech_probability" type="float" setter="" getter="get_speech_probability">Active denoiser speech score normalized to 0–1.</member>
-		<member name="signal_type" type="int" setter="set_signal_type" getter="get_signal_type" enum="TwovoipOpusEncoder.SignalType">Current mutable Opus signal hint.</member>
-	</members>
 	<constants>
 		<constant name="DENOISER_DISABLED" value="0" enum="Denoiser">No denoising.</constant>
 		<constant name="DENOISER_SPEEX" value="1" enum="Denoiser">Speex mono denoising.</constant>

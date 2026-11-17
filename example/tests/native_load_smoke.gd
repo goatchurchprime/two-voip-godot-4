@@ -20,13 +20,11 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	# Godot's editor reads registered properties while generating extension docs.
-	# Merely constructing the object does not exercise those getters.
-	var current_chunk: PackedVector2Array = encoder.get("current_chunk")
+	var current_chunk: PackedVector2Array = encoder.call("get_current_chunk")
 	if not current_chunk.is_empty():
 		push_error("TwoVoIP native smoke test: an uninitialized encoder returned audio")
 		quit(1)
 		return
 
-	print("TwoVoIP %s native smoke test: loaded and read uninitialized encoder properties" % two_voip.get_version_info())
+	print("TwoVoIP %s native smoke test: loaded and checked uninitialized encoder state" % two_voip.get_version_info())
 	quit(0)

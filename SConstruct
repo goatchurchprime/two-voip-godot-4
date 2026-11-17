@@ -5,7 +5,7 @@ from SCons.Script.SConscript import SConsEnvironment
 from SCons.Script import ARGLIST, ARGUMENTS, BUILD_TARGETS, COMMAND_LINE_TARGETS, DEFAULT_TARGETS, Glob
 
 import SCons, SCons.Script
-import sys, os, platform
+import sys, os, platform, subprocess
 import lib_utils, lib_utils_external
 
 # Fixing the encoding of the console
@@ -47,6 +47,13 @@ def setup_options(env: SConsEnvironment, arguments):
     # It must be here for lib_utils.py
     opts.Add(PathVariable("addon_output_dir", "Path to the output directory", default_output_dir, PathVariable.PathIsDirCreate))
     opts.Add(BoolVariable("rnnoise", "Enable rnnoise support", True))
+    opts.Add("opus_include_dir", "Opus header directory", os.environ.get("TWOVOIP_OPUS_INCLUDE_DIR", "opus/include"))
+    opts.Add("opus_library_dir", "Opus library directory", os.environ.get(
+        "TWOVOIP_OPUS_LIBRARY_DIR", lib_utils_external.get_cmake_output_lib_dir(env, "opus")))
+    opts.Add("rnnoise_include_dir", "RNNoise header directory", os.environ.get("TWOVOIP_RNNOISE_INCLUDE_DIR", "rnnoise/include"))
+    opts.Add("rnnoise_library_dir", "RNNoise library directory", os.environ.get(
+        "TWOVOIP_RNNOISE_LIBRARY_DIR", lib_utils_external.get_cmake_output_lib_dir(env, "thirdparty/rnnoise")))
+    opts.Add("rnnoise_library", "RNNoise library name", os.environ.get("TWOVOIP_RNNOISE_LIBRARY", "RnNoise"))
 
     opts.Update(env)
     env.Help(opts.GenerateHelpText(env))
@@ -73,12 +80,12 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out: list):
         if env.get("is_msvc", False):
             env.AppendUnique(LINKFLAGS=["/incremental:no"])
 
-    env.Append(CPPPATH="opus/include", LIBS=["opus"], LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "opus")])
+    env.Append(CPPPATH=[env["opus_include_dir"]], LIBS=["opus"], LIBPATH=[env["opus_library_dir"]])
 
     if env["rnnoise"]:
-        env.Append(CPPPATH="rnnoise/include",
-                   LIBS=["RnNoise"],
-                   LIBPATH=[lib_utils_external.get_cmake_output_lib_dir(env, "thirdparty/rnnoise")],
+        env.Append(CPPPATH=[env["rnnoise_include_dir"]],
+                   LIBS=[env["rnnoise_library"]],
+                   LIBPATH=[env["rnnoise_library_dir"]],
                    CPPDEFINES=["RNNOISE"])
 
     if env.get("is_msvc", False):
@@ -140,6 +147,12 @@ def build_rnnoise(target, source, env: SConsEnvironment):
 
     return lib_utils_external.cmake_build_project(env, "thirdparty/rnnoise", extra_flags)
 
+def set_portable_linux_rpath(target, source, env: SConsEnvironment):
+    patchelf = os.environ.get("TWOVOIP_PATCHELF")
+    if not patchelf:
+        return 0
+    return subprocess.run([patchelf, "--set-rpath", "$ORIGIN", str(target[0])]).returncode
+
 env: SConsEnvironment = SConscript("godot-cpp/SConstruct")
 env = env.Clone()
 
@@ -154,6 +167,8 @@ extra_tags = ""
 output_path = env["addon_output_dir"]
 
 library = lib_utils.get_library_object(env, project_name, lib_name, extra_tags, output_path, src_folder, additional_src)
+if env["platform"] == "linux" and os.environ.get("TWOVOIP_PATCHELF"):
+    env.AddPostAction(library, set_portable_linux_rpath)
 env.Clean(env.File(library), env.Dir("#build"))
 
 # Register console commands
