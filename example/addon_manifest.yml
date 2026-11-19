@@ -1,0 +1,18 @@
+# Direct dependency of this example project.
+github.com/goatchurchprime/godot-mqtt:
+  name: Godot MQTT
+  url: https://github.com/goatchurchprime/godot-mqtt/archive/21e94568bd80a84b59f7b9e485e581736eacfe59.zip
+  path: addons/mqtt
+  version: "21e94568bd80a84b59f7b9e485e581736eacfe59"
+  tag: "21e94568bd80a84b59f7b9e485e581736eacfe59"
+  lock: true
+
+# Direct dependency of this example project. The release contains the compiled
+# Opus, RNNoise, and SpeexDSP libraries.
+github.com/goatchurchprime/two-voip-godot-4:
+  name: TwoVoIP
+  url: https://github.com/goatchurchprime/two-voip-godot-4/releases/download/v6.6.2/TwoVoIP.zip
+  path: addons/twovoip
+  version: "6.6.2"
+  tag: "v6.6.2"
+  lock: true
