@@ -11,6 +11,6 @@ git clone --branch gdaddon-v6.6.2 --single-branch https://github.com/goatchurchp
 gdaddon install --all --root two-voip-godot-4/example
 ```
 
-That one install command downloads the pinned MQTT source snapshot and the public,
+That one install command downloads the tagged MQTT V1.4 source and the public,
 pinned TwoVoIP 6.6.2 release. The TwoVoIP release already contains the compiled
 Opus, RNNoise, and SpeexDSP libraries; they are not separate Godot addons.
