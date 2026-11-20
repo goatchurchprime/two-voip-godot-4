@@ -1,10 +1,10 @@
 # Direct dependency of this example project.
 github.com/goatchurchprime/godot-mqtt:
   name: Godot MQTT
-  url: https://github.com/goatchurchprime/godot-mqtt/archive/refs/tags/V1.4.zip
+  url: https://github.com/goatchurchprime/godot-mqtt/releases/download/V1.5/godot-mqtt.zip
   path: addons/mqtt
-  version: "V1.4"
-  tag: "V1.4"
+  version: "1.5"
+  tag: "V1.5"
   lock: true
 
 # Direct dependency of this example project. The release contains the compiled
