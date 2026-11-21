@@ -10,47 +10,108 @@ for work on the github actions that are successfully building this plugin across
 
 ## Components of this library
 
-The following libraries from Xiph are compiled into this plugin:
+The following libraries are used:
 
-| Dependency | Version used | Pinned source | Release Date |
-| --- | --- | --- | --- |
-| [libopus](https://github.com/xiph/opus) | v1.5.2 | [`ddbe4838`](https://github.com/xiph/opus/commit/ddbe48383984d56acd9e1ab6a090c54ca6b735a6) | 10 April 2024 |
-| [RNNoise](https://github.com/xiph/rnnoise) | v0.2 + 1 commit | [`372f7b4b`](https://github.com/xiph/rnnoise/commit/372f7b4b76cde4ca1ec4605353dd17898a99de38) | 15 April 2024 |
-| [SpeexDSP](https://github.com/xiph/speexdsp) | 1.2.1 | [`1b28a0f6`](https://github.com/xiph/speexdsp/commit/1b28a0f61bc31162979e1f26f3981fc3637095c8) | 13 June 2022 |
-
-The core library, `libopus` is the industry standard for compressing voice packets, `RNNoise` is a hight quality denoiser that works at 48kHz, and `SpeexDSP`
-has a resampler, automatic gain control and an echo canceller (not yet used).
-
-You can use these components themselves, or you can use the VoipHelper module (written in GDScript) to manage all the higher
-level functionality, such as voice gating, packet numbering, jitter buffers and network lag.  There is also a hook to add in vizemes data.
+| Dependency | Version | Features |
+| --- | --- | --- |
+| [libopus](https://github.com/xiph/opus) | v1.5.2 (10 April 2024) | Audio compression |
+| [RNNoise](https://github.com/xiph/rnnoise) | v0.2 + 1 commit (15 April 2024) | Noise suppression |
+| [SpeexDSP](https://github.com/xiph/speexdsp) | 1.2.1 (13 June 2022) | Echo, gain, resampling |
+| [godot-mqtt](https://github.com/goatchurch/godot-mqtt) | 1.5 (??) | Low maintenance networking |
 
 ## Fresh clone and precompiled addons
 
-The repository root is the Godot development project. Clone the submodules,
-restore the repository-pinned GodotEnv tool, and install the precompiled native
-libraries plus the MQTT V1.5 addon:
+Install the packaging of the [GodotEnv](https://github.com/chickensoft-games/godotenv) package manager:
 
+> nix shell nixpkgs#dotnet-sdk_8 nixpkgs#unzip
+
+Then clone and install the addons specified in `addons.jsonc`
 ```sh
 git clone --recursive https://github.com/goatchurchprime/two-voip-godot-4.git
 cd two-voip-godot-4
-nix shell nixpkgs#dotnet-sdk_8 --command dotnet tool restore
-nix shell nixpkgs#dotnet-sdk_8 nixpkgs#unzip --command dotnet tool run godotenv addons install
+dotnet tool run godotenv addons install
 ```
 
-GodotEnv reads `addons.jsonc`. It installs MQTT V1.5, including the LAN and
-simulated brokers, into `addons/mqtt`. For TwoVoIP it installs only the `libs`
-directory from the v7.0.1 release into `addons/twovoip/libs`; the editable
-GDScript addon source already in the clone is not replaced.
+### Building the addon
 
 Open the repository root in Godot 4.6 after the install completes. For native
 TwoVoIP development, `nix develop` followed by `scons` rebuilds the same library
 location from source.
 
-Since most of the bugs and problems encountered in a voip module are to do with networking and the fact that the packing and 
-and unpacking is done on different machines, there is a networked example that works over MQTT that has proven 
-to show up all the issues that occur when running this with a normal network system.
+## Minimal example
 
-## Minimal example here
+This module contains the minimal wrapper for the `TwoVoipMic` and `TwoVoipSpeaker` from `voiphelper`.
+
+### Input player
+
+The first parameter to `$TwoVoipMic.init_voip_mic()` selects naked base64 Opus
+packets when true and naked binary Opus packets when false. All audio and ASCII
+control packets are emitted as `PackedByteArray` values through
+`transmit_audio_packet`. Applications may intercept and parse control packets
+with the static `TwoVoipPacket` helpers when they need the metadata.
+
+The next four parameters are optional buttons `MicOn`, `PTT`, `Vox`, `Denoise` that you can choose to share from the user interface in your game.
+The sixth parameter `InputOption` is of type [OptionButton](https://docs.godotengine.org/en/stable/classes/class_optionbutton.html#optionbutton) and is populated with the results of
+[AudioServer.get_input_device_list()](https://docs.godotengine.org/en/stable/classes/class_audioserver.html#class-audioserver-method-get-input-device-list).
+Finally there is the `voxshader.gdshader` material you can use to make an activity waveform.
+
+The Opus encoder itself is created by `set_opus_values(opussamplerate, opusframedurationms, channels, opusbitrate, opuscomplexity, opusoptimizeforvoice, denoiser, agc_mode)` where `opussamplerate` is chosen from [48000, 24000, 12000, 8000],
+`opusframedurationms` which must be one of [5, 10, 20, 40, 60], `channels` is 1 for mono and 2 for stereo,
+`opusbitrate` is a range between 500 and 64000, `opuscomplexity` a number between 1 and 10, and `opusoptimizeforvoice` is a boolean value. `denoiser` and `agc_mode` are fixed for that sampler configuration. These are better outlined in the [Opus Definition](https://datatracker.ietf.org/doc/html/rfc6716#section-2.1).
+
+If the `Vox` option is set, then `TwoVoipMic.set_voxthreshhold(voxthreshhold)` will set the gating threshold
+(this sets the visual parameter in the shader). There is also `hang_time`, the time the microphone will
+keep running after the noise has fallen below the VOX threshold, and `lead_time`, the amount of conditioned
+audio captured before the threshold was reached to avoid clipping the beginning of speech.
+
+### Output player
+
+The `TwoVoipSpeaker` module handles incoming VoIP packets in the function 
+`receive_audio_packet(packet)` and manages an `AudioStreamOpus` object loaded into an `AudioStreamPlayer`.
+
+The packets are either naked binary/base64 Opus chunks or ASCII JSON-array
+control packets. The function `external_end_stream()`
+will auto-generate an end stream if one is missing because the network has been interrupted so that it doesn't
+try to retain the buffers.
+
+`TwoVoipSpeaker.audio_buffer_lag_time_target` sets the source-to-audible delay in seconds.
+The optional passive `TwoVoipTimingMeter` scene owns arrival statistics,
+anomaly logging, and drawing state. `TwoVoipSpeaker` owns the decoded-frame
+kind/maximum ring because those source-gap cells can later drive playout-delay
+recovery; the meter only observes that ring and never changes playback
+decisions. It draws the target on a fixed
+`display_span` timeline (1.2 seconds by default), rather than rescaling the
+graph when the target changes. Its position is simply the target divided by
+that span, after the configurable `display_before_source` region; neither
+the display position nor these default spans are synchronization policy. The
+negative-time region makes buffer overruns past the source event visible. This
+common time axis can also be used to compare players or to give
+receivers in one room the same presentation deadline. Acquisition is a configured estimate and tolerance;
+yellow arrival bins flash for new packets and fade into a recent density plot.
+Their position is acquisition plus transport variation above the fastest
+observed capture-to-arrival sample, not an absolute one-way network latency.
+The thin output-buffer row is overlaid on the same scale, so a healthy arrival
+appears directly above the decoded buffer tail it extends. Cells remain
+virtually visible after their ring slots pass the read index while that audio
+crosses the mixer and device buffers. The left edge of the shrinking red
+sub-chunk bar is the frame physically audible now.
+
+In the MQTT example, `LogAll Rec` stores the complete arrival sequence and
+timing in `user://mqttlogging.dat`; new recordings encode payloads losslessly
+and the replay reader remains compatible with older text logs. Timing anomaly
+records in `user://two_voip_timing_anomalies.jsonl` identify the speaker,
+recording session, and most recently delivered LogAll packet index. Source-time
+origin overruns are recorded at their first crossing and at subsequent 100 ms
+high-water steps, allowing the existing Replay button to reproduce and locate
+the packet/control transition that preceded the growth.
+
+Obviously the system needs to know when a stream has ended (a footer has been received) so it can consume the buffer down to zero.
+
+The `set_sinewave_out()` setting replaces the audio as it is decoded with a 440Hz tone so it's possible
+to tell the difference between choppy transmission and playing and a choppy microphone data.
+Use `get_tail_max(frame_count)` to get an indicator of the recent decoded audio from a particular player, which helps
+to tell the difference between whether they are muted, or your playback volume has been turned down.
+
 
 
 
@@ -155,79 +216,6 @@ start header. If a player joins while someone is talking,
 mid-stream update containing the current frame count, calculated frame-zero
 time and bitrate.
 
-### simpleexample
-
-This module contains the minimal wrapper for the `TwoVoipMic` and `TwoVoipSpeaker` modules of `voiphelper`.
-
-#### Input player
-
-The first parameter to `$TwoVoipMic.init_voip_mic()` selects naked base64 Opus
-packets when true and naked binary Opus packets when false. All audio and ASCII
-control packets are emitted as `PackedByteArray` values through
-`transmit_audio_packet`. Applications may intercept and parse control packets
-with the static `TwoVoipPacket` helpers when they need the metadata.
-
-The next four parameters are optional buttons `MicOn`, `PTT`, `Vox`, `Denoise` that you can choose to share from the user interface in your game.
-The sixth parameter `InputOption` is of type [OptionButton](https://docs.godotengine.org/en/stable/classes/class_optionbutton.html#optionbutton) and is populated with the results of
-[AudioServer.get_input_device_list()](https://docs.godotengine.org/en/stable/classes/class_audioserver.html#class-audioserver-method-get-input-device-list).
-Finally there is the `voxshader.gdshader` material you can use to make an activity waveform.
-
-The Opus encoder itself is created by `set_opus_values(opussamplerate, opusframedurationms, channels, opusbitrate, opuscomplexity, opusoptimizeforvoice, denoiser, agc_mode)` where `opussamplerate` is chosen from [48000, 24000, 12000, 8000],
-`opusframedurationms` which must be one of [5, 10, 20, 40, 60], `channels` is 1 for mono and 2 for stereo,
-`opusbitrate` is a range between 500 and 64000, `opuscomplexity` a number between 1 and 10, and `opusoptimizeforvoice` is a boolean value. `denoiser` and `agc_mode` are fixed for that sampler configuration. These are better outlined in the [Opus Definition](https://datatracker.ietf.org/doc/html/rfc6716#section-2.1).
-
-If the `Vox` option is set, then `TwoVoipMic.set_voxthreshhold(voxthreshhold)` will set the gating threshold
-(this sets the visual parameter in the shader). There is also `hang_time`, the time the microphone will
-keep running after the noise has fallen below the VOX threshold, and `lead_time`, the amount of conditioned
-audio captured before the threshold was reached to avoid clipping the beginning of speech.
-
-#### Output player
-
-The `TwoVoipSpeaker` module handles incoming VoIP packets in the function 
-`receive_audio_packet(packet)` and manages an `AudioStreamOpus` object loaded into an `AudioStreamPlayer`.
-
-The packets are either naked binary/base64 Opus chunks or ASCII JSON-array
-control packets. The function `external_end_stream()`
-will auto-generate an end stream if one is missing because the network has been interrupted so that it doesn't
-try to retain the buffers.
-
-`TwoVoipSpeaker.audio_buffer_lag_time_target` sets the source-to-audible delay in seconds.
-The optional passive `TwoVoipTimingMeter` scene owns arrival statistics,
-anomaly logging, and drawing state. `TwoVoipSpeaker` owns the decoded-frame
-kind/maximum ring because those source-gap cells can later drive playout-delay
-recovery; the meter only observes that ring and never changes playback
-decisions. It draws the target on a fixed
-`display_span` timeline (1.2 seconds by default), rather than rescaling the
-graph when the target changes. Its position is simply the target divided by
-that span, after the configurable `display_before_source` region; neither
-the display position nor these default spans are synchronization policy. The
-negative-time region makes buffer overruns past the source event visible. This
-common time axis can also be used to compare players or to give
-receivers in one room the same presentation deadline. Acquisition is a configured estimate and tolerance;
-yellow arrival bins flash for new packets and fade into a recent density plot.
-Their position is acquisition plus transport variation above the fastest
-observed capture-to-arrival sample, not an absolute one-way network latency.
-The thin output-buffer row is overlaid on the same scale, so a healthy arrival
-appears directly above the decoded buffer tail it extends. Cells remain
-virtually visible after their ring slots pass the read index while that audio
-crosses the mixer and device buffers. The left edge of the shrinking red
-sub-chunk bar is the frame physically audible now.
-
-In the MQTT example, `LogAll Rec` stores the complete arrival sequence and
-timing in `user://mqttlogging.dat`; new recordings encode payloads losslessly
-and the replay reader remains compatible with older text logs. Timing anomaly
-records in `user://two_voip_timing_anomalies.jsonl` identify the speaker,
-recording session, and most recently delivered LogAll packet index. Source-time
-origin overruns are recorded at their first crossing and at subsequent 100 ms
-high-water steps, allowing the existing Replay button to reproduce and locate
-the packet/control transition that preceded the growth.
-
-Obviously the system needs to know when a stream has ended (a footer has been received) so it can consume the buffer down to zero.
-
-The `set_sinewave_out()` setting replaces the audio as it is decoded with a 440Hz tone so it's possible
-to tell the difference between choppy transmission and playing and a choppy microphone data.
-Use `get_tail_max(frame_count)` to get an indicator of the recent decoded audio from a particular player, which helps
-to tell the difference between whether they are muted, or your playback volume has been turned down.
 
 ### Low-level encoder processing
 
@@ -376,58 +364,3 @@ same `TwoVoipSpeaker.receive_audio_packet()` entry point.
 When a player joins mid-stream use `TwoVoipMic.request_audio_packet_midstream()`
 and deliver both returned control packets in order.
 
-## Building the addon
-
-There are four submodules in this repository.
-
-**godot-cpp** is contains the header files and class definitions required to build a compiled 
-[GDExtension](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/what_is_gdextension.html) object that can 
-dynamically link to the GodotEngine at runtime.
-TwoVoip 6.1 pins the submodule to the official `godot-cpp` `10.0.0-rc1`
-release (`58d1de720b8ffe9f8ffcdfe3a85148582cfd2e74`), whose generated API is
-Godot `4.6-stable`. The godot-cpp project changed its release numbering after
-its `godot-4.5-stable` release, so the `10.0.0-rc1` name refers to the binding
-library version rather than a Godot 4.6 release candidate.
-
-**opus** is the opus voice compression and decompression library from [xiph.org](https://xiph.org/) that 
-generally takes an array of 960 pairs of floats representing 20ms of stereo audio samples at 48kHz and 
-returns 20 to 30 bytes of compressed data for that chunk.
-
-**speexdsp** is a direct submodule of the official
-[Xiph SpeexDSP repository](https://github.com/xiph/speexdsp), pinned to the
-signed `SpeexDSP-1.2.1` release at commit
-`1b28a0f61bc31162979e1f26f3981fc3637095c8`. TwoVoIP compiles the resampler and
-preprocessor sources directly into the extension. This is the same upstream resampler
-revision that was previously copied into `src`, with its floating-point mode
-selected explicitly by the build.
-
-**rnnoise** is a direct submodule of the official
-[Xiph RNNoise repository](https://github.com/xiph/rnnoise), pinned to commit
-`372f7b4b76cde4ca1ec4605353dd17898a99de38`. Xiph does not provide CMake build
-files at that revision, so TwoVoIP supplies a small CMake adapter in
-`thirdparty/rnnoise`. RNNoise also keeps its large default model outside Git;
-the adapter downloads model revision `0b50c45` from Xiph and verifies its
-SHA-256 checksum before compiling it.
-
-GitHub Actions is the authoritative source of distributable native binaries.
-The Linux debug and release libraries are built together on Ubuntu 22.04. The
-workflow rejects either library if it requires a glibc newer than 2.35 or
-contains a Nix store runtime path, and repeats that check after collecting the
-release package. Each stripped binary is also loaded separately by the official
-Godot 4.6 editor and must instantiate `TwovoipOpusEncoder` before it can be
-packaged. This keeps the editor/debug library and exported/release library on
-the same tested Linux compatibility floor.
-
-The pinned local development build on NixOS is:
-```bash
-nix develop
-scons -c  # optional: remove the previous extension and top-level build tree
-scons
-scripts/check_linux_abi.sh addons/twovoip/libs/libtwovoip.linux.*.so
-```
-
-The shell pins the compiler and native dependencies and builds against the
-same old glibc baseline used by `nix build`. The complete `nix build` also runs
-the Linux ABI check and loads the extension in pinned Godot 4.6 before
-packaging `result/addons/twovoip`. GitHub Actions remains the authoritative
-source of release artifacts for every supported platform.
