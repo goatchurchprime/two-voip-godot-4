@@ -44,3 +44,19 @@ Use a separate clone or worktree for another branch. Git normally permits a
 checkout to overwrite ignored addon files. If you do switch this working tree,
 use `git switch --no-overwrite-ignore <branch>` so Git aborts instead of
 silently replacing the generated addon directories.
+
+## GodotEnv command reminder
+
+From the repository root, install or restore the repository-pinned GodotEnv
+tool:
+
+```sh
+nix shell nixpkgs#dotnet-sdk_8 --command dotnet tool restore
+```
+
+Then run GodotEnv from the example directory whenever `addons.jsonc` changes:
+
+```sh
+cd example
+nix shell nixpkgs#dotnet-sdk_8 nixpkgs#unzip --command dotnet tool run godotenv addons install
+```
