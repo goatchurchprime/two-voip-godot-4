@@ -7,7 +7,7 @@ on:
         addons/twovoip/**,
         .github/**,
         "!.github/**/util_*",
-        "example/tests/**",
+        "tests/**",
         "patches/**",
         "scripts/**",
         "thirdparty/**",
@@ -25,7 +25,7 @@ on:
         addons/twovoip/**,
         .github/**,
         "!.github/**/util_*",
-        "example/tests/**",
+        "tests/**",
         "patches/**",
         "scripts/**",
         "thirdparty/**",
@@ -149,12 +149,12 @@ jobs:
           XDG_CONFIG_HOME: ${{runner.temp}}/twovoip-smoke/config
           XDG_CACHE_HOME: ${{runner.temp}}/twovoip-smoke/cache
         run: |
-          mkdir -p addons/twovoip/libs example/.godot
+          mkdir -p addons/twovoip/libs .godot
           printf '%s\n' 'res://addons/twovoip/twovoip.gdextension' \
-            > example/.godot/extension_list.cfg
+            > .godot/extension_list.cfg
           cp "${OUTPUT_LIBS_PATH}"/libtwovoip.linux.*.${{matrix.arch}}.so \
             addons/twovoip/libs/libtwovoip.linux.template_debug.${{matrix.arch}}.so
-          "${{steps.setup_godot.outputs.godot}}" --headless --path example \
+          "${{steps.setup_godot.outputs.godot}}" --headless --path . \
             --script res://tests/native_load_smoke.gd
 
 # ============================================

@@ -96,9 +96,9 @@
             export XDG_DATA_HOME="$TMPDIR/twovoip-smoke/data"
             export XDG_CONFIG_HOME="$TMPDIR/twovoip-smoke/config"
             export XDG_CACHE_HOME="$TMPDIR/twovoip-smoke/cache"
-            mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" example/.godot
-            printf '%s\n' 'res://addons/twovoip/twovoip.gdextension' > example/.godot/extension_list.cfg
-            godot4 --headless --path example --script res://tests/native_load_smoke.gd
+            mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" .godot
+            printf '%s\n' 'res://addons/twovoip/twovoip.gdextension' > .godot/extension_list.cfg
+            godot4 --headless --path . --script res://tests/native_load_smoke.gd
             runHook postCheck
           '';
           installPhase = ''

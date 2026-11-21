@@ -20,5 +20,5 @@ obj/
 addons/twovoip/libs/*
 addons/twovoip_lipsync/libs/*
 addons/twovoip_lipsync/OVRLipSyncNative/*
-example/addons/twovoip*
-example/android/*
+android/*
+exports/*

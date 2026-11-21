@@ -40,9 +40,9 @@ An HTML5 demo is hosted at https://goatchurch.itch.io/twovoip-mqtt
 The purpose of this demo is to test all the features so you can hear what the opus compression and noise cancelling settings do to a voice recording, as well as debug sample rate issues.
 
 1. Clone/Download this repository.
-2. Open the project in the `example/` directory in Godot 4.6.
-3. Go to assetstore, search for twovoip, and install it.
-4. Run the main scene `radiomqtt.tscn`. 
+2. Open the repository root as a project in Godot 4.6.
+3. Build the native extension with `nix develop` followed by `scons`, or install a release artifact into `addons/twovoip`.
+4. Run the main scene `radiomqtt/radiomqtt.tscn`.
 5. If the microphone is working, then you should see a waveform in the app like this:
 
 Use the [mic_record](https://github.com/godotengine/godot-demo-projects/tree/master/audio/mic_record) demo project
