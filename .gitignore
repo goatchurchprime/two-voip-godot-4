@@ -19,7 +19,10 @@ obj/
 addons/twovoip/libs/*
 addons/twovoip_lipsync/libs/*
 addons/twovoip_lipsync/OVRLipSyncNative/*
-example/addons/twovoip*
+# GodotEnv installs these from example/addons.jsonc.
+example/.addons/
+example/addons/*
+!example/addons/.editorconfig
 example/android/*
 cmake_build_out/*
 thirdparty/rnnoise/cmake_build_out/

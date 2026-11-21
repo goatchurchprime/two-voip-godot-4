@@ -1,0 +1,17 @@
+{
+  "$schema": "https://chickensoft.games/schemas/addons.schema.json",
+  "path": "addons",
+  "cache": ".addons",
+  "addons": {
+    "mqtt": {
+      "url": "https://github.com/goatchurchprime/godot-mqtt/releases/download/V1.5/godot-mqtt.zip",
+      "source": "zip",
+      "subfolder": "addons/mqtt"
+    },
+    "twovoip": {
+      "url": "https://github.com/goatchurchprime/two-voip-godot-4/releases/download/v6.6.2/TwoVoIP.zip",
+      "source": "zip",
+      "subfolder": "project/addons/twovoip"
+    }
+  }
+}
