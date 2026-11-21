@@ -24,6 +24,28 @@ has a resampler, automatic gain control and an echo canceller (not yet used).
 You can use these components themselves, or you can use the VoipHelper module (written in GDScript) to manage all the higher
 level functionality, such as voice gating, packet numbering, jitter buffers and network lag.  There is also a hook to add in vizemes data.
 
+## Fresh clone and precompiled addons
+
+The repository root is the Godot development project. Clone the submodules,
+restore the repository-pinned GodotEnv tool, and install the precompiled native
+libraries plus the MQTT V1.5 addon:
+
+```sh
+git clone --recursive https://github.com/goatchurchprime/two-voip-godot-4.git
+cd two-voip-godot-4
+nix shell nixpkgs#dotnet-sdk_8 --command dotnet tool restore
+nix shell nixpkgs#dotnet-sdk_8 nixpkgs#unzip --command dotnet tool run godotenv addons install
+```
+
+GodotEnv reads `addons.jsonc`. It installs MQTT V1.5, including the LAN and
+simulated brokers, into `addons/mqtt`. For TwoVoIP it installs only the `libs`
+directory from the v7.0.1 release into `addons/twovoip/libs`; the editable
+GDScript addon source already in the clone is not replaced.
+
+Open the repository root in Godot 4.6 after the install completes. For native
+TwoVoIP development, `nix develop` followed by `scons` rebuilds the same library
+location from source.
+
 Since most of the bugs and problems encountered in a voip module are to do with networking and the fact that the packing and 
 and unpacking is done on different machines, there is a networked example that works over MQTT that has proven 
 to show up all the issues that occur when running this with a normal network system.
@@ -41,7 +63,7 @@ The purpose of this demo is to test all the features so you can hear what the op
 
 1. Clone/Download this repository.
 2. Open the repository root as a project in Godot 4.6.
-3. Build the native extension with `nix develop` followed by `scons`, or install a release artifact into `addons/twovoip`.
+3. Run the GodotEnv installation above, or build the native extension with `nix develop` followed by `scons`.
 4. Run the main scene `radiomqtt/radiomqtt.tscn`.
 5. If the microphone is working, then you should see a waveform in the app like this:
 

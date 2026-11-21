@@ -5,6 +5,9 @@ on:
       [
         src/**,
         addons/twovoip/**,
+        addons.jsonc,
+        .config/**,
+        project.godot,
         .github/**,
         "!.github/**/util_*",
         "tests/**",
@@ -23,6 +26,9 @@ on:
       [
         src/**,
         addons/twovoip/**,
+        addons.jsonc,
+        .config/**,
+        project.godot,
         .github/**,
         "!.github/**/util_*",
         "tests/**",

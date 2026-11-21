@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 7.0.1 - 2026-11-21
+
+- make the repository root the Godot development and MQTT demonstration
+  project, removing the duplicate `example/` project wrapper;
+- add a repository-pinned GodotEnv setup which installs the precompiled
+  TwoVoIP 7.0.1 native libraries without replacing editable addon source;
+- install the MQTT V1.5 addon through GodotEnv, including its simulated and
+  LAN brokers.
+
+## 7.0.0 - 2026-11-20
+
 - give each incoming talk episode its own independently provisioned
   `AudioStreamPlaybackOpus`, allowing Godot player polyphony to mix overlaps;
 - replace `AudioStreamPlaybackResampled` with a playback-owned Speex resampler

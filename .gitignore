@@ -20,5 +20,9 @@ obj/
 addons/twovoip/libs/*
 addons/twovoip_lipsync/libs/*
 addons/twovoip_lipsync/OVRLipSyncNative/*
+# GodotEnv installs the native TwoVoIP libraries and MQTT dependency.
+.addons/
+addons/mqtt/
+!addons/.editorconfig
 android/*
 exports/*
