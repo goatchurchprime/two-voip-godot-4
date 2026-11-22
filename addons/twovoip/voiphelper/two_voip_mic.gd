@@ -54,6 +54,13 @@ var sent_audio_reference: AudioStreamPlaybackOpus = null
 var application_resume_pending := false
 var application_resume_count := 0
 
+enum EchoCancelling {
+	ECHO_CANCEL_DISABLED,
+	ECHO_CANCEL_SPEEX,
+	ECHO_CANCEL_WEBRTC
+}
+var echo_cancel_mode = EchoCancelling.ECHO_CANCEL_DISABLED
+
 func _notification(what: int):
 	if what == NOTIFICATION_APPLICATION_RESUMED:
 		# get_ticks_usec() is not a portable suspend clock. Force a fresh wire
@@ -69,7 +76,7 @@ func consume_application_resume() -> bool:
 		processtalkstreamends(false)
 	return true
 
-func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_inband_perc, p_denoiser_mode, p_agc_mode):
+func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_inband_perc, p_denoiser_mode, p_agc_mode, p_echo_cancel):
 	input_mix_rate = AudioServer.get_input_mix_rate()
 	var bitrate_changed = opusencoder != null and opusencoder.get_bitrate() != p_opusbitrate
 	if opusencoder == null or opussamplerate != p_opussamplerate or opuschannels != p_channels or denoiser_mode != p_denoiser_mode or agc_mode != p_agc_mode or opusframedurationms != p_opusframedurationms:
@@ -87,14 +94,29 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 		if sampler_error != OK:
 			push_error("TwoVoIP sampler configuration failed: %s" % error_string(sampler_error))
 			return false
-		if echocancel and AudioServer.get_mix_rate() == input_mix_rate:
+		opusencoder.target_agc_gain(5.0)  # hack to move it up quickly
+
+	echo_cancel_mode = p_echo_cancel
+	echocancelobject = null
+	captureframeslip = 0
+	if echo_cancel_mode == EchoCancelling.ECHO_CANCEL_SPEEX:
+		var n = AudioServer.get_bus_effect_count(0)
+		if n == 0 or not is_instance_of(AudioServer.get_bus_effect(0, n-1), AudioEffectCapture):
+			AudioServer.add_bus_effect(0, AudioEffectCapture.new())
+			n = AudioServer.get_bus_effect_count(0)
+		mastercapture = AudioServer.get_bus_effect(0, n - 1)
+		mastercapture.buffer_length = 1.0
+
+		if AudioServer.get_mix_rate() == input_mix_rate:
+			echocancelobject = TwoVoipEchoCanceler.new()
+			mastercapture.clear_buffer()
 			var echo_error = echocancelobject.initialize(input_mix_rate, opusencoder.get_required_input_chunk_size())
 			if echo_error != OK:
 				push_error("TwoVoIP echo cancellation configuration failed: %s" % error_string(echo_error))
-				return false
-		elif echocancel:
+				echocancelobject = null
+		else:
 			push_warning("Echo cancellation requires matching audio input and output mix rates")
-		opusencoder.target_agc_gain(5.0)
+
 	opusencoder.set_bitrate(p_opusbitrate)
 	opusencoder.set_complexity(p_opuscomplexity)
 	opusencoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE if p_opusoptimizeforvoice else TwovoipOpusEncoder.SIGNAL_MUSIC)
@@ -119,8 +141,8 @@ var optioninputdevice: OptionButton = null
 var pttbutton: Button = null
 var voxbutton: Button = null
 var mastercapture: AudioEffectCapture = null
-@export var echocancel = false
-var echocancelobject = null # TwoVoipEchoCanceler.new()
+var echocancelobject = null
+var captureframeslip = 0
 
 func _ready():
 	set_process(false)
@@ -130,45 +152,18 @@ func _ready():
 			func(packet, recipient): transmit_control_packet.emit(packet, recipient))
 	$ClockSync.synchronization_finished.connect(
 			func(success, missing): clock_synchronization_finished.emit(success, missing))
-	if echocancel:
-		var n = AudioServer.get_bus_effect_count(0)
-		if n == 0 or not is_instance_of(AudioServer.get_bus_effect(0, n-1), AudioEffectCapture):
-			AudioServer.add_bus_effect(0, AudioEffectCapture.new())
-			n = AudioServer.get_bus_effect_count(0)
-		mastercapture = AudioServer.get_bus_effect(0, n - 1)
-		mastercapture.buffer_length = 1.0
-
-func get_aligned_echo_frames(first_frame_time_usec: int, frame_count: int) -> PackedVector2Array:
-	if mastercapture == null or AudioServer.get_mix_rate() != input_mix_rate:
-		return PackedVector2Array()
-	var available := mastercapture.get_frames_available()
-	if available < frame_count:
-		return PackedVector2Array()
-	var next_output_time_usec := Time.get_ticks_usec() + roundi(
-			(AudioServer.get_time_to_next_mix() + AudioServer.get_output_latency()) * 1000000.0)
-	var oldest_output_time_usec := next_output_time_usec - roundi(available * 1000000.0 / input_mix_rate)
-	var discard_frames := roundi((first_frame_time_usec - oldest_output_time_usec) * input_mix_rate / 1000000.0)
-	if discard_frames < 0 or discard_frames > available - frame_count:
-		return PackedVector2Array()
-	if discard_frames > 0:
-		mastercapture.get_buffer(discard_frames)
-	return mastercapture.get_buffer(frame_count)
 
 func transport_connected(peer_id: String):
 	$ClockSync.transport_connected(peer_id)
 
-
 func transport_disconnected():
 	$ClockSync.transport_disconnected()
-
 
 func register_peer(peer_id: String, speaker: Node):
 	$ClockSync.register_peer(peer_id, speaker)
 
-
 func unregister_peer(peer_id: String):
 	$ClockSync.unregister_peer(peer_id)
-
 
 func receive_control_packet(peer_id: String, packet: PackedByteArray,
 		arrival_time_usec: int = 0, replay := false) -> bool:
@@ -467,6 +462,8 @@ func receive_audio_hash_response(receiver_name: String, response: Array):
 		get_node("../HBoxNetManage/HashErrors").value += 1
 	recent_hash_code = 0
 
+var raw_audio_chunk = null
+var captured_audio_chunk = null
 var audio_chunk = null
 var last_chunkmax = 0.0
 var speechnoiseprobability = 0.0
@@ -497,20 +494,24 @@ func _process(_delta):
 		if input_frames_available < required_input_frames:
 			break
 
-		audio_chunk = AudioServer.get_input_frames(required_input_frames)
-		if len(audio_chunk) == 0:
+		raw_audio_chunk = AudioServer.get_input_frames(required_input_frames)
+		if len(raw_audio_chunk) == 0:
 			break
 
-		if echocancel and mastercapture:
-			var outframes := get_aligned_echo_frames(first_frame_time_usec, required_input_frames)
-			if outframes.size() == required_input_frames:
-				audio_chunk = echocancelobject.cancel_echo(audio_chunk, outframes)
+		audio_chunk = raw_audio_chunk
+		captured_audio_chunk = null
+		if echocancelobject and mastercapture:
+			captured_audio_chunk = mastercapture.get_buffer(min(mastercapture.get_frames_available(), required_input_frames))
+			if required_input_frames == captured_audio_chunk.size():
+				audio_chunk = echocancelobject.cancel_echo(audio_chunk, captured_audio_chunk)
+			else:
+				captureframeslip += required_input_frames - captured_audio_chunk.size()
+				print("captureframeslip ", captureframeslip)
 
 		if opusencoder.push_input_chunk(audio_chunk) < 0:
 			break
 		input_chunk_number += 1
 		input_chunk_first_frame_times_usec[input_chunk_number % input_chunk_first_frame_times_usec.size()] = first_frame_time_usec
-		talking_first_frame_time_usec
 		if denoiser_mode != TwovoipOpusEncoder.DENOISER_DISABLED and not (denoiser_mode == TwovoipOpusEncoder.DENOISER_RNNOISE_DEFERRED and not currentlytalking):
 			opusencoder.denoise_chunk(0)
 			speechnoiseprobability = opusencoder.get_speech_probability()
@@ -523,4 +524,6 @@ func _process(_delta):
 		processvox(last_chunkmax, speechnoiseprobability, opusencoder.get_current_chunk())
 		if currentlytalking:
 			processopuschunk(0)
+	raw_audio_chunk = null
+	captured_audio_chunk = null
 	audio_chunk = null

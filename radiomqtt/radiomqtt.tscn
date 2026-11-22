@@ -7,6 +7,7 @@
 [ext_resource type="Theme" uid="uid://c2vbx2cnwqepo" path="res://radiomqtt/smallspinbox.tres" id="4_7rbsf"]
 [ext_resource type="PackedScene" uid="uid://c1ibcb1toyerh" path="res://radiomqtt/member.tscn" id="4_w5dv2"]
 [ext_resource type="Shader" uid="uid://bq3uv3u8jhu77" path="res://addons/twovoip/voiphelper/voxshader.gdshader" id="5_7rbsf"]
+[ext_resource type="AudioStream" uid="uid://bngnlpwvxk6r4" path="res://radiomqtt/onetwotwo.mp3" id="5_85ctl"]
 [ext_resource type="Script" uid="uid://bvc0jl61su4fd" path="res://addons/mqtt/simulated_broker.gd" id="6_qfww3"]
 [ext_resource type="Script" uid="uid://rr8tydt33rex" path="res://radiomqtt/mqtt_audio_packet_filter.gd" id="7_audio_filter"]
 
@@ -78,7 +79,6 @@ grow_vertical = 2
 script = ExtResource("1_anot2")
 
 [node name="TwoVoipMic" parent="." unique_id=1643438198 instance=ExtResource("2_0f5ov")]
-check_unpack_hash_codes = null
 
 [node name="LabelTitle" type="Label" parent="." unique_id=1539758880]
 custom_minimum_size = Vector2(0, 50)
@@ -397,6 +397,45 @@ theme = ExtResource("4_7rbsf")
 min_value = -1.0
 value = -1.0
 
+[node name="HBoxEchoCancel" type="HBoxContainer" parent="VBoxFrameLength" unique_id=1992920860]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBoxFrameLength/HBoxEchoCancel" unique_id=6987011]
+layout_mode = 2
+text = "Echo cancelling:"
+
+[node name="EchoOption" type="OptionButton" parent="VBoxFrameLength/HBoxEchoCancel" unique_id=2067496436]
+layout_mode = 2
+selected = 0
+item_count = 3
+popup/item_0/text = "Disabled"
+popup/item_0/id = 0
+popup/item_1/text = "Speex"
+popup/item_1/id = 1
+popup/item_2/text = "WebRTC"
+popup/item_2/id = 2
+
+[node name="ChirpButton" type="Button" parent="VBoxFrameLength/HBoxEchoCancel" unique_id=1059964040]
+layout_mode = 2
+text = "Chirp"
+
+[node name="Label2" type="Label" parent="VBoxFrameLength/HBoxEchoCancel" unique_id=504279560]
+layout_mode = 2
+text = "FrameOffs:"
+
+[node name="FrameOffset" type="SpinBox" parent="VBoxFrameLength/HBoxEchoCancel" unique_id=1088525145]
+layout_mode = 2
+theme = ExtResource("4_7rbsf")
+max_value = 500.0
+
+[node name="VoiceEcho" type="Button" parent="VBoxFrameLength/HBoxEchoCancel" unique_id=1873284845]
+layout_mode = 2
+toggle_mode = true
+text = "VoiceEcho"
+
+[node name="AudioStreamVoiceEcho" type="AudioStreamPlayer" parent="VBoxFrameLength/HBoxEchoCancel" unique_id=70701444]
+stream = ExtResource("5_85ctl")
+
 [node name="HSeparator4" type="HSeparator" parent="." unique_id=1623262998]
 layout_mode = 2
 
@@ -554,7 +593,6 @@ layout_mode = 2
 script = ExtResource("2_y485j")
 
 [node name="MQTT" parent="MQTTnetwork" unique_id=1372585551 instance=ExtResource("2_4wm5t")]
-verbose_level = 0
 binarymessages = true
 
 [node name="Connect" type="Button" parent="MQTTnetwork" unique_id=1623789959]
@@ -808,6 +846,7 @@ text = "sil"
 [connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="gui_input" from="HBoxMicTalk/VoxThreshold" to="." method="_on_vox_threshold_gui_input"]
 [connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox" to="." method="_on_gain_manual_spin_box_value_changed"]
+[connection signal="toggled" from="VBoxFrameLength/HBoxEchoCancel/VoiceEcho" to="." method="_on_voice_echo_toggled"]
 [connection signal="pressed" from="VBoxPlayback/HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 [connection signal="item_selected" from="VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions" to="." method="_on_sav_options_item_selected"]
 [connection signal="broker_connection_failed" from="MQTTnetwork/MQTT" to="MQTTnetwork" method="_on_mqtt_broker_connection_failed"]
