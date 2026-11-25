@@ -46,11 +46,15 @@
           # We only need the library; do not install the demo executable.
           postInstall = "";
         });
-        dependencyEnv = {
+        commonEnv = {
           # A distributable GDExtension must resolve libc/libstdc++ from the
           # target system, not from this machine's immutable Nix store.
           NIX_DONT_SET_RPATH = "1";
           TWOVOIP_PATCHELF = "${nixpkgs-old.patchelf}/bin/patchelf";
+          # Meson executes a compiler sanity binary while configuring APM.
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ stdenv-old.cc.cc.lib ];
+        };
+        packagedDependencyEnv = commonEnv // {
           TWOVOIP_OPUS_INCLUDE_DIR = "${pkgs.libopus.dev}/include/opus";
           TWOVOIP_OPUS_LIBRARY_DIR = "${opus-static}/lib";
           TWOVOIP_RNNOISE_INCLUDE_DIR = "${rnnoise-static}/include";
@@ -68,7 +72,7 @@
           ];
           doCheck = false;
         });
-        packages.default = stdenv-old.mkDerivation (dependencyEnv // {
+        packages.default = stdenv-old.mkDerivation (packagedDependencyEnv // {
           name = "opus-voip";
           src = inputs.self;
           prePatch = ''
@@ -111,14 +115,19 @@
           '';
         });
 
-        devShells.default = pkgs.mkShell.override { stdenv = stdenv-old; } (dependencyEnv // {
+        # Development deliberately builds the pinned submodules. Do not set
+        # TWOVOIP_* dependency paths here: SCons defaults them to the local
+        # Opus and RNNoise build directories.
+        devShells.default = pkgs.mkShell.override { stdenv = stdenv-old; } (commonEnv // {
           packages = [
             nixpkgs-old.binutils
             pkgs.godot_4_6
             nixpkgs-old.patchelf
             nixpkgs-old.scons
-            opus-static
-            rnnoise-static
+            nixpkgs-old.cmake
+            nixpkgs-old.meson
+            nixpkgs-old.ninja
+            nixpkgs-old.pkg-config
           ];
         });
       };

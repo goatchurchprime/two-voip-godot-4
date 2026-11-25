@@ -5,7 +5,7 @@ from SCons.Script.SConscript import SConsEnvironment
 from SCons.Script import ARGLIST, ARGUMENTS, BUILD_TARGETS, COMMAND_LINE_TARGETS, DEFAULT_TARGETS, Glob
 
 import SCons, SCons.Script
-import sys, os, platform, subprocess
+import sys, os, platform, subprocess, shutil
 import lib_utils, lib_utils_external
 
 # Fixing the encoding of the console
@@ -36,7 +36,7 @@ print(
     + f"\n\tOr add them to 'setup_defines_and_flags' inside 'SConstruct'."
 )
 print("To apply git patches, use 'scons apply_patches'.")
-print("To build the opus library, use 'scons build_opus'.")
+print("To build the pinned native dependencies, use 'scons build_dependencies'.")
 
 # Additional console arguments
 def setup_options(env: SConsEnvironment, arguments):
@@ -47,6 +47,7 @@ def setup_options(env: SConsEnvironment, arguments):
     # It must be here for lib_utils.py
     opts.Add(PathVariable("addon_output_dir", "Path to the output directory", default_output_dir, PathVariable.PathIsDirCreate))
     opts.Add(BoolVariable("rnnoise", "Enable rnnoise support", True))
+    opts.Add(BoolVariable("webrtc_apm", "Enable the optional WebRTC Audio Processing Module", env["platform"] == "linux"))
     opts.Add("opus_include_dir", "Opus header directory", os.environ.get("TWOVOIP_OPUS_INCLUDE_DIR", "opus/include"))
     opts.Add("opus_library_dir", "Opus library directory", os.environ.get(
         "TWOVOIP_OPUS_LIBRARY_DIR", lib_utils_external.get_cmake_output_lib_dir(env, "opus")))
@@ -88,11 +89,29 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out: list):
                    LIBPATH=[env["rnnoise_library_dir"]],
                    CPPDEFINES=["RNNOISE"])
 
+    if env["webrtc_apm"]:
+        if env["platform"] != "linux":
+            raise RuntimeError("webrtc_apm is currently supported only for Linux development builds")
+        apm_build_dir = lib_utils_external.get_meson_build_dir(env, "webrtc-apm")
+        apm_library_dir = os.path.join(apm_build_dir, "webrtc", "modules", "audio_processing")
+        apm_library = os.path.join(apm_library_dir, "libwebrtc-audio-processing-2.so.1")
+        absl_include_dir = "webrtc-audio-processing/subprojects/abseil-cpp-20240722.0"
+        if not os.path.isfile(apm_library) or not os.path.isdir(absl_include_dir):
+            raise RuntimeError("webrtc_apm=yes requires: scons build_webrtc_apm platform=linux arch=x86_64")
+        env.Append(
+            CPPDEFINES=["WEBRTC_APM"],
+            CPPPATH=["webrtc-audio-processing/webrtc", absl_include_dir],
+            LIBPATH=[apm_library_dir],
+            LIBS=["webrtc-audio-processing-2"],
+            LINKFLAGS=[r"-Wl,-rpath,\$$ORIGIN"],
+        )
+        env.AppendUnique(CXXFLAGS=["-std=c++20"])
+
     if env.get("is_msvc", False):
         env.Append(CCFLAGS=["/GF"])  # Eliminate Duplicate Strings
         env.Append(LINKFLAGS=["/WX:NO"])
 
-    if env["platform"] in ["linux"]: # , "android"?
+    if env["platform"] in ["linux"] and not env["webrtc_apm"]: # , "android"?
         env.Append(
             LINKFLAGS=[
                 "-static-libgcc",
@@ -147,13 +166,39 @@ def build_rnnoise(target, source, env: SConsEnvironment):
 
     return lib_utils_external.cmake_build_project(env, "thirdparty/rnnoise", extra_flags)
 
+def build_webrtc_apm(target, source, env: SConsEnvironment):
+    if env["platform"] != "linux":
+        print("WebRTC APM build is currently supported only on Linux")
+        return 1
+    rc = lib_utils_external.meson_build_project(env, "webrtc-apm", "webrtc-audio-processing", [
+        "--wrap-mode=forcefallback",
+        "-Ddefault_library=shared",
+        "-Dabseil-cpp:default_library=static",
+        "-Dcpp_std=c++20",
+        "-Dcpp_args=-include cstdint",
+        "-Dbuildtype=release",
+    ])
+    wrap_lock = os.path.join("webrtc-audio-processing", "subprojects", ".wraplock")
+    if os.path.exists(wrap_lock):
+        os.remove(wrap_lock)
+    if rc:
+        return rc
+    build_dir = lib_utils_external.get_meson_build_dir(env, "webrtc-apm")
+    source_library = os.path.join(build_dir, "webrtc", "modules", "audio_processing", "libwebrtc-audio-processing-2.so.1")
+    os.makedirs(env["addon_output_dir"], exist_ok=True)
+    shutil.copy2(source_library, os.path.join(env["addon_output_dir"], os.path.basename(source_library)))
+    return 0
+
 def set_portable_linux_rpath(target, source, env: SConsEnvironment):
     patchelf = os.environ.get("TWOVOIP_PATCHELF")
     if not patchelf:
         return 0
     return subprocess.run([patchelf, "--set-rpath", "$ORIGIN", str(target[0])]).returncode
 
+webrtc_apm_argument = ARGUMENTS.pop("webrtc_apm", None)
 env: SConsEnvironment = SConscript("godot-cpp/SConstruct")
+if webrtc_apm_argument is not None:
+    ARGUMENTS["webrtc_apm"] = webrtc_apm_argument
 env = env.Clone()
 
 args = ARGUMENTS
@@ -175,3 +220,5 @@ env.Clean(env.File(library), env.Dir("#build"))
 env.Command("apply_patches", [], apply_patches)
 env.Command("build_opus", [], build_opus)
 env.Command("build_rnnoise", [], build_rnnoise)
+env.Command("build_webrtc_apm", [], build_webrtc_apm)
+env.Alias("build_dependencies", ["build_opus", "build_rnnoise", "build_webrtc_apm"])

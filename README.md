@@ -35,8 +35,9 @@ dotnet tool run godotenv addons install
 ### Building the addon
 
 Open the repository root in Godot 4.6 after the install completes. For native
-TwoVoIP development, `nix develop` followed by `scons` rebuilds the same library
-location from source.
+TwoVoIP development, run `nix develop`, `scons build_dependencies`, then
+`scons`. This compiles the pinned Opus, RNNoise, and WebRTC submodule sources
+before rebuilding the extension in the addon's library directory.
 
 ## Minimal example
 
@@ -124,7 +125,7 @@ The purpose of this demo is to test all the features so you can hear what the op
 
 1. Clone/Download this repository.
 2. Open the repository root as a project in Godot 4.6.
-3. Run the GodotEnv installation above, or build the native extension with `nix develop` followed by `scons`.
+3. Run the GodotEnv installation above, or build from source with `nix develop`, `scons build_dependencies`, then `scons`.
 4. Run the main scene `radiomqtt/radiomqtt.tscn`.
 5. If the microphone is working, then you should see a waveform in the app like this:
 
@@ -363,4 +364,3 @@ same `TwoVoipSpeaker.receive_audio_packet()` entry point.
 
 When a player joins mid-stream use `TwoVoipMic.request_audio_packet_midstream()`
 and deliver both returned control packets in order.
-

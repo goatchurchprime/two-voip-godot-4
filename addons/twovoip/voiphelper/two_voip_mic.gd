@@ -2,6 +2,7 @@ extends Node
 
 var opusencoder : TwovoipOpusEncoder
 var chunkprefix := TwoVoipPacket.make_sequence_chunk_prefix()
+#var conditioner : TwoVoipConditioner
 
 var lead_time : float = 0.15
 var hang_time : float  = 0.7
@@ -96,6 +97,12 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 			push_error("TwoVoIP sampler configuration failed: %s" % error_string(sampler_error))
 			return false
 		opusencoder.target_agc_gain(5.0)  # hack to move it up quickly
+
+#	conditioner = TwoVoipConditioner.new()
+	# Keep the existing encoder's resampler in charge during this AEC trial.
+#	var conditioner_error = conditioner.initialize(input_mix_rate, input_mix_rate, int(input_mix_rate*p_opusframedurationms/1000.0))
+#	if conditioner_error != OK:
+#		push_error("TwoVoIP conditioner configuration failed: %s" % error_string(conditioner_error))
 
 	echo_cancel_mode = p_echo_cancel
 	echocancelobject = null
@@ -503,7 +510,11 @@ func _process(_delta):
 			apply_audio_input_gap(gap_plan)
 			input_frames_available -= discard_input_frames
 
-		if abs(predicted_first_frame_time - first_frame_time_usec) > input_gap_threshold*1000000.0:
+		if predicted_first_frame_time == 0.0:
+			# Establish the microphone frontier without emptying render audio that
+			# has already accumulated during startup.
+			predicted_first_frame_time = first_frame_time_usec
+		elif abs(predicted_first_frame_time - first_frame_time_usec) > input_gap_threshold*1000000.0:
 			print("clear mastercaptyre ", first_frame_time_usec - predicted_first_frame_time)
 			predicted_first_frame_time = first_frame_time_usec
 			if mastercapture:
@@ -517,7 +528,7 @@ func _process(_delta):
 		raw_audio_chunk = AudioServer.get_input_frames(required_input_frames)
 		if len(raw_audio_chunk) == 0:
 			break
-		predicted_first_frame_time += required_input_frames/AudioServer.get_mix_rate()*1000000.0
+		predicted_first_frame_time += required_input_frames/input_mix_rate*1000000.0
 
 		audio_chunk = raw_audio_chunk
 		captured_audio_chunk = null
@@ -527,6 +538,8 @@ func _process(_delta):
 			if required_input_frames != captured_audio_chunk.size():
 				captureframeslip += required_input_frames - captured_audio_chunk.size()
 				print("captureframeslip ", captureframeslip)
+
+#		audio_chunk = conditioner.condition(raw_audio_chunk, captured_audio_chunk)
 
 		if chirpbuffer != null and len(chirpbuffer) < 200:
 			chirpbuffer.append(raw_audio_chunk)
