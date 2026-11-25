@@ -205,9 +205,11 @@ func reprocessoriginalchunks():
 	print("RESSAMPLLE sound cancel ", Dtog)
 	for i in range(len(recordedsamples)):
 		var s = recordedsamples[i]
-		if Dtog == 0:
+		if echocancelobject_forreprocessing == null:
+			pass
+		elif Dtog == 0:
 			echocancelobject_forreprocessing.set_frame_delay(0)
-		if Dtog == 3:
+		elif Dtog == 3:
 			echocancelobject_forreprocessing.set_frame_delay(echoframedelay)
 		elif Dtog <= 3:
 			if echocancelobject_forreprocessing != null and Dtog >= 0 and i-Dtog < len(recordedcaptures):

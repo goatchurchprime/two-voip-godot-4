@@ -494,10 +494,13 @@ func _process(_delta):
 		if Dtimecou > 2.0:
 			Dtimecou = 2.0
 	while true:
+
 		var input_frames_available := AudioServer.get_input_frames_available()
 		var first_frame_time_usec := Time.get_ticks_usec() - roundi(input_frames_available * 1000000.0 / input_mix_rate)
+
 		var gap_plan := plan_audio_input_gap(first_frame_time_usec)
 		if not gap_plan.is_empty():
+			print("**** gap plan")
 			var discard_input_frames: int = 0 if gap_plan.end_episode else gap_plan.discard_input_frames
 			if input_frames_available < discard_input_frames:
 				break
@@ -510,25 +513,24 @@ func _process(_delta):
 			apply_audio_input_gap(gap_plan)
 			input_frames_available -= discard_input_frames
 
-		if predicted_first_frame_time == 0.0:
-			# Establish the microphone frontier without emptying render audio that
-			# has already accumulated during startup.
-			predicted_first_frame_time = first_frame_time_usec
-		elif abs(predicted_first_frame_time - first_frame_time_usec) > input_gap_threshold*1000000.0:
-			print("clear mastercaptyre ", first_frame_time_usec - predicted_first_frame_time)
-			predicted_first_frame_time = first_frame_time_usec
-			if mastercapture:
-				mastercapture.clear_buffer()
-				captureframeslip = 0
 			
 		var required_input_frames := opusencoder.get_required_input_chunk_size()
 		if input_frames_available < required_input_frames:
 			break
 
+		if predicted_first_frame_time == 0.0 or abs(predicted_first_frame_time - first_frame_time_usec) > input_gap_threshold*1000000.0:
+			print("clear mastercaptyre ", first_frame_time_usec - predicted_first_frame_time)
+			predicted_first_frame_time = first_frame_time_usec
+			if mastercapture:
+				mastercapture.clear_buffer()
+				captureframeslip = 0
+		#prints("ii ", (predicted_first_frame_time - first_frame_time_usec), Time.get_ticks_usec(), predicted_first_frame_time, first_frame_time_usec)
+
+
 		raw_audio_chunk = AudioServer.get_input_frames(required_input_frames)
 		if len(raw_audio_chunk) == 0:
 			break
-		predicted_first_frame_time += required_input_frames/input_mix_rate*1000000.0
+		predicted_first_frame_time += roundi(required_input_frames/input_mix_rate*1000000.0)
 
 		audio_chunk = raw_audio_chunk
 		captured_audio_chunk = null
