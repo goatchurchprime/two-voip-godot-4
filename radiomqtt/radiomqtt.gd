@@ -150,6 +150,7 @@ func updatesamplerates():
 	$TwoVoipMic.hang_time = $HBoxBigButtons/VBoxVox/Hangtime.value
 	reprocessoriginalchunks()
 
+var Dtog = 0
 func reprocessoriginalchunks():
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
 	var opuschannels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
@@ -200,10 +201,25 @@ func reprocessoriginalchunks():
 	recordedopuspackets = [ ]
 	#opusencoder_forreprocessing.resetencoder(true)
 	var resampledopusframecount = 0
+	Dtog = $VBoxFrameLength/HBoxEchoCancel/FrameOffset.value
+	print("RESSAMPLLE sound cancel ", Dtog)
 	for i in range(len(recordedsamples)):
 		var s = recordedsamples[i]
-		if echocancelobject_forreprocessing != null and i < len(recordedcaptures):
-			s = echocancelobject_forreprocessing.cancel_echo(s, recordedcaptures[i])
+		if Dtog == 0:
+			echocancelobject_forreprocessing.set_frame_delay(0)
+		if Dtog == 3:
+			echocancelobject_forreprocessing.set_frame_delay(echoframedelay)
+		elif Dtog <= 3:
+			if echocancelobject_forreprocessing != null and Dtog >= 0 and i-Dtog < len(recordedcaptures):
+				s = echocancelobject_forreprocessing.cancel_echo(s, recordedcaptures[i-Dtog])
+		elif Dtog == 4:
+			s = recordedcaptures[i]
+		elif Dtog == 5:
+			s = recordedsamples[i]
+		elif Dtog == 6:
+			s = echocancelobject_forreprocessing.cancel_echo(recordedsamples[i], recordedsamples[i])
+		else:
+			s = echocancelobject_forreprocessing.cancel_echo(recordedcaptures[i], recordedcaptures[i])
 		if opusencoder_forreprocessing.push_input_chunk(s) < 0:
 			break
 		if denoiser != TwovoipOpusEncoder.DENOISER_DISABLED:
@@ -364,3 +380,66 @@ func _selected_fault_packet_kind() -> String:
 
 func _on_voice_echo_toggled(toggled_on):
 	$VBoxFrameLength/HBoxEchoCancel/AudioStreamVoiceEcho.playing = toggled_on
+
+var chirpdata = null
+var leafvals = [ -1, -1 ]
+var echoframedelay = 0
+func findchirp(leafoffset, chirpdata, chirpbuffer, twovoipmic):
+	var best_score := -1.0
+	var best_frame := -1
+	var frame = 0
+	var chunk = leafoffset
+	var chunkframe = 0
+	while true:
+		var score:= 0.0
+		var lchunk = chunk
+		var lchunkframe = chunkframe
+		for j in range(len(chirpdata)):
+			var s = chirpbuffer[lchunk][lchunkframe]
+			score += chirpdata[j].x*(s.x + s.y)
+			lchunkframe += 1
+			if lchunkframe >= len(chirpbuffer[lchunk]):
+				lchunk += 2
+				if lchunk >= len(chirpbuffer):
+					lchunk = -1
+					break
+				lchunkframe = 0
+		if lchunk == -1:
+			break
+		if absf(score) > best_score:
+			best_score = absf(score)
+			best_frame = frame
+		frame += 1
+		chunkframe += 1
+		if chunkframe >= len(chirpbuffer[chunk]):
+			chunk += 2
+			if chunk >= len(chirpbuffer):
+				break
+			chunkframe = 0
+	print(leafoffset, "  frame ", best_frame, " score: ", best_score)
+	leafvals[leafoffset] = best_frame
+	if leafvals[1-leafoffset] != -1:
+		echoframedelay = leafvals[0] - leafvals[1]
+		twovoipmic.echoframedelay = leafvals[0] - leafvals[1]
+		print(" echoframedelay ", echoframedelay)
+	return best_frame
+
+
+func _on_chirp_button_pressed():
+	$VBoxFrameLength/HBoxEchoCancel/AudioStreamChirp.play()
+	$TwoVoipMic.chirpbuffer = [ ]
+	await get_tree().create_timer(0.5).timeout
+	var chirpbuffer = $TwoVoipMic.chirpbuffer
+	var lcaptureframeslip = $TwoVoipMic.captureframeslip
+	$TwoVoipMic.chirpbuffer = null
+	print("chirpbuffer ", len(chirpbuffer))
+	if chirpdata == null:
+		var d :PackedByteArray = $VBoxFrameLength/HBoxEchoCancel/AudioStreamChirp.stream.get_data()
+		chirpdata = PackedVector2Array()
+		chirpdata.resize(len(d)/4)
+		for i in range(len(chirpdata)):
+			chirpdata[i] = Vector2(d.decode_s16(i*4)/32768.0, d.decode_s16(i*4+2)/32768.0)
+	leafvals = [ -1, -1 ]
+	WorkerThreadPool.add_group_task(findchirp.bind(chirpdata, chirpbuffer, $TwoVoipMic), 2)
+	#WorkerThreadPool.add_group_task(findchirp.bind(chirpdata, chirpbuffer), 1))
+	

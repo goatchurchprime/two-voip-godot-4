@@ -76,6 +76,7 @@ func consume_application_resume() -> bool:
 		processtalkstreamends(false)
 	return true
 
+var echoframedelay = 0
 func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_inband_perc, p_denoiser_mode, p_agc_mode, p_echo_cancel):
 	input_mix_rate = AudioServer.get_input_mix_rate()
 	var bitrate_changed = opusencoder != null and opusencoder.get_bitrate() != p_opusbitrate
@@ -102,14 +103,18 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 	if echo_cancel_mode == EchoCancelling.ECHO_CANCEL_SPEEX:
 		var n = AudioServer.get_bus_effect_count(0)
 		if n == 0 or not is_instance_of(AudioServer.get_bus_effect(0, n-1), AudioEffectCapture):
-			AudioServer.add_bus_effect(0, AudioEffectCapture.new())
+			var aec = AudioEffectCapture.new()
+			aec.buffer_length = 1.0
+			AudioServer.add_bus_effect(0, aec)
 			n = AudioServer.get_bus_effect_count(0)
 		mastercapture = AudioServer.get_bus_effect(0, n - 1)
-		mastercapture.buffer_length = 1.0
 
 		if AudioServer.get_mix_rate() == input_mix_rate:
 			echocancelobject = TwoVoipEchoCanceler.new()
 			mastercapture.clear_buffer()
+			echocancelobject.set_frame_delay(echoframedelay)
+			prints("mastrcapture reset ", mastercapture.get_frames_available(), mastercapture.get_buffer_length_frames(), " framedelay ", echoframedelay)
+			Dtimecou = 0.0
 			var echo_error = echocancelobject.initialize(input_mix_rate, opusencoder.get_required_input_chunk_size())
 			if echo_error != OK:
 				push_error("TwoVoIP echo cancellation configuration failed: %s" % error_string(echo_error))
@@ -380,17 +385,14 @@ func plan_audio_input_gap(frameCusec: int) -> Dictionary:
 		push_error("Cannot detect an audio input gap without valid frame times")
 		return {}
 	var frame_duration_usec: int = opusframedurationms * 1000
-	var frameCusec_predicted: int = frame0usec \
-			+ opusframecount * frame_duration_usec
+	var frameCusec_predicted: int = frame0usec + opusframecount * frame_duration_usec
 	var gap_usec: int = frameCusec - frameCusec_predicted
 	if gap_usec >= input_gap_threshold*1000000.0:
 		var missing_frame_count := ceili(float(gap_usec) / frame_duration_usec)
 		if missing_frame_count <= 0:
 			return {}
-		var next_frame_time_usec: int = frameCusec_predicted \
-				+ missing_frame_count * frame_duration_usec
-		var discard_input_frames: int = ceili(maxi(0,
-				next_frame_time_usec - frameCusec) * input_mix_rate / 1000000.0)
+		var next_frame_time_usec: int = frameCusec_predicted + missing_frame_count * frame_duration_usec
+		var discard_input_frames: int = ceili(maxi(0, next_frame_time_usec - frameCusec) * input_mix_rate / 1000000.0)
 		return {
 			"gap_usec": gap_usec,
 			"missing_frame_count": missing_frame_count,
@@ -467,19 +469,29 @@ var captured_audio_chunk = null
 var audio_chunk = null
 var last_chunkmax = 0.0
 var speechnoiseprobability = 0.0
+var chirpbuffer = null
 
+var Dtimecou = 0.0
+var predicted_first_frame_time = 0.0
 func _process(_delta):
 	var resumed_this_process := consume_application_resume()
 	# Spend one process pass rebuilding capture history after resume. This keeps
 	# pre-suspend lead-time audio out of the new episode.
 	processtalkstreamends(pttbutton.button_pressed and not resumed_this_process)
+
+	Dtimecou += _delta
+	var timrel00 = mastercapture.get_frames_available()/input_mix_rate + AudioServer.get_time_since_last_mix() + AudioServer.get_output_latency() if mastercapture else 0.0
+	var timrel0 = timrel00 - AudioServer.get_input_frames_available()/input_mix_rate if mastercapture else 0.0
+	if Dtimecou > 4.0 or Dtimecou < 1.0:
+		prints("sff ", AudioServer.get_input_frames_available(), mastercapture.get_frames_available() if mastercapture else 0, "discrads", mastercapture.get_discarded_frames() if mastercapture else 0, timrel00, timrel0)
+		if Dtimecou > 2.0:
+			Dtimecou = 2.0
 	while true:
 		var input_frames_available := AudioServer.get_input_frames_available()
 		var first_frame_time_usec := Time.get_ticks_usec() - roundi(input_frames_available * 1000000.0 / input_mix_rate)
 		var gap_plan := plan_audio_input_gap(first_frame_time_usec)
 		if not gap_plan.is_empty():
-			var discard_input_frames: int = 0 if gap_plan.end_episode \
-					else gap_plan.discard_input_frames
+			var discard_input_frames: int = 0 if gap_plan.end_episode else gap_plan.discard_input_frames
 			if input_frames_available < discard_input_frames:
 				break
 			if discard_input_frames > 0:
@@ -490,6 +502,14 @@ func _process(_delta):
 				first_frame_time_usec = gap_plan.next_frame_time_usec
 			apply_audio_input_gap(gap_plan)
 			input_frames_available -= discard_input_frames
+
+		if abs(predicted_first_frame_time - first_frame_time_usec) > input_gap_threshold*1000000.0:
+			print("clear mastercaptyre ", first_frame_time_usec - predicted_first_frame_time)
+			predicted_first_frame_time = first_frame_time_usec
+			if mastercapture:
+				mastercapture.clear_buffer()
+				captureframeslip = 0
+			
 		var required_input_frames := opusencoder.get_required_input_chunk_size()
 		if input_frames_available < required_input_frames:
 			break
@@ -497,16 +517,20 @@ func _process(_delta):
 		raw_audio_chunk = AudioServer.get_input_frames(required_input_frames)
 		if len(raw_audio_chunk) == 0:
 			break
+		predicted_first_frame_time += required_input_frames/AudioServer.get_mix_rate()*1000000.0
 
 		audio_chunk = raw_audio_chunk
 		captured_audio_chunk = null
 		if echocancelobject and mastercapture:
 			captured_audio_chunk = mastercapture.get_buffer(min(mastercapture.get_frames_available(), required_input_frames))
-			if required_input_frames == captured_audio_chunk.size():
-				audio_chunk = echocancelobject.cancel_echo(audio_chunk, captured_audio_chunk)
-			else:
+			audio_chunk = echocancelobject.cancel_echo(audio_chunk, captured_audio_chunk)
+			if required_input_frames != captured_audio_chunk.size():
 				captureframeslip += required_input_frames - captured_audio_chunk.size()
 				print("captureframeslip ", captureframeslip)
+
+		if chirpbuffer != null and len(chirpbuffer) < 200:
+			chirpbuffer.append(raw_audio_chunk)
+			chirpbuffer.append(captured_audio_chunk)
 
 		if opusencoder.push_input_chunk(audio_chunk) < 0:
 			break

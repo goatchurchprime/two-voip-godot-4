@@ -162,6 +162,8 @@ jobs:
             addons/twovoip/libs/libtwovoip.linux.template_debug.${{matrix.arch}}.so
           "${{steps.setup_godot.outputs.godot}}" --headless --path . \
             --script res://tests/native_load_smoke.gd
+          "${{steps.setup_godot.outputs.godot}}" --headless --path . \
+            --script res://tests/echo_canceler_smoke.gd
 
 # ============================================
 

@@ -19,6 +19,10 @@ class TwoVoipEchoCanceler : public RefCounted {
     std::vector<spx_int16_t> microphone_samples;
     std::vector<spx_int16_t> playback_samples;
     std::vector<spx_int16_t> cleaned_samples;
+ 
+    int frame_delay = 0;
+    std::vector<spx_int16_t> playback_delay_buffer;
+    int pbd_ringin = 0;
 
 protected:
     static void _bind_methods();
@@ -26,8 +30,7 @@ protected:
 public:
     Error initialize(int p_sample_rate, int p_frame_size);
     PackedVector2Array cancel_echo(const PackedVector2Array &p_microphone_frames, const PackedVector2Array &p_playback_frames);
-    void reset();
-
+    void set_frame_delay(int p_frame_delay) { frame_delay = p_frame_delay; }
     ~TwoVoipEchoCanceler();
 };
 
