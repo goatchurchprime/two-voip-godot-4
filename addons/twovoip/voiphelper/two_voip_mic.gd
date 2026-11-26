@@ -2,7 +2,7 @@ extends Node
 
 var opusencoder : TwovoipOpusEncoder
 var chunkprefix := TwoVoipPacket.make_sequence_chunk_prefix()
-#var conditioner : TwoVoipConditioner
+var conditioner : TwoVoipConditioner
 
 var lead_time : float = 0.15
 var hang_time : float  = 0.7
@@ -98,11 +98,11 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 			return false
 		opusencoder.target_agc_gain(5.0)  # hack to move it up quickly
 
-#	conditioner = TwoVoipConditioner.new()
+	conditioner = TwoVoipConditioner.new()
 	# Keep the existing encoder's resampler in charge during this AEC trial.
-#	var conditioner_error = conditioner.initialize(input_mix_rate, input_mix_rate, int(input_mix_rate*p_opusframedurationms/1000.0))
-#	if conditioner_error != OK:
-#		push_error("TwoVoIP conditioner configuration failed: %s" % error_string(conditioner_error))
+	var conditioner_error = conditioner.initialize(input_mix_rate, input_mix_rate, int(input_mix_rate*p_opusframedurationms/1000.0))
+	if conditioner_error != OK:
+		push_error("TwoVoIP conditioner configuration failed: %s" % error_string(conditioner_error))
 
 	echo_cancel_mode = p_echo_cancel
 	echocancelobject = null
@@ -541,7 +541,8 @@ func _process(_delta):
 				captureframeslip += required_input_frames - captured_audio_chunk.size()
 				print("captureframeslip ", captureframeslip)
 
-#		audio_chunk = conditioner.condition(raw_audio_chunk, captured_audio_chunk)
+		if conditioner:
+			audio_chunk = conditioner.condition(raw_audio_chunk, captured_audio_chunk)
 
 		if chirpbuffer != null and len(chirpbuffer) < 200:
 			chirpbuffer.append(raw_audio_chunk)

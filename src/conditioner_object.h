@@ -17,11 +17,14 @@ class TwoVoipConditioner : public RefCounted {
 
 #ifdef WEBRTC_APM
     rtc::scoped_refptr<webrtc::AudioProcessing> processor;
+    webrtc::StreamConfig input_config;
+    webrtc::StreamConfig output_config;
+    webrtc::AudioProcessing::Config config;
 #endif
+
     int input_chunk_size = 0;
     int input_frame_10ms = 0;
     int output_frame_10ms = 0;
-    int stream_delay_ms = 0;
     std::vector<float> capture_left;
     std::vector<float> capture_right;
     std::vector<float> render_left;
@@ -41,6 +44,7 @@ public:
     PackedVector2Array condition(const PackedVector2Array &p_microphone_frames,
             const PackedVector2Array &p_render_frames);
     void set_stream_delay_ms(int p_stream_delay_ms);
+    int get_stream_delay_ms();
     void reset();
 };
 

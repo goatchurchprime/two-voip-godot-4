@@ -386,6 +386,7 @@ func _on_voice_echo_toggled(toggled_on):
 var chirpdata = null
 var leafvals = [ -1, -1 ]
 var echoframedelay = 0
+var conditioner_delay_frames = 0
 func findchirp(leafoffset, chirpdata, chirpbuffer, twovoipmic):
 	var best_score := -1.0
 	var best_frame := -1
@@ -423,7 +424,7 @@ func findchirp(leafoffset, chirpdata, chirpbuffer, twovoipmic):
 	if leafvals[1-leafoffset] != -1:
 		echoframedelay = leafvals[0] - leafvals[1]
 		twovoipmic.echoframedelay = leafvals[0] - leafvals[1]
-		print(" echoframedelay ", echoframedelay)
+		prints(" -- echoframedelay ", echoframedelay, " echoest ", conditioner_delay_frames)
 	return best_frame
 
 
@@ -442,6 +443,7 @@ func _on_chirp_button_pressed():
 		for i in range(len(chirpdata)):
 			chirpdata[i] = Vector2(d.decode_s16(i*4)/32768.0, d.decode_s16(i*4+2)/32768.0)
 	leafvals = [ -1, -1 ]
+	conditioner_delay_frames = roundi($TwoVoipMic.conditioner.get_stream_delay_ms()/1000.0*AudioServer.get_input_mix_rate())
 	WorkerThreadPool.add_group_task(findchirp.bind(chirpdata, chirpbuffer, $TwoVoipMic), 2)
 	#WorkerThreadPool.add_group_task(findchirp.bind(chirpdata, chirpbuffer), 1))
 	

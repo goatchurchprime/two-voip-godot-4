@@ -10,6 +10,7 @@ void TwoVoipConditioner::_bind_methods() {
             &TwoVoipConditioner::initialize);
     ClassDB::bind_method(D_METHOD("condition", "microphone_frames", "render_frames"), &TwoVoipConditioner::condition);
     ClassDB::bind_method(D_METHOD("set_stream_delay_ms", "stream_delay_ms"), &TwoVoipConditioner::set_stream_delay_ms);
+    ClassDB::bind_method(D_METHOD("get_stream_delay_ms"), &TwoVoipConditioner::get_stream_delay_ms);
     ClassDB::bind_method(D_METHOD("reset"), &TwoVoipConditioner::reset);
 }
 
@@ -21,7 +22,6 @@ Error TwoVoipConditioner::initialize(int p_input_sample_rate, int p_output_sampl
     }
 
 #ifdef WEBRTC_APM
-    webrtc::AudioProcessing::Config config;
     config.pipeline.multi_channel_render = true;
     config.pipeline.multi_channel_capture = true;
     config.echo_canceller.enabled = true;
@@ -45,6 +45,10 @@ Error TwoVoipConditioner::initialize(int p_input_sample_rate, int p_output_sampl
     render_output_right.resize(input_frame_10ms);
     conditioned_left.resize(output_frame_10ms);
     conditioned_right.resize(output_frame_10ms);
+
+    input_config = webrtc::StreamConfig(input_frame_10ms * 100, 2);
+    output_config = webrtc::StreamConfig(output_frame_10ms * 100, 2);
+
     return OK;
 #else
     UtilityFunctions::printerr("This TwoVoIP build does not include WebRTC APM");
@@ -66,8 +70,6 @@ PackedVector2Array TwoVoipConditioner::condition(const PackedVector2Array &p_mic
     const int block_count = input_chunk_size / input_frame_10ms;
     PackedVector2Array conditioned_frames;
     conditioned_frames.resize(block_count * output_frame_10ms);
-    const webrtc::StreamConfig input_config(input_frame_10ms * 100, 2);
-    const webrtc::StreamConfig output_config(output_frame_10ms * 100, 2);
 
     const int render_prefix_size = input_chunk_size - p_render_frames.size();
     for (int frame = 0; frame < render_prefix_size; frame++)
@@ -92,7 +94,6 @@ PackedVector2Array TwoVoipConditioner::condition(const PackedVector2Array &p_mic
                 webrtc::AudioProcessing::kNoError) {
             return PackedVector2Array();
         }
-        processor->set_stream_delay_ms(stream_delay_ms);
         const float *capture_input[] = { capture_left.data(), capture_right.data() };
         float *capture_output[] = { conditioned_left.data(), conditioned_right.data() };
         if (processor->ProcessStream(capture_input, input_config, output_config, capture_output) !=
@@ -109,8 +110,20 @@ PackedVector2Array TwoVoipConditioner::condition(const PackedVector2Array &p_mic
 }
 
 void TwoVoipConditioner::set_stream_delay_ms(int p_stream_delay_ms) {
-    stream_delay_ms = p_stream_delay_ms < 0 ? 0 : p_stream_delay_ms;
+#ifdef WEBRTC_APM
+    if (processor)
+        processor->set_stream_delay_ms(p_stream_delay_ms);
+#endif
 }
+
+int TwoVoipConditioner::get_stream_delay_ms() {
+#ifdef WEBRTC_APM
+    if (processor)
+        return processor->GetStatistics().delay_ms.value_or(-1);
+#endif
+    return -1;
+}
+
 
 void TwoVoipConditioner::reset() {
 #ifdef WEBRTC_APM
