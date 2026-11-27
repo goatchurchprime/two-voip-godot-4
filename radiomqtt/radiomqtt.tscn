@@ -139,20 +139,6 @@ text = "PTT"
 [node name="HSeparator" type="HSeparator" parent="HBoxBigButtons/VBoxPTT" unique_id=1237214197]
 layout_mode = 2
 
-[node name="Denoise" type="OptionButton" parent="HBoxBigButtons/VBoxPTT" unique_id=2060518890]
-layout_mode = 2
-alignment = 1
-selected = 0
-item_count = 4
-popup/item_0/text = "DENOISER_DISABLED"
-popup/item_0/id = 0
-popup/item_1/text = "DENOISER_SPEEX"
-popup/item_1/id = 1
-popup/item_2/text = "DENOISER_RNNOISE"
-popup/item_2/id = 2
-popup/item_3/text = "DENOISER_RNNOISE_DEFERRED"
-popup/item_3/id = 3
-
 [node name="VSeparator" type="VSeparator" parent="HBoxBigButtons" unique_id=1574942623]
 custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
@@ -188,12 +174,6 @@ value = 0.7
 update_on_text_changed = true
 prefix = "Hangtime:"
 suffix = "Seconds"
-
-[node name="Silence" type="Button" parent="HBoxBigButtons/VBoxVox" unique_id=116974986]
-custom_minimum_size = Vector2(40, 0)
-layout_mode = 2
-tooltip_text = "Hold this down to set the Vox silence threshold"
-text = "Sil"
 
 [node name="HBoxInputDevice" type="HBoxContainer" parent="." unique_id=146857732]
 layout_mode = 2
@@ -873,7 +853,6 @@ offset_right = 42.0
 offset_bottom = 23.0
 text = "sil"
 
-[connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="gui_input" from="HBoxMicTalk/VoxThreshold" to="." method="_on_vox_threshold_gui_input"]
 [connection signal="value_changed" from="VBoxConditioning/HBoxEchoCancel/GainManualSpinBox" to="." method="_on_gain_manual_spin_box_value_changed"]
 [connection signal="pressed" from="VBoxConditioning/HBoxEchoCancel/ChirpButton" to="." method="_on_chirp_button_pressed"]

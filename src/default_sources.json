@@ -1,5 +1,4 @@
 [
-  "opus_encoder_object.cpp",
   "two_voip_opus_encoder.cpp",
   "conditioner_object.cpp",
   "webrtc_conditioner_object.cpp",
@@ -7,11 +6,5 @@
   "register_types.cpp",
   "gen/doc_data.gen.cpp",
   "../speexdsp/libspeexdsp/resample.c",
-  "../speexdsp/libspeexdsp/preprocess.c",
-  "../speexdsp/libspeexdsp/mdf.c",
-  "../speexdsp/libspeexdsp/fftwrap.c",
-  "../speexdsp/libspeexdsp/filterbank.c",
-  "../speexdsp/libspeexdsp/kiss_fft.c",
-  "../speexdsp/libspeexdsp/kiss_fftr.c",
   "utils.cpp"
 ]

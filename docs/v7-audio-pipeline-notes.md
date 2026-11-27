@@ -22,24 +22,13 @@ current encoder-facing GDScript API.
 
 ## Encoder runtime controls
 
-Successful `TwovoipOpusEncoder.initialize()` now creates the Opus encoder.
+Successful `TwoVoipOpusEncoder.initialize()` creates the Opus encoder.
 The input sample rate, channel count and `OPUS_APPLICATION_VOIP` application
 mode remain fixed for that encoder instance. Bitrate, complexity and the
 auto/voice/music signal hint are mutable while encoding; failed setters report
-an error and preserve the previous value. `reset_opus_encoder()` remains
-available for the start of an unrelated stream.
-
-Remaining encoder cleanup should:
-
-- rename `output_chunk_size` to describe its real role, such as
-  `packet_frame_size` or `processing_frame_size`;
-- make clear that this frame size is passed to each `opus_encode_float()` call
-  and is not part of the persistent Opus encoder identity;
-- nevertheless keep frame duration fixed within a TwoVoIP stream initially,
-  because the transport header, jitter policy and FEC recovery currently assume
-  one duration;
-- leave the helper and demonstration GDScript migration for Julian to perform
-  as an API fitness review.
+an error and preserve the previous value. `reset()` remains available for the
+start of an unrelated stream. Conditioning, resampling and PCM history now live
+outside this object.
 
 If variable packet duration is added later, conditioning should operate on a
 fixed small quantum (normally 10 ms) and aggregate conditioned quanta into Opus

@@ -7,24 +7,24 @@ func _ready():
 							  $InputOptionButton,
 							  $PTTButton,
 							  $VoxButton,
+							  $EchoButton,
+							  $DenoiseButton,
+							  $AGCButton,
 							  $FeedbackDisplay.material)
 
 	# Set up the opus compression library
 	var conditioner_backend = 1
-	var echo_cancel_enabled = false
-	var denoiser_mode = 0
-	var agc_enabled = true
 	if speech_mode:
 		$StereoButton.button_pressed = false
 		$AGCButton.button_pressed = true
 		$DenoiseButton.button_pressed = true
-		$TwoVoipMic.set_opus_values(48000, 20, 1, 12000, 5, true, -1, conditioner_backend, echo_cancel_enabled, denoiser_mode, agc_enabled)
+		$TwoVoipMic.set_opus_values(48000, 20, 1, 12000, 5, true, -1, conditioner_backend)
 
 	else:
 		$StereoButton.button_pressed = true
 		$AGCButton.button_pressed = false
 		$DenoiseButton.button_pressed = false
-		$TwoVoipMic.set_opus_values(48000, 20, 2, 12000, 5, true, -1, conditioner_backend, echo_cancel_enabled, denoiser_mode, false)
+		$TwoVoipMic.set_opus_values(48000, 20, 2, 12000, 5, true, -1, conditioner_backend)
 
 	# Set the threshold for voice activation
 	$TwoVoipMic.set_vox_threshhold(0.02)

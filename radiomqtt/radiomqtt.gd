@@ -34,15 +34,15 @@ func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 
-	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxOpusFrame/SampleRate, $VBoxConditioning/HBoxConditioner/OptionChannels, $VBoxConditioning/HBoxConditioner/ConditionerOption, $VBoxConditioning/HBoxAudioFrame/WebRTCdenoiser ]:
+	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxOpusFrame/SampleRate, $VBoxConditioning/HBoxConditioner/OptionChannels, $VBoxConditioning/HBoxConditioner/ConditionerOption ]:
 		h.connect("item_selected", func (_item_selected): updatesamplerates())
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusExtra/FecSpinBox, $VBoxFrameLength/HBoxOpusExtra/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
 		h.connect("value_changed", func (_value): updatesamplerates())
-	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxMosquitto/base64, $VBoxConditioning/HBoxAudioFrame/EchocancelEnabled, $VBoxConditioning/HBoxAudioFrame/AGCEnabled ]:
+	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxMosquitto/base64 ]:
 		h.connect("toggled", func (_toggled_on): updatesamplerates())
 
 	audio_packets_base64 = $HBoxMosquitto/base64.button_pressed
-	$TwoVoipMic.init_voip_mic(audio_packets_base64, $HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $HBoxMicTalk/VoxThreshold.material)
+	$TwoVoipMic.init_voip_mic(audio_packets_base64, $HBoxMicTalk/MicWorking, $HBoxInputDevice/OptionInputDevice, $HBoxBigButtons/VBoxPTT/PTT, $HBoxBigButtons/VBoxVox/Vox, $VBoxConditioning/HBoxAudioFrame/EchocancelEnabled, $VBoxConditioning/HBoxAudioFrame/WebRTCdenoiser, $VBoxConditioning/HBoxAudioFrame/AGCEnabled, $HBoxMicTalk/VoxThreshold.material)
 	$TwoVoipMic.set_vox_threshhold(0.017)
 
 	for d in AudioServer.get_output_device_list():
@@ -125,9 +125,6 @@ func updatesamplerates():
 	var conditioner_backend = $VBoxConditioning/HBoxConditioner/ConditionerOption.selected
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
 	var opussamplerate = int($VBoxFrameLength/HBoxOpusFrame/SampleRate.text)*1000
-	var denoiser_mode = $VBoxConditioning/HBoxAudioFrame/WebRTCdenoiser.selected
-	var agc_enabled = $VBoxConditioning/HBoxAudioFrame/AGCEnabled.button_pressed
-	var echo_cancel_enabled = $VBoxConditioning/HBoxAudioFrame/EchocancelEnabled.button_pressed
 	var channels = int($VBoxConditioning/HBoxConditioner/OptionChannels.text)
 
 	$TwoVoipMic.set_opus_values(opussamplerate, frametimems, channels,
@@ -135,7 +132,7 @@ func updatesamplerates():
 			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value),
 			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed,
 			int($VBoxFrameLength/HBoxOpusExtra/FecSpinBox.value),
-			conditioner_backend, echo_cancel_enabled, denoiser_mode, agc_enabled)
+			conditioner_backend)
 	$TwoVoipMic.set_gain($VBoxConditioning/HBoxEchoCancel/GainManualSpinBox.value)
 	$VBoxConditioning/HBoxAudioFrame/EchocancelEnabled.disabled = not (conditioner_backend == $TwoVoipMic.ConditionerBackend.WEBRTC)
 

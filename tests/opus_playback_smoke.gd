@@ -33,13 +33,12 @@ func _initialize() -> void:
 
 
 func run_tests() -> void:
-	var encoder := TwovoipOpusEncoder.new()
-	assert(encoder.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	var encoder := TwoVoipOpusEncoder.new()
+	assert(encoder.initialize(48000, 1, 960) == OK)
 	assert(encoder.set_bitrate(12000) == OK)
 	assert(encoder.set_complexity(5) == OK)
-	assert(encoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE) == OK)
-	assert(encoder.push_input_chunk(make_mono(960)) == 960)
-	var packet := encoder.encode_chunk()
+	assert(encoder.set_signal_type(TwoVoipOpusEncoder.SIGNAL_VOICE) == OK)
+	var packet := encoder.encode_chunk(make_mono(960))
 	assert(not packet.is_empty())
 
 	# A playback can also be used as a source-side reference decoder without an
@@ -81,10 +80,9 @@ func run_tests() -> void:
 	assert(playback.get_overflow_frames() == 0)
 	assert(playback.get_decode_errors() == 0)
 
-	var short_encoder := TwovoipOpusEncoder.new()
-	assert(short_encoder.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 480) == OK)
-	assert(short_encoder.push_input_chunk(make_mono(480)) == 480)
-	assert(playback.push_opus_packet(short_encoder.encode_chunk(), 0, 0) < 0)
+	var short_encoder := TwoVoipOpusEncoder.new()
+	assert(short_encoder.initialize(48000, 1, 480) == OK)
+	assert(playback.push_opus_packet(short_encoder.encode_chunk(make_mono(480)), 0, 0) < 0)
 	assert(playback.get_decode_errors() == 1)
 	assert(playback.push_opus_packet(PackedByteArray(), 0, 0) < 0)
 	assert(playback.get_decode_errors() == 2)

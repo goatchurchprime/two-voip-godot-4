@@ -2,8 +2,8 @@ extends SceneTree
 
 
 func _initialize() -> void:
-	if not ClassDB.class_exists("TwovoipOpusEncoder"):
-		push_error("TwoVoIP native smoke test: TwovoipOpusEncoder is not registered")
+	if ClassDB.class_exists("TwovoipOpusEncoder"):
+		push_error("TwoVoIP native smoke test: retired TwovoipOpusEncoder is still registered")
 		quit(1)
 		return
 	if ClassDB.class_exists("TwoVoipEchoCanceler"):
@@ -19,9 +19,9 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	var encoder: Variant = ClassDB.instantiate("TwovoipOpusEncoder")
+	var encoder: Variant = ClassDB.instantiate("TwoVoipOpusEncoder")
 	if encoder == null:
-		push_error("TwoVoIP native smoke test: could not instantiate TwovoipOpusEncoder")
+		push_error("TwoVoIP native smoke test: could not instantiate TwoVoipOpusEncoder")
 		quit(1)
 		return
 
@@ -32,11 +32,5 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	var current_chunk: PackedVector2Array = encoder.call("get_current_chunk")
-	if not current_chunk.is_empty():
-		push_error("TwoVoIP native smoke test: an uninitialized encoder returned audio")
-		quit(1)
-		return
-
-	print("TwoVoIP %s native smoke test: loaded and checked uninitialized encoder state" % two_voip.get_version_info())
+	print("TwoVoIP %s native smoke test: loaded current encoder and conditioner API" % two_voip.get_version_info())
 	quit(0)

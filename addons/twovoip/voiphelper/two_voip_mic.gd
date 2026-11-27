@@ -28,8 +28,6 @@ signal clock_synchronization_finished(success: bool, missing_peers: Array[String
 const rootmeansquaremaxmeasurement = false
 var encode_base64 = false
 
-var agc_mode = 0
-
 var talkingtimestart = 0
 var talking_first_frame_time_usec: int = 0
 
@@ -88,7 +86,10 @@ func consume_application_resume() -> bool:
 	return true
 
 var echoframedelay = 0
-func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_inband_perc, p_conditioner_backend, p_echo_cancel_enabled, p_denoiser_mode, p_agc_enabled):
+func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opusbitrate, p_opuscomplexity, p_opusoptimizeforvoice, p_inband_perc, p_conditioner_backend):
+	var requested_echo_cancel := echobutton != null and echobutton.button_pressed
+	denoiser_mode = get_requested_denoising_level()
+	agc_enabled = agcbutton != null and agcbutton.button_pressed
 	input_mix_rate = AudioServer.get_input_mix_rate()
 	var bitrate_changed = opusencoder != null and opusencoder.get_bitrate() != p_opusbitrate
 	var p_opus_chunk_size = int(p_opussamplerate*p_opusframedurationms/1000.0)
@@ -97,24 +98,22 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 	opus_chunk_size = p_opus_chunk_size
 	opusframedurationms = p_opusframedurationms
 	opuschannels = p_channels
-	denoiser_mode = p_denoiser_mode
-	agc_enabled = p_agc_enabled
 	if conditioner == null or conditioner_backend != p_conditioner_backend or samplerates_changed:
 		conditioner_backend = p_conditioner_backend
 		if conditioner_backend == ConditionerBackend.WEBRTC:
 			conditioner = TwoVoipWebRTCConditioner.new()
 			var conditioner_error = conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate, p_channels)
 			if conditioner_error == ERR_UNAVAILABLE:
-				conditioner_backend == ConditionerBackend.RESAMPLE
+				conditioner_backend = ConditionerBackend.RESAMPLE
 		if conditioner_backend == ConditionerBackend.RESAMPLE:
 			conditioner = TwoVoipConditioner.new()
 			conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate, p_channels)
 
 	if conditioner is TwoVoipWebRTCConditioner:
-		conditioner.set_echo_cancel_enabled(p_echo_cancel_enabled)
-		conditioner.set_denoising_level(p_denoiser_mode)
-		conditioner.set_agc_enabled(p_agc_enabled)
-	echo_cancel_enabled = p_echo_cancel_enabled and conditioner is TwoVoipWebRTCConditioner
+		conditioner.set_echo_cancel_enabled(requested_echo_cancel)
+		conditioner.set_denoising_level(denoiser_mode)
+		conditioner.set_agc_enabled(agc_enabled)
+	echo_cancel_enabled = requested_echo_cancel and conditioner is TwoVoipWebRTCConditioner
 	
 	if opusencoder == null or samplerates_changed:
 		opusencoder = TwoVoipOpusEncoder.new()
@@ -129,13 +128,7 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 			return false
 
 	if echo_cancel_enabled:
-		var n = AudioServer.get_bus_effect_count(0)
-		if n == 0 or not is_instance_of(AudioServer.get_bus_effect(0, n-1), AudioEffectCapture):
-			var aec = AudioEffectCapture.new()
-			aec.buffer_length = 1.0
-			AudioServer.add_bus_effect(0, aec)
-			n = AudioServer.get_bus_effect_count(0)
-		mastercapture = AudioServer.get_bus_effect(0, n - 1)
+		ensure_master_capture()
 
 	opusencoder.set_bitrate(p_opusbitrate)
 	opusencoder.set_complexity(p_opuscomplexity)
@@ -160,6 +153,9 @@ var miconbutton: Button = null
 var optioninputdevice: OptionButton = null
 var pttbutton: Button = null
 var voxbutton: Button = null
+var echobutton: Button = null
+var denoisebutton: Button = null
+var agcbutton: Button = null
 var mastercapture: AudioEffectCapture = null
 var captureframeslip = 0
 
@@ -225,11 +221,56 @@ func _on_vox_toggled(toggled_on):
 	pttbutton.toggle_mode = toggled_on
 	pttbutton.set_pressed(false)
 
+func ensure_master_capture():
+	if mastercapture:
+		return
+	var effect_count := AudioServer.get_bus_effect_count(0)
+	if effect_count == 0 or not is_instance_of(AudioServer.get_bus_effect(0, effect_count - 1), AudioEffectCapture):
+		var capture := AudioEffectCapture.new()
+		capture.buffer_length = 1.0
+		AudioServer.add_bus_effect(0, capture)
+		effect_count = AudioServer.get_bus_effect_count(0)
+	mastercapture = AudioServer.get_bus_effect(0, effect_count - 1)
+
+func _on_echo_toggled(toggled_on: bool):
+	echo_cancel_enabled = toggled_on and conditioner is TwoVoipWebRTCConditioner
+	if conditioner is TwoVoipWebRTCConditioner:
+		conditioner.set_echo_cancel_enabled(toggled_on)
+	if echo_cancel_enabled:
+		ensure_master_capture()
+		mastercapture.clear_buffer()
+
+func _set_denoising_level(level: int):
+	denoiser_mode = level
+	if conditioner is TwoVoipWebRTCConditioner:
+		conditioner.set_denoising_level(level)
+
+func _on_denoise_toggled(toggled_on: bool):
+	_set_denoising_level(TwoVoipWebRTCConditioner.DENOISING_MODERATE if toggled_on else TwoVoipWebRTCConditioner.DENOISING_DISABLED)
+
+func _on_denoise_item_selected(index: int):
+	_set_denoising_level(index)
+
+func get_requested_denoising_level() -> int:
+	if denoisebutton is OptionButton:
+		return denoisebutton.selected
+	if denoisebutton != null and denoisebutton.button_pressed:
+		return TwoVoipWebRTCConditioner.DENOISING_MODERATE
+	return TwoVoipWebRTCConditioner.DENOISING_DISABLED
+
+func _on_agc_toggled(toggled_on: bool):
+	agc_enabled = toggled_on
+	if conditioner is TwoVoipWebRTCConditioner:
+		conditioner.set_agc_enabled(toggled_on)
+
 func init_voip_mic(p_encode_base64: bool,
 				   p_miconbutton: Button, 
 				   p_optioninputdevice: OptionButton, 
 				   p_pttbutton: Button,
 				   p_voxbutton: Button, 
+				   p_echobutton: Button,
+				   p_denoisebutton: Button,
+				   p_agcbutton: Button,
 				   p_audiosampleframematerial: Material):
 	encode_base64 = p_encode_base64
 	miconbutton = p_miconbutton
@@ -251,6 +292,37 @@ func init_voip_mic(p_encode_base64: bool,
 	assert(voxbutton.toggle_mode, "Vox must be a toggle button")
 	voxbutton.connect("toggled", _on_vox_toggled)
 	_on_vox_toggled(voxbutton.button_pressed)
+
+	echobutton = p_echobutton
+	if echobutton == null:
+		echobutton = Button.new()
+		echobutton.toggle_mode = true
+		echobutton.button_pressed = false
+	assert(echobutton.toggle_mode, "Echo cancel must be a toggle button")
+	echobutton.toggled.connect(_on_echo_toggled)
+	_on_echo_toggled(echobutton.button_pressed)
+
+	denoisebutton = p_denoisebutton
+	if denoisebutton == null:
+		denoisebutton = Button.new()
+		denoisebutton.toggle_mode = true
+		denoisebutton.button_pressed = true
+	if denoisebutton is OptionButton:
+		denoisebutton.item_selected.connect(_on_denoise_item_selected)
+		_on_denoise_item_selected(denoisebutton.selected)
+	else:
+		assert(denoisebutton.toggle_mode, "Denoise must be a toggle button")
+		denoisebutton.toggled.connect(_on_denoise_toggled)
+		_on_denoise_toggled(denoisebutton.button_pressed)
+
+	agcbutton = p_agcbutton
+	if agcbutton == null:
+		agcbutton = Button.new()
+		agcbutton.toggle_mode = true
+		agcbutton.button_pressed = true
+	assert(agcbutton.toggle_mode, "AGC must be a toggle button")
+	agcbutton.toggled.connect(_on_agc_toggled)
+	_on_agc_toggled(agcbutton.button_pressed)
 
 	audiosampleframematerial = p_audiosampleframematerial
 	
