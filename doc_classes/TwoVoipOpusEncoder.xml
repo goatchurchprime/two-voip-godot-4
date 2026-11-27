@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="TwoVoipOpusEncoder" inherits="RefCounted" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>Encodes one already-conditioned PCM chunk with Opus.</brief_description>
+	<description>The encoder owns no PCM, rewind or lead-frame buffer. Pass one complete output-rate chunk to [method encode_chunk].</description>
+	<methods>
+		<method name="encode_chunk">
+			<return type="PackedByteArray" />
+			<param index="0" name="audio_frames" type="PackedVector2Array" />
+			<param index="1" name="prefix_bytes" type="PackedByteArray" default="PackedByteArray()" />
+			<description>Encodes exactly one configured chunk and prepends optional transport bytes. Returns an empty array on failure.</description>
+		</method>
+		<method name="initialize">
+			<return type="Error" />
+			<param index="0" name="sample_rate" type="int" />
+			<param index="1" name="channels" type="int" />
+			<param index="2" name="frame_size" type="int" />
+			<description>Creates the Opus encoder. The sample rate and frame size must be supported by Opus.</description>
+		</method>
+		<method name="reset"><return type="void" /><description>Resets libopus state before an unrelated stream.</description></method>
+		<method name="set_bitrate"><return type="Error" /><param index="0" name="bitrate" type="int" /></method>
+		<method name="set_complexity"><return type="Error" /><param index="0" name="complexity" type="int" /></method>
+		<method name="set_inband_perc"><return type="Error" /><param index="0" name="packet_loss_perc" type="int" /><description>Sets expected packet loss, or disables in-band FEC with -1.</description></method>
+		<method name="set_signal_type"><return type="Error" /><param index="0" name="signal_type" type="int" enum="TwoVoipOpusEncoder.SignalType" /></method>
+	</methods>
+	<constants>
+		<constant name="SIGNAL_AUTO" value="0" enum="SignalType" />
+		<constant name="SIGNAL_VOICE" value="1" enum="SignalType" />
+		<constant name="SIGNAL_MUSIC" value="2" enum="SignalType" />
+	</constants>
+</class>

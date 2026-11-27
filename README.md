@@ -227,7 +227,7 @@ then accepts exactly one complete output-rate chunk. For a 20 ms Opus frame at
 
 ```gdscript
 var conditioner := TwoVoipConditioner.new()
-assert(conditioner.initialize(20, AudioServer.get_input_mix_rate(), 48000) == OK)
+assert(conditioner.initialize(20, AudioServer.get_input_mix_rate(), 48000, 2) == OK)
 
 var encoder := TwoVoipOpusEncoder.new()
 assert(encoder.initialize(48000, 2, conditioner.get_output_chunk_size()) == OK)

@@ -26,6 +26,7 @@ class TwoVoipWebRTCConditioner : public RefCounted {
 
     int input_chunk_size = 0;
     int output_chunk_size = 0;
+    int channels = 0;
     int input_frame_10ms = 0;
     int output_frame_10ms = 0;
     float gain = 1.0F;
@@ -56,7 +57,7 @@ public:
         DENOISING_VERY_HIGH,
     };
 
-    Error initialize(int p_chunk_ms, int p_input_sample_rate, int p_output_sample_rate);
+    Error initialize(int p_chunk_ms, int p_input_sample_rate, int p_output_sample_rate, int p_channels);
     int get_input_chunk_size() const { return input_chunk_size; }
     int get_output_chunk_size() const { return output_chunk_size; }
     PackedVector2Array condition(const PackedVector2Array &p_microphone_frames,

@@ -10,7 +10,7 @@
 using namespace godot;
 
 void TwoVoipConditioner::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("initialize", "chunk_ms", "input_sample_rate", "output_sample_rate"),
+    ClassDB::bind_method(D_METHOD("initialize", "chunk_ms", "input_sample_rate", "output_sample_rate", "channels"),
             &TwoVoipConditioner::initialize);
     ClassDB::bind_method(D_METHOD("get_input_chunk_size"), &TwoVoipConditioner::get_input_chunk_size);
     ClassDB::bind_method(D_METHOD("get_output_chunk_size"), &TwoVoipConditioner::get_output_chunk_size);
@@ -41,13 +41,18 @@ void TwoVoipConditioner::destroy_resampler() {
     }
 }
 
-Error TwoVoipConditioner::initialize(int p_chunk_ms, int p_input_sample_rate, int p_output_sample_rate) {
+Error TwoVoipConditioner::initialize(int p_chunk_ms, int p_input_sample_rate, int p_output_sample_rate,
+        int p_channels) {
     destroy_resampler();
     input_chunk_size = 0;
     output_chunk_size = 0;
+    channels = 0;
+    mono_input.clear();
+    mono_output.clear();
     last_peak = 0.0F;
     last_rms = 0.0F;
     if (p_chunk_ms <= 0 || p_input_sample_rate <= 0 || p_output_sample_rate <= 0 ||
+            (p_channels != 1 && p_channels != 2) ||
             (static_cast<int64_t>(p_input_sample_rate) * p_chunk_ms) % 1000 != 0 ||
             (static_cast<int64_t>(p_output_sample_rate) * p_chunk_ms) % 1000 != 0) {
         return ERR_INVALID_PARAMETER;
@@ -55,17 +60,23 @@ Error TwoVoipConditioner::initialize(int p_chunk_ms, int p_input_sample_rate, in
 
     input_chunk_size = p_input_sample_rate * p_chunk_ms / 1000;
     output_chunk_size = p_output_sample_rate * p_chunk_ms / 1000;
+    channels = p_channels;
+    if (channels == 1) {
+        mono_input.resize(input_chunk_size);
+        mono_output.resize(output_chunk_size);
+    }
     if (p_input_sample_rate == p_output_sample_rate)
         return OK;
 
     int error = RESAMPLER_ERR_SUCCESS;
-    resampler = speex_resampler_init(2, p_input_sample_rate, p_output_sample_rate,
+    resampler = speex_resampler_init(channels, p_input_sample_rate, p_output_sample_rate,
             SPEEX_RESAMPLER_QUALITY_DEFAULT, &error);
     if (!resampler || error != RESAMPLER_ERR_SUCCESS) {
         UtilityFunctions::printerr("TwoVoipConditioner Speex resampler initialization failed: ", error);
         destroy_resampler();
         input_chunk_size = 0;
         output_chunk_size = 0;
+        channels = 0;
         return ERR_CANT_CREATE;
     }
     return OK;
@@ -84,6 +95,31 @@ PackedVector2Array TwoVoipConditioner::condition(const PackedVector2Array &p_mic
         UtilityFunctions::printerr("TwoVoipConditioner expected ", input_chunk_size,
                 " microphone frames, got ", p_microphone_frames.size());
         return PackedVector2Array();
+    }
+    if (channels == 1) {
+        for (int frame = 0; frame < input_chunk_size; frame++)
+            mono_input[frame] = (p_microphone_frames[frame].x + p_microphone_frames[frame].y) * 0.5F;
+        if (resampler) {
+            spx_uint32_t input_frames = input_chunk_size;
+            spx_uint32_t output_frames = output_chunk_size;
+            const int error = speex_resampler_process_float(resampler, 0, mono_input.data(), &input_frames,
+                    mono_output.data(), &output_frames);
+            if (error != RESAMPLER_ERR_SUCCESS || input_frames != static_cast<spx_uint32_t>(input_chunk_size) ||
+                    output_frames != static_cast<spx_uint32_t>(output_chunk_size)) {
+                UtilityFunctions::printerr("TwoVoipConditioner mono resampling failed: error ", error,
+                        ", consumed ", input_frames, " of ", input_chunk_size,
+                        ", produced ", output_frames, " of ", output_chunk_size, " frames");
+                return PackedVector2Array();
+            }
+        } else {
+            mono_output = mono_input;
+        }
+        PackedVector2Array output;
+        output.resize(output_chunk_size);
+        for (int frame = 0; frame < output_chunk_size; frame++)
+            output.set(frame, Vector2(mono_output[frame], mono_output[frame]));
+        apply_gain_and_measure(output);
+        return output;
     }
     if (!resampler) {
         PackedVector2Array output = p_microphone_frames;

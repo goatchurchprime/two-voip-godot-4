@@ -19,7 +19,7 @@ func _ready():
 	assert(audio_stream_playback_opus.initialize(48000, 2, 960, 0.4) == OK)
 
 	AudioServer.set_input_device_active(true)
-	assert(conditioner.initialize(20, AudioServer.get_input_mix_rate(), 48000) == OK)
+	assert(conditioner.initialize(20, AudioServer.get_input_mix_rate(), 48000, 2) == OK)
 	assert(opusencoder.initialize(48000, 2, conditioner.get_output_chunk_size()) == OK)
 	assert(opusencoder.set_bitrate(12000) == OK)
 	assert(opusencoder.set_complexity(5) == OK)

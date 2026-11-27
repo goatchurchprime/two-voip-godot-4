@@ -15,7 +15,7 @@ void TwoVoipWebRTCConditioner::_bind_methods() {
     BIND_ENUM_CONSTANT(DENOISING_HIGH);
     BIND_ENUM_CONSTANT(DENOISING_VERY_HIGH);
 
-    ClassDB::bind_method(D_METHOD("initialize", "chunk_ms", "input_sample_rate", "output_sample_rate"),
+    ClassDB::bind_method(D_METHOD("initialize", "chunk_ms", "input_sample_rate", "output_sample_rate", "channels"),
             &TwoVoipWebRTCConditioner::initialize);
     ClassDB::bind_method(D_METHOD("get_input_chunk_size"), &TwoVoipWebRTCConditioner::get_input_chunk_size);
     ClassDB::bind_method(D_METHOD("get_output_chunk_size"), &TwoVoipWebRTCConditioner::get_output_chunk_size);
@@ -45,18 +45,23 @@ void TwoVoipWebRTCConditioner::apply_gain_and_measure(PackedVector2Array &p_fram
     last_rms = p_frames.is_empty() ? 0.0F : std::sqrt(sum_squares / (p_frames.size() * 2));
 }
 
-Error TwoVoipWebRTCConditioner::initialize(int p_chunk_ms, int p_input_sample_rate, int p_output_sample_rate) {
+Error TwoVoipWebRTCConditioner::initialize(int p_chunk_ms, int p_input_sample_rate, int p_output_sample_rate,
+        int p_channels) {
+    input_chunk_size = 0;
+    output_chunk_size = 0;
+    channels = 0;
     last_peak = 0.0F;
     last_rms = 0.0F;
     if (p_chunk_ms <= 0 || p_chunk_ms % 10 != 0 ||
             p_input_sample_rate < 8000 || p_input_sample_rate > 384000 || p_input_sample_rate % 100 != 0 ||
-            p_output_sample_rate < 8000 || p_output_sample_rate > 384000 || p_output_sample_rate % 100 != 0) {
+            p_output_sample_rate < 8000 || p_output_sample_rate > 384000 || p_output_sample_rate % 100 != 0 ||
+            (p_channels != 1 && p_channels != 2)) {
         return ERR_INVALID_PARAMETER;
     }
 
 #ifdef WEBRTC_APM
     config.pipeline.multi_channel_render = true;
-    config.pipeline.multi_channel_capture = true;
+    config.pipeline.multi_channel_capture = p_channels == 2;
     config.echo_canceller.enforce_high_pass_filtering = false;
     processor = webrtc::AudioProcessingBuilder().SetConfig(config).Create();
     if (!processor || processor->Initialize() != webrtc::AudioProcessing::kNoError) {
@@ -68,6 +73,7 @@ Error TwoVoipWebRTCConditioner::initialize(int p_chunk_ms, int p_input_sample_ra
     output_frame_10ms = p_output_sample_rate / 100;
     input_chunk_size = input_frame_10ms * (p_chunk_ms / 10);
     output_chunk_size = output_frame_10ms * (p_chunk_ms / 10);
+    channels = p_channels;
     capture_left.resize(input_frame_10ms);
     capture_right.resize(input_frame_10ms);
     render_left.resize(input_frame_10ms);
@@ -80,7 +86,7 @@ Error TwoVoipWebRTCConditioner::initialize(int p_chunk_ms, int p_input_sample_ra
     conditioned_right.resize(output_frame_10ms);
 
     input_config = webrtc::StreamConfig(input_frame_10ms * 100, 2);
-    output_config = webrtc::StreamConfig(output_frame_10ms * 100, 2);
+    output_config = webrtc::StreamConfig(output_frame_10ms * 100, channels);
 
     return OK;
 #else
@@ -141,13 +147,23 @@ PackedVector2Array TwoVoipWebRTCConditioner::condition(const PackedVector2Array 
             }
         }
         const float *capture_input[] = { capture_left.data(), capture_right.data() };
-        float *capture_output[] = { conditioned_left.data(), conditioned_right.data() };
-        if (processor->ProcessStream(capture_input, input_config, output_config, capture_output) !=
-                webrtc::AudioProcessing::kNoError) {
-            return PackedVector2Array();
+        if (channels == 1) {
+            float *capture_output[] = { conditioned_left.data() };
+            if (processor->ProcessStream(capture_input, input_config, output_config, capture_output) !=
+                    webrtc::AudioProcessing::kNoError) {
+                return PackedVector2Array();
+            }
+            for (int frame = 0; frame < output_frame_10ms; frame++)
+                conditioned_frames[output_offset + frame] = Vector2(conditioned_left[frame], conditioned_left[frame]);
+        } else {
+            float *capture_output[] = { conditioned_left.data(), conditioned_right.data() };
+            if (processor->ProcessStream(capture_input, input_config, output_config, capture_output) !=
+                    webrtc::AudioProcessing::kNoError) {
+                return PackedVector2Array();
+            }
+            for (int frame = 0; frame < output_frame_10ms; frame++)
+                conditioned_frames[output_offset + frame] = Vector2(conditioned_left[frame], conditioned_right[frame]);
         }
-        for (int frame = 0; frame < output_frame_10ms; frame++)
-            conditioned_frames[output_offset + frame] = Vector2(conditioned_left[frame], conditioned_right[frame]);
     }
     apply_gain_and_measure(conditioned_frames);
     return conditioned_frames;

@@ -34,7 +34,7 @@ func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 
-	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxOpusFrame/SampleRate, $VBoxConditioning/HBoxConditioner/OptionChannels, $HBoxBigButtons/VBoxPTT/Denoise, $VBoxConditioning/HBoxConditioner/ConditionerOption, $VBoxConditioning/HBoxAudioFrame/WebRTCdenoiser ]:
+	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxOpusFrame/SampleRate, $VBoxConditioning/HBoxConditioner/OptionChannels, $VBoxConditioning/HBoxConditioner/ConditionerOption, $VBoxConditioning/HBoxAudioFrame/WebRTCdenoiser ]:
 		h.connect("item_selected", func (_item_selected): updatesamplerates())
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusExtra/FecSpinBox, $VBoxFrameLength/HBoxOpusExtra/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
 		h.connect("value_changed", func (_value): updatesamplerates())
@@ -148,7 +148,7 @@ func reprocessoriginalchunks():
 	var opuschannels = int($VBoxConditioning/HBoxConditioner/OptionChannels.text)
 
 	var conditioner_forreprocessing := TwoVoipConditioner.new()
-	conditioner_forreprocessing.initialize($TwoVoipMic.opusframedurationms, conditionedsamples_mixrate, opussamplerate)
+	conditioner_forreprocessing.initialize($TwoVoipMic.opusframedurationms, conditionedsamples_mixrate, opussamplerate, opuschannels)
 
 	var opusencoder_forreprocessing := TwoVoipOpusEncoder.new()
 	opusencoder_forreprocessing.initialize(opussamplerate, opuschannels, $TwoVoipMic.opus_chunk_size)

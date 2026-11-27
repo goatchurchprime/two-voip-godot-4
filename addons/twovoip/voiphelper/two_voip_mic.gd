@@ -103,12 +103,12 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 		conditioner_backend = p_conditioner_backend
 		if conditioner_backend == ConditionerBackend.WEBRTC:
 			conditioner = TwoVoipWebRTCConditioner.new()
-			var conditioner_error = conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate)
+			var conditioner_error = conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate, p_channels)
 			if conditioner_error == ERR_UNAVAILABLE:
 				conditioner_backend == ConditionerBackend.RESAMPLE
 		if conditioner_backend == ConditionerBackend.RESAMPLE:
 			conditioner = TwoVoipConditioner.new()
-			conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate)
+			conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate, p_channels)
 
 	if conditioner is TwoVoipWebRTCConditioner:
 		conditioner.set_echo_cancel_enabled(p_echo_cancel_enabled)

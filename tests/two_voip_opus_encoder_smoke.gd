@@ -19,5 +19,10 @@ func _initialize() -> void:
 	assert(packet[0] == prefix[0])
 	assert(encoder.encode_chunk(frames.slice(1), prefix).is_empty())
 	encoder.reset()
-	print("Stateless TwoVoipOpusEncoder smoke passed")
+
+	var mono_encoder := TwoVoipOpusEncoder.new()
+	assert(mono_encoder.initialize(48000, 1, 960) == OK)
+	var mono_packet := mono_encoder.encode_chunk(frames)
+	assert(not mono_packet.is_empty())
+	print("Mono and stereo stateless TwoVoipOpusEncoder smoke passed")
 	quit(0)
