@@ -26,20 +26,22 @@ def get_cmake_output_lib_dir(env: SConsEnvironment, lib_path: str) -> str:
     return os.path.join(get_cmake_build_dir(env, lib_path), "RelWithDebInfo" if env["dev_build"] else "Release")
 
 
-def get_meson_build_dir(env: SConsEnvironment, project_name: str) -> str:
+def get_meson_build_dir(env: SConsEnvironment, project_name: str, build_name: str = "") -> str:
     abs_scons_root = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(abs_scons_root, "build", "meson", project_name, f'{env["platform"]}_{env["arch"]}')
+    target_name = build_name or f'{env["platform"]}_{env["arch"]}'
+    return os.path.join(abs_scons_root, "build", "meson", project_name, target_name)
 
 
-def meson_build_project(env: SConsEnvironment, project_name: str, source_path: str, extra_args: list):
-    build_dir = get_meson_build_dir(env, project_name)
+def meson_build_project(env: SConsEnvironment, project_name: str, source_path: str, extra_args: list, build_name: str = ""):
+    build_dir = get_meson_build_dir(env, project_name, build_name)
     source_dir = os.path.abspath(source_path)
     setup_args = ["meson", "setup", build_dir, source_dir]
     if os.path.exists(os.path.join(build_dir, "meson-private")):
         setup_args.append("--reconfigure")
     setup_args += extra_args
     try:
-        result = subprocess.run(setup_args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+        result = subprocess.run(setup_args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                encoding="utf-8", env=env.get("ENV"))
         print_subprocess_result(result, "meson setup")
         result = subprocess.run(
             ["meson", "compile", "-C", build_dir],
@@ -47,6 +49,7 @@ def meson_build_project(env: SConsEnvironment, project_name: str, source_path: s
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             encoding="utf-8",
+            env=env.get("ENV"),
         )
         print_subprocess_result(result, "meson compile")
     except subprocess.CalledProcessError as error:

@@ -58,9 +58,11 @@ runs:
         if [ "$RUNNER_OS" == "Windows" ]; then
           python -m pip install pywin32
         fi
-        python -m pip install scons
+        python -m pip install scons meson ninja
         python --version
         scons --version
+        meson --version
+        ninja --version
 
     - name: Linux dependencies
       shell: bash
@@ -85,10 +87,18 @@ runs:
       run: |
         echo "::group::🛠️ GDExtension Compilation 🛠️"
         scons_params="platform=${{inputs.platform}} arch=${{inputs.arch}} target=${{inputs.target}} addon_output_dir=${{inputs.output_libs_path}} ${{inputs.additional}}"
+        if [ "${{inputs.platform}}" = "web" ]; then
+          scons_params="$scons_params webrtc_apm=no"
+        else
+          scons_params="$scons_params webrtc_apm=yes"
+        fi
         
         scons apply_patches
         scons build_rnnoise $scons_params
         scons build_opus $scons_params
+        if [ "${{inputs.platform}}" != "web" ]; then
+          scons build_webrtc_apm $scons_params
+        fi
         scons $scons_params
         echo "::endgroup::"
 

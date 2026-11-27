@@ -17,6 +17,7 @@ on:
         .gitmodules,
         rnnoise,
         speexdsp,
+        webrtc-audio-processing,
         lib_utils.py,
         lib_utils_external.py,
         SConstruct,
@@ -38,6 +39,7 @@ on:
         .gitmodules,
         rnnoise,
         speexdsp,
+        webrtc-audio-processing,
         lib_utils.py,
         lib_utils_external.py,
         SConstruct,
@@ -165,6 +167,8 @@ jobs:
           "${{steps.setup_godot.outputs.godot}}" --headless --path . \
             --script res://tests/resample_conditioner_smoke.gd
           "${{steps.setup_godot.outputs.godot}}" --headless --path . \
+            --script res://tests/conditioner_smoke.gd
+          "${{steps.setup_godot.outputs.godot}}" --headless --path . \
             --script res://tests/two_voip_opus_encoder_smoke.gd
 
 # ============================================
@@ -245,7 +249,7 @@ jobs:
 
       # Based on https://stackoverflow.com/q/60776512/8980874 and https://github.com/godotengine/godot/blob/4.5-stable/platform/android/detect.py#L89
       - name: Get ANDROID_HOME
-        run: echo "path=${ANDROID_HOME}" >> $GITHUB_OUTPUT
+        run: echo "path=${ANDROID_HOME}" >> "$GITHUB_OUTPUT"
         id: get_android_home
 
       - name: Restore NDK Cache
@@ -257,7 +261,7 @@ jobs:
 
       - name: Install NDK
         if: steps.ndk-cache.outputs.cache-hit != 'true'
-        run: echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;${{env.NDK_VERSION}}"
+        run: echo "y" | sudo "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install "ndk;${{env.NDK_VERSION}}"
 
       - name: Save NDK Cache
         if: steps.ndk-cache.outputs.cache-hit != 'true'
@@ -358,16 +362,16 @@ jobs:
       - name: Check compiled files
         id: check_compiled_files
         run: |
-          if find extracted_base/ -type f | grep -q .; then
-            echo "is_base_compiled=true" >> $GITHUB_OUTPUT
+          if [ -n "$(find extracted_base/ -type f -print -quit)" ]; then
+            echo "is_base_compiled=true" >> "$GITHUB_OUTPUT"
           else
-            echo "is_base_compiled=false" >> $GITHUB_OUTPUT
+            echo "is_base_compiled=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if find extracted_lipsync/ -type f | grep -q .; then
-            echo "is_lipsync_compiled=true" >> $GITHUB_OUTPUT
+          if [ -n "$(find extracted_lipsync/ -type f -print -quit)" ]; then
+            echo "is_lipsync_compiled=true" >> "$GITHUB_OUTPUT"
           else
-            echo "is_lipsync_compiled=false" >> $GITHUB_OUTPUT
+            echo "is_lipsync_compiled=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Verify packaged Linux binaries
@@ -386,8 +390,10 @@ jobs:
           find extracted_base -mindepth 1
           cd extracted_base
           touch .gdignore
-          echo "Total size Base: $(du -ch -b | grep total | cut -f1 | awk '{printf "%.2f", $1/1048576}') MB, Total number of files: $(find . -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          total_size=$(du -ch -b | awk '/total/ {printf "%.2f", $1/1048576}')
+          total_files=$(find . -type f | wc -l)
+          echo "Total size Base: ${total_size} MB, Total number of files: ${total_files}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
 
       - name: List all LipSync libs
         if: steps.check_compiled_files.outputs.is_lipsync_compiled == 'true'
@@ -396,7 +402,9 @@ jobs:
           find extracted_lipsync -mindepth 1
           cd extracted_lipsync
           touch .gdignore
-          echo "Total size LipSync: $(du -ch -b | grep total | cut -f1 | awk '{printf "%.2f", $1/1048576}') MB, Total number of files: $(find . -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
+          total_size=$(du -ch -b | awk '/total/ {printf "%.2f", $1/1048576}')
+          total_files=$(find . -type f | wc -l)
+          echo "Total size LipSync: ${total_size} MB, Total number of files: ${total_files}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload GDExtension Base
         if: steps.check_compiled_files.outputs.is_base_compiled == 'true'
@@ -473,8 +481,8 @@ jobs:
         if: needs.collect-gdextension.outputs.is_lipsync_compiled == 'true'
         run: |
           pushd addons/${{env.LIBRARY_NAME}}_lipsync/OVRLipSyncNative
-          find -type f \( -name '*.a' -o -name '*.lib' -o -wholename '*/Include/*' -o -wholename '*/Sample/*' \) -delete
-          find -type d -empty -delete
+          find . -type f \( -name '*.a' -o -name '*.lib' -o -wholename '*/Include/*' -o -wholename '*/Sample/*' \) -delete
+          find . -type d -empty -delete
           touch .gdignore
           popd
 

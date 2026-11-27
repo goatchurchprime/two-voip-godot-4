@@ -1,7 +1,7 @@
 class_name TwoVoip
 extends RefCounted
 
-const VERSION := "7.0.1"
+const VERSION := "7.0.2"
 
 static func get_version_info() -> String:
 	var native := TwoVoipOpusEncoder.new()

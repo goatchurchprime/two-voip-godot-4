@@ -1,5 +1,34 @@
 {
   "nodes": {
+    "abseil-cpp": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1722535511,
+        "narHash": "sha256-51jpDhdZ0n+KLmxh8KVaTz53pZAB0dHjmILFX+OLud4=",
+        "owner": "abseil",
+        "repo": "abseil-cpp",
+        "rev": "4447c7562e3bc702ade25105912dce503f0c4010",
+        "type": "github"
+      },
+      "original": {
+        "owner": "abseil",
+        "ref": "20240722.0",
+        "repo": "abseil-cpp",
+        "type": "github"
+      }
+    },
+    "abseil-meson-patch": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-ASKqpkwhMxP/DjHKUcqSSQCoJ5PQNISuZQFuZZ5czJk=",
+        "type": "file",
+        "url": "https://wrapdb.mesonbuild.com/v2/abseil-cpp_20240722.0-3/get_patch"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://wrapdb.mesonbuild.com/v2/abseil-cpp_20240722.0-3/get_patch"
+      }
+    },
     "android": {
       "inputs": {
         "devshell": "devshell",
@@ -182,12 +211,15 @@
     },
     "root": {
       "inputs": {
+        "abseil-cpp": "abseil-cpp",
+        "abseil-meson-patch": "abseil-meson-patch",
         "android": "android",
         "flake-parts": "flake-parts",
         "godot-cpp": "godot-cpp",
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-old": "nixpkgs-old",
-        "speexdsp": "speexdsp"
+        "speexdsp": "speexdsp",
+        "webrtc-audio-processing": "webrtc-audio-processing"
       }
     },
     "speexdsp": {
@@ -235,6 +267,23 @@
         "owner": "nix-systems",
         "repo": "default",
         "type": "github"
+      }
+    },
+    "webrtc-audio-processing": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1737585138,
+        "narHash": "sha256-YR4ELukJgHMbfe80H+r8OiaZUCAqefGXmVOaTVVgOqA=",
+        "ref": "refs/heads/master",
+        "rev": "846fe90a289f58b7c9303a635142aa2c7caa93e5",
+        "revCount": 172,
+        "type": "git",
+        "url": "https://gitlab.freedesktop.org/pulseaudio/webrtc-audio-processing.git"
+      },
+      "original": {
+        "rev": "846fe90a289f58b7c9303a635142aa2c7caa93e5",
+        "type": "git",
+        "url": "https://gitlab.freedesktop.org/pulseaudio/webrtc-audio-processing.git"
       }
     }
   },

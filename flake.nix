@@ -17,6 +17,18 @@
       url = "github:xiph/speexdsp/1b28a0f61bc31162979e1f26f3981fc3637095c8";
       flake = false;
     };
+    webrtc-audio-processing = {
+      url = "git+https://gitlab.freedesktop.org/pulseaudio/webrtc-audio-processing.git?rev=846fe90a289f58b7c9303a635142aa2c7caa93e5";
+      flake = false;
+    };
+    abseil-cpp = {
+      url = "github:abseil/abseil-cpp/20240722.0";
+      flake = false;
+    };
+    abseil-meson-patch = {
+      url = "https://wrapdb.mesonbuild.com/v2/abseil-cpp_20240722.0-3/get_patch";
+      flake = false;
+    };
     android.url = "github:tadfisher/android-nixpkgs";
     flake-parts.url = "github:hercules-ci/flake-parts";
   };
@@ -64,23 +76,34 @@
       in rec {
         packages.android = packages.default.overrideAttrs (_: {
           ANDROID_HOME = "${androidenv}/share/android-sdk";
+          ANDROID_NDK_ROOT = "${androidenv}/share/android-sdk/ndk/23.2.8568313";
           sconsFlags = [
             "platform=android"
-            "webrtc_apm=no"
+            "webrtc_apm=yes"
             "rnnoise=false"
             "opus_include_dir=${pkgs.libopus.dev}/include/opus"
             "opus_library_dir=${pkgs.pkgsCross.aarch64-multiplatform.pkgsStatic.libopus}/lib"
           ];
+          preBuild = ''
+            scons build_webrtc_apm platform=android arch=arm64 webrtc_apm=yes
+          '';
           doCheck = false;
         });
         packages.default = stdenv-old.mkDerivation (packagedDependencyEnv // {
           name = "opus-voip";
           src = inputs.self;
-          sconsFlags = [ "webrtc_apm=no" ];
+          sconsFlags = [ "webrtc_apm=yes" ];
+          dontUseMesonConfigure = true;
+          dontUseNinjaBuild = true;
           prePatch = ''
-            rm -rf godot-cpp speexdsp
+            rm -rf godot-cpp speexdsp webrtc-audio-processing
             cp -r --no-preserve=mode ${inputs.godot-cpp} ./godot-cpp
             cp -r --no-preserve=mode ${inputs.speexdsp} ./speexdsp
+            cp -r --no-preserve=mode ${inputs.webrtc-audio-processing} ./webrtc-audio-processing
+            mkdir -p webrtc-audio-processing/subprojects/abseil-cpp-20240722.0
+            cp -r --no-preserve=mode ${inputs.abseil-cpp}/. webrtc-audio-processing/subprojects/abseil-cpp-20240722.0/
+            unzip -q ${inputs.abseil-meson-patch} \
+              -d webrtc-audio-processing/subprojects
             patch -d godot-cpp -p1 < patches/godot_cpp_exclude_unused_classes.patch
             patch -d godot-cpp -p1 < patches/unity_build.patch
           '';
@@ -89,11 +112,18 @@
             pkgs.godot_4_6
             nixpkgs-old.patchelf
             nixpkgs-old.scons
+            nixpkgs-old.meson
+            nixpkgs-old.ninja
+            nixpkgs-old.pkg-config
+            nixpkgs-old.unzip
           ];
           buildInputs = [
             opus-static
             rnnoise-static
           ];
+          preBuild = ''
+            scons build_webrtc_apm platform=linux arch=x86_64 webrtc_apm=yes
+          '';
           doCheck = true;
           dontPatchELF = true;
           checkPhase = ''
@@ -106,6 +136,7 @@
             printf '%s\n' 'res://addons/twovoip/twovoip.gdextension' > .godot/extension_list.cfg
             env -u LD_LIBRARY_PATH godot4 --headless --path . --script res://tests/native_load_smoke.gd
             env -u LD_LIBRARY_PATH godot4 --headless --path . --script res://tests/resample_conditioner_smoke.gd
+            env -u LD_LIBRARY_PATH godot4 --headless --path . --script res://tests/conditioner_smoke.gd
             env -u LD_LIBRARY_PATH godot4 --headless --path . --script res://tests/two_voip_opus_encoder_smoke.gd
             runHook postCheck
           '';
