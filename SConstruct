@@ -98,10 +98,17 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out: list):
         apm_build_dir = lib_utils_external.get_meson_build_dir(env, "webrtc-apm")
         apm_library = os.path.join(apm_build_dir, "twovoip-webrtc-apm.lib" if env["platform"] == "windows" else "libtwovoip-webrtc-apm.a")
         absl_include_dir = "webrtc-audio-processing/subprojects/abseil-cpp-20240722.0"
-        building_apm = "build_webrtc_apm" in COMMAND_LINE_TARGETS or "build_dependencies" in COMMAND_LINE_TARGETS
-        if (not os.path.isfile(apm_library) or not os.path.isdir(absl_include_dir)) and not building_apm:
+        dependency_targets = {
+            "apply_patches",
+            "build_opus",
+            "build_rnnoise",
+            "build_webrtc_apm",
+            "build_dependencies",
+        }
+        building_dependencies = any(target in dependency_targets for target in COMMAND_LINE_TARGETS)
+        if (not os.path.isfile(apm_library) or not os.path.isdir(absl_include_dir)) and not building_dependencies:
             raise RuntimeError(f"webrtc_apm=yes requires: scons build_webrtc_apm platform={env['platform']} arch={env['arch']}")
-        if not building_apm:
+        if not building_dependencies:
             env.Append(
                 CPPDEFINES=["WEBRTC_APM"],
                 CPPPATH=["webrtc-audio-processing/webrtc", absl_include_dir],

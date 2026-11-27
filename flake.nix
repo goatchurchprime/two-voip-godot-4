@@ -41,7 +41,7 @@
           cmdline-tools-latest
           platform-tools
           platforms-android-34
-          ndk-23-2-8568313
+          ndk-28-1-13356709
         ]);
         # Build the final extension with the same GLIBC generation as the
         # Ubuntu 22.04 GitHub runner instead of the host NixOS toolchain.
@@ -76,7 +76,7 @@
       in rec {
         packages.android = packages.default.overrideAttrs (_: {
           ANDROID_HOME = "${androidenv}/share/android-sdk";
-          ANDROID_NDK_ROOT = "${androidenv}/share/android-sdk/ndk/23.2.8568313";
+          ANDROID_NDK_ROOT = "${androidenv}/share/android-sdk/ndk/28.1.13356709";
           sconsFlags = [
             "platform=android"
             "webrtc_apm=yes"
