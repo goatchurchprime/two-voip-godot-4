@@ -303,7 +303,9 @@ def build_webrtc_apm(target, source, env: SConsEnvironment):
 
     combined_archives = []
     for build_name, platform_args in builds:
-        rc = lib_utils_external.meson_build_project(env, "webrtc-apm", "webrtc-audio-processing", base_args + platform_args, build_name)
+        rc = lib_utils_external.meson_build_project(
+            env, "webrtc-apm", "webrtc-audio-processing", base_args + platform_args,
+            build_name, ["static library"])
         if rc:
             return rc
         build_dir = lib_utils_external.get_meson_build_dir(env, "webrtc-apm", build_name)

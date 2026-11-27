@@ -46,10 +46,10 @@ runs:
           ${{github.job}}-${{inputs.artifact}}-${{steps.get_godot_cpp_sha.outputs.sha}}-${{github.ref}}
           ${{github.job}}-${{inputs.artifact}}-${{steps.get_godot_cpp_sha.outputs.sha}}
 
-    - name: Set up Python 3.x
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: "3.x"
+        python-version: "3.12"
         architecture: ${{runner.arch == 'ARM64' && 'arm64' || 'x64'}}
 
     - name: Configuring Python packages
@@ -58,7 +58,7 @@ runs:
         if [ "$RUNNER_OS" == "Windows" ]; then
           python -m pip install pywin32
         fi
-        python -m pip install scons meson ninja
+        python -m pip install scons==4.11.1 meson==1.12.1 ninja==1.13.2
         python --version
         scons --version
         meson --version

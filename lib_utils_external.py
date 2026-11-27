@@ -4,7 +4,7 @@ from SCons.Script.SConscript import SConsEnvironment
 from SCons.Util import WhereIs
 
 import SCons
-import os, subprocess, shutil
+import json, os, subprocess, shutil
 
 
 # Get the name of the cmake build directory
@@ -32,24 +32,37 @@ def get_meson_build_dir(env: SConsEnvironment, project_name: str, build_name: st
     return os.path.join(abs_scons_root, "build", "meson", project_name, target_name)
 
 
-def meson_build_project(env: SConsEnvironment, project_name: str, source_path: str, extra_args: list, build_name: str = ""):
+def meson_build_project(env: SConsEnvironment, project_name: str, source_path: str, extra_args: list,
+                        build_name: str = "", compile_target_types: list = None):
     build_dir = get_meson_build_dir(env, project_name, build_name)
     source_dir = os.path.abspath(source_path)
     setup_args = ["meson", "setup", build_dir, source_dir]
+    command_env = dict(env.get("ENV") or os.environ)
+    if env["platform"] == "windows":
+        # Meson otherwise auto-detects any compiler cache on PATH. GitHub's
+        # Windows image currently exposes an unrelated, broken Strawberry Perl
+        # ccache, so state the compilers selected by SCons explicitly.
+        command_env["CC"] = env.subst("$CC")
+        command_env["CXX"] = env.subst("$CXX")
     if os.path.exists(os.path.join(build_dir, "meson-private")):
         setup_args.append("--reconfigure")
     setup_args += extra_args
     try:
         result = subprocess.run(setup_args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                encoding="utf-8", env=env.get("ENV"))
+                                encoding="utf-8", env=command_env)
         print_subprocess_result(result, "meson setup")
+        compile_targets = []
+        if compile_target_types:
+            with open(os.path.join(build_dir, "meson-info", "intro-targets.json"), encoding="utf-8") as targets_file:
+                compile_targets = [target["name"] for target in json.load(targets_file)
+                                   if target["type"] in compile_target_types]
         result = subprocess.run(
-            ["meson", "compile", "-C", build_dir],
+            ["meson", "compile", "-C", build_dir] + compile_targets,
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             encoding="utf-8",
-            env=env.get("ENV"),
+            env=command_env,
         )
         print_subprocess_result(result, "meson compile")
     except subprocess.CalledProcessError as error:
