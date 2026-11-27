@@ -16,7 +16,7 @@ The following libraries are used:
 | --- | --- | --- |
 | [libopus](https://github.com/xiph/opus) | v1.5.2 (10 April 2024) | Audio compression |
 | [RNNoise](https://github.com/xiph/rnnoise) | v0.2 + 1 commit (15 April 2024) | Noise suppression |
-| [SpeexDSP](https://github.com/xiph/speexdsp) | 1.2.1 (13 June 2022) | Echo, gain, resampling |
+| [SpeexDSP](https://github.com/xiph/speexdsp) | 1.2.1 (13 June 2022) | Gain, noise suppression, resampling |
 | [godot-mqtt](https://github.com/goatchurch/godot-mqtt) | 1.5 (??) | Low maintenance networking |
 
 ## Fresh clone and precompiled addons
@@ -225,9 +225,12 @@ the per-frame processing call concerned only with audio. For a 20 ms Opus frame
 at 48 kHz:
 
 ```gdscript
+var conditioner := TwoVoipConditioner.new()
+assert(conditioner.initialize(20, AudioServer.get_input_mix_rate(), 48000) == OK)
+
 var encoder := TwovoipOpusEncoder.new()
 var error := encoder.initialize(
-    AudioServer.get_input_mix_rate(),
+    48000,
     48000,
     2,
     TwovoipOpusEncoder.DENOISER_DISABLED,
@@ -239,9 +242,10 @@ assert(encoder.set_bitrate(12000) == OK)
 assert(encoder.set_complexity(5) == OK)
 assert(encoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE) == OK)
 
-var required := encoder.get_required_input_chunk_size()
-var frames := AudioServer.get_input_frames(required)
-var consumed := encoder.push_input_chunk(frames)
+var input_frames := AudioServer.get_input_frames(conditioner.get_input_chunk_size())
+var conditioned_frames := conditioner.condition(input_frames, PackedVector2Array())
+assert(conditioned_frames.size() == conditioner.get_output_chunk_size())
+var consumed := encoder.push_input_chunk(conditioned_frames)
 if consumed >= 0:
     var peak := encoder.get_peak()
     var rms := encoder.get_rms()
@@ -265,14 +269,9 @@ streaming history. Pass `true` after deliberately skipping one or more chunks
 discarded before converting the next chunk. This API may ultimately move into
 the Vizemes integration rather than remain part of TwoVoIP.
 
-`get_required_input_chunk_size()` is constant for the initialized object's lifetime.
-It is the ceiling of the input/output sample ratio, and is
-therefore conservative for fractional combinations. `push_input_chunk()` rejects
-a shorter array without advancing processing state and returns the number of
-input frames actually consumed. The Speex filter state and output capacity can
-occasionally leave additional frames unconsumed, particularly on the first
-call for some rate and long-frame combinations. The caller must retain
-`frames.size() - consumed` frames; TwoVoIP does not buffer or discard them.
+The conditioner owns the input/output sample-rate boundary and reports both
+chunk sizes. The Opus encoder receives one complete output-rate chunk from the
+conditioner; it does not determine how many microphone frames should be read.
 
 The Opus output rate must be one of 8, 12, 16, 24 or 48 kHz, and the output
 chunk must represent a legal Opus duration of 2.5, 5, 10, 20, 40 or 60 ms.

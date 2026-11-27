@@ -103,7 +103,7 @@
             mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" .godot
             printf '%s\n' 'res://addons/twovoip/twovoip.gdextension' > .godot/extension_list.cfg
             godot4 --headless --path . --script res://tests/native_load_smoke.gd
-            godot4 --headless --path . --script res://tests/echo_canceler_smoke.gd
+            godot4 --headless --path . --script res://tests/resample_conditioner_smoke.gd
             runHook postCheck
           '';
           installPhase = ''

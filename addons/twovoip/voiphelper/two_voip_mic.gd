@@ -2,7 +2,7 @@ extends Node
 
 var opusencoder : TwovoipOpusEncoder
 var chunkprefix := TwoVoipPacket.make_sequence_chunk_prefix()
-var conditioner : TwoVoipConditioner
+var conditioner
 
 var lead_time : float = 0.15
 var hang_time : float  = 0.7
@@ -65,6 +65,12 @@ enum EchoCancelling {
 }
 var echo_cancel_mode = EchoCancelling.ECHO_CANCEL_DISABLED
 
+enum ConditionerBackend {
+	RESAMPLE,
+	WEBRTC,
+	SPEEX,
+}
+
 func _notification(what: int):
 	if what == NOTIFICATION_APPLICATION_RESUMED:
 		# get_ticks_usec() is not a portable suspend clock. Force a fresh wire
@@ -92,16 +98,21 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 	opuschannels = p_channels
 	denoiser_mode = p_denoiser_mode
 	agc_enabled = p_agc_enabled
-	echo_cancel_enabled = p_echo_cancel_enabled
 	if conditioner == null or conditioner_backend != p_conditioner_backend or samplerates_changed:
-		conditioner = TwoVoipConditioner.new()
+		conditioner_backend = p_conditioner_backend
+		conditioner = TwoVoipWebRTCConditioner.new() if conditioner_backend == ConditionerBackend.WEBRTC else TwoVoipConditioner.new()
 		var conditioner_error = conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate)
+		if conditioner_error == ERR_UNAVAILABLE and conditioner_backend == ConditionerBackend.WEBRTC:
+			conditioner = TwoVoipConditioner.new()
+			conditioner_error = conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate)
 		if conditioner_error != OK:
 			push_error("TwoVoIP conditioner configuration failed: %s" % error_string(conditioner_error))
 
-	conditioner.set_echo_cancel_enabled(p_echo_cancel_enabled)
-	conditioner.set_denoising_level(p_denoiser_mode)
-	conditioner.set_agc_enabled(p_agc_enabled)
+	if conditioner is TwoVoipWebRTCConditioner:
+		conditioner.set_echo_cancel_enabled(p_echo_cancel_enabled)
+		conditioner.set_denoising_level(p_denoiser_mode)
+		conditioner.set_agc_enabled(p_agc_enabled)
+	echo_cancel_enabled = p_echo_cancel_enabled and conditioner is TwoVoipWebRTCConditioner
 	
 	if opusencoder == null or samplerates_changed:
 		opusencoder = TwovoipOpusEncoder.new()
@@ -129,7 +140,7 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 	if bitrate_changed and currentlytalking:
 		transmit_audio_packet.emit(make_audio_packet_midstream_update())
 
-	audio_chunk_size = roundi(input_mix_rate*p_opusframedurationms/1000.0)
+	audio_chunk_size = conditioner.get_input_chunk_size()
 	frametimesecs = p_opusframedurationms/1000.0
 	if audiosampleframematerial:
 		var audiosampleframedata = PackedVector2Array()

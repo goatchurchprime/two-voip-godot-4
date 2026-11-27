@@ -38,7 +38,7 @@ var chunkmax = 0.0
 var opus_chunk_size = 960
 func _process_record():
 	while true:
-		var frames = AudioServer.get_input_frames(opusencoder.get_required_input_chunk_size())
+		var frames = AudioServer.get_input_frames(opus_chunk_size)
 		if not frames:
 			break
 		opusencoder.push_input_chunk(frames)

@@ -23,7 +23,7 @@ func _initialize() -> void:
 	var encoder := TwovoipOpusEncoder.new()
 	assert(encoder.initialize(44100, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
 	assert(encoder.initialize(44100, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == ERR_ALREADY_IN_USE)
-	assert(encoder.get_required_input_chunk_size() == 882)
+	assert(not encoder.has_method("get_required_input_chunk_size"))
 	assert(not encoder.has_method("fetch_pre_encoded_chunk"))
 	for removed_method in ["create_sampler", "create_opus_encoder", "set_output_chunk_size", "get_output_chunk_size", "calc_audio_chunk_size", "process_pre_encoded_chunk", "get_denoiser", "get_agc_mode"]:
 		assert(not encoder.has_method(removed_method))
@@ -58,13 +58,11 @@ func _initialize() -> void:
 
 	var fractional := TwovoipOpusEncoder.new()
 	assert(fractional.initialize(44117, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
-	assert(fractional.get_required_input_chunk_size() == 883)
 	var consumed := fractional.push_input_chunk(make_stereo(883))
 	assert(consumed == 882 or consumed == 883)
 
 	var mono := TwovoipOpusEncoder.new()
 	assert(mono.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
-	assert(mono.get_required_input_chunk_size() == 960)
 	assert(mono.push_input_chunk(make_stereo(960)) == 960)
 
 	var direct_16khz := TwovoipOpusEncoder.new()
@@ -81,8 +79,7 @@ func _initialize() -> void:
 			var standard := TwovoipOpusEncoder.new()
 			var output_frames: int = output_rate * duration_ms / 1000
 			assert(standard.initialize(44100, output_rate, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, output_frames) == OK)
-			assert(standard.get_required_input_chunk_size() == ceili(44100 * duration_ms / 1000.0))
-			var standard_required: int = standard.get_required_input_chunk_size()
+			var standard_required := ceili(44100 * duration_ms / 1000.0)
 			var standard_consumed: int = standard.push_input_chunk(make_stereo(standard_required))
 			assert(standard_consumed > 0 and standard_consumed <= standard_required)
 			assert(standard.get_current_chunk_16khz(true).size() == duration_ms * 16)

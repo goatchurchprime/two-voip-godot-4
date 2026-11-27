@@ -14,16 +14,18 @@ func _initialize() -> void:
 		noise_state = (noise_state * 1103515245 + 12345) & 0x7fffffff
 		source[frame] = (noise_state / float(0x7fffffff) - 0.5) * 0.3
 
-	var conditioner := TwoVoipConditioner.new()
+	var conditioner := TwoVoipWebRTCConditioner.new()
 	conditioner.set_echo_cancel_enabled(true)
-	conditioner.set_denoising_level(TwoVoipConditioner.DENOISING_MODERATE)
+	conditioner.set_denoising_level(TwoVoipWebRTCConditioner.DENOISING_MODERATE)
 	conditioner.set_agc_enabled(true)
 	assert(conditioner.initialize(20, INPUT_RATE, OUTPUT_RATE) == OK)
-	conditioner.set_denoising_level(TwoVoipConditioner.DENOISING_DISABLED)
+	assert(conditioner.get_input_chunk_size() == INPUT_CHUNK)
+	assert(conditioner.get_output_chunk_size() == OUTPUT_CHUNK)
+	conditioner.set_denoising_level(TwoVoipWebRTCConditioner.DENOISING_DISABLED)
 	conditioner.set_agc_enabled(false)
 	conditioner.set_echo_cancel_enabled(false)
 	conditioner.set_echo_cancel_enabled(true)
-	conditioner.set_denoising_level(TwoVoipConditioner.DENOISING_MODERATE)
+	conditioner.set_denoising_level(TwoVoipWebRTCConditioner.DENOISING_MODERATE)
 	conditioner.set_agc_enabled(true)
 	var input_energy := 0.0
 	var output_energy := 0.0
@@ -62,7 +64,7 @@ func _initialize() -> void:
 	assert(conditioner.condition(microphone, short_playback).size() == OUTPUT_CHUNK)
 	conditioner.set_echo_cancel_enabled(false)
 	assert(conditioner.condition(microphone, PackedVector2Array()).size() == OUTPUT_CHUNK)
-	var native_rate_conditioner := TwoVoipConditioner.new()
+	var native_rate_conditioner := TwoVoipWebRTCConditioner.new()
 	assert(native_rate_conditioner.initialize(20, INPUT_RATE, INPUT_RATE) == OK)
 	assert(native_rate_conditioner.condition(microphone, short_playback).size() == INPUT_CHUNK)
 	print("WebRTC conditioner 44.1 to 48 kHz smoke passed (energy ratio %.4f)" % energy_ratio)

@@ -1,14 +1,15 @@
 # WebRTC conditioner
 
-`TwoVoipConditioner` owns one WebRTC Audio Processing Module instance. It is a
-separate class from `TwoVoipEchoCanceler`; it does not select between backends.
-AEC3, noise suppression and gain control can be enabled independently.
+`TwoVoipWebRTCConditioner` owns one WebRTC Audio Processing Module instance. AEC3,
+noise suppression and gain control can be enabled independently.
 
 ```gdscript
-var conditioner := TwoVoipConditioner.new()
+var conditioner := TwoVoipWebRTCConditioner.new()
 conditioner.initialize(chunk_ms, input_mix_rate, opus_sample_rate)
 conditioner.set_stream_delay_ms(render_to_capture_delay_ms)
+var microphone_frames := AudioServer.get_input_frames(conditioner.get_input_chunk_size())
 var opus_rate_frames := conditioner.condition(microphone_frames, render_frames)
+assert(opus_rate_frames.size() == conditioner.get_output_chunk_size())
 ```
 
 Input and render arrays are native-rate stereo frames. `chunk_ms` must be a

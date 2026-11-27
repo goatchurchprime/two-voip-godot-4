@@ -73,7 +73,6 @@ int get_opus_signal_type(TwovoipOpusEncoder::SignalType p_signal_type) {
 void TwovoipOpusEncoder::_bind_methods() {
     ClassDB::bind_static_method("TwovoipOpusEncoder", D_METHOD("get_version_info"), &TwovoipOpusEncoder::get_version_info);
     ClassDB::bind_method(D_METHOD("initialize", "input_mix_rate", "opus_sample_rate", "channels", "denoiser_mode", "agc_mode", "output_chunk_size"), &TwovoipOpusEncoder::initialize);
-    ClassDB::bind_method(D_METHOD("get_required_input_chunk_size"), &TwovoipOpusEncoder::get_required_input_chunk_size);
     ClassDB::bind_method(D_METHOD("push_input_chunk", "audio_frames"), &TwovoipOpusEncoder::push_input_chunk);
     ClassDB::bind_method(D_METHOD("push_silent_input_chunks", "chunk_count"), &TwovoipOpusEncoder::push_silent_input_chunks);
     ClassDB::bind_method(D_METHOD("denoise_chunk", "chunk_offset_back"), &TwovoipOpusEncoder::denoise_chunk);

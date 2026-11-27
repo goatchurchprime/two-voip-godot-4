@@ -404,13 +404,14 @@ func _on_chirp_button_pressed():
 	$TwoVoipMic.chirpbuffer = null
 	print("chirpbuffer ", len(chirpbuffer))
 	if chirpdata == null:
-		var d :PackedByteArray = $VBoxFrameLength/HBoxEchoCancel/AudioStreamChirp.stream.get_data()
+		var d :PackedByteArray = $VBoxConditioning/HBoxEchoCancel/AudioStreamChirp.stream.get_data()
 		chirpdata = PackedVector2Array()
 		chirpdata.resize(len(d)/4)
 		for i in range(len(chirpdata)):
 			chirpdata[i] = Vector2(d.decode_s16(i*4)/32768.0, d.decode_s16(i*4+2)/32768.0)
 	leafvals = [ -1, -1 ]
-	conditioner_delay_frames = roundi($TwoVoipMic.conditioner.get_stream_delay_ms()/1000.0*AudioServer.get_input_mix_rate())
+	if $TwoVoipMic.conditioner.has_method("get_stream_delay_ms"):
+		conditioner_delay_frames = roundi($TwoVoipMic.conditioner.get_stream_delay_ms()/1000.0*AudioServer.get_input_mix_rate())
 	WorkerThreadPool.add_group_task(findchirp.bind(chirpdata, chirpbuffer, $TwoVoipMic), 2)
 	#WorkerThreadPool.add_group_task(findchirp.bind(chirpdata, chirpbuffer), 1))
 	

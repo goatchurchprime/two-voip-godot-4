@@ -63,10 +63,6 @@
 			<return type="float" />
 			<description>Returns the peak magnitude after automatic and manual gain but before denoising, for use by VOX.</description>
 		</method>
-		<method name="get_required_input_chunk_size" qualifiers="const">
-			<return type="int" />
-			<description>Returns the minimum safe input allocation for each processing call.</description>
-		</method>
 		<method name="get_rms" qualifiers="const">
 			<return type="float" />
 			<description>Returns the RMS level per sample after automatic and manual gain but before denoising, for use by VOX.</description>
