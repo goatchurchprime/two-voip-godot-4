@@ -30,19 +30,15 @@ func make_mono(phase: float, frame_size: int = 960) -> PackedVector2Array:
 func make_opus_packets(stream_count: int, encode_base64: bool,
 		first_frame: int = 0, packet_count: int = 2,
 		frame_size: int = 960) -> Array[PackedByteArray]:
-	var encoder := TwovoipOpusEncoder.new()
-	assert(encoder.initialize(48000, 48000, 1,
-			TwovoipOpusEncoder.DENOISER_DISABLED,
-			TwovoipOpusEncoder.AGC_DISABLED, frame_size) == OK)
+	var encoder := TwoVoipOpusEncoder.new()
+	assert(encoder.initialize(48000, 1, frame_size) == OK)
 	var packets: Array[PackedByteArray] = []
 	for packet_offset in range(packet_count):
 		var frame_count = first_frame + packet_offset
-		assert(encoder.push_input_chunk(
-				make_mono(frame_count * 0.25, frame_size)) == frame_size)
 		var prefix := TwoVoipPacket.make_sequence_chunk_prefix()
 		TwoVoipPacket.set_sequence_chunk_prefix(prefix, frame_count, stream_count)
 		packets.append(TwoVoipPacket.encode_audio_packet(
-				encoder.encode_chunk(prefix, 0), encode_base64))
+				encoder.encode_chunk(make_mono(frame_count * 0.25, frame_size), prefix), encode_base64))
 	return packets
 
 
@@ -850,8 +846,8 @@ func run_mid_restarts_playback(speaker: Node, stream_count: int) -> void:
 func run_input_gap_detection() -> void:
 	var mic := Node.new()
 	mic.set_script(preload("res://addons/twovoip/voiphelper/two_voip_mic.gd"))
-	mic.opusencoder = TwovoipOpusEncoder.new()
-	assert(mic.opusencoder.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	mic.opusencoder = TwoVoipOpusEncoder.new()
+	assert(mic.opusencoder.initialize(48000, 1, 960) == OK)
 	mic.currentlytalking = true
 	mic.opusstreamcount = 12
 	mic.opusframecount = 30
@@ -859,6 +855,7 @@ func run_input_gap_detection() -> void:
 	mic.input_mix_rate = 48000
 	mic.input_gap_threshold = 0.05
 	mic.input_chunk_first_frame_times_usec.resize(10)
+	mic.conditioned_chunk_history.resize(10)
 	var emitted_packets: Array[PackedByteArray] = []
 	mic.transmit_audio_packet.connect(func(packet): emitted_packets.append(packet))
 	var gap_plan: Dictionary = mic.plan_audio_input_gap(1700000000651556)
@@ -868,14 +865,12 @@ func run_input_gap_detection() -> void:
 	mic.apply_audio_input_gap(gap_plan)
 	assert(mic.input_chunk_number == 2)
 	assert(mic.get_input_chunk_first_frame_time_usec(0) == 1700000000640000)
-	assert(mic.opusencoder.push_input_chunk(make_mono(0.0)) == 960)
-	mic.input_chunk_number += 1
-	mic.input_chunk_first_frame_times_usec[mic.input_chunk_number] = 1700000000660000
+	mic.store_conditioned_chunk(make_mono(0.0), 1700000000660000)
 	mic.processopuschunk(0)
 	assert(mic.opusframecount == 34)
 	assert(mic.get_next_frame_time_usec() == 1700000000680000)
 	assert(emitted_packets.size() == 2)
-	assert(mic.opusencoder.get_chunk_sum_squares(1) == 0.0)
+	assert(mic.chunk_sum_squares(mic.get_conditioned_chunk(1)) == 0.0)
 	var mid := TwoVoipPacket.decode_control_packet(emitted_packets[0])
 	assert(int(mid[TwoVoipPacket.MidField.NEXT_FRAME_COUNT]) == 33)
 	assert(int(mid[TwoVoipPacket.MidField.NEXT_FRAME_TIME_USEC]) == 1700000000660000)
@@ -901,20 +896,21 @@ func run_mqtt_log_payload_roundtrip() -> void:
 func run_stream_start_without_history() -> void:
 	var mic := Node.new()
 	mic.set_script(preload("res://addons/twovoip/voiphelper/two_voip_mic.gd"))
-	mic.opusencoder = TwovoipOpusEncoder.new()
-	assert(mic.opusencoder.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	mic.opusencoder = TwoVoipOpusEncoder.new()
+	assert(mic.opusencoder.initialize(48000, 1, 960) == OK)
 	mic.input_chunk_first_frame_times_usec.resize(51)
+	mic.conditioned_chunk_history.resize(51)
 	var emitted_packets: Array[PackedByteArray] = []
 	mic.transmit_audio_packet.connect(func(packet): emitted_packets.append(packet))
 	mic.processtalkstreamends(true)
 	assert(not mic.currentlytalking)
 	assert(emitted_packets.is_empty())
-	assert(mic.opusencoder.push_input_chunk(make_mono(0.0)) == 960)
-	mic.input_chunk_number = 0
-	mic.input_chunk_first_frame_times_usec[0] = 1700000000000000
+	mic.store_conditioned_chunk(make_mono(0.0), 1700000000000000)
 	mic.processtalkstreamends(true)
 	assert(mic.currentlytalking)
 	assert(mic.frame0usec == 1700000000000000)
+	assert(mic.audio_chunk != null)
+	assert(mic.audio_chunk.size() == 960)
 	assert(emitted_packets.size() == 2)
 	var header := TwoVoipPacket.decode_control_packet(emitted_packets[0])
 	assert(int(header[TwoVoipPacket.HeaderField.NEXT_FRAME_TIME_USEC]) == 1700000000000000)
@@ -925,8 +921,8 @@ func run_stream_start_without_history() -> void:
 func run_input_gap_beyond_hang_ends_episode() -> void:
 	var mic := Node.new()
 	mic.set_script(preload("res://addons/twovoip/voiphelper/two_voip_mic.gd"))
-	mic.opusencoder = TwovoipOpusEncoder.new()
-	assert(mic.opusencoder.initialize(48000, 48000, 1, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	mic.opusencoder = TwoVoipOpusEncoder.new()
+	assert(mic.opusencoder.initialize(48000, 1, 960) == OK)
 	mic.currentlytalking = true
 	mic.opusstreamcount = 12
 	mic.opusframecount = 30
@@ -959,10 +955,8 @@ func run_input_gap_beyond_hang_ends_episode() -> void:
 func run_application_resume_restart() -> void:
 	var mic := Node.new()
 	mic.set_script(preload("res://addons/twovoip/voiphelper/two_voip_mic.gd"))
-	mic.opusencoder = TwovoipOpusEncoder.new()
-	assert(mic.opusencoder.initialize(48000, 48000, 1,
-			TwovoipOpusEncoder.DENOISER_DISABLED,
-			TwovoipOpusEncoder.AGC_DISABLED, 960) == OK)
+	mic.opusencoder = TwoVoipOpusEncoder.new()
+	assert(mic.opusencoder.initialize(48000, 1, 960) == OK)
 	mic.currentlytalking = true
 	mic.opusstreamcount = 20
 	mic.opusframecount = 2

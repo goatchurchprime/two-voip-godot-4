@@ -11,8 +11,8 @@ var resampledchunkprefix := TwoVoipPacket.make_sequence_chunk_prefix()
 var audio_packets_base64 : bool = false
 
 var recordedsamples = [ ]
-var recordedcaptures = [ ]
-
+var conditionedsamples = [ ]
+var conditionedsamples_mixrate = 1
 var recordedopuspackets = [ ]
 var recordedresampledpackets = null
 const maxrecordedsamples = 10*50
@@ -34,11 +34,11 @@ func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 
-	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxAudioFrame/SampleRate, $VBoxFrameLength/HBoxOpusFrame/OptionChannels, $HBoxBigButtons/VBoxPTT/Denoise, $VBoxConditioning/HBoxConditioner/ConditionerOption, $VBoxConditioning/HBoxConditioner/WebRTCdenoiser ]:
+	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxOpusFrame/SampleRate, $VBoxConditioning/HBoxConditioner/OptionChannels, $HBoxBigButtons/VBoxPTT/Denoise, $VBoxConditioning/HBoxConditioner/ConditionerOption, $VBoxConditioning/HBoxAudioFrame/WebRTCdenoiser ]:
 		h.connect("item_selected", func (_item_selected): updatesamplerates())
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusExtra/FecSpinBox, $VBoxFrameLength/HBoxOpusExtra/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
 		h.connect("value_changed", func (_value): updatesamplerates())
-	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxMosquitto/base64, $VBoxFrameLength/HBoxOpusFrame/AutoGainControl, $VBoxConditioning/HBoxConditioner/EchocancelEnabled, $VBoxConditioning/HBoxConditioner/AGCEnabled ]:
+	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxMosquitto/base64, $VBoxConditioning/HBoxAudioFrame/EchocancelEnabled, $VBoxConditioning/HBoxAudioFrame/AGCEnabled ]:
 		h.connect("toggled", func (_toggled_on): updatesamplerates())
 
 	audio_packets_base64 = $HBoxMosquitto/base64.button_pressed
@@ -55,11 +55,11 @@ func _ready():
 		print($GodotVersionWarning.text)
 
 	if $VBoxFrameLength/HBoxOpusFrame/FrameDuration.selected == -1:
-		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(3)
-	if $VBoxFrameLength/HBoxOpusFrame/OptionChannels.selected == -1:
-		$VBoxFrameLength/HBoxOpusFrame/OptionChannels.select(0)
-	if $VBoxFrameLength/HBoxAudioFrame/SampleRate.selected == -1:
-		$VBoxFrameLength/HBoxAudioFrame/SampleRate.select(4)
+		$VBoxFrameLength/HBoxOpusFrame/FrameDuration.select(1)
+	if $VBoxConditioning/HBoxConditioner/OptionChannels.selected == -1:
+		$VBoxConditioning/HBoxConditioner/OptionChannels.select(1)
+	if $VBoxFrameLength/HBoxOpusFrame/SampleRate.selected == -1:
+		$VBoxFrameLength/HBoxOpusFrame/SampleRate.select(4)
 
 	if speechbusidx != -1:
 		for effect_idx in range(AudioServer.get_bus_effect_count(speechbusidx)):
@@ -79,7 +79,7 @@ func _ready():
 
 	await get_tree().create_timer(0.1).timeout
 	$HBoxMicTalk/MicWorking.set_pressed(true)
-	
+
 	$TwoVoipMic.connect("transmit_audio_packet", on_transmit_audio_packet)
 
 	# handle lower resolution screens
@@ -115,22 +115,20 @@ func rechunkrecordedchunks(orgsamples, newsamplesize):
 			currentsample = currentsample.slice(newsamplesize)
 	return res
 
-var last_agc_gain := 1.0
 var previous_ptt := false
 
 func updatesamplerates():
 	$TwoVoipMic.processtalkstreamends(false)
 	audio_packets_base64 = $HBoxMosquitto/base64.button_pressed
 	$TwoVoipMic.set_encode_base64(audio_packets_base64)
-	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_input_mix_rate()
-	var conditionerbackend = $VBoxConditioning/HBoxConditioner/ConditionerOption.selected
-	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
-	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
-	var denoiser_mode = $VBoxConditioning/HBoxConditioner/WebRTCdenoiser.selected
-	var agc_enabled = $VBoxConditioning/HBoxConditioner/AGCEnabled.button_pressed
+	$VBoxConditioning/HBoxConditioner/MicSampleRate.value = AudioServer.get_input_mix_rate()
 	var conditioner_backend = $VBoxConditioning/HBoxConditioner/ConditionerOption.selected
-	var echo_cancel_enabled = $VBoxConditioning/HBoxConditioner/EchocancelEnabled.button_pressed
-	var channels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
+	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
+	var opussamplerate = int($VBoxFrameLength/HBoxOpusFrame/SampleRate.text)*1000
+	var denoiser_mode = $VBoxConditioning/HBoxAudioFrame/WebRTCdenoiser.selected
+	var agc_enabled = $VBoxConditioning/HBoxAudioFrame/AGCEnabled.button_pressed
+	var echo_cancel_enabled = $VBoxConditioning/HBoxAudioFrame/EchocancelEnabled.button_pressed
+	var channels = int($VBoxConditioning/HBoxConditioner/OptionChannels.text)
 
 	$TwoVoipMic.set_opus_values(opussamplerate, frametimems, channels,
 			int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), 
@@ -138,25 +136,29 @@ func updatesamplerates():
 			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed,
 			int($VBoxFrameLength/HBoxOpusExtra/FecSpinBox.value),
 			conditioner_backend, echo_cancel_enabled, denoiser_mode, agc_enabled)
+	$TwoVoipMic.set_gain($VBoxConditioning/HBoxEchoCancel/GainManualSpinBox.value)
+	$VBoxConditioning/HBoxAudioFrame/EchocancelEnabled.disabled = not (conditioner_backend == $TwoVoipMic.ConditionerBackend.WEBRTC)
 
 	$TwoVoipMic.lead_time = $HBoxBigButtons/VBoxVox/Leadtime.value
 	$TwoVoipMic.hang_time = $HBoxBigButtons/VBoxVox/Hangtime.value
 	reprocessoriginalchunks()
 
 func reprocessoriginalchunks():
-	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
-	var opuschannels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
-	var denoiser = $HBoxBigButtons/VBoxPTT/Denoise.selected
-	var opusencoder_forreprocessing : TwovoipOpusEncoder = TwovoipOpusEncoder.new()
-	opusencoder_forreprocessing.initialize(AudioServer.get_input_mix_rate(), opussamplerate, opuschannels, denoiser, TwovoipOpusEncoder.AGC_DISABLED, $TwoVoipMic.opus_chunk_size)
-	opusencoder_forreprocessing.set_gain($VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox.value * last_agc_gain)
+	var opussamplerate = int($VBoxFrameLength/HBoxOpusFrame/SampleRate.text)*1000
+	var opuschannels = int($VBoxConditioning/HBoxConditioner/OptionChannels.text)
+
+	var conditioner_forreprocessing := TwoVoipConditioner.new()
+	conditioner_forreprocessing.initialize($TwoVoipMic.opusframedurationms, conditionedsamples_mixrate, opussamplerate)
+
+	var opusencoder_forreprocessing := TwoVoipOpusEncoder.new()
+	opusencoder_forreprocessing.initialize(opussamplerate, opuschannels, $TwoVoipMic.opus_chunk_size)
+	#opusencoder_forreprocessing.set_gain($VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox.value )
 
 	opusencoder_forreprocessing.set_bitrate(int($VBoxFrameLength/HBoxOpusExtra/BitRate.value))
 	opusencoder_forreprocessing.set_complexity(int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value))
 	opusencoder_forreprocessing.set_inband_perc(int($VBoxFrameLength/HBoxOpusExtra/FecSpinBox.value))
-	opusencoder_forreprocessing.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE if $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed else TwovoipOpusEncoder.SIGNAL_MUSIC)
+	opusencoder_forreprocessing.set_signal_type(TwoVoipOpusEncoder.SIGNAL_VOICE if $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed else TwoVoipOpusEncoder.SIGNAL_MUSIC)
 
-	opusencoder_forreprocessing.reset_opus_encoder()
 	var recorded_stream_count := 0
 	var recorded_first_frame_time_usec := 0
 	if TwoVoipPacket.header_is_valid(recordedheader):
@@ -170,15 +172,13 @@ func reprocessoriginalchunks():
 	if not TwoVoipPacket.footer_is_valid(recordedfooter):
 		recordedfooter = TwoVoipPacket.make_footer(int(recordedheader[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT]), 0, 0.0, 0.0)
 
-	$VBoxFrameLength/HBoxAudioFrame/LabFrameLength.text = "%d frames" % $TwoVoipMic.audio_chunk_size
-
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
-	var audioresamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
+	var audioresamplerate = int($VBoxFrameLength/HBoxOpusFrame/SampleRate.text)*1000
 	var audioresamplesize = int(audioresamplerate*frametimems/1000.0)
-	$VBoxFrameLength/HBoxAudioFrame/LabResampleFrameLength.text = "%d frames" % audioresamplesize
+	$VBoxFrameLength/HBoxOpusFrame/LabResampleFrameLength.text = "%d frames" % audioresamplesize
 
-	if len(recordedsamples) != 0 and len(recordedsamples[0]) != $TwoVoipMic.audio_chunk_size:
-		recordedsamples = rechunkrecordedchunks(recordedsamples, $TwoVoipMic.audio_chunk_size)
+	if len(conditionedsamples) != 0 and len(conditionedsamples[0]) != conditioner_forreprocessing.get_input_chunk_size():
+		conditionedsamples = rechunkrecordedchunks(conditionedsamples, conditioner_forreprocessing.get_input_chunk_size())
 	recordedopuspacketsMemSize = 0
 	recordedchunkmax = 0.0
 	recordedopuspackets = null
@@ -187,16 +187,11 @@ func reprocessoriginalchunks():
 	recordedopuspackets = [ ]
 	#opusencoder_forreprocessing.resetencoder(true)
 	var resampledopusframecount = 0
-	for i in range(len(recordedsamples)):
-		var s = recordedsamples[i]
-		if opusencoder_forreprocessing.push_input_chunk(s) < 0:
-			break
-		if denoiser != TwovoipOpusEncoder.DENOISER_DISABLED:
-			opusencoder_forreprocessing.denoise_chunk(0)
-		var chunkmax = opusencoder_forreprocessing.get_peak()
-		recordedchunkmax = max(recordedchunkmax, chunkmax)
+	for i in range(len(conditionedsamples)):
+		var s = conditionedsamples[i]
+		s = conditioner_forreprocessing.condition(s, PackedVector2Array())
 		TwoVoipPacket.set_sequence_chunk_prefix(resampledchunkprefix, resampledopusframecount, int(recordedheader[TwoVoipPacket.HeaderField.OPUS_STREAM_COUNT]))
-		var opuspacket : PackedByteArray = opusencoder_forreprocessing.encode_chunk(resampledchunkprefix, 0)
+		var opuspacket : PackedByteArray = opusencoder_forreprocessing.encode_chunk(s, resampledchunkprefix)
 		opuspacket = TwoVoipPacket.encode_audio_packet(opuspacket, audio_packets_base64)
 		recordedopuspackets.append(opuspacket)
 		resampledopusframecount += 1
@@ -204,16 +199,16 @@ func reprocessoriginalchunks():
 	recordedfooter[TwoVoipPacket.FooterField.OPUS_FRAME_COUNT] = resampledopusframecount
 	$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
 	$VBoxPlayback/HBoxPlaycount/GridContainer/Totalbytes.text = str(recordedopuspacketsMemSize)
-	var tm = len(recordedsamples)*frametimems*0.001
+	var tm = len(conditionedsamples)*frametimems*0.001
 	$VBoxPlayback/HBoxPlaycount/GridContainer/TimeSecs.text = str(tm)
 	$VBoxPlayback/HBoxPlaycount/GridContainer/Bytespersec.text = str(int(recordedopuspacketsMemSize/tm if tm else 0))
 	$VBoxPlayback/HBoxStream/ChunkMax.text = str(recordedchunkmax)
 
-func recordoriginalchunks(audiosamples, capturedsamples, chunkmax, opuspacket):
+func recordoriginalchunks(audiosamples, audiochunk, chunkmax, opuspacket):
 	if audiosamples != null:
 		recordedsamples.append(audiosamples)
-	if capturedsamples != null:
-		recordedcaptures.append(capturedsamples)
+	assert(audiochunk != null)
+	conditionedsamples.append(audiochunk)
 	recordedopuspackets.append(opuspacket)
 	$VBoxPlayback/HBoxPlaycount/GridContainer/FrameCount.text = str(len(recordedopuspackets))
 	recordedopuspacketsMemSize += opuspacket.size()
@@ -228,7 +223,7 @@ func on_transmit_audio_packet(opuspacket : PackedByteArray):
 	if TwoVoipPacket.is_control_packet(opuspacket):
 		intercept_transmit_audio_control_packet(TwoVoipPacket.decode_control_packet(opuspacket))
 	elif len(recordedsamples) < maxrecordedsamples:
-		recordoriginalchunks($TwoVoipMic.raw_audio_chunk, $TwoVoipMic.captured_audio_chunk, $TwoVoipMic.last_chunkmax, opuspacket)
+		recordoriginalchunks($TwoVoipMic.raw_audio_chunk, $TwoVoipMic.audio_chunk, $TwoVoipMic.last_chunkmax, opuspacket)
 	$MQTTnetwork.transportaudiopacket(opuspacket, max(0, $HBoxLogging/TransmissionNoise.selected))
 
 func hash_key(stream_count: int, first_frame: int, frame_count: int) -> String:
@@ -242,7 +237,8 @@ func intercept_transmit_audio_control_packet(control_packet: Array):
 	if control_packet[0] == TwoVoipPacket.TYPE_START:
 		assert(TwoVoipPacket.header_is_valid(control_packet))
 		recordedsamples = [ ]
-		recordedcaptures = [ ]
+		conditionedsamples = [ ]
+		conditionedsamples_mixrate = $TwoVoipMic.opussamplerate
 		recordedopuspackets = [ ]
 		recordedresampledpackets = [ ]
 
@@ -295,11 +291,7 @@ func _on_sav_options_item_selected(index):
 
 func _process(delta):
 	var ptt = $HBoxBigButtons/VBoxPTT/PTT.button_pressed
-	if previous_ptt and not ptt:
-		last_agc_gain = $TwoVoipMic.get_agc_gain()
 	previous_ptt = ptt
-	if $TwoVoipMic.agc_mode == TwovoipOpusEncoder.AGC_APPLIED:
-		$VBoxFrameLength/HBoxOpusFrame/GainSpinBox.set_value_no_signal($TwoVoipMic.get_agc_gain())
 
 func _on_gain_manual_spin_box_value_changed(value):
 	$TwoVoipMic.set_gain(value)

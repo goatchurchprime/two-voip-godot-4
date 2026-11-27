@@ -14,8 +14,12 @@ class TwoVoipConditioner : public RefCounted {
     SpeexResamplerState *resampler = nullptr;
     int input_chunk_size = 0;
     int output_chunk_size = 0;
+    float gain = 1.0F;
+    float last_peak = 0.0F;
+    float last_rms = 0.0F;
 
     void destroy_resampler();
+    void apply_gain_and_measure(PackedVector2Array &p_frames);
 
 protected:
     static void _bind_methods();
@@ -26,6 +30,10 @@ public:
     int get_output_chunk_size() const { return output_chunk_size; }
     PackedVector2Array condition(const PackedVector2Array &p_microphone_frames,
             const PackedVector2Array &p_render_frames);
+    void set_gain(float p_gain);
+    float get_gain() const { return gain; }
+    float get_peak() const { return last_peak; }
+    float get_rms() const { return last_rms; }
     void reset();
 
     ~TwoVoipConditioner();

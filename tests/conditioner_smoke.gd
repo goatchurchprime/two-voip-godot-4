@@ -54,6 +54,8 @@ func _initialize() -> void:
 
 	var energy_ratio := (output_energy / output_frames) / (input_energy / input_frames)
 	assert(energy_ratio < 0.1)
+	assert(conditioner.get_peak() > 0.0)
+	assert(conditioner.get_rms() > 0.0)
 
 	# A short AudioEffectCapture frontier is completed from the tail retained
 	# from the preceding render block rather than dropping the microphone block.

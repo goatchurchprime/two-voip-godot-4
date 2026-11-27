@@ -66,6 +66,7 @@
           ANDROID_HOME = "${androidenv}/share/android-sdk";
           sconsFlags = [
             "platform=android"
+            "webrtc_apm=no"
             "rnnoise=false"
             "opus_include_dir=${pkgs.libopus.dev}/include/opus"
             "opus_library_dir=${pkgs.pkgsCross.aarch64-multiplatform.pkgsStatic.libopus}/lib"
@@ -75,6 +76,7 @@
         packages.default = stdenv-old.mkDerivation (packagedDependencyEnv // {
           name = "opus-voip";
           src = inputs.self;
+          sconsFlags = [ "webrtc_apm=no" ];
           prePatch = ''
             rm -rf godot-cpp speexdsp
             cp -r --no-preserve=mode ${inputs.godot-cpp} ./godot-cpp
@@ -102,8 +104,9 @@
             export XDG_CACHE_HOME="$TMPDIR/twovoip-smoke/cache"
             mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" .godot
             printf '%s\n' 'res://addons/twovoip/twovoip.gdextension' > .godot/extension_list.cfg
-            godot4 --headless --path . --script res://tests/native_load_smoke.gd
-            godot4 --headless --path . --script res://tests/resample_conditioner_smoke.gd
+            env -u LD_LIBRARY_PATH godot4 --headless --path . --script res://tests/native_load_smoke.gd
+            env -u LD_LIBRARY_PATH godot4 --headless --path . --script res://tests/resample_conditioner_smoke.gd
+            env -u LD_LIBRARY_PATH godot4 --headless --path . --script res://tests/two_voip_opus_encoder_smoke.gd
             runHook postCheck
           '';
           installPhase = ''

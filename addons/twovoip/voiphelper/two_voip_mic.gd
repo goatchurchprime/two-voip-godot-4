@@ -1,6 +1,6 @@
 extends Node
 
-var opusencoder : TwovoipOpusEncoder
+var opusencoder : TwoVoipOpusEncoder
 var chunkprefix := TwoVoipPacket.make_sequence_chunk_prefix()
 var conditioner
 
@@ -28,7 +28,7 @@ signal clock_synchronization_finished(success: bool, missing_peers: Array[String
 const rootmeansquaremaxmeasurement = false
 var encode_base64 = false
 
-var agc_mode = TwovoipOpusEncoder.AGC_DISABLED
+var agc_mode = 0
 
 var talkingtimestart = 0
 var talking_first_frame_time_usec: int = 0
@@ -36,6 +36,7 @@ var talking_first_frame_time_usec: int = 0
 const INPUT_TIMESTAMP_HISTORY_SECONDS := 1.0
 # Experimental local history for measuring microphone interruptions.
 var input_chunk_first_frame_times_usec := PackedInt64Array()
+var conditioned_chunk_history: Array[PackedVector2Array] = []
 var input_chunk_number := -1
 
 var frametimesecs = 0.02
@@ -45,7 +46,7 @@ var audio_chunk_size = 882
 var opussamplerate = 48000
 var opus_chunk_size = 960
 var opuschannels = 2
-var denoiser_mode = TwovoipOpusEncoder.DENOISER_DISABLED
+var denoiser_mode = TwoVoipWebRTCConditioner.DENOISING_DISABLED
 var agc_enabled = false
 var conditioner_backend = -1
 var echo_cancel_enabled = false
@@ -100,13 +101,14 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 	agc_enabled = p_agc_enabled
 	if conditioner == null or conditioner_backend != p_conditioner_backend or samplerates_changed:
 		conditioner_backend = p_conditioner_backend
-		conditioner = TwoVoipWebRTCConditioner.new() if conditioner_backend == ConditionerBackend.WEBRTC else TwoVoipConditioner.new()
-		var conditioner_error = conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate)
-		if conditioner_error == ERR_UNAVAILABLE and conditioner_backend == ConditionerBackend.WEBRTC:
+		if conditioner_backend == ConditionerBackend.WEBRTC:
+			conditioner = TwoVoipWebRTCConditioner.new()
+			var conditioner_error = conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate)
+			if conditioner_error == ERR_UNAVAILABLE:
+				conditioner_backend == ConditionerBackend.RESAMPLE
+		if conditioner_backend == ConditionerBackend.RESAMPLE:
 			conditioner = TwoVoipConditioner.new()
-			conditioner_error = conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate)
-		if conditioner_error != OK:
-			push_error("TwoVoIP conditioner configuration failed: %s" % error_string(conditioner_error))
+			conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate)
 
 	if conditioner is TwoVoipWebRTCConditioner:
 		conditioner.set_echo_cancel_enabled(p_echo_cancel_enabled)
@@ -115,11 +117,13 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 	echo_cancel_enabled = p_echo_cancel_enabled and conditioner is TwoVoipWebRTCConditioner
 	
 	if opusencoder == null or samplerates_changed:
-		opusencoder = TwovoipOpusEncoder.new()
-		input_chunk_first_frame_times_usec.resize(ceili(INPUT_TIMESTAMP_HISTORY_SECONDS*1000.0/opusframedurationms) + 1)
+		opusencoder = TwoVoipOpusEncoder.new()
+		var history_size := ceili(INPUT_TIMESTAMP_HISTORY_SECONDS*1000.0/opusframedurationms) + 1
+		input_chunk_first_frame_times_usec.resize(history_size)
 		input_chunk_first_frame_times_usec.fill(0)
+		conditioned_chunk_history.resize(history_size)
 		input_chunk_number = -1
-		var sampler_error = opusencoder.initialize(opussamplerate, opussamplerate, opuschannels, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, opus_chunk_size)
+		var sampler_error = opusencoder.initialize(opussamplerate, opuschannels, opus_chunk_size)
 		if sampler_error != OK:
 			push_error("TwoVoIP sampler configuration failed: %s" % error_string(sampler_error))
 			return false
@@ -135,7 +139,7 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 
 	opusencoder.set_bitrate(p_opusbitrate)
 	opusencoder.set_complexity(p_opuscomplexity)
-	opusencoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE if p_opusoptimizeforvoice else TwovoipOpusEncoder.SIGNAL_MUSIC)
+	opusencoder.set_signal_type(TwoVoipOpusEncoder.SIGNAL_VOICE if p_opusoptimizeforvoice else TwoVoipOpusEncoder.SIGNAL_MUSIC)
 	opusencoder.set_inband_perc(p_inband_perc)
 	if bitrate_changed and currentlytalking:
 		transmit_audio_packet.emit(make_audio_packet_midstream_update())
@@ -269,8 +273,6 @@ func processtalkstreamends(talking: bool):
 			return
 		var available_chunks_back = min(input_chunk_number, input_chunk_first_frame_times_usec.size() - 1)
 		var leadchunks = min(int(lead_time/frametimesecs), available_chunks_back)
-		const rnnwarmuptime = 0.2  # 10 chunks at the usual 20 ms frame duration.
-		var rnnwarmupchunks = min(ceili(rnnwarmuptime/frametimesecs), available_chunks_back - leadchunks)
 		talkingtimestart = Time.get_ticks_msec()*0.001 - leadchunks*frametimesecs
 		talking_first_frame_time_usec = get_input_chunk_first_frame_time_usec(leadchunks)
 		hangchunks = int(hang_time/frametimesecs)
@@ -287,15 +289,12 @@ func processtalkstreamends(talking: bool):
 			sent_audio_reference = AudioStreamPlaybackOpus.new()
 			sent_audio_reference.initialize(opussamplerate, opuschannels, opus_chunk_size)
 
-		opusencoder.reset_opus_encoder()
+		opusencoder.reset()
 		opusframecount = 0
 		frame0usec = talking_first_frame_time_usec
 		currentlytalking = true
 		audio_chunk = null
 
-		if denoiser_mode == TwovoipOpusEncoder.DENOISER_RNNOISE_DEFERRED:
-			for i in range(leadchunks + 1 + rnnwarmupchunks):
-				opusencoder.denoise_chunk(leadchunks + rnnwarmupchunks - i)
 		for i in range(leadchunks + 1):
 			processopuschunk(leadchunks - i)
 
@@ -344,13 +343,10 @@ func set_vox_threshhold(p_vox_threshhold):
 		audiosampleframematerial.set_shader_parameter("voxthreshhold", vox_threshhold)
 
 func set_gain(gain):
-	opusencoder.set_gain(gain)
+	conditioner.set_gain(gain)
 
 func get_gain():
-	return opusencoder.get_gain()
-
-func get_agc_gain():
-	return opusencoder.get_agc_gain()
+	return conditioner.get_gain()
 
 func processvox(chunkmax, speechnoiseprobability, resampled_chunk):
 	if audiosampleframematerial:
@@ -387,6 +383,23 @@ func get_input_chunk_first_frame_time_usec(chunks_back: int) -> int:
 	if chunks_back < 0 or chunks_back > min(input_chunk_number, input_chunk_first_frame_times_usec.size() - 1):
 		return 0
 	return input_chunk_first_frame_times_usec[(input_chunk_number - chunks_back) % input_chunk_first_frame_times_usec.size()]
+
+func get_conditioned_chunk(chunks_back: int) -> PackedVector2Array:
+	if chunks_back < 0 or chunks_back > min(input_chunk_number, conditioned_chunk_history.size() - 1):
+		return PackedVector2Array()
+	return conditioned_chunk_history[(input_chunk_number - chunks_back) % conditioned_chunk_history.size()]
+
+func store_conditioned_chunk(chunk: PackedVector2Array, first_frame_time_usec: int) -> void:
+	input_chunk_number += 1
+	var history_index := input_chunk_number % conditioned_chunk_history.size()
+	conditioned_chunk_history[history_index] = chunk
+	input_chunk_first_frame_times_usec[history_index] = first_frame_time_usec
+
+func chunk_sum_squares(chunk: PackedVector2Array) -> float:
+	var sum_squares := 0.0
+	for frame in chunk:
+		sum_squares += frame.length_squared()
+	return sum_squares / opuschannels
 
 func plan_audio_input_gap(frameCusec: int) -> Dictionary:
 	if not currentlytalking:
@@ -430,14 +443,12 @@ func apply_audio_input_gap(gap_plan: Dictionary):
 	print("TwoVoIP mic input gap %.3f ms: insert %d chunks, discard %d input frames" % [
 			gap_plan.gap_usec / 1000.0, missing_frame_count,
 			gap_plan.discard_input_frames])
-	var stored_silent_chunks = opusencoder.push_silent_input_chunks(missing_frame_count)
-	assert(stored_silent_chunks >= 0)
+	var stored_silent_chunks = min(missing_frame_count, conditioned_chunk_history.size())
+	var silent_chunk := PackedVector2Array()
+	silent_chunk.resize(opus_chunk_size)
 	for chunk in range(stored_silent_chunks):
-		input_chunk_number += 1
-		input_chunk_first_frame_times_usec[
-				input_chunk_number % input_chunk_first_frame_times_usec.size()] = \
-				next_frame_time_usec \
-				- (stored_silent_chunks - chunk) * opusframedurationms * 1000
+		store_conditioned_chunk(silent_chunk, next_frame_time_usec \
+				- (stored_silent_chunks - chunk) * opusframedurationms * 1000)
 	notify_audio_input_gap(missing_frame_count, next_frame_time_usec)
 
 func detect_audio_input_gap(frameCusec: int):
@@ -451,7 +462,11 @@ func processopuschunk(chunks_back):
 		TwoVoipPacket.set_sequence_chunk_prefix(chunkprefix, opusframecount, opusstreamcount)
 	else:
 		assert (len(chunkprefix) == 0)
-	var opuspacket : PackedByteArray = opusencoder.encode_chunk(chunkprefix, chunks_back)
+	var conditioned_chunk := get_conditioned_chunk(chunks_back)
+	assert(conditioned_chunk.size() == opus_chunk_size)
+	audio_chunk = conditioned_chunk
+	var opuspacket : PackedByteArray = opusencoder.encode_chunk(conditioned_chunk, chunkprefix)
+	assert(not opuspacket.is_empty())
 	transmit_audio_packet.emit(TwoVoipPacket.encode_audio_packet(opuspacket, encode_base64))
 	opusframecount += 1
 	if sent_audio_reference:
@@ -462,7 +477,7 @@ func processopuschunk(chunks_back):
 			var hashrequest = TwoVoipPacket.make_hash_request(opusstreamcount, (opusframecount - chunks_per_hash)*opus_chunk_size, chunks_per_hash*opus_chunk_size)
 			transmit_audio_packet.emit(TwoVoipPacket.encode_control_packet(hashrequest))
 	else:
-		sentsumsquares += opusencoder.get_chunk_sum_squares(chunks_back)
+		sentsumsquares += chunk_sum_squares(conditioned_chunk)
 
 func receive_audio_hash_response(receiver_name: String, response: Array):
 	#var stream_count = int(response[TwoVoipPacket.HashResponseField.OPUS_STREAM_COUNT])
@@ -531,27 +546,21 @@ func _process(_delta):
 				captureframeslip += required_input_frames - captured_audio_chunk.size()
 				print("captureframeslip ", captureframeslip)
 
-		if conditioner:
-			audio_chunk = conditioner.condition(raw_audio_chunk, captured_audio_chunk)
+		audio_chunk = conditioner.condition(raw_audio_chunk, captured_audio_chunk)
 
 		if chirpbuffer != null and len(chirpbuffer) < 200:
 			chirpbuffer.append(raw_audio_chunk)
 			chirpbuffer.append(captured_audio_chunk)
 
-		if opusencoder.push_input_chunk(audio_chunk) < 0:
+		if audio_chunk.size() != opus_chunk_size:
 			break
-		input_chunk_number += 1
-		input_chunk_first_frame_times_usec[input_chunk_number % input_chunk_first_frame_times_usec.size()] = first_frame_time_usec
-		if denoiser_mode != TwovoipOpusEncoder.DENOISER_DISABLED and not (denoiser_mode == TwovoipOpusEncoder.DENOISER_RNNOISE_DEFERRED and not currentlytalking):
-			opusencoder.denoise_chunk(0)
-			speechnoiseprobability = opusencoder.get_speech_probability()
-		else:
-			speechnoiseprobability = 0.0
+		store_conditioned_chunk(audio_chunk, first_frame_time_usec)
+		speechnoiseprobability = 0.0
 		if rootmeansquaremaxmeasurement:
-			last_chunkmax = opusencoder.get_rms()
+			last_chunkmax = conditioner.get_rms()
 		else:
-			last_chunkmax = opusencoder.get_peak()
-		processvox(last_chunkmax, speechnoiseprobability, opusencoder.get_current_chunk())
+			last_chunkmax = conditioner.get_peak()
+		processvox(last_chunkmax, speechnoiseprobability, audio_chunk)
 		if currentlytalking:
 			processopuschunk(0)
 	raw_audio_chunk = null

@@ -4,7 +4,7 @@ extends RefCounted
 const VERSION := "7.0.1"
 
 static func get_version_info() -> String:
-	var native := TwovoipOpusEncoder.new()
+	var native := TwoVoipOpusEncoder.new()
 	return native.get_version_info() if native.has_method("get_version_info") else "missing"
 
 static func native_version_is_compatible() -> bool:

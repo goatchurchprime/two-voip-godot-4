@@ -260,35 +260,90 @@ text = "Conditioner:"
 
 [node name="ConditionerOption" type="OptionButton" parent="VBoxConditioning/HBoxConditioner" unique_id=177910248]
 layout_mode = 2
-disabled = true
 selected = 1
 item_count = 3
-popup/item_0/text = "None"
+popup/item_0/text = "Resample"
 popup/item_0/id = 0
 popup/item_1/text = "WebRTC"
 popup/item_1/id = 1
 popup/item_2/text = "Speex"
 popup/item_2/id = 2
+popup/item_2/disabled = true
 
-[node name="EchocancelEnabled" type="CheckButton" parent="VBoxConditioning/HBoxConditioner" unique_id=1247742985]
+[node name="LabSampleRate" type="Label" parent="VBoxConditioning/HBoxConditioner" unique_id=291153900]
+layout_mode = 2
+text = "Mic sampled"
+
+[node name="MicSampleRate" type="SpinBox" parent="VBoxConditioning/HBoxConditioner" unique_id=1440007066]
+custom_minimum_size = Vector2(95, 0)
+layout_mode = 2
+min_value = 20.0
+max_value = 96000.0
+value = 44100.0
+editable = false
+suffix = "Hz"
+
+[node name="LabChannels" type="Label" parent="VBoxConditioning/HBoxConditioner" unique_id=1456455889]
+layout_mode = 2
+text = "Channels:"
+
+[node name="OptionChannels" type="OptionButton" parent="VBoxConditioning/HBoxConditioner" unique_id=221249697]
+layout_mode = 2
+item_count = 2
+popup/item_0/text = "1"
+popup/item_0/id = 0
+popup/item_1/text = "2"
+popup/item_1/id = 1
+
+[node name="HBoxAudioFrame" type="HBoxContainer" parent="VBoxConditioning" unique_id=256979740]
+layout_mode = 2
+
+[node name="EchocancelEnabled" type="CheckButton" parent="VBoxConditioning/HBoxAudioFrame" unique_id=1247742985]
 layout_mode = 2
 text = "Echo  cancel"
 
-[node name="WebRTCdenoiser" type="OptionButton" parent="VBoxConditioning/HBoxConditioner" unique_id=382682775]
+[node name="Label" type="Label" parent="VBoxConditioning/HBoxAudioFrame" unique_id=1460279589]
+layout_mode = 2
+text = "Denoising"
+
+[node name="WebRTCdenoiser" type="OptionButton" parent="VBoxConditioning/HBoxAudioFrame" unique_id=382682775]
 layout_mode = 2
 selected = 0
-item_count = 2
-popup/item_0/text = "Denoiser Off"
+item_count = 5
+popup/item_0/text = "Disabled"
 popup/item_0/id = 0
-popup/item_1/text = "Denois"
+popup/item_1/text = "Low"
 popup/item_1/id = 1
+popup/item_2/text = "Moderate"
+popup/item_2/id = 2
+popup/item_3/text = "High"
+popup/item_3/id = 3
+popup/item_4/text = "Very high"
+popup/item_4/id = 4
 
-[node name="AGCEnabled" type="CheckButton" parent="VBoxConditioning/HBoxConditioner" unique_id=271496691]
+[node name="AGCEnabled" type="CheckButton" parent="VBoxConditioning/HBoxAudioFrame" unique_id=271496691]
 layout_mode = 2
-text = "AGC"
+text = "Automatic Gain Control"
 
 [node name="HBoxEchoCancel" type="HBoxContainer" parent="VBoxConditioning" unique_id=66060305]
 layout_mode = 2
+
+[node name="LabelGain" type="Label" parent="VBoxConditioning/HBoxEchoCancel" unique_id=567037244]
+layout_mode = 2
+text = "Gain:"
+
+[node name="GainManualSpinBox" type="SpinBox" parent="VBoxConditioning/HBoxEchoCancel" unique_id=236570719]
+layout_mode = 2
+tooltip_text = "Manual gain"
+theme = ExtResource("4_7rbsf")
+min_value = 0.1
+max_value = 50.0
+step = 0.1
+value = 1.0
+
+[node name="Label" type="Label" parent="VBoxConditioning/HBoxEchoCancel" unique_id=321113834]
+layout_mode = 2
+text = "Alignment Debug:"
 
 [node name="ChirpButton" type="Button" parent="VBoxConditioning/HBoxEchoCancel" unique_id=1817852951]
 layout_mode = 2
@@ -323,7 +378,7 @@ custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_onpxr")
-text = "LibOpus compression and resampling"
+text = "LibOpus compression"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -331,94 +386,11 @@ vertical_alignment = 1
 layout_mode = 2
 size_flags_horizontal = 0
 
-[node name="LabFrameDuration" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1051907019]
+[node name="LabResampleRate" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1687906129]
 layout_mode = 2
-text = "Duration"
+text = "Sample rate:"
 
-[node name="FrameDuration" type="OptionButton" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=533184879]
-layout_mode = 2
-item_count = 6
-popup/item_0/text = "2.5ms"
-popup/item_0/id = 0
-popup/item_0/disabled = true
-popup/item_1/text = "5ms"
-popup/item_1/id = 1
-popup/item_1/disabled = true
-popup/item_2/text = "10ms"
-popup/item_2/id = 2
-popup/item_3/text = "20ms"
-popup/item_3/id = 3
-popup/item_4/text = "40ms"
-popup/item_4/id = 4
-popup/item_5/text = "60ms"
-popup/item_5/id = 5
-
-[node name="LabChannels" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1456455889]
-layout_mode = 2
-text = "Channels:"
-
-[node name="OptionChannels" type="OptionButton" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=221249697]
-layout_mode = 2
-item_count = 2
-popup/item_0/text = "1"
-popup/item_0/id = 0
-popup/item_1/text = "2"
-popup/item_1/id = 1
-
-[node name="AutoGainControl" type="CheckButton" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1563638136]
-layout_mode = 2
-tooltip_text = "Not implemented"
-text = "Gain auto"
-
-[node name="LabelGain" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=560405035]
-visible = false
-layout_mode = 2
-text = "Gain"
-
-[node name="GainSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=250327984]
-layout_mode = 2
-max_value = 50.0
-step = 0.001
-value = 1.0
-editable = false
-
-[node name="GainManualSpinBox" type="SpinBox" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=236570719]
-layout_mode = 2
-tooltip_text = "Manual gain"
-theme = ExtResource("4_7rbsf")
-min_value = 0.1
-max_value = 50.0
-step = 0.1
-value = 1.0
-
-[node name="HBoxAudioFrame" type="HBoxContainer" parent="VBoxFrameLength" unique_id=256979740]
-layout_mode = 2
-
-[node name="LabSampleRate" type="Label" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=291153900]
-layout_mode = 2
-text = "Mic sampled"
-
-[node name="MicSampleRate" type="SpinBox" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=1440007066]
-custom_minimum_size = Vector2(95, 0)
-layout_mode = 2
-min_value = 20.0
-max_value = 96000.0
-value = 44100.0
-editable = false
-suffix = "Hz"
-
-[node name="LabFrameLength" type="Label" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=51294929]
-layout_mode = 2
-text = "0 samples"
-
-[node name="VSeparator" type="VSeparator" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=913793561]
-layout_mode = 2
-
-[node name="LabResampleRate" type="Label" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=1687906129]
-layout_mode = 2
-text = "Resampled:"
-
-[node name="SampleRate" type="OptionButton" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=510280838]
+[node name="SampleRate" type="OptionButton" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=510280838]
 layout_mode = 2
 allow_reselect = true
 item_count = 5
@@ -433,7 +405,23 @@ popup/item_3/id = 3
 popup/item_4/text = "48KHz"
 popup/item_4/id = 4
 
-[node name="LabResampleFrameLength" type="Label" parent="VBoxFrameLength/HBoxAudioFrame" unique_id=104965148]
+[node name="LabFrameDuration" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=1051907019]
+layout_mode = 2
+text = "Chunk size:"
+
+[node name="FrameDuration" type="OptionButton" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=533184879]
+layout_mode = 2
+item_count = 4
+popup/item_0/text = "10ms"
+popup/item_0/id = 2
+popup/item_1/text = "20ms"
+popup/item_1/id = 3
+popup/item_2/text = "40ms"
+popup/item_2/id = 4
+popup/item_3/text = "60ms"
+popup/item_3/id = 5
+
+[node name="LabResampleFrameLength" type="Label" parent="VBoxFrameLength/HBoxOpusFrame" unique_id=104965148]
 layout_mode = 2
 text = "0 samples"
 
@@ -885,9 +873,9 @@ text = "sil"
 
 [connection signal="button_down" from="HBoxBigButtons/VBoxVox/Silence" to="HBoxMicTalk" method="_on_silence_button_down"]
 [connection signal="gui_input" from="HBoxMicTalk/VoxThreshold" to="." method="_on_vox_threshold_gui_input"]
+[connection signal="value_changed" from="VBoxConditioning/HBoxEchoCancel/GainManualSpinBox" to="." method="_on_gain_manual_spin_box_value_changed"]
 [connection signal="pressed" from="VBoxConditioning/HBoxEchoCancel/ChirpButton" to="." method="_on_chirp_button_pressed"]
 [connection signal="toggled" from="VBoxConditioning/HBoxEchoCancel/VoiceEcho" to="." method="_on_voice_echo_toggled"]
-[connection signal="value_changed" from="VBoxFrameLength/HBoxOpusFrame/GainManualSpinBox" to="." method="_on_gain_manual_spin_box_value_changed"]
 [connection signal="pressed" from="VBoxPlayback/HBoxPlaycount/Play" to="." method="_on_play_pressed"]
 [connection signal="item_selected" from="VBoxPlayback/HBoxPlaycount/VBoxExpt/SavOptions" to="." method="_on_sav_options_item_selected"]
 [connection signal="broker_connection_failed" from="MQTTnetwork/MQTT" to="MQTTnetwork" method="_on_mqtt_broker_connection_failed"]

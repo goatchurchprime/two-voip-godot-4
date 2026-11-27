@@ -1,5 +1,8 @@
 #include "webrtc_conditioner_object.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -23,10 +26,28 @@ void TwoVoipWebRTCConditioner::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_agc_enabled", "enabled"), &TwoVoipWebRTCConditioner::set_agc_enabled);
     ClassDB::bind_method(D_METHOD("set_stream_delay_ms", "stream_delay_ms"), &TwoVoipWebRTCConditioner::set_stream_delay_ms);
     ClassDB::bind_method(D_METHOD("get_stream_delay_ms"), &TwoVoipWebRTCConditioner::get_stream_delay_ms);
+    ClassDB::bind_method(D_METHOD("set_gain", "gain"), &TwoVoipWebRTCConditioner::set_gain);
+    ClassDB::bind_method(D_METHOD("get_gain"), &TwoVoipWebRTCConditioner::get_gain);
+    ClassDB::bind_method(D_METHOD("get_peak"), &TwoVoipWebRTCConditioner::get_peak);
+    ClassDB::bind_method(D_METHOD("get_rms"), &TwoVoipWebRTCConditioner::get_rms);
     ClassDB::bind_method(D_METHOD("reset"), &TwoVoipWebRTCConditioner::reset);
 }
 
+void TwoVoipWebRTCConditioner::apply_gain_and_measure(PackedVector2Array &p_frames) {
+    last_peak = 0.0F;
+    double sum_squares = 0.0;
+    for (int frame = 0; frame < p_frames.size(); frame++) {
+        Vector2 sample = p_frames[frame] * gain;
+        p_frames.set(frame, sample);
+        last_peak = std::max(last_peak, std::max(std::abs(sample.x), std::abs(sample.y)));
+        sum_squares += sample.length_squared();
+    }
+    last_rms = p_frames.is_empty() ? 0.0F : std::sqrt(sum_squares / (p_frames.size() * 2));
+}
+
 Error TwoVoipWebRTCConditioner::initialize(int p_chunk_ms, int p_input_sample_rate, int p_output_sample_rate) {
+    last_peak = 0.0F;
+    last_rms = 0.0F;
     if (p_chunk_ms <= 0 || p_chunk_ms % 10 != 0 ||
             p_input_sample_rate < 8000 || p_input_sample_rate > 384000 || p_input_sample_rate % 100 != 0 ||
             p_output_sample_rate < 8000 || p_output_sample_rate > 384000 || p_output_sample_rate % 100 != 0) {
@@ -70,6 +91,8 @@ Error TwoVoipWebRTCConditioner::initialize(int p_chunk_ms, int p_input_sample_ra
 
 PackedVector2Array TwoVoipWebRTCConditioner::condition(const PackedVector2Array &p_microphone_frames,
         const PackedVector2Array &p_render_frames) {
+    last_peak = 0.0F;
+    last_rms = 0.0F;
     if (p_microphone_frames.size() != input_chunk_size) {
         UtilityFunctions::printerr("TwoVoipWebRTCConditioner expected ", input_chunk_size,
                 " microphone frames, got ", p_microphone_frames.size());
@@ -126,6 +149,7 @@ PackedVector2Array TwoVoipWebRTCConditioner::condition(const PackedVector2Array 
         for (int frame = 0; frame < output_frame_10ms; frame++)
             conditioned_frames[output_offset + frame] = Vector2(conditioned_left[frame], conditioned_right[frame]);
     }
+    apply_gain_and_measure(conditioned_frames);
     return conditioned_frames;
 #else
     return PackedVector2Array();
@@ -203,10 +227,17 @@ int TwoVoipWebRTCConditioner::get_stream_delay_ms() {
     return -1;
 }
 
+void TwoVoipWebRTCConditioner::set_gain(float p_gain) {
+    if (std::isfinite(p_gain) && p_gain >= 0.0F)
+        gain = p_gain;
+}
+
 
 void TwoVoipWebRTCConditioner::reset() {
 #ifdef WEBRTC_APM
     if (processor)
         processor->Initialize();
 #endif
+    last_peak = 0.0F;
+    last_rms = 0.0F;
 }

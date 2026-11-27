@@ -14,6 +14,10 @@ func _initialize() -> void:
 		push_error("TwoVoIP native smoke test: conditioner classes are not registered")
 		quit(1)
 		return
+	if not ClassDB.class_exists("TwoVoipOpusEncoder"):
+		push_error("TwoVoIP native smoke test: TwoVoipOpusEncoder is not registered")
+		quit(1)
+		return
 
 	var encoder: Variant = ClassDB.instantiate("TwovoipOpusEncoder")
 	if encoder == null:

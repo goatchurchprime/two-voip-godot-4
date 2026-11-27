@@ -164,6 +164,8 @@ jobs:
             --script res://tests/native_load_smoke.gd
           "${{steps.setup_godot.outputs.godot}}" --headless --path . \
             --script res://tests/resample_conditioner_smoke.gd
+          "${{steps.setup_godot.outputs.godot}}" --headless --path . \
+            --script res://tests/two_voip_opus_encoder_smoke.gd
 
 # ============================================
 

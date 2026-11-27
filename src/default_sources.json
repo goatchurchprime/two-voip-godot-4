@@ -1,5 +1,6 @@
 [
   "opus_encoder_object.cpp",
+  "two_voip_opus_encoder.cpp",
   "conditioner_object.cpp",
   "webrtc_conditioner_object.cpp",
   "audio_stream_opus.cpp",

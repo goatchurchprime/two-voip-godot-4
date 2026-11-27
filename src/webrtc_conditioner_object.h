@@ -28,6 +28,9 @@ class TwoVoipWebRTCConditioner : public RefCounted {
     int output_chunk_size = 0;
     int input_frame_10ms = 0;
     int output_frame_10ms = 0;
+    float gain = 1.0F;
+    float last_peak = 0.0F;
+    float last_rms = 0.0F;
     std::vector<float> capture_left;
     std::vector<float> capture_right;
     std::vector<float> render_left;
@@ -38,6 +41,8 @@ class TwoVoipWebRTCConditioner : public RefCounted {
     std::vector<float> render_output_right;
     std::vector<float> conditioned_left;
     std::vector<float> conditioned_right;
+
+    void apply_gain_and_measure(PackedVector2Array &p_frames);
 
 protected:
     static void _bind_methods();
@@ -61,6 +66,10 @@ public:
     void set_agc_enabled(bool p_enabled);
     void set_stream_delay_ms(int p_stream_delay_ms);
     int get_stream_delay_ms();
+    void set_gain(float p_gain);
+    float get_gain() const { return gain; }
+    float get_peak() const { return last_peak; }
+    float get_rms() const { return last_rms; }
     void reset();
 };
 

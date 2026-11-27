@@ -3,6 +3,7 @@
 #include "audio_stream_opus.h"
 #include "conditioner_object.h"
 #include "opus_encoder_object.h"
+#include "two_voip_opus_encoder.h"
 #include "webrtc_conditioner_object.h"
 
 #include <gdextension_interface.h>
@@ -20,6 +21,7 @@ void initialize_two_voip_module(ModuleInitializationLevel p_level) {
     ClassDB::register_class<AudioStreamOpus>();
     ClassDB::register_class<AudioStreamPlaybackOpus>();
     ClassDB::register_class<TwovoipOpusEncoder>();
+    ClassDB::register_class<TwoVoipOpusEncoder>();
     ClassDB::register_class<TwoVoipConditioner>();
     ClassDB::register_class<TwoVoipWebRTCConditioner>();
 

@@ -1,28 +1,29 @@
 extends Node
 
-# Just the bare use of the TwovoipOpusEncoder and the AudioStreamOpus
+# Just the bare use of TwoVoipConditioner, TwoVoipOpusEncoder and AudioStreamOpus.
 # to prove that the C++ compiled part of the library works.
 # You are recommended to use the voiphelper and its simpleexample
 # as your starting point.
 
-var opusencoder : TwovoipOpusEncoder
+var conditioner := TwoVoipConditioner.new()
+var opusencoder := TwoVoipOpusEncoder.new()
 var audiostreamopus : AudioStreamOpus
 var audio_stream_playback_opus : AudioStreamPlaybackOpus
 var prepend = PackedByteArray()
 var opuspacketsbuffer = [ ]
 
 func _ready():
-	opusencoder = TwovoipOpusEncoder.new()
 	audiostreamopus = $AudioStreamPlayer.stream
 	$AudioStreamPlayer.play()
 	audio_stream_playback_opus = $AudioStreamPlayer.get_stream_playback()
-	assert(audio_stream_playback_opus.initialize(48000, 2, opus_chunk_size, 0.4) == OK)
+	assert(audio_stream_playback_opus.initialize(48000, 2, 960, 0.4) == OK)
 
 	AudioServer.set_input_device_active(true)
-	opusencoder.initialize(48000, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, opus_chunk_size)
+	assert(conditioner.initialize(20, AudioServer.get_input_mix_rate(), 48000) == OK)
+	assert(opusencoder.initialize(48000, 2, conditioner.get_output_chunk_size()) == OK)
 	assert(opusencoder.set_bitrate(12000) == OK)
 	assert(opusencoder.set_complexity(5) == OK)
-	assert(opusencoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE) == OK)
+	assert(opusencoder.set_signal_type(TwoVoipOpusEncoder.SIGNAL_VOICE) == OK)
 
 	# Voice says: "Listen to me"
 	print("Message length (seconds): ", len(opusaudiodata)*960.0/48000.0)
@@ -35,22 +36,23 @@ func _process(_delta):
 
 var chunkcount = 0
 var chunkmax = 0.0
-var opus_chunk_size = 960
 func _process_record():
 	while true:
-		var frames = AudioServer.get_input_frames(opus_chunk_size)
+		var frames = AudioServer.get_input_frames(conditioner.get_input_chunk_size())
 		if not frames:
 			break
-		opusencoder.push_input_chunk(frames)
+		frames = conditioner.condition(frames, PackedVector2Array())
+		if frames.size() != conditioner.get_output_chunk_size():
+			break
 		chunkcount += 1
-		chunkmax = max(chunkmax, opusencoder.get_peak())
-		var opusdata : PackedByteArray = opusencoder.encode_chunk(prepend);
+		chunkmax = max(chunkmax, conditioner.get_peak())
+		var opusdata : PackedByteArray = opusencoder.encode_chunk(frames, prepend)
 		if (chunkcount % 50) == 0:
 			prints("audiomax: %.3f  data[%d]: %s" % [chunkmax, opusdata.size(), opusdata.slice(0,5)])
 			chunkmax = 0.0
 	
 func _process_playback():
-	while opus_chunk_size < audio_stream_playback_opus.available_space_frames() and len(opuspacketsbuffer) != 0:
+	while 960 < audio_stream_playback_opus.available_space_frames() and len(opuspacketsbuffer) != 0:
 		audio_stream_playback_opus.push_opus_packet(opuspacketsbuffer.pop_front(), 0, 0)
 	if opuspacketsbuffer.is_empty() and not playback_finished:
 		audio_stream_playback_opus.finish_episode()
