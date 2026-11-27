@@ -2,21 +2,20 @@
 
 `TwoVoipConditioner` owns one WebRTC Audio Processing Module instance. It is a
 separate class from `TwoVoipEchoCanceler`; it does not select between backends.
-This initial integration enables AEC3 only so its echo cancellation can be
-evaluated in isolation. Noise suppression and gain control remain disabled.
+AEC3, noise suppression and gain control can be enabled independently.
 
 ```gdscript
 var conditioner := TwoVoipConditioner.new()
-conditioner.initialize(input_mix_rate, opus_sample_rate, input_chunk_size)
+conditioner.initialize(chunk_ms, input_mix_rate, opus_sample_rate)
 conditioner.set_stream_delay_ms(render_to_capture_delay_ms)
 var opus_rate_frames := conditioner.condition(microphone_frames, render_frames)
 ```
 
-Input and render arrays are native-rate stereo frames. The input chunk must
-contain whole 10 ms frames. WebRTC returns the same duration at the requested
+Input and render arrays are native-rate stereo frames. `chunk_ms` must be a
+multiple of 10 ms. WebRTC returns the same duration at the requested
 output rate, ready to pass to the Opus encoder. The delay setter deliberately
-has no getter: it supplies an external estimate to WebRTC and is not a measured
-result from the echo canceller.
+supplies an external estimate to WebRTC; `get_stream_delay_ms()` returns the
+echo canceller's measured delay instead of echoing that setting.
 
 The initial integration is optional and Linux development-only. Build it with:
 

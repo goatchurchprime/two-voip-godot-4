@@ -12,7 +12,7 @@ void TwoVoipConditioner::_bind_methods() {
     BIND_ENUM_CONSTANT(DENOISING_HIGH);
     BIND_ENUM_CONSTANT(DENOISING_VERY_HIGH);
 
-    ClassDB::bind_method(D_METHOD("initialize", "input_sample_rate", "output_sample_rate", "input_chunk_size"),
+    ClassDB::bind_method(D_METHOD("initialize", "chunk_ms", "input_sample_rate", "output_sample_rate"),
             &TwoVoipConditioner::initialize);
     ClassDB::bind_method(D_METHOD("condition", "microphone_frames", "render_frames"), &TwoVoipConditioner::condition);
     ClassDB::bind_method(D_METHOD("set_echo_cancel_enabled", "enabled"),
@@ -24,10 +24,10 @@ void TwoVoipConditioner::_bind_methods() {
     ClassDB::bind_method(D_METHOD("reset"), &TwoVoipConditioner::reset);
 }
 
-Error TwoVoipConditioner::initialize(int p_input_sample_rate, int p_output_sample_rate, int p_input_chunk_size) {
-    if (p_input_sample_rate < 8000 || p_input_sample_rate > 384000 || p_input_sample_rate % 100 != 0 ||
-            p_output_sample_rate < 8000 || p_output_sample_rate > 384000 || p_output_sample_rate % 100 != 0 ||
-            p_input_chunk_size <= 0 || p_input_chunk_size % (p_input_sample_rate / 100) != 0) {
+Error TwoVoipConditioner::initialize(int p_chunk_ms, int p_input_sample_rate, int p_output_sample_rate) {
+    if (p_chunk_ms <= 0 || p_chunk_ms % 10 != 0 ||
+            p_input_sample_rate < 8000 || p_input_sample_rate > 384000 || p_input_sample_rate % 100 != 0 ||
+            p_output_sample_rate < 8000 || p_output_sample_rate > 384000 || p_output_sample_rate % 100 != 0) {
         return ERR_INVALID_PARAMETER;
     }
 
@@ -41,9 +41,9 @@ Error TwoVoipConditioner::initialize(int p_input_sample_rate, int p_output_sampl
         return ERR_CANT_CREATE;
     }
 
-    input_chunk_size = p_input_chunk_size;
     input_frame_10ms = p_input_sample_rate / 100;
     output_frame_10ms = p_output_sample_rate / 100;
+    input_chunk_size = input_frame_10ms * (p_chunk_ms / 10);
     capture_left.resize(input_frame_10ms);
     capture_right.resize(input_frame_10ms);
     render_left.resize(input_frame_10ms);
@@ -67,25 +67,32 @@ Error TwoVoipConditioner::initialize(int p_input_sample_rate, int p_output_sampl
 
 PackedVector2Array TwoVoipConditioner::condition(const PackedVector2Array &p_microphone_frames,
         const PackedVector2Array &p_render_frames) {
-    if (p_microphone_frames.size() != input_chunk_size || p_render_frames.size() > input_chunk_size) {
-        UtilityFunctions::printerr("TwoVoipConditioner requires one full microphone block and at most one render block");
+    if (p_microphone_frames.size() != input_chunk_size) {
+        UtilityFunctions::printerr("TwoVoipConditioner expected ", input_chunk_size,
+                " microphone frames, got ", p_microphone_frames.size());
         return PackedVector2Array();
     }
-
 #ifdef WEBRTC_APM
     if (!processor)
         return PackedVector2Array();
+    if (config.echo_canceller.enabled && p_render_frames.size() > input_chunk_size) {
+        UtilityFunctions::printerr("TwoVoipConditioner expected at most ", input_chunk_size,
+                " render frames, got ", p_render_frames.size());
+        return PackedVector2Array();
+    }
 
     const int block_count = input_chunk_size / input_frame_10ms;
     PackedVector2Array conditioned_frames;
     conditioned_frames.resize(block_count * output_frame_10ms);
 
-    const int render_prefix_size = input_chunk_size - p_render_frames.size();
-    for (int frame = 0; frame < render_prefix_size; frame++)
-        aligned_render_frames[frame] = previous_render_frames[p_render_frames.size() + frame];
-    for (int frame = render_prefix_size; frame < input_chunk_size; frame++)
-        aligned_render_frames[frame] = p_render_frames[frame - render_prefix_size];
-    previous_render_frames = aligned_render_frames;
+    if (config.echo_canceller.enabled) {
+        const int render_prefix_size = input_chunk_size - p_render_frames.size();
+        for (int frame = 0; frame < render_prefix_size; frame++)
+            aligned_render_frames[frame] = previous_render_frames[p_render_frames.size() + frame];
+        for (int frame = render_prefix_size; frame < input_chunk_size; frame++)
+            aligned_render_frames[frame] = p_render_frames[frame - render_prefix_size];
+        previous_render_frames = aligned_render_frames;
+    }
 
     for (int block = 0; block < block_count; block++) {
         const int input_offset = block * input_frame_10ms;
@@ -93,15 +100,19 @@ PackedVector2Array TwoVoipConditioner::condition(const PackedVector2Array &p_mic
         for (int frame = 0; frame < input_frame_10ms; frame++) {
             capture_left[frame] = p_microphone_frames[input_offset + frame].x;
             capture_right[frame] = p_microphone_frames[input_offset + frame].y;
-            render_left[frame] = aligned_render_frames[input_offset + frame].x;
-            render_right[frame] = aligned_render_frames[input_offset + frame].y;
+            if (config.echo_canceller.enabled) {
+                render_left[frame] = aligned_render_frames[input_offset + frame].x;
+                render_right[frame] = aligned_render_frames[input_offset + frame].y;
+            }
         }
 
-        const float *render_input[] = { render_left.data(), render_right.data() };
-        float *render_output[] = { render_output_left.data(), render_output_right.data() };
-        if (processor->ProcessReverseStream(render_input, input_config, input_config, render_output) !=
-                webrtc::AudioProcessing::kNoError) {
-            return PackedVector2Array();
+        if (config.echo_canceller.enabled) {
+            const float *render_input[] = { render_left.data(), render_right.data() };
+            float *render_output[] = { render_output_left.data(), render_output_right.data() };
+            if (processor->ProcessReverseStream(render_input, input_config, input_config, render_output) !=
+                    webrtc::AudioProcessing::kNoError) {
+                return PackedVector2Array();
+            }
         }
         const float *capture_input[] = { capture_left.data(), capture_right.data() };
         float *capture_output[] = { conditioned_left.data(), conditioned_right.data() };
@@ -128,6 +139,8 @@ void TwoVoipConditioner::apply_config() {
 void TwoVoipConditioner::set_echo_cancel_enabled(bool p_enabled) {
 #ifdef WEBRTC_APM
     config.echo_canceller.enabled = p_enabled;
+    if (!p_enabled)
+        previous_render_frames.assign(previous_render_frames.size(), Vector2());
     apply_config();
 #endif
 }

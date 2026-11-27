@@ -19,7 +19,7 @@ func _ready():
 	assert(audio_stream_playback_opus.initialize(48000, 2, opus_chunk_size, 0.4) == OK)
 
 	AudioServer.set_input_device_active(true)
-	opusencoder.initialize(AudioServer.get_input_mix_rate(), 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, opus_chunk_size)
+	opusencoder.initialize(48000, 48000, 2, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, opus_chunk_size)
 	assert(opusencoder.set_bitrate(12000) == OK)
 	assert(opusencoder.set_complexity(5) == OK)
 	assert(opusencoder.set_signal_type(TwovoipOpusEncoder.SIGNAL_VOICE) == OK)

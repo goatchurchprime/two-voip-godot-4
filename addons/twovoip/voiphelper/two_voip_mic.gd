@@ -95,7 +95,7 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 	echo_cancel_enabled = p_echo_cancel_enabled
 	if conditioner == null or conditioner_backend != p_conditioner_backend or samplerates_changed:
 		conditioner = TwoVoipConditioner.new()
-		var conditioner_error = conditioner.initialize(input_mix_rate, p_opussamplerate, int(input_mix_rate*p_opusframedurationms/1000.0))
+		var conditioner_error = conditioner.initialize(p_opusframedurationms, input_mix_rate, p_opussamplerate)
 		if conditioner_error != OK:
 			push_error("TwoVoIP conditioner configuration failed: %s" % error_string(conditioner_error))
 
@@ -108,7 +108,7 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 		input_chunk_first_frame_times_usec.resize(ceili(INPUT_TIMESTAMP_HISTORY_SECONDS*1000.0/opusframedurationms) + 1)
 		input_chunk_first_frame_times_usec.fill(0)
 		input_chunk_number = -1
-		var sampler_error = opusencoder.initialize(input_mix_rate, opussamplerate, opuschannels, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, opus_chunk_size)
+		var sampler_error = opusencoder.initialize(opussamplerate, opussamplerate, opuschannels, TwovoipOpusEncoder.DENOISER_DISABLED, TwovoipOpusEncoder.AGC_DISABLED, opus_chunk_size)
 		if sampler_error != OK:
 			push_error("TwoVoIP sampler configuration failed: %s" % error_string(sampler_error))
 			return false
@@ -129,7 +129,7 @@ func set_opus_values(p_opussamplerate, p_opusframedurationms, p_channels, p_opus
 	if bitrate_changed and currentlytalking:
 		transmit_audio_packet.emit(make_audio_packet_midstream_update())
 
-	audio_chunk_size = opusencoder.get_required_input_chunk_size()
+	audio_chunk_size = roundi(input_mix_rate*p_opusframedurationms/1000.0)
 	frametimesecs = p_opusframedurationms/1000.0
 	if audiosampleframematerial:
 		var audiosampleframedata = PackedVector2Array()
@@ -496,7 +496,7 @@ func _process(_delta):
 			apply_audio_input_gap(gap_plan)
 			input_frames_available -= discard_input_frames
 
-		var required_input_frames := opusencoder.get_required_input_chunk_size()
+		var required_input_frames: int = audio_chunk_size
 		if input_frames_available < required_input_frames:
 			break
 

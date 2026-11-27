@@ -50,7 +50,7 @@ public:
         DENOISING_VERY_HIGH,
     };
 
-    Error initialize(int p_input_sample_rate, int p_output_sample_rate, int p_input_chunk_size);
+    Error initialize(int p_chunk_ms, int p_input_sample_rate, int p_output_sample_rate);
     PackedVector2Array condition(const PackedVector2Array &p_microphone_frames,
             const PackedVector2Array &p_render_frames);
     void set_echo_cancel_enabled(bool p_enabled);
