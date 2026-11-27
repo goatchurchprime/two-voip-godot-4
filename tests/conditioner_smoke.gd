@@ -15,7 +15,16 @@ func _initialize() -> void:
 		source[frame] = (noise_state / float(0x7fffffff) - 0.5) * 0.3
 
 	var conditioner := TwoVoipConditioner.new()
+	conditioner.set_echo_cancel_enabled(true)
+	conditioner.set_denoising_level(TwoVoipConditioner.DENOISING_MODERATE)
+	conditioner.set_agc_enabled(true)
 	assert(conditioner.initialize(INPUT_RATE, OUTPUT_RATE, INPUT_CHUNK) == OK)
+	conditioner.set_denoising_level(TwoVoipConditioner.DENOISING_DISABLED)
+	conditioner.set_agc_enabled(false)
+	conditioner.set_echo_cancel_enabled(false)
+	conditioner.set_echo_cancel_enabled(true)
+	conditioner.set_denoising_level(TwoVoipConditioner.DENOISING_MODERATE)
+	conditioner.set_agc_enabled(true)
 	var input_energy := 0.0
 	var output_energy := 0.0
 	var input_frames := 0

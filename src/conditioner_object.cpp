@@ -6,9 +6,19 @@
 using namespace godot;
 
 void TwoVoipConditioner::_bind_methods() {
+    BIND_ENUM_CONSTANT(DENOISING_DISABLED);
+    BIND_ENUM_CONSTANT(DENOISING_LOW);
+    BIND_ENUM_CONSTANT(DENOISING_MODERATE);
+    BIND_ENUM_CONSTANT(DENOISING_HIGH);
+    BIND_ENUM_CONSTANT(DENOISING_VERY_HIGH);
+
     ClassDB::bind_method(D_METHOD("initialize", "input_sample_rate", "output_sample_rate", "input_chunk_size"),
             &TwoVoipConditioner::initialize);
     ClassDB::bind_method(D_METHOD("condition", "microphone_frames", "render_frames"), &TwoVoipConditioner::condition);
+    ClassDB::bind_method(D_METHOD("set_echo_cancel_enabled", "enabled"),
+            &TwoVoipConditioner::set_echo_cancel_enabled);
+    ClassDB::bind_method(D_METHOD("set_denoising_level", "level"), &TwoVoipConditioner::set_denoising_level);
+    ClassDB::bind_method(D_METHOD("set_agc_enabled", "enabled"), &TwoVoipConditioner::set_agc_enabled);
     ClassDB::bind_method(D_METHOD("set_stream_delay_ms", "stream_delay_ms"), &TwoVoipConditioner::set_stream_delay_ms);
     ClassDB::bind_method(D_METHOD("get_stream_delay_ms"), &TwoVoipConditioner::get_stream_delay_ms);
     ClassDB::bind_method(D_METHOD("reset"), &TwoVoipConditioner::reset);
@@ -24,7 +34,6 @@ Error TwoVoipConditioner::initialize(int p_input_sample_rate, int p_output_sampl
 #ifdef WEBRTC_APM
     config.pipeline.multi_channel_render = true;
     config.pipeline.multi_channel_capture = true;
-    config.echo_canceller.enabled = true;
     config.echo_canceller.enforce_high_pass_filtering = false;
     processor = webrtc::AudioProcessingBuilder().SetConfig(config).Create();
     if (!processor || processor->Initialize() != webrtc::AudioProcessing::kNoError) {
@@ -106,6 +115,60 @@ PackedVector2Array TwoVoipConditioner::condition(const PackedVector2Array &p_mic
     return conditioned_frames;
 #else
     return PackedVector2Array();
+#endif
+}
+
+#ifdef WEBRTC_APM
+void TwoVoipConditioner::apply_config() {
+    if (processor)
+        processor->ApplyConfig(config);
+}
+#endif
+
+void TwoVoipConditioner::set_echo_cancel_enabled(bool p_enabled) {
+#ifdef WEBRTC_APM
+    config.echo_canceller.enabled = p_enabled;
+    apply_config();
+#endif
+}
+
+void TwoVoipConditioner::set_denoising_level(DenoisingLevel p_level) {
+#ifdef WEBRTC_APM
+    switch (p_level) {
+        case DENOISING_DISABLED:
+            config.noise_suppression.enabled = false;
+            break;
+        case DENOISING_LOW:
+            config.noise_suppression.enabled = true;
+            config.noise_suppression.level = webrtc::AudioProcessing::Config::NoiseSuppression::kLow;
+            break;
+        case DENOISING_MODERATE:
+            config.noise_suppression.enabled = true;
+            config.noise_suppression.level = webrtc::AudioProcessing::Config::NoiseSuppression::kModerate;
+            break;
+        case DENOISING_HIGH:
+            config.noise_suppression.enabled = true;
+            config.noise_suppression.level = webrtc::AudioProcessing::Config::NoiseSuppression::kHigh;
+            break;
+        case DENOISING_VERY_HIGH:
+            config.noise_suppression.enabled = true;
+            config.noise_suppression.level = webrtc::AudioProcessing::Config::NoiseSuppression::kVeryHigh;
+            break;
+        default:
+            UtilityFunctions::push_error("Invalid TwoVoipConditioner denoising level");
+            return;
+    }
+    apply_config();
+#endif
+}
+
+void TwoVoipConditioner::set_agc_enabled(bool p_enabled) {
+#ifdef WEBRTC_APM
+    config.gain_controller1.enabled = false;
+    config.gain_controller2.enabled = p_enabled;
+    config.gain_controller2.input_volume_controller.enabled = false;
+    config.gain_controller2.adaptive_digital.enabled = p_enabled;
+    apply_config();
 #endif
 }
 

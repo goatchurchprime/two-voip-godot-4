@@ -20,6 +20,8 @@ class TwoVoipConditioner : public RefCounted {
     webrtc::StreamConfig input_config;
     webrtc::StreamConfig output_config;
     webrtc::AudioProcessing::Config config;
+
+    void apply_config();
 #endif
 
     int input_chunk_size = 0;
@@ -40,14 +42,27 @@ protected:
     static void _bind_methods();
 
 public:
+    enum DenoisingLevel {
+        DENOISING_DISABLED,
+        DENOISING_LOW,
+        DENOISING_MODERATE,
+        DENOISING_HIGH,
+        DENOISING_VERY_HIGH,
+    };
+
     Error initialize(int p_input_sample_rate, int p_output_sample_rate, int p_input_chunk_size);
     PackedVector2Array condition(const PackedVector2Array &p_microphone_frames,
             const PackedVector2Array &p_render_frames);
+    void set_echo_cancel_enabled(bool p_enabled);
+    void set_denoising_level(DenoisingLevel p_level);
+    void set_agc_enabled(bool p_enabled);
     void set_stream_delay_ms(int p_stream_delay_ms);
     int get_stream_delay_ms();
     void reset();
 };
 
 } // namespace godot
+
+VARIANT_ENUM_CAST(godot::TwoVoipConditioner::DenoisingLevel);
 
 #endif

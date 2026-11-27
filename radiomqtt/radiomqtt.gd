@@ -34,11 +34,11 @@ func _ready():
 	print("AudioServer.get_mix_rate()=", AudioServer.get_mix_rate())
 	print("ProjectSettings.get_setting_with_override(\"audio/driver/mix_rate\")=", ProjectSettings.get_setting_with_override("audio/driver/mix_rate"))
 
-	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxAudioFrame/SampleRate, $VBoxFrameLength/HBoxOpusFrame/OptionChannels, $HBoxBigButtons/VBoxPTT/Denoise, $VBoxFrameLength/HBoxEchoCancel/EchoOption ]:
+	for h in [ $VBoxFrameLength/HBoxOpusFrame/FrameDuration, $VBoxFrameLength/HBoxAudioFrame/SampleRate, $VBoxFrameLength/HBoxOpusFrame/OptionChannels, $HBoxBigButtons/VBoxPTT/Denoise, $VBoxConditioning/HBoxConditioner/ConditionerOption, $VBoxConditioning/HBoxConditioner/WebRTCdenoiser ]:
 		h.connect("item_selected", func (_item_selected): updatesamplerates())
 	for h in [ $VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox, $VBoxFrameLength/HBoxOpusExtra/FecSpinBox, $VBoxFrameLength/HBoxOpusExtra/BitRate, $HBoxBigButtons/VBoxVox/Leadtime, $HBoxBigButtons/VBoxVox/Hangtime ]:
 		h.connect("value_changed", func (_value): updatesamplerates())
-	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxMosquitto/base64, $VBoxFrameLength/HBoxOpusFrame/AutoGainControl ]:
+	for h in [ $VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice, $HBoxMosquitto/base64, $VBoxFrameLength/HBoxOpusFrame/AutoGainControl, $VBoxConditioning/HBoxConditioner/EchocancelEnabled, $VBoxConditioning/HBoxConditioner/AGCEnabled ]:
 		h.connect("toggled", func (_toggled_on): updatesamplerates())
 
 	audio_packets_base64 = $HBoxMosquitto/base64.button_pressed
@@ -123,34 +123,26 @@ func updatesamplerates():
 	audio_packets_base64 = $HBoxMosquitto/base64.button_pressed
 	$TwoVoipMic.set_encode_base64(audio_packets_base64)
 	$VBoxFrameLength/HBoxAudioFrame/MicSampleRate.value = AudioServer.get_input_mix_rate()
+	var conditionerbackend = $VBoxConditioning/HBoxConditioner/ConditionerOption.selected
 	var frametimems = float($VBoxFrameLength/HBoxOpusFrame/FrameDuration.text)
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
-	var denoiser_mode = $HBoxBigButtons/VBoxPTT/Denoise.selected
-	var agc_mode = TwovoipOpusEncoder.AGC_APPLIED if $VBoxFrameLength/HBoxOpusFrame/AutoGainControl.button_pressed else TwovoipOpusEncoder.AGC_DISABLED
-	var echo_cancel_mode = $VBoxFrameLength/HBoxEchoCancel/EchoOption.selected
+	var denoiser_mode = $VBoxConditioning/HBoxConditioner/WebRTCdenoiser.selected
+	var agc_enabled = $VBoxConditioning/HBoxConditioner/AGCEnabled.button_pressed
+	var conditioner_backend = $VBoxConditioning/HBoxConditioner/ConditionerOption.selected
+	var echo_cancel_enabled = $VBoxConditioning/HBoxConditioner/EchocancelEnabled.button_pressed
 	var channels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
-
-	assert ((channels == 1) or (denoiser_mode == TwovoipOpusEncoder.DENOISER_DISABLED))
-	assert ((channels == 1) or (agc_mode == TwovoipOpusEncoder.AGC_DISABLED))
-	assert ((opussamplerate == 48000) or (denoiser_mode != TwovoipOpusEncoder.DENOISER_RNNOISE))
-	$HBoxBigButtons/VBoxPTT/Denoise.disabled = (channels != 1)
-	$HBoxBigButtons/VBoxPTT/Denoise.set_item_disabled(2, (opussamplerate != 48000))
-	$VBoxFrameLength/HBoxOpusFrame/AutoGainControl.disabled = (channels != 1)
-	$VBoxFrameLength/HBoxOpusFrame/OptionChannels.disabled = ((denoiser_mode != TwovoipOpusEncoder.DENOISER_DISABLED) or (agc_mode != TwovoipOpusEncoder.AGC_DISABLED))
-	$VBoxFrameLength/HBoxAudioFrame/SampleRate.disabled = (denoiser_mode == TwovoipOpusEncoder.DENOISER_RNNOISE)
 
 	$TwoVoipMic.set_opus_values(opussamplerate, frametimems, channels,
 			int($VBoxFrameLength/HBoxOpusExtra/BitRate.value), 
 			int($VBoxFrameLength/HBoxOpusExtra/ComplexitySpinBox.value),
 			$VBoxFrameLength/HBoxOpusExtra/OptimizeForVoice.button_pressed,
 			int($VBoxFrameLength/HBoxOpusExtra/FecSpinBox.value),
-			denoiser_mode, agc_mode, echo_cancel_mode)
+			conditioner_backend, echo_cancel_enabled, denoiser_mode, agc_enabled)
 
 	$TwoVoipMic.lead_time = $HBoxBigButtons/VBoxVox/Leadtime.value
 	$TwoVoipMic.hang_time = $HBoxBigButtons/VBoxVox/Hangtime.value
 	reprocessoriginalchunks()
 
-var Dtog = 0
 func reprocessoriginalchunks():
 	var opussamplerate = int($VBoxFrameLength/HBoxAudioFrame/SampleRate.text)*1000
 	var opuschannels = int($VBoxFrameLength/HBoxOpusFrame/OptionChannels.text)
@@ -192,36 +184,11 @@ func reprocessoriginalchunks():
 	recordedopuspackets = null
 	recordedresampledpackets = null
 
-	var echocancelobject_forreprocessing = null
-	var echo_cancel_mode = $VBoxFrameLength/HBoxEchoCancel/EchoOption.selected
-	if echo_cancel_mode == $TwoVoipMic.EchoCancelling.ECHO_CANCEL_SPEEX:
-		echocancelobject_forreprocessing = TwoVoipEchoCanceler.new()
-		echocancelobject_forreprocessing.initialize(AudioServer.get_input_mix_rate(), $TwoVoipMic.audio_chunk_size)
-
 	recordedopuspackets = [ ]
 	#opusencoder_forreprocessing.resetencoder(true)
 	var resampledopusframecount = 0
-	Dtog = $VBoxFrameLength/HBoxEchoCancel/FrameOffset.value
-	print("RESSAMPLLE sound cancel ", Dtog)
 	for i in range(len(recordedsamples)):
 		var s = recordedsamples[i]
-		if echocancelobject_forreprocessing == null:
-			pass
-		elif Dtog == 0:
-			echocancelobject_forreprocessing.set_frame_delay(0)
-		elif Dtog == 3:
-			echocancelobject_forreprocessing.set_frame_delay(echoframedelay)
-		elif Dtog <= 3:
-			if echocancelobject_forreprocessing != null and Dtog >= 0 and i-Dtog < len(recordedcaptures):
-				s = echocancelobject_forreprocessing.cancel_echo(s, recordedcaptures[i-Dtog])
-		elif Dtog == 4:
-			s = recordedcaptures[i]
-		elif Dtog == 5:
-			s = recordedsamples[i]
-		elif Dtog == 6:
-			s = echocancelobject_forreprocessing.cancel_echo(recordedsamples[i], recordedsamples[i])
-		else:
-			s = echocancelobject_forreprocessing.cancel_echo(recordedcaptures[i], recordedcaptures[i])
 		if opusencoder_forreprocessing.push_input_chunk(s) < 0:
 			break
 		if denoiser != TwovoipOpusEncoder.DENOISER_DISABLED:
@@ -297,7 +264,7 @@ func _on_vox_threshold_gui_input(event):
 		$TwoVoipMic.set_vox_threshhold(event.position.x/$HBoxMicTalk/VoxThreshold.size.x)
 
 func _on_play_pressed():
-	$VBoxFrameLength/HBoxEchoCancel/VoiceEcho.button_pressed = false
+	$VBoxConditioning/HBoxEchoCancel/VoiceEcho.button_pressed = false
 	if false and audioeffectpitchshift != null:
 		var speedup = $VBoxPlayback/HBoxStream/StreamSpeedup.value
 		AudioServer.set_bus_effect_enabled(speechbusidx, audioeffectpitchshiftidx, (speedup != 1.0))
@@ -381,7 +348,7 @@ func _selected_fault_packet_kind() -> String:
 			$HBoxNetManage/FaultPacketKind.selected).to_lower()
 
 func _on_voice_echo_toggled(toggled_on):
-	$VBoxFrameLength/HBoxEchoCancel/AudioStreamVoiceEcho.playing = toggled_on
+	$VBoxConditioning/HBoxEchoCancel/AudioStreamVoiceEcho.playing = toggled_on
 
 var chirpdata = null
 var leafvals = [ -1, -1 ]
@@ -429,7 +396,7 @@ func findchirp(leafoffset, chirpdata, chirpbuffer, twovoipmic):
 
 
 func _on_chirp_button_pressed():
-	$VBoxFrameLength/HBoxEchoCancel/AudioStreamChirp.play()
+	$VBoxConditioning/HBoxEchoCancel/AudioStreamChirp.play()
 	$TwoVoipMic.chirpbuffer = [ ]
 	await get_tree().create_timer(0.5).timeout
 	var chirpbuffer = $TwoVoipMic.chirpbuffer
