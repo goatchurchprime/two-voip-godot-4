@@ -17,10 +17,8 @@ var statustopic = ""
 @onready var Mstatusdisconnected = "disconnnected".to_ascii_buffer()
 @onready var MstatusdisconnectedLW = "disconnected-LW".to_ascii_buffer()
 
-var pending_ready_subscriptions := {}
 var pending_mid_recipients := {}
 var network_ready := false
-var network_ready_failed := false
 var connection_announced := false
 
 const logfile = "user://mqttlogging.dat"
@@ -60,21 +58,8 @@ func _ensure_member(membername: String):
 			membername, member.get_node("AudioStreamPlayer/TwoVoipSpeaker"))
 	return member
 
-func subscribe_ready_channel(topic_filter: String):
-	var packet_id: int = $MQTT.subscribe(topic_filter)
-	pending_ready_subscriptions[packet_id] = topic_filter
-
-func on_subscribe_acknowledge(packet_id: int, result: int):
-	if not pending_ready_subscriptions.has(packet_id):
-		return
-	var topic_filter: String = pending_ready_subscriptions[packet_id]
-	pending_ready_subscriptions.erase(packet_id)
-	if result == 0x80:
-		network_ready_failed = true
-		push_error("MQTT relay subscription rejected: %s" % topic_filter)
-	if not pending_ready_subscriptions.is_empty():
-		return
-	if network_ready_failed:
+func subscription_caboose_reached():
+	if network_ready:
 		return
 	network_ready = true
 	audioouttopic = "%s/%s/audio" % [roomtopic, myname]
@@ -159,7 +144,10 @@ func received_mqtt(topic, msg, packet_arrival_time_usec := 0, replay := false):
 	if len(stopic) == roomtopicwords + 2:
 		var membername = stopic[roomtopicwords]
 		if stopic[roomtopicwords+1] == "status":
-			if membername != myname:
+			if membername == myname:
+				if msg == Mstatusconnecting:
+					subscription_caboose_reached()
+			else:
 				if msg == Mstatusconnected:
 					_ensure_member(membername)
 					if connection_announced:
@@ -212,17 +200,17 @@ func received_mqtt(topic, msg, packet_arrival_time_usec := 0, replay := false):
 func on_broker_connect():
 	get_node("../TwoVoipMic").transport_disconnected()
 	network_ready = false
-	network_ready_failed = false
 	connection_announced = false
-	pending_ready_subscriptions.clear()
 	pending_mid_recipients.clear()
 	audioouttopic = ""
 	audioouttopicmeta = ""
+	$MQTT.subscribe("%s/+/status" % roomtopic)
+	$MQTT.subscribe("%s/+/audio/meta" % roomtopic)
+	$MQTT.subscribe("%s/+/audio" % roomtopic)
+	$MQTT.subscribe("%s/+/audio/meta/%s" % [roomtopic, myname])
+	# This self-status is queued after every subscription. Receiving it through
+	# the status subscription proves the preceding retained-message train ended.
 	$MQTT.publish(statustopic, Mstatusconnecting, true)
-	subscribe_ready_channel("%s/+/status" % roomtopic)
-	subscribe_ready_channel("%s/+/audio/meta" % roomtopic)
-	subscribe_ready_channel("%s/+/audio" % roomtopic)
-	subscribe_ready_channel("%s/+/audio/meta/%s" % [roomtopic, myname])
 
 func on_broker_disconnect():
 	get_node("../TwoVoipMic").transport_disconnected()
@@ -267,7 +255,6 @@ func _on_connect_toggled(toggled_on):
 		$MQTT.received_message.connect(received_mqtt)
 		$MQTT.broker_connected.connect(on_broker_connect)
 		$MQTT.broker_disconnected.connect(on_broker_disconnect)
-		$MQTT.subscribe_acknowledge.connect(on_subscribe_acknowledge)
 		randomize()
 		var FriendlyName = get_node("../HBoxMosquitto/FriendlyName")
 		myname = "%s_%x" % [FriendlyName.text, (randi() % 0x10000)]
@@ -315,7 +302,6 @@ func _on_connect_toggled(toggled_on):
 		$MQTT.received_message.disconnect(received_mqtt)
 		$MQTT.broker_connected.disconnect(on_broker_connect)
 		$MQTT.broker_disconnected.disconnect(on_broker_disconnect)
-		$MQTT.subscribe_acknowledge.disconnect(on_subscribe_acknowledge)
 		$MQTT.publish(statustopic, Mstatusdisconnected, true)
 		$MQTT.disconnect_from_server()
 		while Members.get_child_count() >= 2:
