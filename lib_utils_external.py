@@ -73,6 +73,10 @@ def meson_build_project(env: SConsEnvironment, project_name: str, source_path: s
         print_subprocess_result(result, "meson compile")
     except subprocess.CalledProcessError as error:
         print_subprocess_result(error, "meson")
+        meson_log = os.path.join(build_dir, "meson-logs", "meson-log.txt")
+        if os.path.isfile(meson_log):
+            with open(meson_log, encoding="utf-8", errors="replace") as log_file:
+                print(f"meson log: {log_file.read()}")
         return 1
     return 0
 
