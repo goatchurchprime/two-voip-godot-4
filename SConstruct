@@ -300,6 +300,8 @@ def build_webrtc_apm(target, source, env: SConsEnvironment):
         for arch in arches:
             name = f"ios_{'simulator_' if env['ios_simulator'] else ''}{arch}"
             builds.append((name, ["--cross-file", _apple_webrtc_cross_file(env, target_build_dir, "ios", arch)]))
+    elif env["platform"] == "windows":
+        builds[0][1].append("-Dcpp_args=/FIcstdint")
     else:
         builds[0][1].append("-Dcpp_args=-include cstdint")
 
