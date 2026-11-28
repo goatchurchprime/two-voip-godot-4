@@ -133,6 +133,8 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out: list):
                 "log",
             ]
         )
+    if env["platform"] == "macos" and env["webrtc_apm"]:
+        env.Append(LINKFLAGS=["-framework", "CoreFoundation"])
     print()
 
 

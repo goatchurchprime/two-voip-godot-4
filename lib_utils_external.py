@@ -39,11 +39,17 @@ def meson_build_project(env: SConsEnvironment, project_name: str, source_path: s
     setup_args = ["meson", "setup", build_dir, source_dir]
     command_env = dict(env.get("ENV") or os.environ)
     if env["platform"] == "windows":
-        # Meson otherwise auto-detects any compiler cache on PATH. GitHub's
-        # Windows image currently exposes an unrelated, broken Strawberry Perl
-        # ccache, so state the compilers selected by SCons explicitly.
-        command_env["CC"] = env.subst("$CC")
-        command_env["CXX"] = env.subst("$CXX")
+        # GitHub's Windows image exposes an unrelated, broken Strawberry Perl
+        # ccache. Exclude it, then let Meson establish the complete MSVC/SDK
+        # environment rather than selecting cl.exe without its library paths.
+        path_key = next((key for key in command_env if key.upper() == "PATH"), "PATH")
+        strawberry_bin = os.path.normcase(os.path.normpath(r"C:\Strawberry\c\bin"))
+        command_env[path_key] = os.pathsep.join(
+            entry for entry in command_env.get(path_key, "").split(os.pathsep)
+            if os.path.normcase(os.path.normpath(entry.strip('"'))) != strawberry_bin)
+        command_env.pop("CC", None)
+        command_env.pop("CXX", None)
+        setup_args.append("--vsenv")
     if os.path.exists(os.path.join(build_dir, "meson-private")):
         setup_args.append("--reconfigure")
     setup_args += extra_args
