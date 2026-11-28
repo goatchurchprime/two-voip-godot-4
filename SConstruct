@@ -135,6 +135,8 @@ def setup_defines_and_flags(env: SConsEnvironment, src_out: list):
         )
     if env["platform"] == "macos" and env["webrtc_apm"]:
         env.Append(LINKFLAGS=["-framework", "CoreFoundation"])
+    if env["platform"] == "windows" and env["webrtc_apm"]:
+        env.Append(LIBS=["winmm"])
     print()
 
 
@@ -301,7 +303,7 @@ def build_webrtc_apm(target, source, env: SConsEnvironment):
             name = f"ios_{'simulator_' if env['ios_simulator'] else ''}{arch}"
             builds.append((name, ["--cross-file", _apple_webrtc_cross_file(env, target_build_dir, "ios", arch)]))
     elif env["platform"] == "windows":
-        builds[0][1].append("-Dcpp_args=/FIcstdint")
+        builds[0][1].extend(["-Dcpp_args=/FIcstdint", "-Db_vscrt=mt"])
     else:
         builds[0][1].append("-Dcpp_args=-include cstdint")
 
