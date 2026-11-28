@@ -198,12 +198,12 @@ def _write_meson_cross_file(path: str, binaries: dict, host: dict, args: list, n
 
 
 def _combine_webrtc_archives(env: SConsEnvironment, build_dir: str, output_path: str):
-    suffix = ".lib" if env["platform"] == "windows" else ".a"
+    suffixes = (".lib", ".a") if env["platform"] == "windows" else (".a",)
     archives = []
     for root, _, files in os.walk(build_dir):
         for filename in files:
             path = os.path.join(root, filename)
-            if filename.endswith(suffix) and os.path.abspath(path) != os.path.abspath(output_path):
+            if filename.endswith(suffixes) and os.path.abspath(path) != os.path.abspath(output_path):
                 archives.append(path)
     archives.sort()
     if not archives:
