@@ -9,7 +9,7 @@
       "subfolder": "addons/mqtt"
     },
     "twovoip/libs": {
-      "url": "https://github.com/goatchurchprime/two-voip-godot-4/releases/download/v7.0.1/TwoVoIP.zip",
+      "url": "https://github.com/goatchurchprime/two-voip-godot-4/releases/download/v7.0.2/TwoVoIP.zip",
       "source": "zip",
       "subfolder": "project/addons/twovoip/libs"
     }
